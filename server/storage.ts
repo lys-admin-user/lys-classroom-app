@@ -8,8 +8,13 @@ import {
   type Assessment,
   type AssessmentResult,
   type LessonPlan,
+  type EducatorProfile,
+  type InsertEducatorProfile,
+  type User,
   lessons,
   goals,
+  educatorProfiles,
+  users,
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, desc, and } from "drizzle-orm";
@@ -29,6 +34,15 @@ export interface IStorage {
   updateGoal(id: string, updates: Partial<Goal>, userId?: string | null): Promise<Goal | undefined>;
   deleteGoal(id: string, userId?: string | null): Promise<boolean>;
   updateMilestone(goalId: string, milestoneId: string, completed: boolean, userId?: string | null): Promise<Goal | undefined>;
+  
+  // Educator Profiles
+  getEducatorProfile(userId: string): Promise<EducatorProfile | undefined>;
+  createEducatorProfile(profile: InsertEducatorProfile): Promise<EducatorProfile>;
+  updateEducatorProfile(userId: string, updates: Partial<EducatorProfile>): Promise<EducatorProfile | undefined>;
+  
+  // User tier management
+  getUserTier(userId: string): Promise<string>;
+  updateUserTier(userId: string, tier: string): Promise<User | undefined>;
   
   // Static data (in-memory)
   getCareers(): Promise<Career[]>;
@@ -332,6 +346,42 @@ export class DatabaseStorage implements IStorage {
     }
 
     return await this.updateGoal(goalId, { milestones: updatedMilestones, progress, status }, userId);
+  }
+
+  // Educator Profiles
+  async getEducatorProfile(userId: string): Promise<EducatorProfile | undefined> {
+    const [profile] = await db.select().from(educatorProfiles).where(eq(educatorProfiles.userId, userId));
+    return profile || undefined;
+  }
+
+  async createEducatorProfile(profile: InsertEducatorProfile): Promise<EducatorProfile> {
+    const [created] = await db.insert(educatorProfiles).values(profile as any).returning();
+    return created;
+  }
+
+  async updateEducatorProfile(userId: string, updates: Partial<EducatorProfile>): Promise<EducatorProfile | undefined> {
+    const existing = await this.getEducatorProfile(userId);
+    if (!existing) return undefined;
+    
+    const [updated] = await db.update(educatorProfiles)
+      .set({ ...updates, updatedAt: new Date() })
+      .where(eq(educatorProfiles.userId, userId))
+      .returning();
+    return updated || undefined;
+  }
+
+  // User tier management
+  async getUserTier(userId: string): Promise<string> {
+    const [user] = await db.select().from(users).where(eq(users.id, userId));
+    return user?.tier || "free";
+  }
+
+  async updateUserTier(userId: string, tier: string): Promise<User | undefined> {
+    const [updated] = await db.update(users)
+      .set({ tier: tier as any, updatedAt: new Date() })
+      .where(eq(users.id, userId))
+      .returning();
+    return updated || undefined;
   }
 
   // Static data - careers
