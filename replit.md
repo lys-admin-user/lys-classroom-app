@@ -27,9 +27,19 @@ Preferred communication style: Simple, everyday language.
 
 ### Data Layer
 - **ORM**: Drizzle ORM with PostgreSQL dialect
+- **Database**: PostgreSQL with lessons and goals tables tied to authenticated users
 - **Schema Location**: `shared/schema.ts` contains all database tables and Zod validation schemas
-- **Current Storage**: In-memory storage implementation (`MemStorage`) with interface designed for database migration
+- **Storage**: `DatabaseStorage` implementation using PostgreSQL for lessons and goals
 - **Shared Types**: Schema types are shared between client and server via `@shared/*` path alias
+
+### Authentication & Security
+- **Auth Provider**: Replit Auth with Google, GitHub, and email login options
+- **Session Management**: express-session with PostgreSQL session storage
+- **Ownership Checks**: 
+  - Lessons require authentication to save; delete operations verify userId ownership
+  - Goals support anonymous creation; modifications check ownership when userId is set
+  - Milestone IDs are always regenerated server-side to prevent ID injection attacks
+- **Input Validation**: All POST/PATCH endpoints validate request bodies with Zod schemas before processing
 
 ### Key Design Patterns
 - **Monorepo Structure**: Client code in `/client`, server in `/server`, shared types in `/shared`

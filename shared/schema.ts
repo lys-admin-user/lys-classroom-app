@@ -1,23 +1,52 @@
 import { sql } from "drizzle-orm";
-import { pgTable, text, varchar, integer, boolean, jsonb } from "drizzle-orm/pg-core";
+import { pgTable, text, varchar, integer, boolean, jsonb, timestamp } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
-export const users = pgTable("users", {
+// Re-export auth schema (users and sessions tables)
+export * from "./models/auth";
+
+// Saved Lessons Table (for educators to save generated lessons)
+export const lessons = pgTable("lessons", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  username: text("username").notNull().unique(),
-  password: text("password").notNull(),
+  userId: varchar("user_id").notNull(),
+  title: text("title").notNull(),
+  topic: text("topic").notNull(),
+  gradeLevel: text("grade_level").notNull(),
+  bkdFocus: text("bkd_focus").notNull(),
+  standards: text("standards"),
+  duration: text("duration").notNull(),
+  objectives: jsonb("objectives").notNull().$type<string[]>(),
+  activities: jsonb("activities").notNull().$type<{ title: string; description: string; duration: string; type: string }[]>(),
+  materials: jsonb("materials").notNull().$type<string[]>(),
+  assessment: text("assessment").notNull(),
+  reflection: text("reflection"),
+  createdAt: timestamp("created_at").defaultNow(),
 });
 
-export const insertUserSchema = createInsertSchema(users).pick({
-  username: true,
-  password: true,
+export const insertLessonSchema = createInsertSchema(lessons).omit({ id: true, createdAt: true });
+export type InsertLesson = z.infer<typeof insertLessonSchema>;
+export type Lesson = typeof lessons.$inferSelect;
+
+// Goals Table (for action plans)
+export const goals = pgTable("goals", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id"),
+  title: text("title").notNull(),
+  description: text("description"),
+  category: text("category").notNull(),
+  targetDate: text("target_date").notNull(),
+  status: text("status").notNull().default("not_started"),
+  progress: integer("progress").notNull().default(0),
+  milestones: jsonb("milestones").notNull().$type<{ id: string; title: string; completed: boolean; dueDate?: string }[]>(),
+  createdAt: timestamp("created_at").defaultNow(),
 });
 
-export type InsertUser = z.infer<typeof insertUserSchema>;
-export type User = typeof users.$inferSelect;
+export const insertGoalSchema = createInsertSchema(goals).omit({ id: true, createdAt: true });
+export type InsertGoal = z.infer<typeof insertGoalSchema>;
+export type Goal = typeof goals.$inferSelect;
 
-// Lesson Plan Schema
+// Lesson Plan Schema (for API response - not stored in DB)
 export const lessonPlanSchema = z.object({
   id: z.string(),
   title: z.string(),
@@ -39,9 +68,6 @@ export const lessonPlanSchema = z.object({
 });
 
 export type LessonPlan = z.infer<typeof lessonPlanSchema>;
-
-export const insertLessonPlanSchema = lessonPlanSchema.omit({ id: true });
-export type InsertLessonPlan = z.infer<typeof insertLessonPlanSchema>;
 
 // Assessment Schema (BE - Identity & Purpose)
 export const assessmentSchema = z.object({
@@ -100,30 +126,6 @@ export const careerSchema = z.object({
 });
 
 export type Career = z.infer<typeof careerSchema>;
-
-// Action Plan Schema (DO - Action & Impact)
-export const goalSchema = z.object({
-  id: z.string(),
-  title: z.string(),
-  description: z.string(),
-  category: z.enum(["academic", "career", "personal", "financial", "social", "health"]),
-  targetDate: z.string(),
-  status: z.enum(["not_started", "in_progress", "completed"]),
-  progress: z.number().min(0).max(100),
-  milestones: z.array(z.object({
-    id: z.string(),
-    title: z.string(),
-    completed: z.boolean(),
-    dueDate: z.string().optional(),
-  })),
-});
-
-export type Goal = z.infer<typeof goalSchema>;
-
-export const insertGoalSchema = goalSchema.omit({ id: true, progress: true }).extend({
-  progress: z.number().min(0).max(100).optional().default(0),
-});
-export type InsertGoal = z.infer<typeof insertGoalSchema>;
 
 // Resource Schema
 export const resourceSchema = z.object({

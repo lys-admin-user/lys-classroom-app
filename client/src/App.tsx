@@ -11,6 +11,7 @@ import Assessments from "@/pages/Assessments";
 import Careers from "@/pages/Careers";
 import ActionPlans from "@/pages/ActionPlans";
 import Resources from "@/pages/Resources";
+import MyLessons from "@/pages/MyLessons";
 import NotFound from "@/pages/not-found";
 
 function Router() {
@@ -22,6 +23,7 @@ function Router() {
       <Route path="/careers" component={Careers} />
       <Route path="/action-plans" component={ActionPlans} />
       <Route path="/resources" component={Resources} />
+      <Route path="/my-lessons" component={MyLessons} />
       <Route component={NotFound} />
     </Switch>
   );

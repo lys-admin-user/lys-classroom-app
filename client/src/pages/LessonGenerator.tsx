@@ -9,9 +9,10 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Sparkles, Clock, Target, BookOpen, Users, Loader2, Copy, Download, Heart, Compass } from "lucide-react";
+import { Sparkles, Clock, Target, BookOpen, Users, Loader2, Copy, Download, Heart, Compass, Save, Check } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import { apiRequest } from "@/lib/queryClient";
+import { apiRequest, queryClient } from "@/lib/queryClient";
+import { useAuth } from "@/hooks/use-auth";
 import type { LessonPlan } from "@shared/schema";
 
 const gradeLevels = [
@@ -26,12 +27,14 @@ const durations = ["30 minutes", "45 minutes", "60 minutes", "90 minutes"];
 
 export default function LessonGenerator() {
   const { toast } = useToast();
+  const { isAuthenticated } = useAuth();
   const [topic, setTopic] = useState("");
   const [gradeLevel, setGradeLevel] = useState("");
   const [bkdFocus, setBkdFocus] = useState<"be" | "know" | "do">("be");
   const [standards, setStandards] = useState("");
   const [duration, setDuration] = useState("45 minutes");
   const [generatedLesson, setGeneratedLesson] = useState<LessonPlan | null>(null);
+  const [isSaved, setIsSaved] = useState(false);
 
   const generateMutation = useMutation({
     mutationFn: async () => {
@@ -46,6 +49,7 @@ export default function LessonGenerator() {
     },
     onSuccess: (data) => {
       setGeneratedLesson(data);
+      setIsSaved(false);
       toast({
         title: "Lesson Generated!",
         description: "Great job! You just saved yourself 30+ minutes.",
@@ -55,6 +59,41 @@ export default function LessonGenerator() {
       toast({
         title: "Oops! Let's try that again",
         description: error.message || "There was an error generating your lesson.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const saveMutation = useMutation({
+    mutationFn: async () => {
+      if (!generatedLesson) throw new Error("No lesson to save");
+      const response = await apiRequest("POST", "/api/lessons/save", {
+        title: generatedLesson.title,
+        topic: generatedLesson.topic,
+        gradeLevel: generatedLesson.gradeLevel,
+        bkdFocus: generatedLesson.bkdFocus,
+        standards: generatedLesson.standards,
+        duration: generatedLesson.duration,
+        objectives: generatedLesson.objectives,
+        activities: generatedLesson.activities,
+        materials: generatedLesson.materials,
+        assessment: generatedLesson.assessment,
+        reflection: generatedLesson.reflection,
+      });
+      return await response.json();
+    },
+    onSuccess: () => {
+      setIsSaved(true);
+      queryClient.invalidateQueries({ queryKey: ["/api/lessons"] });
+      toast({
+        title: "Lesson Saved!",
+        description: "Your lesson has been added to your library.",
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Failed to Save",
+        description: error.message || "Please try again.",
         variant: "destructive",
       });
     },
@@ -256,6 +295,25 @@ ${generatedLesson.assessment}
                 </div>
                 {generatedLesson && (
                   <div className="flex items-center gap-2">
+                    {isAuthenticated && (
+                      <Button 
+                        variant={isSaved ? "secondary" : "default"}
+                        size="sm" 
+                        onClick={() => saveMutation.mutate()} 
+                        disabled={saveMutation.isPending || isSaved}
+                        className={`gap-1 font-roboto ${!isSaved ? 'bg-lys-teal hover:bg-lys-teal/90 text-white' : ''}`}
+                        data-testid="button-save-lesson"
+                      >
+                        {saveMutation.isPending ? (
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                        ) : isSaved ? (
+                          <Check className="h-4 w-4" />
+                        ) : (
+                          <Save className="h-4 w-4" />
+                        )}
+                        {isSaved ? "Saved" : "Save to Library"}
+                      </Button>
+                    )}
                     <Button variant="outline" size="sm" onClick={copyToClipboard} className="gap-1 font-roboto" data-testid="button-copy-lesson">
                       <Copy className="h-4 w-4" />
                       Copy

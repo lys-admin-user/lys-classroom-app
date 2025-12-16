@@ -1,8 +1,17 @@
 import { Link, useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
 import { ThemeToggle } from "./ThemeToggle";
-import { Menu, X, Sparkles } from "lucide-react";
+import { Menu, X, Sparkles, LogIn, LogOut, BookOpen, User } from "lucide-react";
 import { useState } from "react";
+import { useAuth } from "@/hooks/use-auth";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 const navLinks = [
   { href: "/", label: "Dashboard" },
@@ -16,6 +25,17 @@ const navLinks = [
 export function Header() {
   const [location] = useLocation();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const { user, isLoading, isAuthenticated } = useAuth();
+
+  const getInitials = () => {
+    if (user?.firstName && user?.lastName) {
+      return `${user.firstName[0]}${user.lastName[0]}`.toUpperCase();
+    }
+    if (user?.email) {
+      return user.email[0].toUpperCase();
+    }
+    return "U";
+  };
 
   return (
     <header className="sticky top-0 z-50 bg-background/95 backdrop-blur border-b border-border">
@@ -49,17 +69,73 @@ export function Header() {
                 </Button>
               </Link>
             ))}
+            {isAuthenticated && (
+              <Link href="/my-lessons">
+                <Button
+                  variant={location === "/my-lessons" ? "secondary" : "ghost"}
+                  size="sm"
+                  className="font-roboto"
+                  data-testid="nav-my-lessons"
+                >
+                  My Lessons
+                </Button>
+              </Link>
+            )}
           </nav>
 
           <div className="flex items-center gap-2">
             <ThemeToggle />
-            <Button
-              className="hidden sm:flex bg-lys-red hover:bg-lys-red/90 text-white font-oswald gap-2"
-              data-testid="button-get-started"
-            >
-              <Sparkles className="h-4 w-4" />
-              Get Started Free
-            </Button>
+            
+            {isLoading ? (
+              <div className="w-9 h-9 rounded-full bg-muted animate-pulse" />
+            ) : isAuthenticated ? (
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="ghost" size="icon" className="rounded-full" data-testid="button-user-menu">
+                    <Avatar className="h-8 w-8">
+                      <AvatarImage src={user?.profileImageUrl || undefined} />
+                      <AvatarFallback className="bg-lys-teal text-white font-oswald text-sm">
+                        {getInitials()}
+                      </AvatarFallback>
+                    </Avatar>
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-48">
+                  <div className="px-2 py-1.5">
+                    <p className="text-sm font-medium">
+                      {user?.firstName} {user?.lastName}
+                    </p>
+                    <p className="text-xs text-muted-foreground truncate">{user?.email}</p>
+                  </div>
+                  <DropdownMenuSeparator />
+                  <Link href="/my-lessons">
+                    <DropdownMenuItem className="cursor-pointer" data-testid="menu-my-lessons">
+                      <BookOpen className="mr-2 h-4 w-4" />
+                      My Lessons
+                    </DropdownMenuItem>
+                  </Link>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem 
+                    className="cursor-pointer text-destructive"
+                    onClick={() => window.location.href = "/api/logout"}
+                    data-testid="button-logout"
+                  >
+                    <LogOut className="mr-2 h-4 w-4" />
+                    Log Out
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            ) : (
+              <Button
+                className="hidden sm:flex bg-lys-red hover:bg-lys-red/90 text-white font-oswald gap-2"
+                onClick={() => window.location.href = "/api/login"}
+                data-testid="button-login"
+              >
+                <LogIn className="h-4 w-4" />
+                Sign In
+              </Button>
+            )}
+
             <Button
               variant="ghost"
               size="icon"
@@ -87,13 +163,39 @@ export function Header() {
                   </Button>
                 </Link>
               ))}
-              <Button
-                className="bg-lys-red hover:bg-lys-red/90 text-white font-oswald gap-2 mt-2"
-                data-testid="button-mobile-get-started"
-              >
-                <Sparkles className="h-4 w-4" />
-                Get Started Free
-              </Button>
+              {isAuthenticated && (
+                <Link href="/my-lessons">
+                  <Button
+                    variant={location === "/my-lessons" ? "secondary" : "ghost"}
+                    className="w-full justify-start font-roboto"
+                    onClick={() => setMobileMenuOpen(false)}
+                    data-testid="mobile-nav-my-lessons"
+                  >
+                    <BookOpen className="mr-2 h-4 w-4" />
+                    My Lessons
+                  </Button>
+                </Link>
+              )}
+              {isAuthenticated ? (
+                <Button
+                  variant="outline"
+                  className="mt-2"
+                  onClick={() => window.location.href = "/api/logout"}
+                  data-testid="mobile-button-logout"
+                >
+                  <LogOut className="mr-2 h-4 w-4" />
+                  Log Out
+                </Button>
+              ) : (
+                <Button
+                  className="bg-lys-red hover:bg-lys-red/90 text-white font-oswald gap-2 mt-2"
+                  onClick={() => window.location.href = "/api/login"}
+                  data-testid="mobile-button-login"
+                >
+                  <LogIn className="h-4 w-4" />
+                  Sign In Free
+                </Button>
+              )}
             </div>
           </nav>
         )}
