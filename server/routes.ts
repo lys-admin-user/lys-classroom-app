@@ -222,6 +222,100 @@ export async function registerRoutes(
     }
   });
 
+  // Educator Profiles - requires authentication
+  const educatorProfileSchema = z.object({
+    country: z.string().optional(),
+    state: z.string().optional(),
+    standardsName: z.string().optional(),
+    schoolDistrict: z.string().optional(),
+    schoolName: z.string().optional(),
+    gradeLevels: z.array(z.string()).optional().default([]),
+    subjects: z.array(z.string()).optional().default([]),
+    preferredStandardCodes: z.array(z.object({
+      code: z.string(),
+      description: z.string(),
+    })).optional().default([]),
+  });
+
+  app.get("/api/educator-profile", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user?.claims?.sub;
+      const profile = await storage.getEducatorProfile(userId);
+      const tier = await storage.getUserTier(userId);
+      res.json({ profile: profile || null, tier });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch educator profile" });
+    }
+  });
+
+  app.post("/api/educator-profile", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user?.claims?.sub;
+      const validated = educatorProfileSchema.parse(req.body);
+      
+      const existing = await storage.getEducatorProfile(userId);
+      if (existing) {
+        res.status(400).json({ error: "Profile already exists. Use PATCH to update." });
+        return;
+      }
+      
+      const profile = await storage.createEducatorProfile({
+        userId,
+        ...validated,
+      });
+      res.json(profile);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        res.status(400).json({ error: "Invalid profile data", details: error.errors });
+      } else {
+        console.error("Create profile error:", error);
+        res.status(500).json({ error: "Failed to create educator profile" });
+      }
+    }
+  });
+
+  app.patch("/api/educator-profile", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user?.claims?.sub;
+      const validated = educatorProfileSchema.parse(req.body);
+      
+      let profile = await storage.getEducatorProfile(userId);
+      if (!profile) {
+        profile = await storage.createEducatorProfile({
+          userId,
+          ...validated,
+        });
+      } else {
+        profile = await storage.updateEducatorProfile(userId, validated);
+      }
+      
+      res.json(profile);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        res.status(400).json({ error: "Invalid profile data", details: error.errors });
+      } else {
+        console.error("Update profile error:", error);
+        res.status(500).json({ error: "Failed to update educator profile" });
+      }
+    }
+  });
+
+  app.post("/api/educator-profile/complete-onboarding", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user?.claims?.sub;
+      const profile = await storage.updateEducatorProfile(userId, {
+        onboardingCompleted: new Date(),
+      });
+      if (!profile) {
+        res.status(404).json({ error: "Profile not found" });
+        return;
+      }
+      res.json(profile);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to complete onboarding" });
+    }
+  });
+
   // Careers - public
   app.get("/api/careers", async (req, res) => {
     try {
