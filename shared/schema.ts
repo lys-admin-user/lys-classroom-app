@@ -46,16 +46,72 @@ export const insertGoalSchema = createInsertSchema(goals).omit({ id: true, creat
 export type InsertGoal = z.infer<typeof insertGoalSchema>;
 export type Goal = typeof goals.$inferSelect;
 
+// LYS Methodology Schema
+export const lysMethodologySchema = z.object({
+  be: z.object({
+    focus: z.string(),
+    description: z.string(),
+  }),
+  know: z.object({
+    focus: z.string(),
+    description: z.string(),
+  }),
+  do: z.object({
+    focus: z.string(),
+    description: z.string(),
+  }),
+});
+
+// Instructional Phase Schema
+export const instructionalPhaseSchema = z.object({
+  anticipatorySet: z.string(),
+  modeling: z.string(),
+  guidedPractice: z.string(),
+  independentPractice: z.string(),
+});
+
+// Lesson Close Schema - Life Application Connections
+export const lessonCloseSchema = z.object({
+  educational: z.string().optional(),
+  social: z.string().optional(),
+  vocational: z.string().optional(),
+  financial: z.string().optional(),
+  spiritual: z.string().optional(),
+  cultural: z.string().optional(),
+  health: z.string().optional(),
+});
+
 // Lesson Plan Schema (for API response - not stored in DB)
 export const lessonPlanSchema = z.object({
   id: z.string(),
   title: z.string(),
   topic: z.string(),
+  course: z.string().optional(),
+  unit: z.string().optional(),
   gradeLevel: z.string(),
   bkdFocus: z.enum(["be", "know", "do"]),
-  standards: z.string().optional(),
+  standards: z.object({
+    country: z.string(),
+    state: z.string(),
+    standardsName: z.string(),
+    subject: z.string(),
+    codes: z.array(z.object({
+      code: z.string(),
+      description: z.string(),
+    })),
+  }).optional(),
   duration: z.string(),
+  lessonPart: z.string().optional(),
   objectives: z.array(z.string()),
+  essentialQuestions: z.array(z.string()),
+  lysMethodology: lysMethodologySchema,
+  resources: z.array(z.object({
+    title: z.string(),
+    url: z.string().optional(),
+    type: z.string(),
+  })),
+  asynchronousInstruction: instructionalPhaseSchema.optional(),
+  synchronousInstruction: instructionalPhaseSchema,
   activities: z.array(z.object({
     title: z.string(),
     description: z.string(),
@@ -64,10 +120,14 @@ export const lessonPlanSchema = z.object({
   })),
   materials: z.array(z.string()),
   assessment: z.string(),
+  lessonClose: lessonCloseSchema,
   reflection: z.string().optional(),
 });
 
 export type LessonPlan = z.infer<typeof lessonPlanSchema>;
+export type LYSMethodology = z.infer<typeof lysMethodologySchema>;
+export type InstructionalPhase = z.infer<typeof instructionalPhaseSchema>;
+export type LessonClose = z.infer<typeof lessonCloseSchema>;
 
 // Assessment Schema (BE - Identity & Purpose)
 export const assessmentSchema = z.object({
@@ -147,10 +207,22 @@ export type Resource = z.infer<typeof resourceSchema>;
 // API Request/Response Types
 export const generateLessonRequestSchema = z.object({
   topic: z.string().min(1, "Topic is required"),
+  course: z.string().optional(),
+  unit: z.string().optional(),
   gradeLevel: z.string().min(1, "Grade level is required"),
   bkdFocus: z.enum(["be", "know", "do"]),
-  standards: z.string().optional(),
+  standards: z.object({
+    country: z.string().min(1, "Country is required"),
+    state: z.string().min(1, "State is required"),
+    standardsName: z.string().min(1, "Standards name is required"),
+    subject: z.string().min(1, "Subject is required"),
+    codes: z.array(z.object({
+      code: z.string().min(1, "Standard code is required"),
+      description: z.string(),
+    })).min(1, "At least one standard code is required"),
+  }),
   duration: z.string().optional().default("45 minutes"),
+  lessonPart: z.string().optional(),
 });
 
 export type GenerateLessonRequest = z.infer<typeof generateLessonRequestSchema>;

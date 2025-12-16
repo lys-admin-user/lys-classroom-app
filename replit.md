@@ -53,6 +53,20 @@ The application is structured around the LYS methodology:
 - **KNOW (Strategy & Resources)**: Career exploration, educational resources, financial literacy tools
 - **DO (Action & Impact)**: Goal setting, action plans, milestone tracking
 
+### Educational Standards System
+The lesson generator requires legally-compliant educational standards:
+- **Standards Database**: `shared/standards.ts` contains hierarchical standards data
+- **Hierarchy**: Country → State/Region → Subject → Standard Codes
+- **Supported Standards**: 
+  - US: Texas TEKS, California CCSS, Florida B.E.S.T., New York NYSLS
+  - Common Core State Standards (Multi-State)
+- **Lesson Plan Format**: Professional educator format with:
+  - Course, Unit, TEKS/Standards codes
+  - LYS Methodology section (BE/KNOW/DO with life applications)
+  - Essential Questions
+  - Instructional phases (Anticipatory Set, Modeling, Guided Practice, Independent Practice)
+  - Lesson Close with life application connections (Educational, Social, Vocational, Financial, Spiritual, Cultural, Health)
+
 ## External Dependencies
 
 ### AI Services

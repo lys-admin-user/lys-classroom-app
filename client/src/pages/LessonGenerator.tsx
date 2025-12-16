@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useMutation } from "@tanstack/react-query";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -9,11 +9,13 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Sparkles, Clock, Target, BookOpen, Users, Loader2, Copy, Download, Heart, Compass, Save, Check } from "lucide-react";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Sparkles, Clock, Target, BookOpen, Users, Loader2, Copy, Download, Heart, Compass, Save, Check, GraduationCap, FileText, Globe, MapPin, Lightbulb, Play, UserCheck } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useAuth } from "@/hooks/use-auth";
 import type { LessonPlan } from "@shared/schema";
+import { educationalStandards, getStates, getSubjects, getStandardCodes, getStandardsName, type StandardCode } from "@shared/standards";
 
 const gradeLevels = [
   "Elementary (K-2)",
@@ -23,27 +25,79 @@ const gradeLevels = [
   "High School (11-12)",
 ];
 
-const durations = ["30 minutes", "45 minutes", "60 minutes", "90 minutes"];
+const durations = ["30 minutes", "45 minutes", "60 minutes", "90 minutes", "1-2 class periods"];
 
 export default function LessonGenerator() {
   const { toast } = useToast();
   const { isAuthenticated } = useAuth();
   const [topic, setTopic] = useState("");
+  const [course, setCourse] = useState("");
+  const [unit, setUnit] = useState("");
   const [gradeLevel, setGradeLevel] = useState("");
   const [bkdFocus, setBkdFocus] = useState<"be" | "know" | "do">("be");
-  const [standards, setStandards] = useState("");
   const [duration, setDuration] = useState("45 minutes");
+  const [lessonPart, setLessonPart] = useState("");
+  
+  const [selectedCountry, setSelectedCountry] = useState("");
+  const [selectedState, setSelectedState] = useState("");
+  const [selectedSubject, setSelectedSubject] = useState("");
+  const [selectedStandardCodes, setSelectedStandardCodes] = useState<StandardCode[]>([]);
+  
   const [generatedLesson, setGeneratedLesson] = useState<LessonPlan | null>(null);
   const [isSaved, setIsSaved] = useState(false);
 
+  const countries = useMemo(() => educationalStandards.map(c => c.country), []);
+  const states = useMemo(() => selectedCountry ? getStates(selectedCountry) : [], [selectedCountry]);
+  const subjects = useMemo(() => selectedCountry && selectedState ? getSubjects(selectedCountry, selectedState) : [], [selectedCountry, selectedState]);
+  const standardCodes = useMemo(() => selectedCountry && selectedState && selectedSubject ? getStandardCodes(selectedCountry, selectedState, selectedSubject) : [], [selectedCountry, selectedState, selectedSubject]);
+  const standardsName = useMemo(() => selectedCountry && selectedState ? getStandardsName(selectedCountry, selectedState) : "", [selectedCountry, selectedState]);
+
+  const handleCountryChange = (country: string) => {
+    setSelectedCountry(country);
+    setSelectedState("");
+    setSelectedSubject("");
+    setSelectedStandardCodes([]);
+  };
+
+  const handleStateChange = (stateAbbr: string) => {
+    setSelectedState(stateAbbr);
+    setSelectedSubject("");
+    setSelectedStandardCodes([]);
+  };
+
+  const handleSubjectChange = (subject: string) => {
+    setSelectedSubject(subject);
+    setSelectedStandardCodes([]);
+  };
+
+  const toggleStandardCode = (code: StandardCode) => {
+    setSelectedStandardCodes(prev => {
+      const exists = prev.find(c => c.code === code.code);
+      if (exists) {
+        return prev.filter(c => c.code !== code.code);
+      }
+      return [...prev, code];
+    });
+  };
+
   const generateMutation = useMutation({
     mutationFn: async () => {
+      const stateData = states.find(s => s.abbreviation === selectedState);
       const response = await apiRequest("POST", "/api/lessons/generate", {
         topic,
+        course,
+        unit,
         gradeLevel,
         bkdFocus,
-        standards,
+        standards: {
+          country: selectedCountry,
+          state: selectedState,
+          standardsName: stateData?.standardsName || standardsName,
+          subject: selectedSubject,
+          codes: selectedStandardCodes,
+        },
         duration,
+        lessonPart,
       });
       return await response.json() as LessonPlan;
     },
@@ -67,12 +121,15 @@ export default function LessonGenerator() {
   const saveMutation = useMutation({
     mutationFn: async () => {
       if (!generatedLesson) throw new Error("No lesson to save");
+      const standardsString = generatedLesson.standards 
+        ? `${generatedLesson.standards.standardsName}: ${generatedLesson.standards.codes.map(c => c.code).join(", ")}`
+        : "";
       const response = await apiRequest("POST", "/api/lessons/save", {
         title: generatedLesson.title,
         topic: generatedLesson.topic,
         gradeLevel: generatedLesson.gradeLevel,
         bkdFocus: generatedLesson.bkdFocus,
-        standards: generatedLesson.standards,
+        standards: standardsString,
         duration: generatedLesson.duration,
         objectives: generatedLesson.objectives,
         activities: generatedLesson.activities,
@@ -108,27 +165,57 @@ export default function LessonGenerator() {
       });
       return;
     }
+    if (!selectedCountry || !selectedState || !selectedSubject || selectedStandardCodes.length === 0) {
+      toast({
+        title: "Standards Required",
+        description: "Please select your educational standards. This ensures your lesson meets legal requirements.",
+        variant: "destructive",
+      });
+      return;
+    }
     generateMutation.mutate();
   };
 
   const copyToClipboard = () => {
     if (generatedLesson) {
+      const standardsText = generatedLesson.standards 
+        ? `${generatedLesson.standards.standardsName}: ${generatedLesson.standards.codes.map(c => c.code).join(", ")}`
+        : "";
       const text = `
-${generatedLesson.title}
+LESSON PLAN: ${generatedLesson.title}
+${generatedLesson.course ? `Course: ${generatedLesson.course}` : ""}
+${generatedLesson.unit ? `Unit: ${generatedLesson.unit}` : ""}
 Grade: ${generatedLesson.gradeLevel}
 Duration: ${generatedLesson.duration}
+Standards: ${standardsText}
 
-Objectives:
+ESSENTIAL QUESTIONS:
+${generatedLesson.essentialQuestions?.map((q) => `- ${q}`).join("\n") || ""}
+
+LYS METHODOLOGY:
+Be (Character/Values): ${generatedLesson.lysMethodology?.be?.focus || ""} - ${generatedLesson.lysMethodology?.be?.description || ""}
+Know (Resources): ${generatedLesson.lysMethodology?.know?.focus || ""} - ${generatedLesson.lysMethodology?.know?.description || ""}
+Do (Excellence): ${generatedLesson.lysMethodology?.do?.focus || ""} - ${generatedLesson.lysMethodology?.do?.description || ""}
+
+LEARNING OBJECTIVES:
 ${generatedLesson.objectives.map((o) => `- ${o}`).join("\n")}
 
-Activities:
-${generatedLesson.activities.map((a) => `- ${a.title}: ${a.description}`).join("\n")}
+INSTRUCTIONAL INPUT:
+Anticipatory Set: ${generatedLesson.synchronousInstruction?.anticipatorySet || ""}
+Modeling (I do): ${generatedLesson.synchronousInstruction?.modeling || ""}
+Guided Practice (We do): ${generatedLesson.synchronousInstruction?.guidedPractice || ""}
+Independent Practice: ${generatedLesson.synchronousInstruction?.independentPractice || ""}
 
-Materials:
+MATERIALS:
 ${generatedLesson.materials.map((m) => `- ${m}`).join("\n")}
 
-Assessment:
+ASSESSMENT:
 ${generatedLesson.assessment}
+
+LESSON CLOSE:
+${generatedLesson.lessonClose?.educational ? `Educational: ${generatedLesson.lessonClose.educational}` : ""}
+${generatedLesson.lessonClose?.social ? `Social: ${generatedLesson.lessonClose.social}` : ""}
+${generatedLesson.lessonClose?.vocational ? `Vocational: ${generatedLesson.lessonClose.vocational}` : ""}
       `.trim();
       navigator.clipboard.writeText(text);
       toast({
@@ -157,7 +244,7 @@ ${generatedLesson.assessment}
                 AI Lesson Generator
               </h1>
               <p className="font-roboto text-muted-foreground">
-                Create engaging, standards-aligned lessons in seconds
+                Create standards-aligned lessons using the LYS Be-Know-Do methodology
               </p>
             </div>
           </div>
@@ -169,21 +256,46 @@ ${generatedLesson.assessment}
               <CardHeader className="bg-lys-teal/5 border-b">
                 <CardTitle className="font-oswald text-lg flex items-center gap-2">
                   <BookOpen className="h-5 w-5 text-lys-teal" />
-                  Tell me what you need...
+                  Lesson Details
                 </CardTitle>
                 <CardDescription className="font-roboto">
-                  Fill in the details and let AI do the heavy lifting
+                  Fill in the details and let AI create your lesson plan
                 </CardDescription>
               </CardHeader>
               <CardContent className="p-6 space-y-6">
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="course" className="font-oswald">Course</Label>
+                    <Input
+                      id="course"
+                      placeholder="e.g., G8 ELAR"
+                      value={course}
+                      onChange={(e) => setCourse(e.target.value)}
+                      className="font-roboto"
+                      data-testid="input-course"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="unit" className="font-oswald">Unit</Label>
+                    <Input
+                      id="unit"
+                      placeholder="e.g., Unit 04"
+                      value={unit}
+                      onChange={(e) => setUnit(e.target.value)}
+                      className="font-roboto"
+                      data-testid="input-unit"
+                    />
+                  </div>
+                </div>
+
                 <div className="space-y-2">
-                  <Label htmlFor="topic" className="font-oswald">Topic or Learning Objective</Label>
+                  <Label htmlFor="topic" className="font-oswald">Topic / Lesson Title</Label>
                   <Textarea
                     id="topic"
-                    placeholder="e.g., Introduction to growth mindset and resilience..."
+                    placeholder="e.g., Annotating an Argumentative Text..."
                     value={topic}
                     onChange={(e) => setTopic(e.target.value)}
-                    className="font-roboto min-h-[100px]"
+                    className="font-roboto min-h-[80px]"
                     data-testid="input-lesson-topic"
                   />
                 </div>
@@ -204,8 +316,112 @@ ${generatedLesson.assessment}
                   </Select>
                 </div>
 
+                <Separator />
+
+                <div className="space-y-4">
+                  <div className="flex items-center gap-2">
+                    <GraduationCap className="h-5 w-5 text-lys-red" />
+                    <Label className="font-oswald text-base">Educational Standards (Required)</Label>
+                  </div>
+                  
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label className="font-roboto text-sm text-muted-foreground flex items-center gap-1">
+                        <Globe className="h-3 w-3" />
+                        Country
+                      </Label>
+                      <Select value={selectedCountry} onValueChange={handleCountryChange}>
+                        <SelectTrigger className="font-roboto" data-testid="select-country">
+                          <SelectValue placeholder="Select country" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {countries.map((country) => (
+                            <SelectItem key={country} value={country} className="font-roboto">
+                              {country}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-2">
+                      <Label className="font-roboto text-sm text-muted-foreground flex items-center gap-1">
+                        <MapPin className="h-3 w-3" />
+                        State/Region
+                      </Label>
+                      <Select value={selectedState} onValueChange={handleStateChange} disabled={!selectedCountry}>
+                        <SelectTrigger className="font-roboto" data-testid="select-state">
+                          <SelectValue placeholder="Select state" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {states.map((state) => (
+                            <SelectItem key={state.abbreviation} value={state.abbreviation} className="font-roboto">
+                              {state.state} ({state.standardsName})
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label className="font-roboto text-sm text-muted-foreground flex items-center gap-1">
+                      <FileText className="h-3 w-3" />
+                      Subject Area
+                    </Label>
+                    <Select value={selectedSubject} onValueChange={handleSubjectChange} disabled={!selectedState}>
+                      <SelectTrigger className="font-roboto" data-testid="select-subject">
+                        <SelectValue placeholder="Select subject" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {subjects.map((subject) => (
+                          <SelectItem key={subject.subject} value={subject.subject} className="font-roboto">
+                            {subject.subject}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  {standardCodes.length > 0 && (
+                    <div className="space-y-2">
+                      <Label className="font-roboto text-sm text-muted-foreground">
+                        {standardsName} Standard Codes (select all that apply)
+                      </Label>
+                      <ScrollArea className="h-32 rounded-md border p-3">
+                        <div className="space-y-2">
+                          {standardCodes.map((code) => (
+                            <div key={code.code} className="flex items-start gap-2">
+                              <Checkbox
+                                id={code.code}
+                                checked={selectedStandardCodes.some(c => c.code === code.code)}
+                                onCheckedChange={() => toggleStandardCode(code)}
+                                data-testid={`checkbox-standard-${code.code}`}
+                              />
+                              <label htmlFor={code.code} className="font-roboto text-sm cursor-pointer leading-tight">
+                                <span className="font-semibold text-lys-teal">{code.code}</span>
+                                <span className="text-muted-foreground ml-1">- {code.description}</span>
+                              </label>
+                            </div>
+                          ))}
+                        </div>
+                      </ScrollArea>
+                      {selectedStandardCodes.length > 0 && (
+                        <div className="flex flex-wrap gap-1 mt-2">
+                          {selectedStandardCodes.map((code) => (
+                            <Badge key={code.code} variant="secondary" className="font-roboto text-xs">
+                              {code.code}
+                            </Badge>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+
+                <Separator />
+
                 <div className="space-y-2">
-                  <Label className="font-oswald">Be-Know-Do Focus</Label>
+                  <Label className="font-oswald">Primary Be-Know-Do Focus</Label>
                   <div className="grid grid-cols-3 gap-2">
                     {bkdOptions.map((option) => (
                       <button
@@ -246,14 +462,14 @@ ${generatedLesson.assessment}
                     </Select>
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="standards" className="font-oswald">Standards (optional)</Label>
+                    <Label htmlFor="lessonPart" className="font-oswald">Lesson Part</Label>
                     <Input
-                      id="standards"
-                      placeholder="e.g., SEL, CCSS"
-                      value={standards}
-                      onChange={(e) => setStandards(e.target.value)}
+                      id="lessonPart"
+                      placeholder="e.g., 1 of 3"
+                      value={lessonPart}
+                      onChange={(e) => setLessonPart(e.target.value)}
                       className="font-roboto"
-                      data-testid="input-standards"
+                      data-testid="input-lesson-part"
                     />
                   </div>
                 </div>
@@ -272,14 +488,10 @@ ${generatedLesson.assessment}
                   ) : (
                     <>
                       <Sparkles className="h-5 w-5" />
-                      Generate Lesson
+                      Generate Lesson Plan
                     </>
                   )}
                 </Button>
-
-                <p className="text-xs text-center text-muted-foreground font-roboto italic">
-                  Powered by AI to save you time and spark creativity
-                </p>
               </CardContent>
             </Card>
           </div>
@@ -288,9 +500,9 @@ ${generatedLesson.assessment}
             <Card className="h-full">
               <CardHeader className="flex flex-row items-center justify-between gap-4 flex-wrap bg-muted/30 border-b">
                 <div>
-                  <CardTitle className="font-oswald text-lg">Lesson Preview</CardTitle>
+                  <CardTitle className="font-oswald text-lg">Lesson Plan Preview</CardTitle>
                   <CardDescription className="font-roboto">
-                    {generatedLesson ? "Your personalized lesson is ready!" : "Your lesson will appear here"}
+                    {generatedLesson ? "Your personalized LYS lesson is ready!" : "Your lesson will appear here"}
                   </CardDescription>
                 </div>
                 {generatedLesson && (
@@ -340,34 +552,89 @@ ${generatedLesson.assessment}
                     </p>
                   </div>
                 ) : generatedLesson ? (
-                  <ScrollArea className="h-[600px]">
+                  <ScrollArea className="h-[700px]">
                     <div className="p-6 space-y-6">
-                      <div>
-                        <div className="flex flex-wrap items-start justify-between gap-4 mb-4">
-                          <div>
-                            <h2 className="font-marker text-2xl text-foreground">{generatedLesson.title}</h2>
-                            <div className="flex flex-wrap items-center gap-2 mt-2">
-                              <Badge variant="secondary" className="font-roboto">
-                                <Users className="h-3 w-3 mr-1" />
-                                {generatedLesson.gradeLevel}
-                              </Badge>
-                              <Badge variant="secondary" className="font-roboto">
-                                <Clock className="h-3 w-3 mr-1" />
-                                {generatedLesson.duration}
-                              </Badge>
-                              <Badge 
-                                className={`font-roboto ${
-                                  generatedLesson.bkdFocus === "be" ? "bg-lys-yellow/20 text-lys-yellow" :
-                                  generatedLesson.bkdFocus === "know" ? "bg-lys-red/20 text-lys-red" :
-                                  "bg-lys-teal/20 text-lys-teal"
-                                }`}
-                              >
-                                {(generatedLesson.bkdFocus || bkdFocus).toUpperCase()} Focus
-                              </Badge>
+                      <div className="border-b pb-4">
+                        <h2 className="font-marker text-2xl text-foreground mb-3">{generatedLesson.title}</h2>
+                        <div className="grid grid-cols-2 md:grid-cols-4 gap-2 text-sm font-roboto">
+                          {generatedLesson.course && (
+                            <div><span className="text-muted-foreground">Course:</span> {generatedLesson.course}</div>
+                          )}
+                          {generatedLesson.unit && (
+                            <div><span className="text-muted-foreground">Unit:</span> {generatedLesson.unit}</div>
+                          )}
+                          <div><span className="text-muted-foreground">Duration:</span> {generatedLesson.duration}</div>
+                          {generatedLesson.lessonPart && (
+                            <div><span className="text-muted-foreground">Part:</span> {generatedLesson.lessonPart}</div>
+                          )}
+                        </div>
+                        {generatedLesson.standards && (
+                          <div className="mt-3 p-3 bg-lys-teal/5 rounded-md">
+                            <div className="flex items-center gap-2 mb-1">
+                              <GraduationCap className="h-4 w-4 text-lys-teal" />
+                              <span className="font-oswald text-sm font-semibold">{generatedLesson.standards.standardsName}</span>
+                            </div>
+                            <div className="flex flex-wrap gap-1">
+                              {generatedLesson.standards.codes.map((code) => (
+                                <Badge key={code.code} variant="outline" className="font-roboto text-xs">
+                                  {code.code}
+                                </Badge>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+
+                      {generatedLesson.essentialQuestions && generatedLesson.essentialQuestions.length > 0 && (
+                        <div>
+                          <h3 className="font-oswald text-lg font-semibold mb-3 flex items-center gap-2">
+                            <Lightbulb className="h-5 w-5 text-lys-yellow" />
+                            Essential Questions
+                          </h3>
+                          <ul className="space-y-2">
+                            {generatedLesson.essentialQuestions.map((q, i) => (
+                              <li key={i} className="font-roboto text-sm italic text-muted-foreground pl-4 border-l-2 border-lys-yellow">
+                                {q}
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
+
+                      {generatedLesson.lysMethodology && (
+                        <div className="p-4 rounded-md bg-muted/30">
+                          <h3 className="font-oswald text-lg font-semibold mb-3">LYS Methodology</h3>
+                          <div className="grid gap-3">
+                            <div className="flex items-start gap-3">
+                              <Heart className="h-5 w-5 text-lys-yellow flex-shrink-0 mt-0.5" />
+                              <div>
+                                <span className="font-oswald font-semibold text-lys-yellow">BE</span>
+                                <span className="text-muted-foreground ml-2 font-roboto text-sm">
+                                  {generatedLesson.lysMethodology.be.focus} - {generatedLesson.lysMethodology.be.description}
+                                </span>
+                              </div>
+                            </div>
+                            <div className="flex items-start gap-3">
+                              <Compass className="h-5 w-5 text-lys-red flex-shrink-0 mt-0.5" />
+                              <div>
+                                <span className="font-oswald font-semibold text-lys-red">KNOW</span>
+                                <span className="text-muted-foreground ml-2 font-roboto text-sm">
+                                  {generatedLesson.lysMethodology.know.focus} - {generatedLesson.lysMethodology.know.description}
+                                </span>
+                              </div>
+                            </div>
+                            <div className="flex items-start gap-3">
+                              <Target className="h-5 w-5 text-lys-teal flex-shrink-0 mt-0.5" />
+                              <div>
+                                <span className="font-oswald font-semibold text-lys-teal">DO</span>
+                                <span className="text-muted-foreground ml-2 font-roboto text-sm">
+                                  {generatedLesson.lysMethodology.do.focus} - {generatedLesson.lysMethodology.do.description}
+                                </span>
+                              </div>
                             </div>
                           </div>
                         </div>
-                      </div>
+                      )}
 
                       <Separator />
 
@@ -390,43 +657,38 @@ ${generatedLesson.assessment}
 
                       <Separator />
 
-                      <div>
-                        <h3 className="font-oswald text-lg font-semibold mb-3 flex items-center gap-2">
-                          <BookOpen className="h-5 w-5 text-lys-teal" />
-                          Activities
-                        </h3>
-                        <div className="space-y-4">
-                          {generatedLesson.activities.map((activity, i) => (
-                            <div key={i} className="p-4 rounded-md bg-muted/30 border-l-4 border-l-lys-teal">
-                              <div className="flex flex-wrap items-center justify-between gap-2 mb-2">
-                                <h4 className="font-oswald font-semibold">{activity.title}</h4>
-                                <div className="flex items-center gap-2">
-                                  <Badge variant="outline" className="text-xs font-roboto">
-                                    <Clock className="h-3 w-3 mr-1" />
-                                    {activity.duration}
-                                  </Badge>
-                                  <Badge 
-                                    className={`text-xs font-roboto ${
-                                      activity.type === "be" ? "bg-lys-yellow/20 text-lys-yellow" :
-                                      activity.type === "know" ? "bg-lys-red/20 text-lys-red" :
-                                      "bg-lys-teal/20 text-lys-teal"
-                                    }`}
-                                  >
-                                    {(activity.type || "do").toUpperCase()}
-                                  </Badge>
-                                </div>
-                              </div>
-                              <p className="font-roboto text-sm text-muted-foreground">{activity.description}</p>
+                      {generatedLesson.synchronousInstruction && (
+                        <div>
+                          <h3 className="font-oswald text-lg font-semibold mb-3 flex items-center gap-2">
+                            <Play className="h-5 w-5 text-lys-teal" />
+                            Instructional Input
+                          </h3>
+                          <div className="space-y-4">
+                            <div className="p-4 rounded-md bg-muted/30">
+                              <h4 className="font-oswald font-semibold text-sm mb-2">Anticipatory Set (Introduction)</h4>
+                              <p className="font-roboto text-sm text-muted-foreground">{generatedLesson.synchronousInstruction.anticipatorySet}</p>
                             </div>
-                          ))}
+                            <div className="p-4 rounded-md bg-muted/30">
+                              <h4 className="font-oswald font-semibold text-sm mb-2">Modeling (I Do)</h4>
+                              <p className="font-roboto text-sm text-muted-foreground">{generatedLesson.synchronousInstruction.modeling}</p>
+                            </div>
+                            <div className="p-4 rounded-md bg-muted/30">
+                              <h4 className="font-oswald font-semibold text-sm mb-2">Guided Practice (We Do)</h4>
+                              <p className="font-roboto text-sm text-muted-foreground">{generatedLesson.synchronousInstruction.guidedPractice}</p>
+                            </div>
+                            <div className="p-4 rounded-md bg-muted/30">
+                              <h4 className="font-oswald font-semibold text-sm mb-2">Independent Practice</h4>
+                              <p className="font-roboto text-sm text-muted-foreground">{generatedLesson.synchronousInstruction.independentPractice}</p>
+                            </div>
+                          </div>
                         </div>
-                      </div>
+                      )}
 
                       <Separator />
 
                       <div className="grid md:grid-cols-2 gap-6">
                         <div>
-                          <h3 className="font-oswald text-lg font-semibold mb-3">Materials Needed</h3>
+                          <h3 className="font-oswald text-lg font-semibold mb-3">Materials & Resources</h3>
                           <ul className="space-y-1">
                             {generatedLesson.materials.map((material, i) => (
                               <li key={i} className="flex items-center gap-2 font-roboto text-sm text-muted-foreground">
@@ -442,12 +704,46 @@ ${generatedLesson.assessment}
                         </div>
                       </div>
 
-                      {generatedLesson.reflection && (
+                      {generatedLesson.lessonClose && (
                         <>
                           <Separator />
                           <div className="p-4 rounded-md bg-lys-yellow/10 border border-lys-yellow/20">
-                            <h3 className="font-oswald text-lg font-semibold mb-2 text-lys-yellow">Reflection Prompt</h3>
-                            <p className="font-roboto text-sm italic">{generatedLesson.reflection}</p>
+                            <h3 className="font-oswald text-lg font-semibold mb-3 flex items-center gap-2">
+                              <UserCheck className="h-5 w-5 text-lys-yellow" />
+                              Lesson Close - Life Application
+                            </h3>
+                            <div className="space-y-3 font-roboto text-sm">
+                              {generatedLesson.lessonClose.educational && (
+                                <div>
+                                  <span className="font-semibold">Educational:</span>
+                                  <span className="text-muted-foreground ml-2">{generatedLesson.lessonClose.educational}</span>
+                                </div>
+                              )}
+                              {generatedLesson.lessonClose.social && (
+                                <div>
+                                  <span className="font-semibold">Social:</span>
+                                  <span className="text-muted-foreground ml-2">{generatedLesson.lessonClose.social}</span>
+                                </div>
+                              )}
+                              {generatedLesson.lessonClose.vocational && (
+                                <div>
+                                  <span className="font-semibold">Vocational:</span>
+                                  <span className="text-muted-foreground ml-2">{generatedLesson.lessonClose.vocational}</span>
+                                </div>
+                              )}
+                              {generatedLesson.lessonClose.financial && (
+                                <div>
+                                  <span className="font-semibold">Financial:</span>
+                                  <span className="text-muted-foreground ml-2">{generatedLesson.lessonClose.financial}</span>
+                                </div>
+                              )}
+                              {generatedLesson.lessonClose.spiritual && (
+                                <div>
+                                  <span className="font-semibold">Spiritual:</span>
+                                  <span className="text-muted-foreground ml-2">{generatedLesson.lessonClose.spiritual}</span>
+                                </div>
+                              )}
+                            </div>
                           </div>
                         </>
                       )}
@@ -460,7 +756,7 @@ ${generatedLesson.assessment}
                     </div>
                     <h3 className="font-oswald text-lg text-muted-foreground">Your first amazing lesson is just a click away</h3>
                     <p className="text-sm text-muted-foreground/70 font-roboto mt-2 max-w-sm">
-                      Fill in the details on the left and click "Generate Lesson" to see the magic happen
+                      Fill in the details on the left and click "Generate Lesson Plan" to create a standards-aligned LYS lesson
                     </p>
                   </div>
                 )}
