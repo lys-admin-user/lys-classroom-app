@@ -1,0 +1,127 @@
+import { useQuery } from "@tanstack/react-query";
+import { useAuth } from "@/hooks/use-auth";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { Separator } from "@/components/ui/separator";
+import { Settings as SettingsIcon, User, Crown, Loader2 } from "lucide-react";
+import { useLocation } from "wouter";
+import EducatorProfileForm from "@/components/EducatorProfileForm";
+import type { EducatorProfile } from "@shared/schema";
+
+export default function Settings() {
+  const { isAuthenticated, isLoading: authLoading, user } = useAuth();
+  const [, setLocation] = useLocation();
+
+  const { data: profileData, isLoading: profileLoading } = useQuery<{ profile: EducatorProfile | null; tier: string }>({
+    queryKey: ["/api/educator-profile"],
+    enabled: isAuthenticated,
+  });
+
+  if (authLoading || profileLoading) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    );
+  }
+
+  if (!isAuthenticated) {
+    return (
+      <div className="min-h-screen bg-background">
+        <div className="max-w-2xl mx-auto px-4 sm:px-6 py-12">
+          <Card>
+            <CardHeader className="text-center">
+              <CardTitle className="font-marker text-2xl">Sign In Required</CardTitle>
+              <CardDescription className="font-roboto">
+                Please sign in to access your settings and educator profile.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="flex justify-center">
+              <Button onClick={() => setLocation("/")} data-testid="button-go-home">
+                Go to Home
+              </Button>
+            </CardContent>
+          </Card>
+        </div>
+      </div>
+    );
+  }
+
+  const tier = profileData?.tier || "free";
+  const profile = profileData?.profile;
+
+  const tierColors: Record<string, string> = {
+    free: "bg-muted text-muted-foreground",
+    paid: "bg-lys-yellow/20 text-lys-yellow",
+    enterprise: "bg-lys-teal/20 text-lys-teal",
+  };
+
+  const tierLabels: Record<string, string> = {
+    free: "Free Plan",
+    paid: "Professional",
+    enterprise: "Enterprise",
+  };
+
+  return (
+    <div className="min-h-screen bg-background">
+      <div className="max-w-4xl mx-auto px-4 sm:px-6 py-8">
+        <div className="mb-8">
+          <div className="flex items-center gap-3 mb-2">
+            <div className="w-12 h-12 rounded-md bg-muted flex items-center justify-center">
+              <SettingsIcon className="h-6 w-6 text-foreground" />
+            </div>
+            <div>
+              <h1 className="font-marker text-3xl sm:text-4xl text-foreground">
+                Settings
+              </h1>
+              <p className="font-roboto text-muted-foreground">
+                Manage your account and educator preferences
+              </p>
+            </div>
+          </div>
+        </div>
+
+        <div className="space-y-6">
+          <Card>
+            <CardHeader>
+              <div className="flex items-center justify-between gap-4 flex-wrap">
+                <div className="flex items-center gap-3">
+                  <User className="h-5 w-5 text-primary" />
+                  <div>
+                    <CardTitle className="font-oswald">Account</CardTitle>
+                    <CardDescription className="font-roboto">
+                      {user?.email || "Your account details"}
+                    </CardDescription>
+                  </div>
+                </div>
+                <Badge className={tierColors[tier]} data-testid="badge-tier">
+                  <Crown className="h-3 w-3 mr-1" />
+                  {tierLabels[tier]}
+                </Badge>
+              </div>
+            </CardHeader>
+            <CardContent>
+              <div className="flex items-center gap-4">
+                <div className="flex-1">
+                  <p className="text-sm text-muted-foreground">
+                    {user?.firstName && user?.lastName 
+                      ? `Signed in as ${user.firstName} ${user.lastName}`
+                      : "Welcome to LYS!"}
+                  </p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Separator />
+
+          <EducatorProfileForm 
+            existingProfile={profile}
+            isOnboarding={!profile?.onboardingCompleted}
+          />
+        </div>
+      </div>
+    </div>
+  );
+}

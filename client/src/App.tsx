@@ -12,6 +12,7 @@ import Careers from "@/pages/Careers";
 import ActionPlans from "@/pages/ActionPlans";
 import Resources from "@/pages/Resources";
 import MyLessons from "@/pages/MyLessons";
+import Settings from "@/pages/Settings";
 import NotFound from "@/pages/not-found";
 
 function Router() {
@@ -24,6 +25,7 @@ function Router() {
       <Route path="/action-plans" component={ActionPlans} />
       <Route path="/resources" component={Resources} />
       <Route path="/my-lessons" component={MyLessons} />
+      <Route path="/settings" component={Settings} />
       <Route component={NotFound} />
     </Switch>
   );
