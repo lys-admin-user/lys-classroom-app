@@ -1,5 +1,5 @@
-import { useState, useMemo } from "react";
-import { useMutation } from "@tanstack/react-query";
+import { useState, useMemo, useEffect } from "react";
+import { useMutation, useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -10,12 +10,13 @@ import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Sparkles, Clock, Target, BookOpen, Users, Loader2, Copy, Download, Heart, Compass, Save, Check, GraduationCap, FileText, Globe, MapPin, Lightbulb, Play, UserCheck } from "lucide-react";
+import { Sparkles, Clock, Target, BookOpen, Users, Loader2, Copy, Download, Heart, Compass, Save, Check, GraduationCap, FileText, Globe, MapPin, Lightbulb, Play, UserCheck, Settings } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useAuth } from "@/hooks/use-auth";
-import type { LessonPlan } from "@shared/schema";
+import type { LessonPlan, EducatorProfile } from "@shared/schema";
 import { educationalStandards, getStates, getSubjects, getStandardCodes, getStandardsName, type StandardCode } from "@shared/standards";
+import { Link } from "wouter";
 
 const gradeLevels = [
   "Elementary (K-2)",
@@ -45,6 +46,26 @@ export default function LessonGenerator() {
   
   const [generatedLesson, setGeneratedLesson] = useState<LessonPlan | null>(null);
   const [isSaved, setIsSaved] = useState(false);
+  const [profileApplied, setProfileApplied] = useState(false);
+
+  const { data: profileData } = useQuery<{ profile: EducatorProfile | null; tier: string }>({
+    queryKey: ["/api/educator-profile"],
+    enabled: isAuthenticated,
+  });
+
+  const educatorProfile = profileData?.profile;
+  const hasProfile = !!educatorProfile && !!educatorProfile.country && !!educatorProfile.state;
+
+  useEffect(() => {
+    if (educatorProfile && !profileApplied) {
+      if (educatorProfile.country) setSelectedCountry(educatorProfile.country);
+      if (educatorProfile.state) setSelectedState(educatorProfile.state);
+      if (educatorProfile.preferredStandardCodes && (educatorProfile.preferredStandardCodes as StandardCode[]).length > 0) {
+        setSelectedStandardCodes(educatorProfile.preferredStandardCodes as StandardCode[]);
+      }
+      setProfileApplied(true);
+    }
+  }, [educatorProfile, profileApplied]);
 
   const countries = useMemo(() => educationalStandards.map(c => c.country), []);
   const states = useMemo(() => selectedCountry ? getStates(selectedCountry) : [], [selectedCountry]);
@@ -319,9 +340,27 @@ ${generatedLesson.lessonClose?.vocational ? `Vocational: ${generatedLesson.lesso
                 <Separator />
 
                 <div className="space-y-4">
-                  <div className="flex items-center gap-2">
-                    <GraduationCap className="h-5 w-5 text-lys-red" />
-                    <Label className="font-oswald text-base">Educational Standards (Required)</Label>
+                  <div className="flex items-center justify-between gap-2 flex-wrap">
+                    <div className="flex items-center gap-2">
+                      <GraduationCap className="h-5 w-5 text-lys-red" />
+                      <Label className="font-oswald text-base">Educational Standards (Required)</Label>
+                    </div>
+                    {isAuthenticated && (
+                      <div className="flex items-center gap-2">
+                        {hasProfile && (
+                          <Badge variant="secondary" className="flex items-center gap-1" data-testid="badge-profile-loaded">
+                            <Check className="h-3 w-3" />
+                            <span className="text-xs">From Profile</span>
+                          </Badge>
+                        )}
+                        <Link href="/settings">
+                          <Button variant="ghost" size="sm" className="flex items-center gap-1" data-testid="link-settings">
+                            <Settings className="h-3 w-3" />
+                            <span className="text-xs">Settings</span>
+                          </Button>
+                        </Link>
+                      </div>
+                    )}
                   </div>
                   
                   <div className="grid grid-cols-2 gap-4">
