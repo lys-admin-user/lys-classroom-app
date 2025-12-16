@@ -42,7 +42,7 @@ export default function LessonGenerator() {
         standards,
         duration,
       });
-      return response as LessonPlan;
+      return await response.json() as LessonPlan;
     },
     onSuccess: (data) => {
       setGeneratedLesson(data);
@@ -304,7 +304,7 @@ ${generatedLesson.assessment}
                                   "bg-lys-teal/20 text-lys-teal"
                                 }`}
                               >
-                                {generatedLesson.bkdFocus.toUpperCase()} Focus
+                                {(generatedLesson.bkdFocus || bkdFocus).toUpperCase()} Focus
                               </Badge>
                             </div>
                           </div>
@@ -354,7 +354,7 @@ ${generatedLesson.assessment}
                                       "bg-lys-teal/20 text-lys-teal"
                                     }`}
                                   >
-                                    {activity.type.toUpperCase()}
+                                    {(activity.type || "do").toUpperCase()}
                                   </Badge>
                                 </div>
                               </div>
