@@ -53,6 +53,16 @@ The application is structured around the LYS methodology:
 - **KNOW (Strategy & Resources)**: Career exploration, educational resources, financial literacy tools
 - **DO (Action & Impact)**: Goal setting, action plans, milestone tracking
 
+### Scope & Sequence Builder
+Yearly curriculum planning tool for educators:
+- **Build From Scratch**: Multi-step wizard with Country → State → Subject → Grade selection
+- **Import Existing**: Upload PDF/DOCX/TXT documents (stub implementation for parsing)
+- **Skip Option**: Teachers can skip to lesson planning if they don't need scope planning
+- **Unit Management**: Add/edit units with standards alignment, transfer goals, and timeline
+- **Campus Admin Tab**: Placeholder for managing campus-wide default scopes and change request approvals
+- **Database Tables**: `scope_sequences`, `sequence_units`, `campus_scopes`, `scope_change_requests`
+- **Pages**: `/scope-sequence` (list/manage scopes), `/scope/:id` (edit individual scope with units)
+
 ### Educational Standards System
 The lesson generator requires legally-compliant educational standards:
 - **Standards Database**: `shared/standards.ts` contains hierarchical standards data

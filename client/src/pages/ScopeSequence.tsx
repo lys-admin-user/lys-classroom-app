@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -12,7 +12,9 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Plus, Calendar, BookOpen, Target, Trash2, Edit, ChevronRight, FileText, Upload, GraduationCap, LayoutList, Clock } from "lucide-react";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Progress } from "@/components/ui/progress";
+import { Plus, Calendar, BookOpen, Target, Trash2, Edit, ChevronRight, FileText, Upload, GraduationCap, LayoutList, Clock, CheckCircle, ArrowRight, FileUp, Sparkles, Building2, Users } from "lucide-react";
 import { useAuth } from "@/hooks/use-auth";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
@@ -41,9 +43,14 @@ export default function ScopeSequencePage() {
   const { toast } = useToast();
   const { user, isLoading: authLoading, isAuthenticated } = useAuth();
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
+  const [importDialogOpen, setImportDialogOpen] = useState(false);
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [selectedCountry, setSelectedCountry] = useState<string>("");
   const [selectedState, setSelectedState] = useState<string>("");
+  const [wizardStep, setWizardStep] = useState(1);
+  const [uploadFile, setUploadFile] = useState<File | null>(null);
+  const [importProgress, setImportProgress] = useState(0);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const { data: scopes = [], isLoading } = useQuery<ScopeSequence[]>({
     queryKey: ["/api/scopes"],
@@ -108,8 +115,70 @@ export default function ScopeSequencePage() {
     },
   });
 
+  const importMutation = useMutation({
+    mutationFn: async (file: File) => {
+      setImportProgress(10);
+      
+      // Pass country/state as query params for the stub endpoint
+      const params = new URLSearchParams();
+      params.set("country", selectedCountry || "United States");
+      params.set("state", selectedState || "Texas");
+      
+      const response = await fetch(`/api/scopes/import?${params.toString()}`, {
+        method: "POST",
+        credentials: "include",
+      });
+      
+      setImportProgress(50);
+      if (!response.ok) {
+        throw new Error("Import failed");
+      }
+      
+      setImportProgress(100);
+      return await response.json();
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/scopes"] });
+      toast({
+        title: "Import Started",
+        description: "Your document is being processed. You'll see the scope appear shortly.",
+      });
+      setImportDialogOpen(false);
+      setUploadFile(null);
+      setImportProgress(0);
+    },
+    onError: () => {
+      toast({
+        title: "Import Failed",
+        description: "We couldn't process that file. Try a different format or build from scratch.",
+        variant: "destructive",
+      });
+      setImportProgress(0);
+    },
+  });
+
   const onSubmit = (data: CreateScopeFormData) => {
     createMutation.mutate(data);
+  };
+
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      setUploadFile(file);
+    }
+  };
+
+  const handleImport = () => {
+    if (uploadFile) {
+      importMutation.mutate(uploadFile);
+    }
+  };
+
+  const resetWizard = () => {
+    setWizardStep(1);
+    setSelectedCountry("");
+    setSelectedState("");
+    form.reset();
   };
 
   const countries = educationalStandards.map((c) => c.country);
@@ -175,14 +244,25 @@ export default function ScopeSequencePage() {
               Plan your year's curriculum by organizing units, standards, and pacing
             </p>
           </div>
-          <Dialog open={createDialogOpen} onOpenChange={setCreateDialogOpen}>
-            <DialogTrigger asChild>
-              <Button data-testid="button-create-scope">
-                <Plus className="h-4 w-4 mr-2" />
-                Create New
-              </Button>
-            </DialogTrigger>
-            <DialogContent className="max-w-lg">
+          <div className="flex flex-wrap gap-2">
+            <Button variant="ghost" asChild data-testid="button-skip-to-lessons">
+              <Link href="/lesson-generator">
+                <Sparkles className="h-4 w-4 mr-2" />
+                Skip to Lessons
+              </Link>
+            </Button>
+            <Button variant="outline" onClick={() => setImportDialogOpen(true)} data-testid="button-import-scope">
+              <Upload className="h-4 w-4 mr-2" />
+              Import
+            </Button>
+            <Dialog open={createDialogOpen} onOpenChange={(open) => { setCreateDialogOpen(open); if (!open) resetWizard(); }}>
+              <DialogTrigger asChild>
+                <Button data-testid="button-create-scope">
+                  <Plus className="h-4 w-4 mr-2" />
+                  Build New
+                </Button>
+              </DialogTrigger>
+              <DialogContent className="max-w-lg">
               <DialogHeader>
                 <DialogTitle className="font-oswald text-xl">Create Scope & Sequence</DialogTitle>
                 <DialogDescription>
@@ -376,9 +456,23 @@ export default function ScopeSequencePage() {
                 </form>
               </Form>
             </DialogContent>
-          </Dialog>
+            </Dialog>
+          </div>
         </div>
 
+        <Tabs defaultValue="my-scopes" className="w-full">
+          <TabsList>
+            <TabsTrigger value="my-scopes" data-testid="tab-my-scopes">
+              <LayoutList className="h-4 w-4 mr-2" />
+              My Scopes
+            </TabsTrigger>
+            <TabsTrigger value="admin" data-testid="tab-admin">
+              <Building2 className="h-4 w-4 mr-2" />
+              Campus Admin
+            </TabsTrigger>
+          </TabsList>
+          
+          <TabsContent value="my-scopes" className="mt-4">
         {isLoading ? (
           <div className="grid gap-4">
             {[1, 2, 3].map((i) => (
@@ -468,6 +562,61 @@ export default function ScopeSequencePage() {
             ))}
           </div>
         )}
+          </TabsContent>
+
+          <TabsContent value="admin" className="mt-4">
+            <Card>
+              <CardHeader>
+                <div className="flex items-center gap-2">
+                  <Building2 className="h-5 w-5 text-lys-teal" />
+                  <CardTitle className="font-oswald">Campus Administration</CardTitle>
+                </div>
+                <CardDescription>
+                  Manage campus-wide scope assignments and review teacher change requests
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-6">
+                <div>
+                  <h3 className="font-oswald text-lg mb-3 flex items-center gap-2">
+                    <Users className="h-4 w-4" />
+                    Default Scope Assignments
+                  </h3>
+                  <p className="text-sm text-muted-foreground mb-4">
+                    Set default scopes that all teachers in your campus will use as their starting point.
+                  </p>
+                  <Card className="border-dashed">
+                    <CardContent className="py-8 text-center">
+                      <Building2 className="h-10 w-10 mx-auto text-muted-foreground/50 mb-2" />
+                      <p className="text-muted-foreground text-sm">
+                        Campus admin features coming soon. You'll be able to assign default scopes
+                        to all teachers and manage change requests.
+                      </p>
+                    </CardContent>
+                  </Card>
+                </div>
+                
+                <div>
+                  <h3 className="font-oswald text-lg mb-3 flex items-center gap-2">
+                    <FileText className="h-4 w-4" />
+                    Pending Change Requests
+                  </h3>
+                  <p className="text-sm text-muted-foreground mb-4">
+                    Review and approve teacher requests to modify campus-assigned scopes.
+                  </p>
+                  <Card className="border-dashed">
+                    <CardContent className="py-8 text-center">
+                      <CheckCircle className="h-10 w-10 mx-auto text-muted-foreground/50 mb-2" />
+                      <p className="text-muted-foreground text-sm">
+                        No pending change requests. Teachers can submit requests when they want to 
+                        customize the campus-assigned scope for their classroom.
+                      </p>
+                    </CardContent>
+                  </Card>
+                </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
+        </Tabs>
 
         <AlertDialog open={!!deleteId} onOpenChange={() => setDeleteId(null)}>
           <AlertDialogContent>
@@ -490,6 +639,105 @@ export default function ScopeSequencePage() {
             </AlertDialogFooter>
           </AlertDialogContent>
         </AlertDialog>
+
+        <Dialog open={importDialogOpen} onOpenChange={setImportDialogOpen}>
+          <DialogContent className="max-w-md">
+            <DialogHeader>
+              <DialogTitle className="font-oswald text-xl">Import Scope & Sequence</DialogTitle>
+              <DialogDescription>
+                Upload an existing scope and sequence document (PDF, DOCX, or TXT).
+                We'll extract the units and standards for you.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4 py-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <Label>Country</Label>
+                  <Select value={selectedCountry} onValueChange={setSelectedCountry}>
+                    <SelectTrigger data-testid="import-select-country">
+                      <SelectValue placeholder="Select country" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {countries.map((c) => (
+                        <SelectItem key={c} value={c}>{c}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div>
+                  <Label>State</Label>
+                  <Select value={selectedState} onValueChange={setSelectedState} disabled={!selectedCountry}>
+                    <SelectTrigger data-testid="import-select-state">
+                      <SelectValue placeholder="Select state" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {states.map((s) => (
+                        <SelectItem key={s.state} value={s.state}>{s.state}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+
+              <div
+                className="border-2 border-dashed rounded-md p-8 text-center cursor-pointer hover-elevate"
+                onClick={() => fileInputRef.current?.click()}
+              >
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  className="hidden"
+                  accept=".pdf,.docx,.doc,.txt"
+                  onChange={handleFileSelect}
+                  data-testid="input-import-file"
+                />
+                {uploadFile ? (
+                  <div className="space-y-2">
+                    <FileUp className="h-8 w-8 mx-auto text-lys-teal" />
+                    <p className="font-medium">{uploadFile.name}</p>
+                    <p className="text-sm text-muted-foreground">
+                      {(uploadFile.size / 1024).toFixed(1)} KB
+                    </p>
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    <Upload className="h-8 w-8 mx-auto text-muted-foreground" />
+                    <p className="text-muted-foreground">
+                      Click to upload or drag and drop
+                    </p>
+                    <p className="text-xs text-muted-foreground">
+                      PDF, DOCX, or TXT (max 10MB)
+                    </p>
+                  </div>
+                )}
+              </div>
+
+              {importMutation.isPending && (
+                <div className="space-y-2">
+                  <Progress value={importProgress} />
+                  <p className="text-sm text-center text-muted-foreground">
+                    Processing document...
+                  </p>
+                </div>
+              )}
+            </div>
+            <DialogFooter>
+              <Button
+                variant="outline"
+                onClick={() => { setImportDialogOpen(false); setUploadFile(null); }}
+              >
+                Cancel
+              </Button>
+              <Button
+                onClick={handleImport}
+                disabled={!uploadFile || !selectedCountry || !selectedState || importMutation.isPending}
+                data-testid="button-start-import"
+              >
+                {importMutation.isPending ? "Importing..." : "Import Document"}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       </div>
     </div>
   );

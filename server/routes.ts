@@ -479,6 +479,54 @@ export async function registerRoutes(
     }
   });
 
+  // Import Scope from Document (stub - actual parsing would require file processing library)
+  app.post("/api/scopes/import", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user?.claims?.sub;
+      
+      // Get country and state from query params or use defaults
+      const country = req.query.country as string || "United States";
+      const state = req.query.state as string || "Texas";
+      
+      // Determine standards name based on state
+      let standardsName = "TEKS";
+      if (state === "California") standardsName = "California CCSS";
+      else if (state === "Florida") standardsName = "Florida B.E.S.T.";
+      else if (state === "New York") standardsName = "NYSLS";
+      else if (state === "Common Core") standardsName = "CCSS";
+      
+      // For now, return a stubbed response indicating import is being processed
+      // In a full implementation, you would:
+      // 1. Use multer to handle file upload
+      // 2. Parse PDF/DOCX content
+      // 3. Use AI to extract units and standards
+      // 4. Create the scope and units from parsed content
+      
+      const scope = await storage.createScopeSequence({
+        userId,
+        title: "Imported Scope & Sequence (Processing...)",
+        subject: "Social Studies",
+        gradeLevel: "7",
+        country,
+        state,
+        standardsName,
+        schoolYear: "2024-2025",
+        totalWeeks: 36,
+        status: "draft",
+      });
+      
+      res.json({ 
+        success: true, 
+        message: "Import started. Document is being processed. You can edit the details while we extract the content.",
+        scope,
+        importJobId: scope.id 
+      });
+    } catch (error) {
+      console.error("Import error:", error);
+      res.status(500).json({ error: "Failed to start import" });
+    }
+  });
+
   // Sequence Units
   app.post("/api/scopes/:scopeId/units", isAuthenticated, async (req: any, res) => {
     try {
