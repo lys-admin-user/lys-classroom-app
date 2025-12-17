@@ -289,3 +289,100 @@
     inset: -1px;
   }
 }
+
+/* Print Styles for Lesson Plans */
+@media print {
+  /* Hide non-printable elements */
+  .no-print,
+  header,
+  footer,
+  nav,
+  .sidebar,
+  button,
+  [data-radix-scroll-area-viewport] > div > div:first-child,
+  .print\\:hidden {
+    display: none !important;
+  }
+
+  /* Reset page margins */
+  @page {
+    margin: 0.75in;
+    size: letter;
+  }
+
+  /* Reset background colors for printing */
+  body {
+    background: white !important;
+    color: black !important;
+    font-size: 11pt !important;
+    line-height: 1.4 !important;
+  }
+
+  /* Make the printable content full width */
+  .print-content {
+    width: 100% !important;
+    max-width: none !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    box-shadow: none !important;
+    border: none !important;
+  }
+
+  /* Override card styles for print */
+  .print-content .bg-muted\/30,
+  .print-content [class*="bg-lys-"] {
+    background-color: #f5f5f5 !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  /* Ensure text is readable */
+  .print-content * {
+    color: black !important;
+  }
+
+  .print-content .text-muted-foreground {
+    color: #555 !important;
+  }
+
+  /* Keep badge colors visible */
+  .print-content .badge,
+  .print-content [class*="Badge"] {
+    border: 1px solid #ccc !important;
+    background-color: #f0f0f0 !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  /* Prevent page breaks inside sections */
+  .print-content > div {
+    page-break-inside: avoid;
+  }
+
+  /* Style separators for print */
+  .print-content hr,
+  .print-content [class*="Separator"] {
+    border-color: #ccc !important;
+    margin: 12pt 0 !important;
+  }
+
+  /* Ensure headers stand out */
+  .print-content h1,
+  .print-content h2,
+  .print-content h3 {
+    color: black !important;
+    font-weight: bold !important;
+    page-break-after: avoid;
+  }
+
+  /* LYS branding for print - use grayscale-friendly styling */
+  .print-content .font-marker {
+    font-size: 18pt !important;
+  }
+
+  /* ScrollArea should not clip content when printing */
+  [data-radix-scroll-area-viewport] {
+    overflow: visible !important;
+    height: auto !important;
+  }
+}

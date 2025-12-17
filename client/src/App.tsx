@@ -13,6 +13,8 @@ import ActionPlans from "@/pages/ActionPlans";
 import Resources from "@/pages/Resources";
 import MyLessons from "@/pages/MyLessons";
 import Settings from "@/pages/Settings";
+import SharedLesson from "@/pages/SharedLesson";
+import Analytics from "@/pages/Analytics";
 import NotFound from "@/pages/not-found";
 
 function Router() {
@@ -26,6 +28,8 @@ function Router() {
       <Route path="/resources" component={Resources} />
       <Route path="/my-lessons" component={MyLessons} />
       <Route path="/settings" component={Settings} />
+      <Route path="/analytics" component={Analytics} />
+      <Route path="/shared/:shareId" component={SharedLesson} />
       <Route component={NotFound} />
     </Switch>
   );

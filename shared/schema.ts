@@ -21,6 +21,7 @@ export const lessons = pgTable("lessons", {
   materials: jsonb("materials").notNull().$type<string[]>(),
   assessment: text("assessment").notNull(),
   reflection: text("reflection"),
+  shareId: varchar("share_id"),
   createdAt: timestamp("created_at").defaultNow(),
 });
 
@@ -35,10 +36,12 @@ export const goals = pgTable("goals", {
   title: text("title").notNull(),
   description: text("description"),
   category: text("category").notNull(),
+  bkdPillar: text("bkd_pillar").default("do"),
+  linkedCareerId: varchar("linked_career_id"),
   targetDate: text("target_date").notNull(),
   status: text("status").notNull().default("not_started"),
   progress: integer("progress").notNull().default(0),
-  milestones: jsonb("milestones").notNull().$type<{ id: string; title: string; completed: boolean; dueDate?: string }[]>(),
+  milestones: jsonb("milestones").notNull().$type<{ id: string; title: string; completed: boolean; dueDate?: string; reflection?: string }[]>(),
   createdAt: timestamp("created_at").defaultNow(),
 });
 

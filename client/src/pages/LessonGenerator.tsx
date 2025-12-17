@@ -10,7 +10,7 @@ import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Sparkles, Clock, Target, BookOpen, Users, Loader2, Copy, Download, Heart, Compass, Save, Check, GraduationCap, FileText, Globe, MapPin, Lightbulb, Play, UserCheck, Settings } from "lucide-react";
+import { Sparkles, Clock, Target, BookOpen, Users, Loader2, Copy, Download, Heart, Compass, Save, Check, GraduationCap, FileText, Globe, MapPin, Lightbulb, Play, UserCheck, Settings, Printer } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useAuth } from "@/hooks/use-auth";
@@ -272,7 +272,7 @@ ${generatedLesson.lessonClose?.vocational ? `Vocational: ${generatedLesson.lesso
         </div>
 
         <div className="grid lg:grid-cols-5 gap-6">
-          <div className="lg:col-span-2">
+          <div className="lg:col-span-2 no-print">
             <Card>
               <CardHeader className="bg-lys-teal/5 border-b">
                 <CardTitle className="font-oswald text-lg flex items-center gap-2">
@@ -535,7 +535,7 @@ ${generatedLesson.lessonClose?.vocational ? `Vocational: ${generatedLesson.lesso
             </Card>
           </div>
 
-          <div className="lg:col-span-3">
+          <div className="lg:col-span-3 print-content">
             <Card className="h-full">
               <CardHeader className="flex flex-row items-center justify-between gap-4 flex-wrap bg-muted/30 border-b">
                 <div>
@@ -569,9 +569,9 @@ ${generatedLesson.lessonClose?.vocational ? `Vocational: ${generatedLesson.lesso
                       <Copy className="h-4 w-4" />
                       Copy
                     </Button>
-                    <Button variant="outline" size="sm" className="gap-1 font-roboto" data-testid="button-download-lesson">
-                      <Download className="h-4 w-4" />
-                      Export
+                    <Button variant="outline" size="sm" onClick={() => window.print()} className="gap-1 font-roboto" data-testid="button-print-lesson">
+                      <Printer className="h-4 w-4" />
+                      Print
                     </Button>
                   </div>
                 )}

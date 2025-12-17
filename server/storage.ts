@@ -24,8 +24,10 @@ export interface IStorage {
   // Lessons (saved by authenticated users)
   getLessons(userId: string): Promise<Lesson[]>;
   getLesson(id: string): Promise<Lesson | undefined>;
+  getLessonByShareId(shareId: string): Promise<Lesson | undefined>;
   createLesson(lesson: InsertLesson): Promise<Lesson>;
   deleteLesson(id: string, userId: string): Promise<boolean>;
+  toggleLessonShare(id: string, userId: string): Promise<{ shareId: string | null } | undefined>;
   
   // Goals
   getGoals(userId?: string): Promise<Goal[]>;
@@ -283,6 +285,20 @@ export class DatabaseStorage implements IStorage {
       .where(and(eq(lessons.id, id), eq(lessons.userId, userId)))
       .returning();
     return result.length > 0;
+  }
+
+  async getLessonByShareId(shareId: string): Promise<Lesson | undefined> {
+    const [lesson] = await db.select().from(lessons).where(eq(lessons.shareId, shareId));
+    return lesson || undefined;
+  }
+
+  async toggleLessonShare(id: string, userId: string): Promise<{ shareId: string | null } | undefined> {
+    const lesson = await this.getLesson(id);
+    if (!lesson || lesson.userId !== userId) return undefined;
+    
+    const newShareId = lesson.shareId ? null : randomUUID().substring(0, 12);
+    await db.update(lessons).set({ shareId: newShareId }).where(eq(lessons.id, id));
+    return { shareId: newShareId };
   }
 
   // Goals - stored in database

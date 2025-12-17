@@ -25,11 +25,15 @@ import {
   Heart,
   DollarSign,
   Users,
-  Activity
+  Activity,
+  Briefcase,
+  ArrowRight,
+  MessageSquare
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
-import type { Goal } from "@shared/schema";
+import type { Goal, Career } from "@shared/schema";
+import { Link } from "wouter";
 
 const categoryConfig = {
   academic: { label: "Academic", icon: BookOpen, color: "bg-blue-500/10 text-blue-600" },
@@ -40,10 +44,25 @@ const categoryConfig = {
   health: { label: "Health", icon: Activity, color: "bg-orange-500/10 text-orange-600" },
 };
 
+const bkdConfig = {
+  be: { label: "BE", description: "Identity & Purpose", color: "bg-lys-yellow/10 text-lys-yellow border-lys-yellow/30" },
+  know: { label: "KNOW", description: "Strategy & Resources", color: "bg-lys-red/10 text-lys-red border-lys-red/30" },
+  do: { label: "DO", description: "Action & Impact", color: "bg-lys-teal/10 text-lys-teal border-lys-teal/30" },
+};
+
 const statusConfig = {
   not_started: { label: "Not Started", color: "bg-muted text-muted-foreground" },
   in_progress: { label: "In Progress", color: "bg-lys-yellow/20 text-lys-yellow" },
   completed: { label: "Completed", color: "bg-green-500/20 text-green-600" },
+};
+
+const categoryToCareerType: Record<string, string[]> = {
+  academic: ["technology", "education"],
+  career: ["technology", "business", "healthcare"],
+  personal: ["healthcare", "creative"],
+  financial: ["business", "technology"],
+  social: ["healthcare", "education"],
+  health: ["healthcare", "trades"],
 };
 
 export default function ActionPlans() {
@@ -53,6 +72,7 @@ export default function ActionPlans() {
     title: "",
     description: "",
     category: "academic" as keyof typeof categoryConfig,
+    bkdPillar: "do" as keyof typeof bkdConfig,
     targetDate: "",
     milestones: [] as { id: string; title: string; completed: boolean }[],
   });
@@ -61,6 +81,15 @@ export default function ActionPlans() {
   const { data: goals = [], isLoading } = useQuery<Goal[]>({
     queryKey: ["/api/goals"],
   });
+
+  const { data: careers = [] } = useQuery<Career[]>({
+    queryKey: ["/api/careers"],
+  });
+
+  const getRelatedCareers = (category: string) => {
+    const careerTypes = categoryToCareerType[category] || [];
+    return careers.filter((c) => careerTypes.includes(c.category)).slice(0, 2);
+  };
 
   const createGoalMutation = useMutation({
     mutationFn: async (goal: typeof newGoal) => {
@@ -77,6 +106,7 @@ export default function ActionPlans() {
         title: "",
         description: "",
         category: "academic",
+        bkdPillar: "do",
         targetDate: "",
         milestones: [],
       });
@@ -207,6 +237,27 @@ export default function ActionPlans() {
                     className="font-roboto"
                     data-testid="input-goal-description"
                   />
+                </div>
+                <div className="space-y-2">
+                  <Label className="font-oswald">Be-Know-Do Pillar</Label>
+                  <div className="grid grid-cols-3 gap-2">
+                    {Object.entries(bkdConfig).map(([key, config]) => (
+                      <button
+                        key={key}
+                        type="button"
+                        onClick={() => setNewGoal((prev) => ({ ...prev, bkdPillar: key as any }))}
+                        className={`p-2 rounded-md border-2 transition-all ${
+                          newGoal.bkdPillar === key
+                            ? `${config.color} ring-2 ring-offset-1`
+                            : "border-border hover:border-muted-foreground/30"
+                        }`}
+                        data-testid={`button-bkd-${key}`}
+                      >
+                        <p className="font-oswald text-sm font-semibold">{config.label}</p>
+                        <p className="text-[10px] text-muted-foreground font-roboto">{config.description}</p>
+                      </button>
+                    ))}
+                  </div>
                 </div>
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2">
@@ -362,15 +413,19 @@ export default function ActionPlans() {
         ) : (
           <div className="grid md:grid-cols-2 gap-6">
             {goals.map((goal) => {
-              const config = categoryConfig[goal.category];
-              const status = statusConfig[goal.status];
+              const config = categoryConfig[goal.category as keyof typeof categoryConfig] || categoryConfig.academic;
+              const status = statusConfig[goal.status as keyof typeof statusConfig] || statusConfig.not_started;
+              const bkd = bkdConfig[(goal.bkdPillar as keyof typeof bkdConfig) || 'do'] || bkdConfig.do;
               const completedMilestones = goal.milestones.filter((m) => m.completed).length;
 
               return (
                 <Card key={goal.id} className="overflow-hidden">
                   <CardHeader className="pb-2">
                     <div className="flex items-start justify-between gap-4 flex-wrap">
-                      <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <Badge variant="outline" className={bkd.color}>
+                          {bkd.label}
+                        </Badge>
                         <Badge className={config.color}>
                           <config.icon className="h-3 w-3 mr-1" />
                           {config.label}
@@ -422,17 +477,47 @@ export default function ActionPlans() {
                                 data-testid={`checkbox-milestone-${milestone.id}`}
                               />
                               <span
-                                className={`font-roboto text-sm ${
+                                className={`font-roboto text-sm flex-1 ${
                                   milestone.completed ? "line-through text-muted-foreground" : ""
                                 }`}
                               >
                                 {milestone.title}
                               </span>
+                              {milestone.reflection && (
+                                <MessageSquare className="h-3 w-3 text-lys-yellow" title="Has reflection" />
+                              )}
                             </li>
                           ))}
                         </ul>
                       </div>
                     )}
+
+                    {(() => {
+                      const relatedCareers = getRelatedCareers(goal.category);
+                      if (relatedCareers.length === 0) return null;
+                      return (
+                        <div className="pt-3 border-t">
+                          <p className="text-xs text-muted-foreground font-roboto mb-2 flex items-center gap-1">
+                            <Briefcase className="h-3 w-3" />
+                            Related Career Paths
+                          </p>
+                          <div className="flex flex-wrap gap-1">
+                            {relatedCareers.map((career) => (
+                              <Link key={career.id} href={`/careers?id=${career.id}`}>
+                                <Badge 
+                                  variant="secondary" 
+                                  className="font-roboto text-xs cursor-pointer hover-elevate"
+                                  data-testid={`badge-career-${career.id}`}
+                                >
+                                  {career.title}
+                                  <ArrowRight className="h-3 w-3 ml-1" />
+                                </Badge>
+                              </Link>
+                            ))}
+                          </div>
+                        </div>
+                      );
+                    })()}
                   </CardContent>
                 </Card>
               );

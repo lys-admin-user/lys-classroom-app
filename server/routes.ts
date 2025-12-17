@@ -30,6 +30,8 @@ const createGoalSchema = z.object({
   title: z.string().min(1, "Title is required"),
   description: z.string().optional(),
   category: z.string().min(1),
+  bkdPillar: z.enum(["be", "know", "do"]).optional().default("do"),
+  linkedCareerId: z.string().optional(),
   targetDate: z.string().min(1, "Target date is required"),
   status: z.string().optional().default("not_started"),
   progress: z.number().optional().default(0),
@@ -38,6 +40,7 @@ const createGoalSchema = z.object({
     title: z.string(),
     completed: z.boolean(),
     dueDate: z.string().optional(),
+    reflection: z.string().optional(),
   })).optional().default([]),
 });
 
@@ -45,6 +48,8 @@ const updateGoalSchema = z.object({
   title: z.string().min(1).optional(),
   description: z.string().optional(),
   category: z.string().optional(),
+  bkdPillar: z.enum(["be", "know", "do"]).optional(),
+  linkedCareerId: z.string().optional(),
   targetDate: z.string().optional(),
   status: z.string().optional(),
   progress: z.number().optional(),
@@ -53,6 +58,7 @@ const updateGoalSchema = z.object({
     title: z.string(),
     completed: z.boolean(),
     dueDate: z.string().optional(),
+    reflection: z.string().optional(),
   })).optional(),
 });
 
@@ -125,6 +131,35 @@ export async function registerRoutes(
     }
   });
 
+  // Toggle lesson sharing (authenticated users only)
+  app.post("/api/lessons/:id/share", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user?.claims?.sub;
+      const result = await storage.toggleLessonShare(req.params.id, userId);
+      if (!result) {
+        res.status(404).json({ error: "Lesson not found or not authorized" });
+        return;
+      }
+      res.json(result);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to toggle sharing" });
+    }
+  });
+
+  // Get shared lesson by share ID (public endpoint)
+  app.get("/api/shared/:shareId", async (req, res) => {
+    try {
+      const lesson = await storage.getLessonByShareId(req.params.shareId);
+      if (!lesson) {
+        res.status(404).json({ error: "Shared lesson not found" });
+        return;
+      }
+      res.json(lesson);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch shared lesson" });
+    }
+  });
+
   // Goals - works for all users, but data is session-based for non-auth
   app.get("/api/goals", async (req: any, res) => {
     try {
@@ -172,6 +207,7 @@ export async function registerRoutes(
           title: m.title,
           completed: m.completed,
           dueDate: m.dueDate,
+          reflection: m.reflection,
           id: randomUUID(),
         }));
       }

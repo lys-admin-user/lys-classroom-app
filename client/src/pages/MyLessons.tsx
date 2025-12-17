@@ -1,11 +1,12 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { BookOpen, Trash2, Clock, Target, GraduationCap, Heart, Compass, Lightbulb, AlertCircle } from "lucide-react";
+import { BookOpen, Trash2, Clock, Target, GraduationCap, Heart, Compass, Lightbulb, AlertCircle, Share2, Link2, Check, BarChart3 } from "lucide-react";
+import { Progress } from "@/components/ui/progress";
 import { useAuth } from "@/hooks/use-auth";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
@@ -57,6 +58,82 @@ export default function MyLessons() {
       });
     },
   });
+
+  const shareMutation = useMutation({
+    mutationFn: async (id: string) => {
+      const response = await apiRequest("POST", `/api/lessons/${id}/share`);
+      return await response.json();
+    },
+    onSuccess: (data, id) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/lessons"] });
+      if (data.shareId) {
+        const shareUrl = `${window.location.origin}/shared/${data.shareId}`;
+        navigator.clipboard.writeText(shareUrl);
+        toast({
+          title: "Link Copied!",
+          description: "The share link has been copied to your clipboard.",
+        });
+      } else {
+        toast({
+          title: "Sharing Disabled",
+          description: "This lesson is no longer publicly accessible.",
+        });
+      }
+    },
+    onError: () => {
+      toast({
+        title: "Error",
+        description: "Failed to update sharing. Please try again.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const standardsCoverage = useMemo(() => {
+    if (!lessons || lessons.length === 0) return null;
+    
+    const standardsMap = new Map<string, { code: string; count: number; standardsName: string }>();
+    let totalWithStandards = 0;
+    
+    lessons.forEach((lesson) => {
+      if (lesson.standards) {
+        try {
+          const parsed = JSON.parse(lesson.standards);
+          if (parsed.codes && Array.isArray(parsed.codes)) {
+            totalWithStandards++;
+            parsed.codes.forEach((code: { code: string }) => {
+              const existing = standardsMap.get(code.code);
+              if (existing) {
+                existing.count++;
+              } else {
+                standardsMap.set(code.code, { 
+                  code: code.code, 
+                  count: 1, 
+                  standardsName: parsed.standardsName || "Standards" 
+                });
+              }
+            });
+          }
+        } catch (e) {
+          // Invalid JSON, skip
+        }
+      }
+    });
+    
+    if (standardsMap.size === 0) return null;
+    
+    const sorted = Array.from(standardsMap.values()).sort((a, b) => b.count - a.count);
+    const topStandards = sorted.slice(0, 6);
+    const standardsName = sorted[0]?.standardsName || "Standards";
+    
+    return {
+      total: standardsMap.size,
+      topStandards,
+      lessonsWithStandards: totalWithStandards,
+      totalLessons: lessons.length,
+      standardsName,
+    };
+  }, [lessons]);
 
   if (authLoading) {
     return (
@@ -112,6 +189,40 @@ export default function MyLessons() {
         </p>
       </div>
 
+      {standardsCoverage && (
+        <Card className="mb-6" data-testid="card-standards-coverage">
+          <CardHeader className="pb-2">
+            <CardTitle className="font-oswald text-lg flex items-center gap-2">
+              <BarChart3 className="h-5 w-5 text-lys-teal" />
+              Standards Coverage
+            </CardTitle>
+            <CardDescription className="font-roboto">
+              Tracking {standardsCoverage.total} unique {standardsCoverage.standardsName} codes across {standardsCoverage.lessonsWithStandards} of {standardsCoverage.totalLessons} lessons
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="pt-0">
+            <div className="flex flex-wrap gap-2">
+              {standardsCoverage.topStandards.map((standard) => (
+                <Badge 
+                  key={standard.code} 
+                  variant="outline" 
+                  className="font-roboto text-xs gap-1"
+                  data-testid={`badge-standard-${standard.code}`}
+                >
+                  <span className="font-semibold text-lys-teal">{standard.code}</span>
+                  <span className="text-muted-foreground">({standard.count})</span>
+                </Badge>
+              ))}
+              {standardsCoverage.total > 6 && (
+                <Badge variant="secondary" className="font-roboto text-xs">
+                  +{standardsCoverage.total - 6} more
+                </Badge>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       {isLoading ? (
         <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
           {[1, 2, 3].map((i) => (
@@ -158,10 +269,18 @@ export default function MyLessons() {
                     <CardTitle className="font-oswald text-lg line-clamp-2">
                       {lesson.title}
                     </CardTitle>
-                    <Badge variant="outline" className={`shrink-0 ${bkd.color}`}>
-                      <BkdIcon className="h-3 w-3 mr-1" />
-                      {bkd.label}
-                    </Badge>
+                    <div className="flex items-center gap-1 shrink-0">
+                      {lesson.shareId && (
+                        <Badge variant="secondary" className="bg-lys-teal/10 text-lys-teal border-lys-teal/20">
+                          <Link2 className="h-3 w-3 mr-1" />
+                          Shared
+                        </Badge>
+                      )}
+                      <Badge variant="outline" className={bkd.color}>
+                        <BkdIcon className="h-3 w-3 mr-1" />
+                        {bkd.label}
+                      </Badge>
+                    </div>
                   </div>
                   <CardDescription className="font-roboto text-sm">
                     {lesson.topic}
@@ -204,6 +323,16 @@ export default function MyLessons() {
                     data-testid={`button-view-${lesson.id}`}
                   >
                     View Lesson
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className={lesson.shareId ? "text-lys-teal" : "text-muted-foreground"}
+                    onClick={() => shareMutation.mutate(lesson.id)}
+                    disabled={shareMutation.isPending}
+                    data-testid={`button-share-${lesson.id}`}
+                  >
+                    {lesson.shareId ? <Link2 className="h-4 w-4" /> : <Share2 className="h-4 w-4" />}
                   </Button>
                   <Button
                     variant="ghost"
