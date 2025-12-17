@@ -71,6 +71,16 @@ export function Header() {
             ))}
             {isAuthenticated && (
               <>
+                <Link href="/scope-sequence">
+                  <Button
+                    variant={location === "/scope-sequence" || location.startsWith("/scope/") ? "secondary" : "ghost"}
+                    size="sm"
+                    className="font-roboto"
+                    data-testid="nav-scope-sequence"
+                  >
+                    Scope & Sequence
+                  </Button>
+                </Link>
                 <Link href="/my-lessons">
                   <Button
                     variant={location === "/my-lessons" ? "secondary" : "ghost"}
@@ -183,6 +193,17 @@ export function Header() {
               ))}
               {isAuthenticated && (
                 <>
+                  <Link href="/scope-sequence">
+                    <Button
+                      variant={location === "/scope-sequence" || location.startsWith("/scope/") ? "secondary" : "ghost"}
+                      className="w-full justify-start font-roboto"
+                      onClick={() => setMobileMenuOpen(false)}
+                      data-testid="mobile-nav-scope-sequence"
+                    >
+                      <BookOpen className="mr-2 h-4 w-4" />
+                      Scope & Sequence
+                    </Button>
+                  </Link>
                   <Link href="/my-lessons">
                     <Button
                       variant={location === "/my-lessons" ? "secondary" : "ghost"}

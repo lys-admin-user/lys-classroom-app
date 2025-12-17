@@ -229,3 +229,126 @@ export const generateLessonRequestSchema = z.object({
 });
 
 export type GenerateLessonRequest = z.infer<typeof generateLessonRequestSchema>;
+
+// Scope and Sequence Tables
+export const scopeSequences = pgTable("scope_sequences", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull(),
+  title: text("title").notNull(),
+  subject: text("subject").notNull(),
+  gradeLevel: text("grade_level").notNull(),
+  country: text("country").notNull(),
+  state: text("state").notNull(),
+  standardsName: text("standards_name").notNull(),
+  schoolYear: text("school_year").notNull(), // e.g., "2024-2025"
+  totalWeeks: integer("total_weeks").default(36),
+  status: text("status").notNull().default("draft"), // draft, published, archived
+  isTemplate: boolean("is_template").default(false),
+  campusId: varchar("campus_id"), // null for personal, set for campus-wide
+  parentScopeId: varchar("parent_scope_id"), // if derived from admin scope
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertScopeSequenceSchema = createInsertSchema(scopeSequences).omit({ id: true, createdAt: true, updatedAt: true });
+export type InsertScopeSequence = z.infer<typeof insertScopeSequenceSchema>;
+export type ScopeSequence = typeof scopeSequences.$inferSelect;
+
+// Units within a Scope and Sequence
+export const sequenceUnits = pgTable("sequence_units", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  scopeId: varchar("scope_id").notNull(),
+  unitNumber: integer("unit_number").notNull(),
+  title: text("title").notNull(),
+  summary: text("summary"),
+  transferGoal: text("transfer_goal"),
+  startWeek: integer("start_week").notNull(),
+  endWeek: integer("end_week").notNull(),
+  nineWeeksPeriod: integer("nine_weeks_period").notNull(), // 1, 2, 3, or 4
+  studentsWillKnow: jsonb("students_will_know").$type<string[]>().default([]),
+  studentsWillBeSkilled: jsonb("students_will_be_skilled").$type<string[]>().default([]),
+  standardCodes: jsonb("standard_codes").$type<{ code: string; description: string }[]>().default([]),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertSequenceUnitSchema = createInsertSchema(sequenceUnits).omit({ id: true, createdAt: true });
+export type InsertSequenceUnit = z.infer<typeof insertSequenceUnitSchema>;
+export type SequenceUnit = typeof sequenceUnits.$inferSelect;
+
+// Campus-level scope assignments (for admin to assign to all teachers)
+export const campusScopes = pgTable("campus_scopes", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  campusId: varchar("campus_id").notNull(),
+  scopeId: varchar("scope_id").notNull(),
+  subject: text("subject").notNull(),
+  gradeLevel: text("grade_level").notNull(),
+  isActive: boolean("is_active").default(true),
+  effectiveDate: timestamp("effective_date").defaultNow(),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertCampusScopeSchema = createInsertSchema(campusScopes).omit({ id: true, createdAt: true });
+export type InsertCampusScope = z.infer<typeof insertCampusScopeSchema>;
+export type CampusScope = typeof campusScopes.$inferSelect;
+
+// Teacher change requests for admin-set scopes
+export const scopeChangeRequests = pgTable("scope_change_requests", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  scopeId: varchar("scope_id").notNull(),
+  userId: varchar("user_id").notNull(),
+  unitId: varchar("unit_id"), // null if requesting scope-level changes
+  changeType: text("change_type").notNull(), // "add_unit", "modify_unit", "remove_unit", "modify_scope"
+  proposedChanges: jsonb("proposed_changes").notNull().$type<Record<string, unknown>>(),
+  reason: text("reason"),
+  status: text("status").notNull().default("pending"), // pending, approved, rejected
+  adminNotes: text("admin_notes"),
+  reviewedBy: varchar("reviewed_by"),
+  reviewedAt: timestamp("reviewed_at"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertScopeChangeRequestSchema = createInsertSchema(scopeChangeRequests).omit({ id: true, createdAt: true, reviewedAt: true });
+export type InsertScopeChangeRequest = z.infer<typeof insertScopeChangeRequestSchema>;
+export type ScopeChangeRequest = typeof scopeChangeRequests.$inferSelect;
+
+// Scope with units (for API response)
+export const scopeWithUnitsSchema = z.object({
+  scope: z.object({
+    id: z.string(),
+    userId: z.string(),
+    title: z.string(),
+    subject: z.string(),
+    gradeLevel: z.string(),
+    country: z.string(),
+    state: z.string(),
+    standardsName: z.string(),
+    schoolYear: z.string(),
+    totalWeeks: z.number().nullable(),
+    status: z.string(),
+    isTemplate: z.boolean().nullable(),
+    campusId: z.string().nullable(),
+    parentScopeId: z.string().nullable(),
+    createdAt: z.date().nullable(),
+    updatedAt: z.date().nullable(),
+  }),
+  units: z.array(z.object({
+    id: z.string(),
+    scopeId: z.string(),
+    unitNumber: z.number(),
+    title: z.string(),
+    summary: z.string().nullable(),
+    transferGoal: z.string().nullable(),
+    startWeek: z.number(),
+    endWeek: z.number(),
+    nineWeeksPeriod: z.number(),
+    studentsWillKnow: z.array(z.string()).nullable(),
+    studentsWillBeSkilled: z.array(z.string()).nullable(),
+    standardCodes: z.array(z.object({
+      code: z.string(),
+      description: z.string(),
+    })).nullable(),
+    createdAt: z.date().nullable(),
+  })),
+});
+
+export type ScopeWithUnits = z.infer<typeof scopeWithUnitsSchema>;

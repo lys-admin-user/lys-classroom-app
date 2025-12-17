@@ -11,13 +11,22 @@ import {
   type EducatorProfile,
   type InsertEducatorProfile,
   type User,
+  type ScopeSequence,
+  type InsertScopeSequence,
+  type SequenceUnit,
+  type InsertSequenceUnit,
+  type ScopeChangeRequest,
+  type InsertScopeChangeRequest,
   lessons,
   goals,
   educatorProfiles,
   users,
+  scopeSequences,
+  sequenceUnits,
+  scopeChangeRequests,
 } from "@shared/schema";
 import { db } from "./db";
-import { eq, desc, and } from "drizzle-orm";
+import { eq, desc, and, asc } from "drizzle-orm";
 import { randomUUID } from "crypto";
 
 export interface IStorage {
@@ -54,6 +63,25 @@ export interface IStorage {
   getAssessments(): Promise<Assessment[]>;
   getAssessment(id: string): Promise<Assessment | undefined>;
   saveAssessmentResult(result: AssessmentResult): Promise<AssessmentResult>;
+  
+  // Scope and Sequence
+  getScopeSequences(userId: string): Promise<ScopeSequence[]>;
+  getScopeSequence(id: string): Promise<ScopeSequence | undefined>;
+  createScopeSequence(scope: InsertScopeSequence): Promise<ScopeSequence>;
+  updateScopeSequence(id: string, updates: Partial<ScopeSequence>, userId: string): Promise<ScopeSequence | undefined>;
+  deleteScopeSequence(id: string, userId: string): Promise<boolean>;
+  
+  // Sequence Units
+  getSequenceUnits(scopeId: string): Promise<SequenceUnit[]>;
+  getSequenceUnit(id: string): Promise<SequenceUnit | undefined>;
+  createSequenceUnit(unit: InsertSequenceUnit): Promise<SequenceUnit>;
+  updateSequenceUnit(id: string, updates: Partial<SequenceUnit>, userId: string): Promise<SequenceUnit | undefined>;
+  deleteSequenceUnit(id: string, userId: string): Promise<boolean>;
+  
+  // Scope Change Requests
+  getScopeChangeRequests(scopeId: string): Promise<ScopeChangeRequest[]>;
+  createScopeChangeRequest(request: InsertScopeChangeRequest): Promise<ScopeChangeRequest>;
+  updateScopeChangeRequest(id: string, updates: Partial<ScopeChangeRequest>): Promise<ScopeChangeRequest | undefined>;
 }
 
 // Seed data for careers and resources (static content)
@@ -430,6 +458,109 @@ export class DatabaseStorage implements IStorage {
   async saveAssessmentResult(result: AssessmentResult): Promise<AssessmentResult> {
     this.assessmentResults.set(result.id, result);
     return result;
+  }
+
+  // Scope and Sequence
+  async getScopeSequences(userId: string): Promise<ScopeSequence[]> {
+    return await db.select().from(scopeSequences)
+      .where(eq(scopeSequences.userId, userId))
+      .orderBy(desc(scopeSequences.createdAt));
+  }
+
+  async getScopeSequence(id: string): Promise<ScopeSequence | undefined> {
+    const [scope] = await db.select().from(scopeSequences).where(eq(scopeSequences.id, id));
+    return scope || undefined;
+  }
+
+  async createScopeSequence(scope: InsertScopeSequence): Promise<ScopeSequence> {
+    const [created] = await db.insert(scopeSequences).values(scope as any).returning();
+    return created;
+  }
+
+  async updateScopeSequence(id: string, updates: Partial<ScopeSequence>, userId: string): Promise<ScopeSequence | undefined> {
+    const scope = await this.getScopeSequence(id);
+    if (!scope || scope.userId !== userId) return undefined;
+    
+    const [updated] = await db.update(scopeSequences)
+      .set({ ...updates, updatedAt: new Date() })
+      .where(eq(scopeSequences.id, id))
+      .returning();
+    return updated || undefined;
+  }
+
+  async deleteScopeSequence(id: string, userId: string): Promise<boolean> {
+    const scope = await this.getScopeSequence(id);
+    if (!scope || scope.userId !== userId) return false;
+    
+    // Delete associated units first
+    await db.delete(sequenceUnits).where(eq(sequenceUnits.scopeId, id));
+    // Delete the scope
+    await db.delete(scopeSequences).where(eq(scopeSequences.id, id));
+    return true;
+  }
+
+  // Sequence Units
+  async getSequenceUnits(scopeId: string): Promise<SequenceUnit[]> {
+    return await db.select().from(sequenceUnits)
+      .where(eq(sequenceUnits.scopeId, scopeId))
+      .orderBy(asc(sequenceUnits.unitNumber));
+  }
+
+  async getSequenceUnit(id: string): Promise<SequenceUnit | undefined> {
+    const [unit] = await db.select().from(sequenceUnits).where(eq(sequenceUnits.id, id));
+    return unit || undefined;
+  }
+
+  async createSequenceUnit(unit: InsertSequenceUnit): Promise<SequenceUnit> {
+    const [created] = await db.insert(sequenceUnits).values(unit as any).returning();
+    return created;
+  }
+
+  async updateSequenceUnit(id: string, updates: Partial<SequenceUnit>, userId: string): Promise<SequenceUnit | undefined> {
+    const unit = await this.getSequenceUnit(id);
+    if (!unit) return undefined;
+    
+    // Verify user owns the scope
+    const scope = await this.getScopeSequence(unit.scopeId);
+    if (!scope || scope.userId !== userId) return undefined;
+    
+    const [updated] = await db.update(sequenceUnits)
+      .set(updates)
+      .where(eq(sequenceUnits.id, id))
+      .returning();
+    return updated || undefined;
+  }
+
+  async deleteSequenceUnit(id: string, userId: string): Promise<boolean> {
+    const unit = await this.getSequenceUnit(id);
+    if (!unit) return false;
+    
+    // Verify user owns the scope
+    const scope = await this.getScopeSequence(unit.scopeId);
+    if (!scope || scope.userId !== userId) return false;
+    
+    await db.delete(sequenceUnits).where(eq(sequenceUnits.id, id));
+    return true;
+  }
+
+  // Scope Change Requests
+  async getScopeChangeRequests(scopeId: string): Promise<ScopeChangeRequest[]> {
+    return await db.select().from(scopeChangeRequests)
+      .where(eq(scopeChangeRequests.scopeId, scopeId))
+      .orderBy(desc(scopeChangeRequests.createdAt));
+  }
+
+  async createScopeChangeRequest(request: InsertScopeChangeRequest): Promise<ScopeChangeRequest> {
+    const [created] = await db.insert(scopeChangeRequests).values(request as any).returning();
+    return created;
+  }
+
+  async updateScopeChangeRequest(id: string, updates: Partial<ScopeChangeRequest>): Promise<ScopeChangeRequest | undefined> {
+    const [updated] = await db.update(scopeChangeRequests)
+      .set(updates)
+      .where(eq(scopeChangeRequests.id, id))
+      .returning();
+    return updated || undefined;
   }
 }
 

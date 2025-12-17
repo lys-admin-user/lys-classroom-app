@@ -2,7 +2,7 @@ import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { generateLessonPlan } from "./openai";
-import { generateLessonRequestSchema } from "@shared/schema";
+import { generateLessonRequestSchema, insertScopeSequenceSchema, insertSequenceUnitSchema, insertScopeChangeRequestSchema } from "@shared/schema";
 import { z } from "zod";
 import { setupAuth, registerAuthRoutes, isAuthenticated } from "./replit_integrations/auth";
 import { randomUUID } from "crypto";
@@ -397,6 +397,200 @@ export async function registerRoutes(
       res.json(resource);
     } catch (error) {
       res.status(500).json({ error: "Failed to fetch resource" });
+    }
+  });
+
+  // Scope and Sequence - requires auth
+  app.get("/api/scopes", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user?.claims?.sub;
+      const scopes = await storage.getScopeSequences(userId);
+      res.json(scopes);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch scope sequences" });
+    }
+  });
+
+  app.get("/api/scopes/:id", isAuthenticated, async (req: any, res) => {
+    try {
+      const { id } = req.params;
+      const scope = await storage.getScopeSequence(id);
+      if (!scope) {
+        res.status(404).json({ error: "Scope sequence not found" });
+        return;
+      }
+      // Get units for this scope
+      const units = await storage.getSequenceUnits(id);
+      res.json({ scope, units });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch scope sequence" });
+    }
+  });
+
+  app.post("/api/scopes", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user?.claims?.sub;
+      const validated = insertScopeSequenceSchema.parse(req.body);
+      const scope = await storage.createScopeSequence({
+        ...validated,
+        userId,
+      });
+      res.json(scope);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        res.status(400).json({ error: "Invalid scope data", details: error.errors });
+      } else {
+        console.error("Create scope error:", error);
+        res.status(500).json({ error: "Failed to create scope sequence" });
+      }
+    }
+  });
+
+  app.patch("/api/scopes/:id", isAuthenticated, async (req: any, res) => {
+    try {
+      const { id } = req.params;
+      const userId = req.user?.claims?.sub;
+      const updates = req.body;
+      
+      const updated = await storage.updateScopeSequence(id, updates, userId);
+      if (!updated) {
+        res.status(404).json({ error: "Scope not found or not authorized" });
+        return;
+      }
+      res.json(updated);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to update scope sequence" });
+    }
+  });
+
+  app.delete("/api/scopes/:id", isAuthenticated, async (req: any, res) => {
+    try {
+      const { id } = req.params;
+      const userId = req.user?.claims?.sub;
+      
+      const deleted = await storage.deleteScopeSequence(id, userId);
+      if (!deleted) {
+        res.status(404).json({ error: "Scope not found or not authorized" });
+        return;
+      }
+      res.json({ success: true });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to delete scope sequence" });
+    }
+  });
+
+  // Sequence Units
+  app.post("/api/scopes/:scopeId/units", isAuthenticated, async (req: any, res) => {
+    try {
+      const { scopeId } = req.params;
+      const userId = req.user?.claims?.sub;
+      
+      // Verify user owns the scope
+      const scope = await storage.getScopeSequence(scopeId);
+      if (!scope || scope.userId !== userId) {
+        res.status(403).json({ error: "Not authorized to add units to this scope" });
+        return;
+      }
+      
+      const validated = insertSequenceUnitSchema.parse({ ...req.body, scopeId });
+      const unit = await storage.createSequenceUnit(validated);
+      res.json(unit);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        res.status(400).json({ error: "Invalid unit data", details: error.errors });
+      } else {
+        console.error("Create unit error:", error);
+        res.status(500).json({ error: "Failed to create unit" });
+      }
+    }
+  });
+
+  app.patch("/api/units/:id", isAuthenticated, async (req: any, res) => {
+    try {
+      const { id } = req.params;
+      const userId = req.user?.claims?.sub;
+      const updates = req.body;
+      
+      const updated = await storage.updateSequenceUnit(id, updates, userId);
+      if (!updated) {
+        res.status(404).json({ error: "Unit not found or not authorized" });
+        return;
+      }
+      res.json(updated);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to update unit" });
+    }
+  });
+
+  app.delete("/api/units/:id", isAuthenticated, async (req: any, res) => {
+    try {
+      const { id } = req.params;
+      const userId = req.user?.claims?.sub;
+      
+      const deleted = await storage.deleteSequenceUnit(id, userId);
+      if (!deleted) {
+        res.status(404).json({ error: "Unit not found or not authorized" });
+        return;
+      }
+      res.json({ success: true });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to delete unit" });
+    }
+  });
+
+  // Scope Change Requests (for teacher suggestions on admin-set scopes)
+  app.get("/api/scopes/:scopeId/requests", isAuthenticated, async (req: any, res) => {
+    try {
+      const { scopeId } = req.params;
+      const requests = await storage.getScopeChangeRequests(scopeId);
+      res.json(requests);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch change requests" });
+    }
+  });
+
+  app.post("/api/scopes/:scopeId/requests", isAuthenticated, async (req: any, res) => {
+    try {
+      const { scopeId } = req.params;
+      const userId = req.user?.claims?.sub;
+      
+      const validated = insertScopeChangeRequestSchema.parse({
+        ...req.body,
+        scopeId,
+        userId,
+      });
+      const request = await storage.createScopeChangeRequest(validated);
+      res.json(request);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        res.status(400).json({ error: "Invalid request data", details: error.errors });
+      } else {
+        console.error("Create change request error:", error);
+        res.status(500).json({ error: "Failed to create change request" });
+      }
+    }
+  });
+
+  app.patch("/api/requests/:id", isAuthenticated, async (req: any, res) => {
+    try {
+      const { id } = req.params;
+      const userId = req.user?.claims?.sub;
+      const updates = req.body;
+      
+      // Add reviewer info if status is being updated
+      if (updates.status === "approved" || updates.status === "rejected") {
+        updates.reviewedBy = userId;
+        updates.reviewedAt = new Date();
+      }
+      
+      const updated = await storage.updateScopeChangeRequest(id, updates);
+      if (!updated) {
+        res.status(404).json({ error: "Change request not found" });
+        return;
+      }
+      res.json(updated);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to update change request" });
     }
   });
 
