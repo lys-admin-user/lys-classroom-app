@@ -5,8 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { BookOpen, Trash2, Clock, Target, GraduationCap, Heart, Compass, Lightbulb, AlertCircle, Share2, Link2, Check, BarChart3 } from "lucide-react";
-import { Progress } from "@/components/ui/progress";
+import { BookOpen, Trash2, Clock, Target, GraduationCap, Heart, Compass, Lightbulb, AlertCircle, Share2, Link2, BarChart3 } from "lucide-react";
 import { useAuth } from "@/hooks/use-auth";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
@@ -21,6 +20,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { ShareDialog } from "@/components/ShareDialog";
 
 const bkdConfig = {
   be: { label: "BE", icon: Heart, color: "bg-lys-red/10 text-lys-red border-lys-red/20" },
@@ -32,6 +32,7 @@ export default function MyLessons() {
   const { toast } = useToast();
   const { user, isLoading: authLoading, isAuthenticated } = useAuth();
   const [deleteId, setDeleteId] = useState<string | null>(null);
+  const [shareLesson, setShareLesson] = useState<{ id: string; title: string } | null>(null);
 
   const { data: lessons = [], isLoading } = useQuery<Lesson[]>({
     queryKey: ["/api/lessons"],
@@ -59,35 +60,6 @@ export default function MyLessons() {
     },
   });
 
-  const shareMutation = useMutation({
-    mutationFn: async (id: string) => {
-      const response = await apiRequest("POST", `/api/lessons/${id}/share`);
-      return await response.json();
-    },
-    onSuccess: (data, id) => {
-      queryClient.invalidateQueries({ queryKey: ["/api/lessons"] });
-      if (data.shareId) {
-        const shareUrl = `${window.location.origin}/shared/${data.shareId}`;
-        navigator.clipboard.writeText(shareUrl);
-        toast({
-          title: "Link Copied!",
-          description: "The share link has been copied to your clipboard.",
-        });
-      } else {
-        toast({
-          title: "Sharing Disabled",
-          description: "This lesson is no longer publicly accessible.",
-        });
-      }
-    },
-    onError: () => {
-      toast({
-        title: "Error",
-        description: "Failed to update sharing. Please try again.",
-        variant: "destructive",
-      });
-    },
-  });
 
   const standardsCoverage = useMemo(() => {
     if (!lessons || lessons.length === 0) return null;
@@ -328,8 +300,7 @@ export default function MyLessons() {
                     variant="ghost"
                     size="icon"
                     className={lesson.shareId ? "text-lys-teal" : "text-muted-foreground"}
-                    onClick={() => shareMutation.mutate(lesson.id)}
-                    disabled={shareMutation.isPending}
+                    onClick={() => setShareLesson({ id: lesson.id, title: lesson.title })}
                     data-testid={`button-share-${lesson.id}`}
                   >
                     {lesson.shareId ? <Link2 className="h-4 w-4" /> : <Share2 className="h-4 w-4" />}
@@ -370,6 +341,15 @@ export default function MyLessons() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {shareLesson && (
+        <ShareDialog
+          open={!!shareLesson}
+          onOpenChange={(open) => !open && setShareLesson(null)}
+          lessonId={shareLesson.id}
+          lessonTitle={shareLesson.title}
+        />
+      )}
     </div>
   );
 }
