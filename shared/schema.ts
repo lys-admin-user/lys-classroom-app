@@ -473,3 +473,132 @@ export const affiliateDashboardSchema = z.object({
 });
 
 export type AffiliateDashboard = z.infer<typeof affiliateDashboardSchema>;
+
+// ================================
+// Educational Standards Ingestion System
+// ================================
+
+// Jurisdictions (Countries/States that have standards)
+export const standardsJurisdictions = pgTable("standards_jurisdictions", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  externalId: varchar("external_id"), // CSP jurisdiction ID
+  country: text("country").notNull(),
+  name: text("name").notNull(), // e.g., "Texas", "California"
+  abbreviation: text("abbreviation").notNull(), // e.g., "TX", "CA"
+  standardsName: text("standards_name").notNull(), // e.g., "TEKS", "CCSS"
+  source: text("source").notNull(), // "csp", "case", "manual", "pdf_import"
+  sourceUrl: text("source_url"),
+  lastSyncedAt: timestamp("last_synced_at"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertJurisdictionSchema = createInsertSchema(standardsJurisdictions).omit({ id: true, createdAt: true, updatedAt: true });
+export type InsertStandardsJurisdiction = z.infer<typeof insertJurisdictionSchema>;
+export type StandardsJurisdiction = typeof standardsJurisdictions.$inferSelect;
+
+// Standard Sets (groups of standards, e.g., "Grade 6 Math")
+export const standardSets = pgTable("standard_sets", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  uid: varchar("uid").unique().notNull(), // Composite hash: country+state+year+grade+subject
+  externalId: varchar("external_id"), // CSP standard_set ID
+  jurisdictionId: varchar("jurisdiction_id").notNull(),
+  title: text("title").notNull(), // e.g., "Grade 6 Mathematics"
+  subject: text("subject").notNull(),
+  educationLevels: jsonb("education_levels").$type<string[]>(), // grade levels
+  documentTitle: text("document_title"), // source document title
+  documentUrl: text("document_url"),
+  documentYear: varchar("document_year"), // e.g., "2024"
+  licenseTitle: text("license_title"),
+  licenseUrl: text("license_url"),
+  source: text("source").notNull(), // "csp", "case", "manual", "pdf_import"
+  lastSyncedAt: timestamp("last_synced_at"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertStandardSetSchema = createInsertSchema(standardSets).omit({ id: true, createdAt: true, updatedAt: true });
+export type InsertStandardSet = z.infer<typeof insertStandardSetSchema>;
+export type StandardSet = typeof standardSets.$inferSelect;
+
+// Individual Standards (the actual learning objectives)
+export const educationalStandardsDb = pgTable("educational_standards", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  uid: varchar("uid").unique().notNull(), // Composite hash for deduplication
+  externalId: varchar("external_id"), // External system ID (CSP, CASE, ASN)
+  asnIdentifier: varchar("asn_identifier"), // Achievement Standards Network ID
+  standardSetId: varchar("standard_set_id").notNull(),
+  humanCoding: varchar("human_coding").notNull(), // e.g., "CCSS.ELA-LITERACY.RI.1.1"
+  statementLabel: text("statement_label"), // e.g., "Standard", "Cluster", "Domain"
+  statement: text("statement").notNull(), // The actual learning objective text
+  description: text("description"), // Extended description if available
+  gradeLevel: text("grade_level"), // e.g., "6", "K", "9-12"
+  depth: integer("depth").default(0), // Hierarchy depth in tree
+  position: integer("position").default(0), // Order position
+  parentId: varchar("parent_id"), // For hierarchical standards
+  versionHistory: jsonb("version_history").$type<{
+    version: string;
+    changedAt: string;
+    previousStatement?: string;
+    changeType: "create" | "update" | "deprecate";
+  }[]>(),
+  isActive: boolean("is_active").default(true),
+  source: text("source").notNull(), // "csp", "case", "manual", "pdf_import"
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertEducationalStandardSchema = createInsertSchema(educationalStandardsDb).omit({ id: true, createdAt: true, updatedAt: true });
+export type InsertEducationalStandard = z.infer<typeof insertEducationalStandardSchema>;
+export type EducationalStandard = typeof educationalStandardsDb.$inferSelect;
+
+// Standards Sync Log (tracks sync operations)
+export const standardsSyncLog = pgTable("standards_sync_log", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  source: text("source").notNull(), // "csp", "case", "pdf_import"
+  jurisdictionId: varchar("jurisdiction_id"),
+  standardSetId: varchar("standard_set_id"),
+  status: text("status").notNull(), // "started", "in_progress", "completed", "failed"
+  totalRecords: integer("total_records").default(0),
+  processedRecords: integer("processed_records").default(0),
+  newRecords: integer("new_records").default(0),
+  updatedRecords: integer("updated_records").default(0),
+  errorCount: integer("error_count").default(0),
+  errorMessages: jsonb("error_messages").$type<string[]>(),
+  startedAt: timestamp("started_at").defaultNow(),
+  completedAt: timestamp("completed_at"),
+  triggeredBy: varchar("triggered_by"), // "cron", "manual", user ID
+});
+
+export const insertSyncLogSchema = createInsertSchema(standardsSyncLog).omit({ id: true, startedAt: true });
+export type InsertSyncLog = z.infer<typeof insertSyncLogSchema>;
+export type SyncLog = typeof standardsSyncLog.$inferSelect;
+
+// PDF Import Queue (for Tier 3 sources)
+export const pdfImportQueue = pgTable("pdf_import_queue", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull(),
+  fileName: text("file_name").notNull(),
+  fileUrl: text("file_url"),
+  country: text("country").notNull(),
+  jurisdiction: text("jurisdiction").notNull(),
+  subject: text("subject"),
+  gradeLevel: text("grade_level"),
+  status: text("status").notNull().default("pending"), // "pending", "processing", "completed", "failed"
+  extractedData: jsonb("extracted_data").$type<{
+    rawText?: string;
+    standards?: Array<{
+      code: string;
+      statement: string;
+      gradeLevel?: string;
+    }>;
+    confidence?: number;
+  }>(),
+  errorMessage: text("error_message"),
+  createdAt: timestamp("created_at").defaultNow(),
+  processedAt: timestamp("processed_at"),
+});
+
+export const insertPdfImportSchema = createInsertSchema(pdfImportQueue).omit({ id: true, createdAt: true });
+export type InsertPdfImport = z.infer<typeof insertPdfImportSchema>;
+export type PdfImport = typeof pdfImportQueue.$inferSelect;

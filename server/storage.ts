@@ -27,6 +27,14 @@ import {
   type InsertReferralEvent,
   type AffiliateReward,
   type InsertAffiliateReward,
+  type StandardsJurisdiction,
+  type InsertStandardsJurisdiction,
+  type StandardSet,
+  type InsertStandardSet,
+  type EducationalStandard,
+  type InsertEducationalStandard,
+  type SyncLog,
+  type InsertSyncLog,
   lessons,
   goals,
   educatorProfiles,
@@ -39,6 +47,10 @@ import {
   educatorAffiliates,
   referralEvents,
   affiliateRewards,
+  standardsJurisdictions,
+  standardSets,
+  educationalStandardsDb,
+  standardsSyncLog,
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, desc, and, asc } from "drizzle-orm";
@@ -121,6 +133,30 @@ export interface IStorage {
   // Affiliate Rewards
   createAffiliateReward(reward: InsertAffiliateReward): Promise<AffiliateReward>;
   getAffiliateRewards(affiliateId: string): Promise<AffiliateReward[]>;
+  
+  // Educational Standards Ingestion
+  getJurisdictions(country?: string): Promise<StandardsJurisdiction[]>;
+  getJurisdiction(id: string): Promise<StandardsJurisdiction | undefined>;
+  getJurisdictionByAbbr(country: string, abbreviation: string): Promise<StandardsJurisdiction | undefined>;
+  createJurisdiction(jurisdiction: InsertStandardsJurisdiction): Promise<StandardsJurisdiction>;
+  updateJurisdiction(id: string, updates: Partial<StandardsJurisdiction>): Promise<StandardsJurisdiction | undefined>;
+  
+  getStandardSets(jurisdictionId: string): Promise<StandardSet[]>;
+  getStandardSet(id: string): Promise<StandardSet | undefined>;
+  getStandardSetByUid(uid: string): Promise<StandardSet | undefined>;
+  createStandardSet(set: InsertStandardSet): Promise<StandardSet>;
+  updateStandardSet(id: string, updates: Partial<StandardSet>): Promise<StandardSet | undefined>;
+  
+  getEducationalStandards(standardSetId: string): Promise<EducationalStandard[]>;
+  getEducationalStandard(id: string): Promise<EducationalStandard | undefined>;
+  getEducationalStandardByUid(uid: string): Promise<EducationalStandard | undefined>;
+  createEducationalStandard(standard: InsertEducationalStandard): Promise<EducationalStandard>;
+  updateEducationalStandard(id: string, updates: Partial<EducationalStandard>): Promise<EducationalStandard | undefined>;
+  bulkCreateEducationalStandards(standards: InsertEducationalStandard[]): Promise<EducationalStandard[]>;
+  
+  createSyncLog(log: InsertSyncLog): Promise<SyncLog>;
+  updateSyncLog(id: string, updates: Partial<SyncLog>): Promise<SyncLog | undefined>;
+  getLatestSyncLogs(limit?: number): Promise<SyncLog[]>;
 }
 
 // Seed data for careers and resources (static content)
@@ -714,6 +750,131 @@ export class DatabaseStorage implements IStorage {
     return await db.select().from(affiliateRewards)
       .where(eq(affiliateRewards.affiliateId, affiliateId))
       .orderBy(desc(affiliateRewards.createdAt));
+  }
+
+  // Educational Standards Ingestion
+  async getJurisdictions(country?: string): Promise<StandardsJurisdiction[]> {
+    if (country) {
+      return await db.select().from(standardsJurisdictions)
+        .where(eq(standardsJurisdictions.country, country))
+        .orderBy(asc(standardsJurisdictions.name));
+    }
+    return await db.select().from(standardsJurisdictions)
+      .orderBy(asc(standardsJurisdictions.country), asc(standardsJurisdictions.name));
+  }
+
+  async getJurisdiction(id: string): Promise<StandardsJurisdiction | undefined> {
+    const [result] = await db.select().from(standardsJurisdictions)
+      .where(eq(standardsJurisdictions.id, id));
+    return result || undefined;
+  }
+
+  async getJurisdictionByAbbr(country: string, abbreviation: string): Promise<StandardsJurisdiction | undefined> {
+    const [result] = await db.select().from(standardsJurisdictions)
+      .where(and(
+        eq(standardsJurisdictions.country, country),
+        eq(standardsJurisdictions.abbreviation, abbreviation)
+      ));
+    return result || undefined;
+  }
+
+  async createJurisdiction(jurisdiction: InsertStandardsJurisdiction): Promise<StandardsJurisdiction> {
+    const [created] = await db.insert(standardsJurisdictions).values(jurisdiction as any).returning();
+    return created;
+  }
+
+  async updateJurisdiction(id: string, updates: Partial<StandardsJurisdiction>): Promise<StandardsJurisdiction | undefined> {
+    const [updated] = await db.update(standardsJurisdictions)
+      .set({ ...updates, updatedAt: new Date() })
+      .where(eq(standardsJurisdictions.id, id))
+      .returning();
+    return updated || undefined;
+  }
+
+  async getStandardSets(jurisdictionId: string): Promise<StandardSet[]> {
+    return await db.select().from(standardSets)
+      .where(eq(standardSets.jurisdictionId, jurisdictionId))
+      .orderBy(asc(standardSets.title));
+  }
+
+  async getStandardSet(id: string): Promise<StandardSet | undefined> {
+    const [result] = await db.select().from(standardSets)
+      .where(eq(standardSets.id, id));
+    return result || undefined;
+  }
+
+  async getStandardSetByUid(uid: string): Promise<StandardSet | undefined> {
+    const [result] = await db.select().from(standardSets)
+      .where(eq(standardSets.uid, uid));
+    return result || undefined;
+  }
+
+  async createStandardSet(set: InsertStandardSet): Promise<StandardSet> {
+    const [created] = await db.insert(standardSets).values(set as any).returning();
+    return created;
+  }
+
+  async updateStandardSet(id: string, updates: Partial<StandardSet>): Promise<StandardSet | undefined> {
+    const [updated] = await db.update(standardSets)
+      .set({ ...updates, updatedAt: new Date() })
+      .where(eq(standardSets.id, id))
+      .returning();
+    return updated || undefined;
+  }
+
+  async getEducationalStandards(standardSetId: string): Promise<EducationalStandard[]> {
+    return await db.select().from(educationalStandardsDb)
+      .where(eq(educationalStandardsDb.standardSetId, standardSetId))
+      .orderBy(asc(educationalStandardsDb.position));
+  }
+
+  async getEducationalStandard(id: string): Promise<EducationalStandard | undefined> {
+    const [result] = await db.select().from(educationalStandardsDb)
+      .where(eq(educationalStandardsDb.id, id));
+    return result || undefined;
+  }
+
+  async getEducationalStandardByUid(uid: string): Promise<EducationalStandard | undefined> {
+    const [result] = await db.select().from(educationalStandardsDb)
+      .where(eq(educationalStandardsDb.uid, uid));
+    return result || undefined;
+  }
+
+  async createEducationalStandard(standard: InsertEducationalStandard): Promise<EducationalStandard> {
+    const [created] = await db.insert(educationalStandardsDb).values(standard as any).returning();
+    return created;
+  }
+
+  async updateEducationalStandard(id: string, updates: Partial<EducationalStandard>): Promise<EducationalStandard | undefined> {
+    const [updated] = await db.update(educationalStandardsDb)
+      .set({ ...updates, updatedAt: new Date() })
+      .where(eq(educationalStandardsDb.id, id))
+      .returning();
+    return updated || undefined;
+  }
+
+  async bulkCreateEducationalStandards(standards: InsertEducationalStandard[]): Promise<EducationalStandard[]> {
+    if (standards.length === 0) return [];
+    return await db.insert(educationalStandardsDb).values(standards as any[]).returning();
+  }
+
+  async createSyncLog(log: InsertSyncLog): Promise<SyncLog> {
+    const [created] = await db.insert(standardsSyncLog).values(log as any).returning();
+    return created;
+  }
+
+  async updateSyncLog(id: string, updates: Partial<SyncLog>): Promise<SyncLog | undefined> {
+    const [updated] = await db.update(standardsSyncLog)
+      .set(updates)
+      .where(eq(standardsSyncLog.id, id))
+      .returning();
+    return updated || undefined;
+  }
+
+  async getLatestSyncLogs(limit: number = 20): Promise<SyncLog[]> {
+    return await db.select().from(standardsSyncLog)
+      .orderBy(desc(standardsSyncLog.startedAt))
+      .limit(limit);
   }
 }
 
