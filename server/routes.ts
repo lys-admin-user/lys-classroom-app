@@ -751,5 +751,197 @@ export async function registerRoutes(
     }
   });
 
+  // Affiliate System - Get or create affiliate profile
+  app.get("/api/affiliate/me", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user?.claims?.sub;
+      let affiliate = await storage.getEducatorAffiliate(userId);
+      
+      if (!affiliate) {
+        const referralCode = `LYS${userId.substring(0, 6).toUpperCase()}${Date.now().toString(36).toUpperCase()}`;
+        affiliate = await storage.createEducatorAffiliate({
+          userId,
+          referralCode,
+          displayName: req.user?.claims?.name || null,
+          isActive: true,
+        });
+      }
+      
+      res.json(affiliate);
+    } catch (error) {
+      console.error("Get affiliate error:", error);
+      res.status(500).json({ error: "Failed to get affiliate profile" });
+    }
+  });
+
+  // Get affiliate dashboard with stats
+  app.get("/api/affiliate/dashboard", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user?.claims?.sub;
+      let affiliate = await storage.getEducatorAffiliate(userId);
+      
+      if (!affiliate) {
+        res.status(404).json({ error: "Affiliate profile not found" });
+        return;
+      }
+      
+      const recentEvents = await storage.getReferralEvents(affiliate.id, 20);
+      const rewards = await storage.getAffiliateRewards(affiliate.id);
+      
+      res.json({
+        affiliate,
+        recentEvents,
+        rewards,
+      });
+    } catch (error) {
+      console.error("Get affiliate dashboard error:", error);
+      res.status(500).json({ error: "Failed to get affiliate dashboard" });
+    }
+  });
+
+  // Update affiliate profile
+  app.patch("/api/affiliate/me", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user?.claims?.sub;
+      const { displayName, bio } = req.body;
+      
+      const updated = await storage.updateEducatorAffiliate(userId, {
+        displayName,
+        bio,
+      });
+      
+      if (!updated) {
+        res.status(404).json({ error: "Affiliate profile not found" });
+        return;
+      }
+      
+      res.json(updated);
+    } catch (error) {
+      console.error("Update affiliate error:", error);
+      res.status(500).json({ error: "Failed to update affiliate profile" });
+    }
+  });
+
+  // Track referral event (public endpoint for shared lesson views)
+  app.post("/api/referral/track", async (req, res) => {
+    try {
+      const { shareId, referralCode, eventType, channel, visitorId } = req.body;
+      
+      if (!eventType) {
+        res.status(400).json({ error: "Event type is required" });
+        return;
+      }
+      
+      let affiliate;
+      if (referralCode) {
+        affiliate = await storage.getEducatorAffiliateByCode(referralCode);
+      } else if (shareId) {
+        const lesson = await storage.getLessonByShareId(shareId);
+        if (lesson) {
+          affiliate = await storage.getEducatorAffiliate(lesson.userId);
+        }
+      }
+      
+      if (!affiliate) {
+        res.status(404).json({ error: "Invalid referral" });
+        return;
+      }
+      
+      const pointsMap: Record<string, number> = {
+        view: 1,
+        share: 5,
+        copy_link: 2,
+        signup: 50,
+        lesson_save: 25,
+      };
+      
+      const event = await storage.createReferralEvent({
+        affiliateId: affiliate.id,
+        shareId: shareId || null,
+        eventType,
+        channel: channel || "direct",
+        visitorId: visitorId || null,
+        pointsEarned: pointsMap[eventType] || 0,
+      });
+      
+      if (pointsMap[eventType] && pointsMap[eventType] > 0) {
+        await storage.createAffiliateReward({
+          affiliateId: affiliate.id,
+          points: pointsMap[eventType],
+          rewardType: "earned",
+          description: `${eventType} from ${channel || "direct"} link`,
+          eventId: event.id,
+        });
+      }
+      
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Track referral error:", error);
+      res.status(500).json({ error: "Failed to track referral" });
+    }
+  });
+
+  // Generate share URL with referral code
+  app.post("/api/lessons/:id/share-link", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user?.claims?.sub;
+      const { id } = req.params;
+      const { channel } = req.body;
+      
+      const lesson = await storage.getLesson(id);
+      if (!lesson || lesson.userId !== userId) {
+        res.status(404).json({ error: "Lesson not found or not authorized" });
+        return;
+      }
+      
+      let shareId = lesson.shareId;
+      if (!shareId) {
+        const result = await storage.toggleLessonShare(id, userId);
+        shareId = result?.shareId || null;
+      }
+      
+      let affiliate = await storage.getEducatorAffiliate(userId);
+      if (!affiliate) {
+        const referralCode = `LYS${userId.substring(0, 6).toUpperCase()}${Date.now().toString(36).toUpperCase()}`;
+        affiliate = await storage.createEducatorAffiliate({
+          userId,
+          referralCode,
+          displayName: req.user?.claims?.name || null,
+          isActive: true,
+        });
+      }
+      
+      if (channel) {
+        await storage.createReferralEvent({
+          affiliateId: affiliate.id,
+          lessonId: id,
+          shareId,
+          eventType: "share",
+          channel,
+          pointsEarned: 5,
+        });
+        
+        await storage.createAffiliateReward({
+          affiliateId: affiliate.id,
+          points: 5,
+          rewardType: "earned",
+          description: `Shared lesson via ${channel}`,
+        });
+      }
+      
+      const baseUrl = `${req.protocol}://${req.get("host")}`;
+      const shareUrl = `${baseUrl}/shared/${shareId}?ref=${affiliate.referralCode}`;
+      
+      res.json({
+        shareUrl,
+        shareId,
+        referralCode: affiliate.referralCode,
+      });
+    } catch (error) {
+      console.error("Generate share link error:", error);
+      res.status(500).json({ error: "Failed to generate share link" });
+    }
+  });
+
   return httpServer;
 }
