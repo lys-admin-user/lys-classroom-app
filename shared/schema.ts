@@ -385,3 +385,91 @@ export const savedCareers = pgTable("saved_careers", {
 export const insertSavedCareerSchema = createInsertSchema(savedCareers).omit({ id: true, createdAt: true });
 export type InsertSavedCareer = z.infer<typeof insertSavedCareerSchema>;
 export type SavedCareer = typeof savedCareers.$inferSelect;
+
+// Educator Affiliate Profiles
+export const educatorAffiliates = pgTable("educator_affiliates", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull(),
+  referralCode: varchar("referral_code").notNull(), // unique code like "TEACH123"
+  displayName: text("display_name"),
+  bio: text("bio"),
+  totalPoints: integer("total_points").default(0),
+  totalViews: integer("total_views").default(0),
+  totalShares: integer("total_shares").default(0),
+  totalReferrals: integer("total_referrals").default(0),
+  isActive: boolean("is_active").default(true),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertEducatorAffiliateSchema = createInsertSchema(educatorAffiliates).omit({ id: true, createdAt: true, updatedAt: true });
+export type InsertEducatorAffiliate = z.infer<typeof insertEducatorAffiliateSchema>;
+export type EducatorAffiliate = typeof educatorAffiliates.$inferSelect;
+
+// Referral Events (tracks views, shares, signups from shared content)
+export const referralEvents = pgTable("referral_events", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  affiliateId: varchar("affiliate_id").notNull(),
+  lessonId: varchar("lesson_id"),
+  shareId: varchar("share_id"),
+  eventType: text("event_type").notNull(), // "view", "share", "copy_link", "signup", "lesson_save"
+  channel: text("channel"), // "twitter", "facebook", "linkedin", "email", "direct"
+  visitorId: text("visitor_id"), // anonymous tracking ID
+  referredUserId: varchar("referred_user_id"), // if they signed up
+  pointsEarned: integer("points_earned").default(0),
+  metadata: jsonb("metadata").$type<Record<string, unknown>>(),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertReferralEventSchema = createInsertSchema(referralEvents).omit({ id: true, createdAt: true });
+export type InsertReferralEvent = z.infer<typeof insertReferralEventSchema>;
+export type ReferralEvent = typeof referralEvents.$inferSelect;
+
+// Affiliate Rewards (points ledger for redemption)
+export const affiliateRewards = pgTable("affiliate_rewards", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  affiliateId: varchar("affiliate_id").notNull(),
+  points: integer("points").notNull(),
+  rewardType: text("reward_type").notNull(), // "earned", "redeemed", "bonus"
+  description: text("description"),
+  status: text("status").default("active"), // "active", "pending", "redeemed", "expired"
+  eventId: varchar("event_id"), // links to referral event if applicable
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertAffiliateRewardSchema = createInsertSchema(affiliateRewards).omit({ id: true, createdAt: true });
+export type InsertAffiliateReward = z.infer<typeof insertAffiliateRewardSchema>;
+export type AffiliateReward = typeof affiliateRewards.$inferSelect;
+
+// Affiliate Dashboard Stats (computed type for API response)
+export const affiliateDashboardSchema = z.object({
+  affiliate: z.object({
+    id: z.string(),
+    userId: z.string(),
+    referralCode: z.string(),
+    displayName: z.string().nullable(),
+    bio: z.string().nullable(),
+    totalPoints: z.number().nullable(),
+    totalViews: z.number().nullable(),
+    totalShares: z.number().nullable(),
+    totalReferrals: z.number().nullable(),
+    isActive: z.boolean().nullable(),
+  }),
+  recentEvents: z.array(z.object({
+    id: z.string(),
+    eventType: z.string(),
+    channel: z.string().nullable(),
+    pointsEarned: z.number().nullable(),
+    createdAt: z.date().nullable(),
+  })),
+  rewards: z.array(z.object({
+    id: z.string(),
+    points: z.number(),
+    rewardType: z.string(),
+    description: z.string().nullable(),
+    status: z.string().nullable(),
+    createdAt: z.date().nullable(),
+  })),
+});
+
+export type AffiliateDashboard = z.infer<typeof affiliateDashboardSchema>;
