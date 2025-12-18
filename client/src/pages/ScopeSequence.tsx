@@ -23,8 +23,9 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Link } from "wouter";
-import type { ScopeSequence, SequenceUnit } from "@shared/schema";
+import type { ScopeSequence, SequenceUnit, ScopeChangeRequest } from "@shared/schema";
 import { educationalStandards } from "@shared/standards";
+import { useTier } from "@/hooks/use-tier";
 
 const createScopeSchema = z.object({
   title: z.string().min(1, "Title is required"),
@@ -52,9 +53,38 @@ export default function ScopeSequencePage() {
   const [importProgress, setImportProgress] = useState(0);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  const { tier } = useTier();
+  const isCampusAdmin = tier === "campus" || tier === "enterprise";
+
   const { data: scopes = [], isLoading } = useQuery<ScopeSequence[]>({
     queryKey: ["/api/scopes"],
     enabled: isAuthenticated,
+  });
+
+  const { data: pendingRequests = [] } = useQuery<ScopeChangeRequest[]>({
+    queryKey: ["/api/admin/change-requests"],
+    enabled: isAuthenticated && isCampusAdmin,
+  });
+
+  const reviewRequestMutation = useMutation({
+    mutationFn: async ({ id, status, adminNotes }: { id: string; status: "approved" | "rejected"; adminNotes?: string }) => {
+      const response = await apiRequest("PATCH", `/api/requests/${id}`, { status, adminNotes });
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/change-requests"] });
+      toast({
+        title: "Request Updated",
+        description: "The change request has been reviewed.",
+      });
+    },
+    onError: () => {
+      toast({
+        title: "Error",
+        description: "Failed to update request. Please try again.",
+        variant: "destructive",
+      });
+    },
   });
 
   const form = useForm<CreateScopeFormData>({
@@ -581,43 +611,119 @@ export default function ScopeSequencePage() {
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-6">
-                <div>
-                  <h3 className="font-oswald text-lg mb-3 flex items-center gap-2">
-                    <Users className="h-4 w-4" />
-                    Default Scope Assignments
-                  </h3>
-                  <p className="text-sm text-muted-foreground mb-4">
-                    Set default scopes that all teachers in your campus will use as their starting point.
-                  </p>
+                {!isCampusAdmin ? (
                   <Card className="border-dashed">
                     <CardContent className="py-8 text-center">
                       <Building2 className="h-10 w-10 mx-auto text-muted-foreground/50 mb-2" />
                       <p className="text-muted-foreground text-sm">
-                        Campus admin features coming soon. You'll be able to assign default scopes
-                        to all teachers and manage change requests.
+                        Campus administration features are available for campus and enterprise tier users.
+                        Contact your administrator to upgrade your account.
                       </p>
                     </CardContent>
                   </Card>
-                </div>
-                
-                <div>
-                  <h3 className="font-oswald text-lg mb-3 flex items-center gap-2">
-                    <FileText className="h-4 w-4" />
-                    Pending Change Requests
-                  </h3>
-                  <p className="text-sm text-muted-foreground mb-4">
-                    Review and approve teacher requests to modify campus-assigned scopes.
-                  </p>
-                  <Card className="border-dashed">
-                    <CardContent className="py-8 text-center">
-                      <CheckCircle className="h-10 w-10 mx-auto text-muted-foreground/50 mb-2" />
-                      <p className="text-muted-foreground text-sm">
-                        No pending change requests. Teachers can submit requests when they want to 
-                        customize the campus-assigned scope for their classroom.
+                ) : (
+                  <>
+                    <div>
+                      <h3 className="font-oswald text-lg mb-3 flex items-center gap-2">
+                        <Users className="h-4 w-4" />
+                        Default Scope Assignments
+                      </h3>
+                      <p className="text-sm text-muted-foreground mb-4">
+                        Set default scopes that all teachers in your campus will use as their starting point.
                       </p>
-                    </CardContent>
-                  </Card>
-                </div>
+                      <div className="grid gap-4">
+                        {scopes.filter(s => s.status === "published").length === 0 ? (
+                          <Card className="border-dashed">
+                            <CardContent className="py-8 text-center">
+                              <LayoutList className="h-10 w-10 mx-auto text-muted-foreground/50 mb-2" />
+                              <p className="text-muted-foreground text-sm">
+                                Create and publish a scope & sequence first to assign it as a campus default.
+                              </p>
+                            </CardContent>
+                          </Card>
+                        ) : (
+                          scopes.filter(s => s.status === "published").map((scope) => (
+                            <Card key={scope.id} className="hover-elevate">
+                              <CardContent className="p-4 flex items-center justify-between gap-4">
+                                <div>
+                                  <p className="font-oswald">{scope.title}</p>
+                                  <p className="text-sm text-muted-foreground font-roboto">
+                                    {scope.subject} - Grade {scope.gradeLevel}
+                                  </p>
+                                </div>
+                                <Badge variant="secondary">Published</Badge>
+                              </CardContent>
+                            </Card>
+                          ))
+                        )}
+                      </div>
+                    </div>
+                    
+                    <div>
+                      <h3 className="font-oswald text-lg mb-3 flex items-center gap-2">
+                        <FileText className="h-4 w-4" />
+                        Pending Change Requests
+                        {pendingRequests.length > 0 && (
+                          <Badge variant="destructive" className="ml-2">{pendingRequests.length}</Badge>
+                        )}
+                      </h3>
+                      <p className="text-sm text-muted-foreground mb-4">
+                        Review and approve teacher requests to modify campus-assigned scopes.
+                      </p>
+                      {pendingRequests.length === 0 ? (
+                        <Card className="border-dashed">
+                          <CardContent className="py-8 text-center">
+                            <CheckCircle className="h-10 w-10 mx-auto text-muted-foreground/50 mb-2" />
+                            <p className="text-muted-foreground text-sm">
+                              No pending change requests. Teachers can submit requests when they want to 
+                              customize the campus-assigned scope for their classroom.
+                            </p>
+                          </CardContent>
+                        </Card>
+                      ) : (
+                        <div className="space-y-4">
+                          {pendingRequests.map((request) => (
+                            <Card key={request.id}>
+                              <CardContent className="p-4">
+                                <div className="flex items-start justify-between gap-4 flex-wrap">
+                                  <div>
+                                    <Badge variant="outline" className="mb-2 capitalize">{request.changeType.replace("_", " ")}</Badge>
+                                    <p className="font-oswald text-sm">Scope ID: {request.scopeId}</p>
+                                    {request.reason && (
+                                      <p className="text-sm text-muted-foreground font-roboto mt-1">
+                                        Reason: {request.reason}
+                                      </p>
+                                    )}
+                                  </div>
+                                  <div className="flex gap-2">
+                                    <Button
+                                      size="sm"
+                                      variant="outline"
+                                      onClick={() => reviewRequestMutation.mutate({ id: request.id, status: "rejected" })}
+                                      disabled={reviewRequestMutation.isPending}
+                                      data-testid={`button-reject-request-${request.id}`}
+                                    >
+                                      Reject
+                                    </Button>
+                                    <Button
+                                      size="sm"
+                                      className="bg-lys-teal hover:bg-lys-teal/90 text-white"
+                                      onClick={() => reviewRequestMutation.mutate({ id: request.id, status: "approved" })}
+                                      disabled={reviewRequestMutation.isPending}
+                                      data-testid={`button-approve-request-${request.id}`}
+                                    >
+                                      Approve
+                                    </Button>
+                                  </div>
+                                </div>
+                              </CardContent>
+                            </Card>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  </>
+                )}
               </CardContent>
             </Card>
           </TabsContent>

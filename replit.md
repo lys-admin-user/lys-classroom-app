@@ -27,9 +27,15 @@ Preferred communication style: Simple, everyday language.
 
 ### Data Layer
 - **ORM**: Drizzle ORM with PostgreSQL dialect
-- **Database**: PostgreSQL with lessons and goals tables tied to authenticated users
+- **Database**: PostgreSQL with full user data persistence
 - **Schema Location**: `shared/schema.ts` contains all database tables and Zod validation schemas
-- **Storage**: `DatabaseStorage` implementation using PostgreSQL for lessons and goals
+- **Storage**: `DatabaseStorage` implementation using PostgreSQL for:
+  - Lessons and lesson sharing
+  - Goals with milestones
+  - Scope & Sequence with units
+  - Self-discovery assessment results
+  - Saved careers
+  - Scope change requests
 - **Shared Types**: Schema types are shared between client and server via `@shared/*` path alias
 
 ### Authentication & Security
@@ -56,12 +62,26 @@ The application is structured around the LYS methodology:
 ### Scope & Sequence Builder
 Yearly curriculum planning tool for educators:
 - **Build From Scratch**: Multi-step wizard with Country → State → Subject → Grade selection
-- **Import Existing**: Upload PDF/DOCX/TXT documents (stub implementation for parsing)
+- **Import Existing**: Upload PDF/DOCX/TXT documents with intelligent unit extraction using pdf-parse and mammoth
 - **Skip Option**: Teachers can skip to lesson planning if they don't need scope planning
 - **Unit Management**: Add/edit units with standards alignment, transfer goals, and timeline
-- **Campus Admin Tab**: Placeholder for managing campus-wide default scopes and change request approvals
+- **Campus Admin Tab**: For campus/enterprise tier users to view published scopes and approve/reject teacher change requests
 - **Database Tables**: `scope_sequences`, `sequence_units`, `campus_scopes`, `scope_change_requests`
 - **Pages**: `/scope-sequence` (list/manage scopes), `/scope/:id` (edit individual scope with units)
+
+### Self-Discovery Module
+BE pillar assessment tool:
+- **9-Question Assessment**: Evaluates Be-Know-Do competencies with personalized scoring
+- **Results Persistence**: Saves assessment results to database for authenticated users
+- **Career Connection**: Links to career exploration based on results
+- **Page**: `/self-discovery`
+
+### Career Exploration
+KNOW pillar features:
+- **Career Database**: Detailed career information with pathways, salaries, and requirements
+- **Save Careers**: Authenticated users can save/unsave careers for future reference
+- **Pathway Types**: College, Military, Trade School, Certification options
+- **Page**: `/careers`
 
 ### Educational Standards System
 The lesson generator requires legally-compliant educational standards:

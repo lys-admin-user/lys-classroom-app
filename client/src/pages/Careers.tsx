@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation } from "@tanstack/react-query";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -24,9 +24,13 @@ import {
   ArrowRight,
   Star,
   Clock,
-  X
+  X,
+  Check
 } from "lucide-react";
-import type { Career } from "@shared/schema";
+import type { Career, SavedCareer } from "@shared/schema";
+import { useAuth } from "@/hooks/use-auth";
+import { useToast } from "@/hooks/use-toast";
+import { apiRequest, queryClient } from "@/lib/queryClient";
 
 const categories = [
   { value: "all", label: "All Categories", icon: Briefcase },
@@ -49,9 +53,66 @@ export default function Careers() {
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedCategory, setSelectedCategory] = useState("all");
   const [selectedCareer, setSelectedCareer] = useState<Career | null>(null);
+  const { isAuthenticated } = useAuth();
+  const { toast } = useToast();
 
   const { data: careers = [], isLoading } = useQuery<Career[]>({
     queryKey: ["/api/careers"],
+  });
+
+  const { data: savedCareers = [] } = useQuery<SavedCareer[]>({
+    queryKey: ["/api/saved-careers"],
+    enabled: isAuthenticated,
+  });
+
+  const isCareerSaved = (careerId: string) => 
+    savedCareers.some((sc) => sc.careerId === careerId);
+
+  const saveCareerMutation = useMutation({
+    mutationFn: async (career: Career) => {
+      const response = await apiRequest("POST", "/api/saved-careers", {
+        careerId: career.id,
+        careerTitle: career.title,
+        careerCategory: career.category,
+      });
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/saved-careers"] });
+      toast({
+        title: "Career Saved",
+        description: "This career has been added to your saved list.",
+      });
+    },
+    onError: () => {
+      toast({
+        title: "Error",
+        description: "Failed to save career. Please try again.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const unsaveCareerMutation = useMutation({
+    mutationFn: async (careerId: string) => {
+      const savedCareer = savedCareers.find((sc) => sc.careerId === careerId);
+      if (!savedCareer) throw new Error("Career not found");
+      await apiRequest("DELETE", `/api/saved-careers/${savedCareer.id}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/saved-careers"] });
+      toast({
+        title: "Career Removed",
+        description: "This career has been removed from your saved list.",
+      });
+    },
+    onError: () => {
+      toast({
+        title: "Error",
+        description: "Failed to remove career. Please try again.",
+        variant: "destructive",
+      });
+    },
   });
 
   const filteredCareers = careers.filter((career) => {
@@ -94,10 +155,30 @@ export default function Careers() {
                     {selectedCareer.description}
                   </CardDescription>
                 </div>
-                <Button className="bg-lys-red hover:bg-lys-red/90 text-white font-oswald gap-2" data-testid="button-save-career">
-                  <Star className="h-4 w-4" />
-                  Save Career
-                </Button>
+                {isAuthenticated && (
+                  isCareerSaved(selectedCareer.id) ? (
+                    <Button 
+                      variant="outline" 
+                      className="font-oswald gap-2"
+                      onClick={() => unsaveCareerMutation.mutate(selectedCareer.id)}
+                      disabled={unsaveCareerMutation.isPending}
+                      data-testid="button-unsave-career"
+                    >
+                      <Check className="h-4 w-4" />
+                      Saved
+                    </Button>
+                  ) : (
+                    <Button 
+                      className="bg-lys-red hover:bg-lys-red/90 text-white font-oswald gap-2"
+                      onClick={() => saveCareerMutation.mutate(selectedCareer)}
+                      disabled={saveCareerMutation.isPending}
+                      data-testid="button-save-career"
+                    >
+                      <Star className="h-4 w-4" />
+                      Save Career
+                    </Button>
+                  )
+                )}
               </div>
             </CardHeader>
             <CardContent className="p-6 space-y-8">

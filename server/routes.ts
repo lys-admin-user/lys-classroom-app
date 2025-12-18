@@ -676,5 +676,80 @@ export async function registerRoutes(
     }
   });
 
+  // Get all pending change requests (for campus admin)
+  app.get("/api/admin/change-requests", isAuthenticated, async (req: any, res) => {
+    try {
+      const requests = await storage.getAllPendingChangeRequests();
+      res.json(requests);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch pending change requests" });
+    }
+  });
+
+  // Self-Discovery Results
+  app.get("/api/self-discovery/results", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user?.claims?.sub;
+      const results = await storage.getSelfDiscoveryResults(userId);
+      res.json(results);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch self-discovery results" });
+    }
+  });
+
+  app.post("/api/self-discovery/results", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user?.claims?.sub;
+      const result = await storage.saveSelfDiscoveryResult({
+        ...req.body,
+        userId,
+      });
+      res.json(result);
+    } catch (error) {
+      console.error("Save self-discovery result error:", error);
+      res.status(500).json({ error: "Failed to save self-discovery result" });
+    }
+  });
+
+  // Saved Careers
+  app.get("/api/saved-careers", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user?.claims?.sub;
+      const careers = await storage.getSavedCareers(userId);
+      res.json(careers);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch saved careers" });
+    }
+  });
+
+  app.post("/api/saved-careers", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user?.claims?.sub;
+      const career = await storage.saveCareer({
+        ...req.body,
+        userId,
+      });
+      res.json(career);
+    } catch (error) {
+      console.error("Save career error:", error);
+      res.status(500).json({ error: "Failed to save career" });
+    }
+  });
+
+  app.delete("/api/saved-careers/:id", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user?.claims?.sub;
+      const { id } = req.params;
+      const deleted = await storage.deleteSavedCareer(id, userId);
+      if (!deleted) {
+        res.status(404).json({ error: "Saved career not found or not authorized" });
+        return;
+      }
+      res.json({ success: true });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to delete saved career" });
+    }
+  });
+
   return httpServer;
 }

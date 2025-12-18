@@ -17,6 +17,10 @@ import {
   type InsertSequenceUnit,
   type ScopeChangeRequest,
   type InsertScopeChangeRequest,
+  type SelfDiscoveryResult,
+  type InsertSelfDiscoveryResult,
+  type SavedCareer,
+  type InsertSavedCareer,
   lessons,
   goals,
   educatorProfiles,
@@ -24,6 +28,8 @@ import {
   scopeSequences,
   sequenceUnits,
   scopeChangeRequests,
+  selfDiscoveryResults,
+  savedCareers,
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, desc, and, asc } from "drizzle-orm";
@@ -80,8 +86,18 @@ export interface IStorage {
   
   // Scope Change Requests
   getScopeChangeRequests(scopeId: string): Promise<ScopeChangeRequest[]>;
+  getAllPendingChangeRequests(): Promise<ScopeChangeRequest[]>;
   createScopeChangeRequest(request: InsertScopeChangeRequest): Promise<ScopeChangeRequest>;
   updateScopeChangeRequest(id: string, updates: Partial<ScopeChangeRequest>): Promise<ScopeChangeRequest | undefined>;
+  
+  // Self-Discovery Results
+  getSelfDiscoveryResults(userId: string): Promise<SelfDiscoveryResult[]>;
+  saveSelfDiscoveryResult(result: InsertSelfDiscoveryResult): Promise<SelfDiscoveryResult>;
+  
+  // Saved Careers
+  getSavedCareers(userId: string): Promise<SavedCareer[]>;
+  saveCareer(career: InsertSavedCareer): Promise<SavedCareer>;
+  deleteSavedCareer(id: string, userId: string): Promise<boolean>;
 }
 
 // Seed data for careers and resources (static content)
@@ -561,6 +577,44 @@ export class DatabaseStorage implements IStorage {
       .where(eq(scopeChangeRequests.id, id))
       .returning();
     return updated || undefined;
+  }
+
+  async getAllPendingChangeRequests(): Promise<ScopeChangeRequest[]> {
+    return await db.select().from(scopeChangeRequests)
+      .where(eq(scopeChangeRequests.status, "pending"))
+      .orderBy(desc(scopeChangeRequests.createdAt));
+  }
+
+  // Self-Discovery Results
+  async getSelfDiscoveryResults(userId: string): Promise<SelfDiscoveryResult[]> {
+    return await db.select().from(selfDiscoveryResults)
+      .where(eq(selfDiscoveryResults.userId, userId))
+      .orderBy(desc(selfDiscoveryResults.createdAt));
+  }
+
+  async saveSelfDiscoveryResult(result: InsertSelfDiscoveryResult): Promise<SelfDiscoveryResult> {
+    const [created] = await db.insert(selfDiscoveryResults).values(result as any).returning();
+    return created;
+  }
+
+  // Saved Careers
+  async getSavedCareers(userId: string): Promise<SavedCareer[]> {
+    return await db.select().from(savedCareers)
+      .where(eq(savedCareers.userId, userId))
+      .orderBy(desc(savedCareers.createdAt));
+  }
+
+  async saveCareer(career: InsertSavedCareer): Promise<SavedCareer> {
+    const [created] = await db.insert(savedCareers).values(career as any).returning();
+    return created;
+  }
+
+  async deleteSavedCareer(id: string, userId: string): Promise<boolean> {
+    const [existing] = await db.select().from(savedCareers)
+      .where(and(eq(savedCareers.id, id), eq(savedCareers.userId, userId)));
+    if (!existing) return false;
+    await db.delete(savedCareers).where(eq(savedCareers.id, id));
+    return true;
   }
 }
 

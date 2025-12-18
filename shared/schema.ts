@@ -352,3 +352,36 @@ export const scopeWithUnitsSchema = z.object({
 });
 
 export type ScopeWithUnits = z.infer<typeof scopeWithUnitsSchema>;
+
+// Self-Discovery Assessment Results
+export const selfDiscoveryResults = pgTable("self_discovery_results", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull(),
+  beScore: integer("be_score").notNull(),
+  knowScore: integer("know_score").notNull(),
+  doScore: integer("do_score").notNull(),
+  totalScore: integer("total_score").notNull(),
+  strengths: jsonb("strengths").$type<string[]>().default([]),
+  growthAreas: jsonb("growth_areas").$type<string[]>().default([]),
+  answers: jsonb("answers").$type<Record<string, { value: string; score: number }>>(),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertSelfDiscoveryResultSchema = createInsertSchema(selfDiscoveryResults).omit({ id: true, createdAt: true });
+export type InsertSelfDiscoveryResult = z.infer<typeof insertSelfDiscoveryResultSchema>;
+export type SelfDiscoveryResult = typeof selfDiscoveryResults.$inferSelect;
+
+// Saved Careers (for students to bookmark careers they're interested in)
+export const savedCareers = pgTable("saved_careers", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull(),
+  careerId: varchar("career_id").notNull(),
+  careerTitle: text("career_title").notNull(),
+  careerCategory: text("career_category"),
+  notes: text("notes"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertSavedCareerSchema = createInsertSchema(savedCareers).omit({ id: true, createdAt: true });
+export type InsertSavedCareer = z.infer<typeof insertSavedCareerSchema>;
+export type SavedCareer = typeof savedCareers.$inferSelect;

@@ -1,5 +1,6 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
+import { useLocation } from "wouter";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
@@ -12,6 +13,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/use-auth";
 import { useTier } from "@/hooks/use-tier";
 import { AdBanner } from "@/components/AdBanner";
+import { apiRequest } from "@/lib/queryClient";
 
 interface Question {
   id: string;
@@ -126,12 +128,43 @@ export default function SelfDiscovery() {
   const { toast } = useToast();
   const { isAuthenticated } = useAuth();
   const { showAds } = useTier();
+  const [, setLocation] = useLocation();
   const [currentQuestion, setCurrentQuestion] = useState(0);
   const [answers, setAnswers] = useState<Record<string, { value: string; score: number }>>({});
   const [showResults, setShowResults] = useState(false);
+  const [resultsSaved, setResultsSaved] = useState(false);
 
   const progress = ((currentQuestion + 1) / assessmentQuestions.length) * 100;
   const question = assessmentQuestions[currentQuestion];
+
+  const saveResultsMutation = useMutation({
+    mutationFn: async (results: Results) => {
+      const response = await apiRequest("POST", "/api/self-discovery/results", {
+        beScore: results.be,
+        knowScore: results.know,
+        doScore: results.do,
+        totalScore: results.total,
+        strengths: results.strengths,
+        growthAreas: results.growthAreas,
+        answers,
+      });
+      return response.json();
+    },
+    onSuccess: () => {
+      setResultsSaved(true);
+      toast({
+        title: "Results Saved",
+        description: "Your assessment results have been saved to your profile.",
+      });
+    },
+    onError: () => {
+      toast({
+        title: "Error",
+        description: "Failed to save results. Please try again.",
+        variant: "destructive",
+      });
+    },
+  });
 
   const handleAnswer = (value: string, score: number) => {
     setAnswers((prev) => ({
@@ -289,12 +322,33 @@ export default function SelfDiscovery() {
             </CardContent>
           </Card>
 
-          <div className="flex justify-center gap-4">
+          <div className="flex flex-wrap justify-center gap-4">
             <Button variant="outline" onClick={resetAssessment} className="gap-2" data-testid="button-retake">
               <RotateCcw className="h-4 w-4" />
               Take Again
             </Button>
-            <Button className="bg-lys-red hover:bg-lys-red/90 text-white gap-2" data-testid="button-explore-careers">
+            {isAuthenticated && !resultsSaved && (
+              <Button 
+                variant="outline" 
+                onClick={() => saveResultsMutation.mutate(results)}
+                disabled={saveResultsMutation.isPending}
+                className="gap-2" 
+                data-testid="button-save-results"
+              >
+                <Sparkles className="h-4 w-4" />
+                {saveResultsMutation.isPending ? "Saving..." : "Save Results"}
+              </Button>
+            )}
+            {resultsSaved && (
+              <Badge variant="secondary" className="font-roboto py-2 px-4">
+                Results Saved
+              </Badge>
+            )}
+            <Button 
+              className="bg-lys-red hover:bg-lys-red/90 text-white gap-2" 
+              onClick={() => setLocation("/careers")}
+              data-testid="button-explore-careers"
+            >
               <BookOpen className="h-4 w-4" />
               Explore Careers
             </Button>
