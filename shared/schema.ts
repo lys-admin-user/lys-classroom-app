@@ -602,3 +602,50 @@ export const pdfImportQueue = pgTable("pdf_import_queue", {
 export const insertPdfImportSchema = createInsertSchema(pdfImportQueue).omit({ id: true, createdAt: true });
 export type InsertPdfImport = z.infer<typeof insertPdfImportSchema>;
 export type PdfImport = typeof pdfImportQueue.$inferSelect;
+
+// Standards Staging Table (for approval workflow)
+export const standardsStaging = pgTable("standards_staging", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  jurisdictionId: varchar("jurisdiction_id").notNull(),
+  standardSetId: varchar("standard_set_id"),
+  humanCoding: varchar("human_coding").notNull(),
+  statement: text("statement").notNull(),
+  description: text("description"),
+  gradeLevel: text("grade_level"),
+  depth: integer("depth").default(0),
+  position: integer("position").default(0),
+  parentCode: varchar("parent_code"),
+  source: text("source").notNull(), // "csp", "case", "pdf_import", "llm_extract"
+  rawSourceText: text("raw_source_text"), // Original text before processing
+  extractionConfidence: integer("extraction_confidence"), // AI confidence 0-100
+  status: text("status").notNull().default("pending"), // "pending", "approved", "rejected"
+  reviewedBy: varchar("reviewed_by"),
+  reviewedAt: timestamp("reviewed_at"),
+  rejectionReason: text("rejection_reason"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertStagingSchema = createInsertSchema(standardsStaging).omit({ id: true, createdAt: true });
+export type InsertStandardsStaging = z.infer<typeof insertStagingSchema>;
+export type StandardsStaging = typeof standardsStaging.$inferSelect;
+
+// Source Checksums (for change detection watchdog)
+export const sourceChecksums = pgTable("source_checksums", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  sourceUrl: text("source_url").notNull().unique(),
+  sourceName: text("source_name").notNull(),
+  jurisdictionId: varchar("jurisdiction_id"),
+  standardSetId: varchar("standard_set_id"),
+  etag: varchar("etag"),
+  md5Hash: varchar("md5_hash"),
+  contentLength: integer("content_length"),
+  lastModified: timestamp("last_modified"),
+  lastCheckedAt: timestamp("last_checked_at").defaultNow(),
+  hasChanged: boolean("has_changed").default(false),
+  changeDetectedAt: timestamp("change_detected_at"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertChecksumSchema = createInsertSchema(sourceChecksums).omit({ id: true, createdAt: true });
+export type InsertSourceChecksum = z.infer<typeof insertChecksumSchema>;
+export type SourceChecksum = typeof sourceChecksums.$inferSelect;

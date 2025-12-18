@@ -35,6 +35,12 @@ import {
   type InsertEducationalStandard,
   type SyncLog,
   type InsertSyncLog,
+  type StandardsStaging,
+  type InsertStandardsStaging,
+  type SourceChecksum,
+  type InsertSourceChecksum,
+  type PdfImport,
+  type InsertPdfImport,
   lessons,
   goals,
   educatorProfiles,
@@ -51,6 +57,9 @@ import {
   standardSets,
   educationalStandardsDb,
   standardsSyncLog,
+  standardsStaging,
+  sourceChecksums,
+  pdfImportQueue,
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, desc, and, asc } from "drizzle-orm";
@@ -157,6 +166,29 @@ export interface IStorage {
   createSyncLog(log: InsertSyncLog): Promise<SyncLog>;
   updateSyncLog(id: string, updates: Partial<SyncLog>): Promise<SyncLog | undefined>;
   getLatestSyncLogs(limit?: number): Promise<SyncLog[]>;
+  
+  // Standards Staging (Approval Queue)
+  createStagingStandard(staging: InsertStandardsStaging): Promise<StandardsStaging>;
+  getStagingStandards(status?: string): Promise<StandardsStaging[]>;
+  updateStagingStandard(id: string, updates: Partial<StandardsStaging>): Promise<StandardsStaging | undefined>;
+  approveStagingStandard(id: string, reviewerId: string): Promise<EducationalStandard | undefined>;
+  rejectStagingStandard(id: string, reviewerId: string, reason: string): Promise<StandardsStaging | undefined>;
+  bulkCreateStagingStandards(standards: InsertStandardsStaging[]): Promise<StandardsStaging[]>;
+  
+  // Source Checksums (Change Detection)
+  createSourceChecksum(checksum: InsertSourceChecksum): Promise<SourceChecksum>;
+  getSourceChecksum(sourceUrl: string): Promise<SourceChecksum | undefined>;
+  updateSourceChecksum(id: string, updates: Partial<SourceChecksum>): Promise<SourceChecksum | undefined>;
+  getChangedSources(): Promise<SourceChecksum[]>;
+  
+  // PDF Import Queue
+  createPdfImport(pdfImport: InsertPdfImport): Promise<PdfImport>;
+  getPdfImport(id: string): Promise<PdfImport | undefined>;
+  updatePdfImport(id: string, updates: Partial<PdfImport>): Promise<PdfImport | undefined>;
+  getPdfImports(userId: string): Promise<PdfImport[]>;
+  
+  // Soft Delete for Standards
+  deprecateStandard(id: string): Promise<EducationalStandard | undefined>;
 }
 
 // Seed data for careers and resources (static content)
@@ -875,6 +907,139 @@ export class DatabaseStorage implements IStorage {
     return await db.select().from(standardsSyncLog)
       .orderBy(desc(standardsSyncLog.startedAt))
       .limit(limit);
+  }
+
+  // Standards Staging (Approval Queue)
+  async createStagingStandard(staging: InsertStandardsStaging): Promise<StandardsStaging> {
+    const [created] = await db.insert(standardsStaging).values(staging as any).returning();
+    return created;
+  }
+
+  async getStagingStandards(status?: string): Promise<StandardsStaging[]> {
+    if (status) {
+      return await db.select().from(standardsStaging)
+        .where(eq(standardsStaging.status, status))
+        .orderBy(desc(standardsStaging.createdAt));
+    }
+    return await db.select().from(standardsStaging)
+      .orderBy(desc(standardsStaging.createdAt));
+  }
+
+  async updateStagingStandard(id: string, updates: Partial<StandardsStaging>): Promise<StandardsStaging | undefined> {
+    const [updated] = await db.update(standardsStaging)
+      .set(updates)
+      .where(eq(standardsStaging.id, id))
+      .returning();
+    return updated || undefined;
+  }
+
+  async approveStagingStandard(id: string, reviewerId: string): Promise<EducationalStandard | undefined> {
+    const [staging] = await db.select().from(standardsStaging).where(eq(standardsStaging.id, id));
+    if (!staging) return undefined;
+
+    await db.update(standardsStaging)
+      .set({ status: "approved", reviewedBy: reviewerId, reviewedAt: new Date() })
+      .where(eq(standardsStaging.id, id));
+
+    const uid = `${staging.jurisdictionId}-${staging.humanCoding}-${Date.now()}`;
+    const [created] = await db.insert(educationalStandardsDb).values({
+      uid,
+      standardSetId: staging.standardSetId || "",
+      humanCoding: staging.humanCoding,
+      statement: staging.statement,
+      description: staging.description,
+      gradeLevel: staging.gradeLevel,
+      depth: staging.depth,
+      position: staging.position,
+      isActive: true,
+      source: staging.source,
+      versionHistory: [{ version: "1.0", changedAt: new Date().toISOString(), changeType: "create" as const }],
+    } as any).returning();
+    return created;
+  }
+
+  async rejectStagingStandard(id: string, reviewerId: string, reason: string): Promise<StandardsStaging | undefined> {
+    const [updated] = await db.update(standardsStaging)
+      .set({ status: "rejected", reviewedBy: reviewerId, reviewedAt: new Date(), rejectionReason: reason })
+      .where(eq(standardsStaging.id, id))
+      .returning();
+    return updated || undefined;
+  }
+
+  async bulkCreateStagingStandards(standards: InsertStandardsStaging[]): Promise<StandardsStaging[]> {
+    if (standards.length === 0) return [];
+    return await db.insert(standardsStaging).values(standards as any[]).returning();
+  }
+
+  // Source Checksums (Change Detection)
+  async createSourceChecksum(checksum: InsertSourceChecksum): Promise<SourceChecksum> {
+    const [created] = await db.insert(sourceChecksums).values(checksum as any).returning();
+    return created;
+  }
+
+  async getSourceChecksum(sourceUrl: string): Promise<SourceChecksum | undefined> {
+    const [result] = await db.select().from(sourceChecksums)
+      .where(eq(sourceChecksums.sourceUrl, sourceUrl));
+    return result || undefined;
+  }
+
+  async updateSourceChecksum(id: string, updates: Partial<SourceChecksum>): Promise<SourceChecksum | undefined> {
+    const [updated] = await db.update(sourceChecksums)
+      .set({ ...updates, lastCheckedAt: new Date() })
+      .where(eq(sourceChecksums.id, id))
+      .returning();
+    return updated || undefined;
+  }
+
+  async getChangedSources(): Promise<SourceChecksum[]> {
+    return await db.select().from(sourceChecksums)
+      .where(eq(sourceChecksums.hasChanged, true));
+  }
+
+  // PDF Import Queue
+  async createPdfImport(pdfImport: InsertPdfImport): Promise<PdfImport> {
+    const [created] = await db.insert(pdfImportQueue).values(pdfImport as any).returning();
+    return created;
+  }
+
+  async getPdfImport(id: string): Promise<PdfImport | undefined> {
+    const [result] = await db.select().from(pdfImportQueue)
+      .where(eq(pdfImportQueue.id, id));
+    return result || undefined;
+  }
+
+  async updatePdfImport(id: string, updates: Partial<PdfImport>): Promise<PdfImport | undefined> {
+    const [updated] = await db.update(pdfImportQueue)
+      .set(updates)
+      .where(eq(pdfImportQueue.id, id))
+      .returning();
+    return updated || undefined;
+  }
+
+  async getPdfImports(userId: string): Promise<PdfImport[]> {
+    return await db.select().from(pdfImportQueue)
+      .where(eq(pdfImportQueue.userId, userId))
+      .orderBy(desc(pdfImportQueue.createdAt));
+  }
+
+  // Soft Delete for Standards
+  async deprecateStandard(id: string): Promise<EducationalStandard | undefined> {
+    const existing = await this.getEducationalStandard(id);
+    if (!existing) return undefined;
+
+    const versionHistory = existing.versionHistory || [];
+    versionHistory.push({
+      version: new Date().toISOString(),
+      changedAt: new Date().toISOString(),
+      previousStatement: existing.statement,
+      changeType: "deprecate",
+    });
+
+    const [updated] = await db.update(educationalStandardsDb)
+      .set({ isActive: false, versionHistory, updatedAt: new Date() })
+      .where(eq(educationalStandardsDb.id, id))
+      .returning();
+    return updated || undefined;
   }
 }
 

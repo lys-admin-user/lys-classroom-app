@@ -1,15 +1,26 @@
 import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { z } from "zod";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { RefreshCw, Database, FileText, CheckCircle, XCircle, Clock, ChevronRight, AlertCircle } from "lucide-react";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Textarea } from "@/components/ui/textarea";
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
+import { RefreshCw, Database, FileText, CheckCircle, XCircle, Clock, ChevronRight, AlertCircle, ClipboardCheck, Sparkles } from "lucide-react";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
-import type { StandardsJurisdiction, StandardSet, EducationalStandard, SyncLog } from "@shared/schema";
+import type { StandardsJurisdiction, StandardSet, EducationalStandard, SyncLog, StandardsStaging } from "@shared/schema";
+
+const extractFormSchema = z.object({
+  jurisdictionName: z.string().min(1, "Please select a jurisdiction"),
+  rawText: z.string().min(10, "Please paste some text to extract standards from"),
+});
 
 interface SyncStatus {
   lastSync: string | null;
@@ -89,6 +100,20 @@ export default function StandardsAdmin() {
     queryKey: ["/api/admin/standards/sync-logs"],
   });
 
+  const { data: stagingStandards } = useQuery<StandardsStaging[]>({
+    queryKey: ["/api/admin/standards/staging"],
+  });
+
+  const [selectedStaging, setSelectedStaging] = useState<string[]>([]);
+
+  const extractForm = useForm<z.infer<typeof extractFormSchema>>({
+    resolver: zodResolver(extractFormSchema),
+    defaultValues: {
+      jurisdictionName: "",
+      rawText: "",
+    },
+  });
+
   const syncJurisdictionsMutation = useMutation({
     mutationFn: () => apiRequest("POST", "/api/admin/standards/sync/jurisdictions"),
     onSuccess: (data: any) => {
@@ -108,6 +133,47 @@ export default function StandardsAdmin() {
       });
     },
   });
+
+  const approveMutation = useMutation({
+    mutationFn: (id: string) => apiRequest("POST", `/api/admin/standards/staging/${id}/approve`),
+    onSuccess: () => {
+      toast({ title: "Standard Approved", description: "Standard has been moved to active standards" });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/standards/staging"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/standards/status"] });
+    },
+  });
+
+  const rejectMutation = useMutation({
+    mutationFn: ({ id, reason }: { id: string; reason: string }) => 
+      apiRequest("POST", `/api/admin/standards/staging/${id}/reject`, { reason }),
+    onSuccess: () => {
+      toast({ title: "Standard Rejected" });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/standards/staging"] });
+    },
+  });
+
+  const bulkApproveMutation = useMutation({
+    mutationFn: (ids: string[]) => apiRequest("POST", "/api/admin/standards/staging/bulk-approve", { ids }),
+    onSuccess: (data: any) => {
+      toast({ title: "Bulk Approval Complete", description: `${data.approved} standards approved` });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/standards/staging"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/standards/status"] });
+      setSelectedStaging([]);
+    },
+  });
+
+  const extractMutation = useMutation({
+    mutationFn: ({ rawText, jurisdictionName }: { rawText: string; jurisdictionName: string }) =>
+      apiRequest("POST", "/api/admin/standards/extract", { rawText, jurisdictionName }),
+    onSuccess: (data: any) => {
+      toast({
+        title: "Extraction Complete",
+        description: `${data.extractedCount} standards extracted. ${data.validationMessage}`,
+      });
+    },
+  });
+
+  const pendingCount = stagingStandards?.filter(s => s.status === "pending").length || 0;
 
   return (
     <div className="container py-8 max-w-6xl">
@@ -160,6 +226,17 @@ export default function StandardsAdmin() {
           <TabsTrigger value="browse" data-testid="tab-browse">
             <Database className="h-4 w-4 mr-2" />
             Browse Standards
+          </TabsTrigger>
+          <TabsTrigger value="staging" data-testid="tab-staging">
+            <ClipboardCheck className="h-4 w-4 mr-2" />
+            Staging Queue
+            {pendingCount > 0 && (
+              <Badge variant="secondary" className="ml-2">{pendingCount}</Badge>
+            )}
+          </TabsTrigger>
+          <TabsTrigger value="extract" data-testid="tab-extract">
+            <Sparkles className="h-4 w-4 mr-2" />
+            LLM Extract
           </TabsTrigger>
           <TabsTrigger value="logs" data-testid="tab-logs">
             <FileText className="h-4 w-4 mr-2" />
@@ -279,6 +356,172 @@ export default function StandardsAdmin() {
               </CardContent>
             </Card>
           )}
+        </TabsContent>
+
+        <TabsContent value="staging" className="space-y-4">
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between gap-4">
+              <div>
+                <CardTitle>Staging Queue</CardTitle>
+                <CardDescription>
+                  Review and approve new standards before they go live
+                </CardDescription>
+              </div>
+              {selectedStaging.length > 0 && (
+                <Button
+                  onClick={() => bulkApproveMutation.mutate(selectedStaging)}
+                  disabled={bulkApproveMutation.isPending}
+                  data-testid="button-bulk-approve"
+                >
+                  <CheckCircle className="h-4 w-4 mr-2" />
+                  Approve Selected ({selectedStaging.length})
+                </Button>
+              )}
+            </CardHeader>
+            <CardContent>
+              <ScrollArea className="h-[500px]">
+                <div className="space-y-3">
+                  {stagingStandards && stagingStandards.filter(s => s.status === "pending").length > 0 ? (
+                    stagingStandards
+                      .filter(s => s.status === "pending")
+                      .map((staging) => (
+                        <div
+                          key={staging.id}
+                          className="p-4 rounded-md border bg-card"
+                          data-testid={`staging-${staging.id}`}
+                        >
+                          <div className="flex items-start gap-3">
+                            <Checkbox
+                              checked={selectedStaging.includes(staging.id)}
+                              onCheckedChange={(checked) => {
+                                if (checked) {
+                                  setSelectedStaging([...selectedStaging, staging.id]);
+                                } else {
+                                  setSelectedStaging(selectedStaging.filter(id => id !== staging.id));
+                                }
+                              }}
+                              data-testid={`checkbox-staging-${staging.id}`}
+                            />
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center gap-2 flex-wrap mb-1">
+                                <Badge variant="outline" className="font-mono text-xs">
+                                  {staging.humanCoding}
+                                </Badge>
+                                <Badge variant="secondary">
+                                  {staging.sourceType}
+                                </Badge>
+                              </div>
+                              <p className="text-sm text-foreground">{staging.statement}</p>
+                              {staging.jurisdictionName && (
+                                <p className="text-xs text-muted-foreground mt-1">
+                                  {staging.jurisdictionName} {staging.subject && `• ${staging.subject}`}
+                                </p>
+                              )}
+                            </div>
+                            <div className="flex gap-2 shrink-0">
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => approveMutation.mutate(staging.id)}
+                                disabled={approveMutation.isPending}
+                                data-testid={`button-approve-${staging.id}`}
+                              >
+                                <CheckCircle className="h-4 w-4" />
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => rejectMutation.mutate({ id: staging.id, reason: "Rejected by admin" })}
+                                disabled={rejectMutation.isPending}
+                                data-testid={`button-reject-${staging.id}`}
+                              >
+                                <XCircle className="h-4 w-4" />
+                              </Button>
+                            </div>
+                          </div>
+                        </div>
+                      ))
+                  ) : (
+                    <div className="text-center py-12 text-muted-foreground">
+                      <CheckCircle className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                      <p>No pending standards</p>
+                      <p className="text-sm">All standards have been reviewed</p>
+                    </div>
+                  )}
+                </div>
+              </ScrollArea>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="extract" className="space-y-4">
+          <Card>
+            <CardHeader>
+              <CardTitle>LLM-Powered Extraction</CardTitle>
+              <CardDescription>
+                Extract standards from raw text using AI. Paste PDF text content below.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <Form {...extractForm}>
+                <form
+                  onSubmit={extractForm.handleSubmit((data) => extractMutation.mutate(data))}
+                  className="space-y-4"
+                >
+                  <FormField
+                    control={extractForm.control}
+                    name="jurisdictionName"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Jurisdiction Name</FormLabel>
+                        <Select onValueChange={field.onChange} value={field.value}>
+                          <FormControl>
+                            <SelectTrigger data-testid="select-llm-jurisdiction">
+                              <SelectValue placeholder="Select jurisdiction..." />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            {jurisdictions?.map((j) => (
+                              <SelectItem key={j.id} value={j.name}>
+                                {j.name} ({j.abbreviation})
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={extractForm.control}
+                    name="rawText"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Raw Text</FormLabel>
+                        <FormControl>
+                          <Textarea
+                            placeholder="Paste raw text from PDF or document..."
+                            className="min-h-[200px] font-mono text-sm"
+                            data-testid="textarea-llm-text"
+                            {...field}
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <Button
+                    type="submit"
+                    disabled={extractMutation.isPending}
+                    data-testid="button-extract"
+                  >
+                    <Sparkles className={`h-4 w-4 mr-2 ${extractMutation.isPending ? "animate-pulse" : ""}`} />
+                    {extractMutation.isPending ? "Extracting..." : "Extract Standards"}
+                  </Button>
+                </form>
+              </Form>
+            </CardContent>
+          </Card>
         </TabsContent>
 
         <TabsContent value="logs" className="space-y-4">

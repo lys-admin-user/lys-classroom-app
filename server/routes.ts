@@ -9,6 +9,7 @@ import { setupAuth, registerAuthRoutes, isAuthenticated } from "./replit_integra
 import { randomUUID } from "crypto";
 import multer from "multer";
 import { syncJurisdictionsFromCSP, syncStandardSetFromCSP, getSyncStatus, fetchCSPJurisdictions } from "./services/cspService";
+import { extractStandardsFromText, processPdfImport, checkSourceForChanges } from "./services/llmExtractionService";
 
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 10 * 1024 * 1024 } });
 
@@ -1115,6 +1116,157 @@ export async function registerRoutes(
     } catch (error) {
       console.error("Get standard codes error:", error);
       res.status(500).json({ error: "Failed to get standard codes" });
+    }
+  });
+
+  // ================================
+  // Standards Staging Queue (Approval Workflow)
+  // ================================
+
+  // Get staging standards (pending, approved, rejected)
+  app.get("/api/admin/standards/staging", isAuthenticated, async (req: any, res) => {
+    try {
+      const status = req.query.status as string | undefined;
+      const staging = await storage.getStagingStandards(status);
+      res.json(staging);
+    } catch (error) {
+      console.error("Get staging standards error:", error);
+      res.status(500).json({ error: "Failed to get staging standards" });
+    }
+  });
+
+  // Approve a staging standard
+  app.post("/api/admin/standards/staging/:id/approve", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user?.claims?.sub;
+      const { id } = req.params;
+      const result = await storage.approveStagingStandard(id, userId);
+      if (!result) {
+        res.status(404).json({ error: "Staging standard not found" });
+        return;
+      }
+      res.json({ success: true, standard: result });
+    } catch (error) {
+      console.error("Approve staging error:", error);
+      res.status(500).json({ error: "Failed to approve staging standard" });
+    }
+  });
+
+  // Reject a staging standard
+  app.post("/api/admin/standards/staging/:id/reject", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user?.claims?.sub;
+      const { id } = req.params;
+      const { reason } = req.body;
+      const result = await storage.rejectStagingStandard(id, userId, reason || "No reason provided");
+      if (!result) {
+        res.status(404).json({ error: "Staging standard not found" });
+        return;
+      }
+      res.json({ success: true, staging: result });
+    } catch (error) {
+      console.error("Reject staging error:", error);
+      res.status(500).json({ error: "Failed to reject staging standard" });
+    }
+  });
+
+  // Bulk approve staging standards
+  app.post("/api/admin/standards/staging/bulk-approve", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user?.claims?.sub;
+      const { ids } = req.body;
+      if (!Array.isArray(ids) || ids.length === 0) {
+        res.status(400).json({ error: "No IDs provided" });
+        return;
+      }
+      let approved = 0;
+      for (const id of ids) {
+        const result = await storage.approveStagingStandard(id, userId);
+        if (result) approved++;
+      }
+      res.json({ success: true, approved });
+    } catch (error) {
+      console.error("Bulk approve error:", error);
+      res.status(500).json({ error: "Failed to bulk approve" });
+    }
+  });
+
+  // ================================
+  // LLM Extraction (Tier 3)
+  // ================================
+
+  // Extract standards from text using LLM
+  app.post("/api/admin/standards/extract", isAuthenticated, async (req: any, res) => {
+    try {
+      const { rawText, jurisdictionName, subject, gradeLevel } = req.body;
+      if (!rawText || !jurisdictionName) {
+        res.status(400).json({ error: "Missing rawText or jurisdictionName" });
+        return;
+      }
+      const result = await extractStandardsFromText(rawText, jurisdictionName, subject, gradeLevel);
+      res.json(result);
+    } catch (error) {
+      console.error("LLM extraction error:", error);
+      res.status(500).json({ error: "Failed to extract standards" });
+    }
+  });
+
+  // Process a PDF import
+  app.post("/api/admin/standards/pdf/:id/process", isAuthenticated, async (req: any, res) => {
+    try {
+      const { id } = req.params;
+      const result = await processPdfImport(id);
+      res.json(result);
+    } catch (error) {
+      console.error("PDF process error:", error);
+      res.status(500).json({ error: "Failed to process PDF" });
+    }
+  });
+
+  // ================================
+  // Change Detection (Watchdog)
+  // ================================
+
+  // Check a source URL for changes
+  app.post("/api/admin/standards/check-source", isAuthenticated, async (req: any, res) => {
+    try {
+      const { sourceUrl } = req.body;
+      if (!sourceUrl) {
+        res.status(400).json({ error: "Missing sourceUrl" });
+        return;
+      }
+      const result = await checkSourceForChanges(sourceUrl);
+      res.json(result);
+    } catch (error) {
+      console.error("Check source error:", error);
+      res.status(500).json({ error: "Failed to check source" });
+    }
+  });
+
+  // Get all sources with detected changes
+  app.get("/api/admin/standards/changed-sources", isAuthenticated, async (req: any, res) => {
+    try {
+      const sources = await storage.getChangedSources();
+      res.json(sources);
+    } catch (error) {
+      console.error("Get changed sources error:", error);
+      res.status(500).json({ error: "Failed to get changed sources" });
+    }
+  });
+
+  // Deprecate a standard (soft delete)
+  app.post("/api/admin/standards/:id/deprecate", isAuthenticated, async (req: any, res) => {
+    try {
+      const { id } = req.params;
+      const result = await storage.deprecateStandard(id);
+      if (!result) {
+        res.status(404).json({ error: "Standard not found" });
+        return;
+      }
+      res.json({ success: true, standard: result });
+    } catch (error) {
+      console.error("Deprecate standard error:", error);
+      res.status(500).json({ error: "Failed to deprecate standard" });
     }
   });
 
