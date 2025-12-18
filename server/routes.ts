@@ -8,6 +8,7 @@ import { z } from "zod";
 import { setupAuth, registerAuthRoutes, isAuthenticated } from "./replit_integrations/auth";
 import { randomUUID } from "crypto";
 import multer from "multer";
+import { syncJurisdictionsFromCSP, syncStandardSetFromCSP, getSyncStatus, fetchCSPJurisdictions } from "./services/cspService";
 
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 10 * 1024 * 1024 } });
 
@@ -940,6 +941,180 @@ export async function registerRoutes(
     } catch (error) {
       console.error("Generate share link error:", error);
       res.status(500).json({ error: "Failed to generate share link" });
+    }
+  });
+
+  // ================================
+  // Educational Standards Admin API
+  // ================================
+
+  // Get sync status and statistics
+  app.get("/api/admin/standards/status", isAuthenticated, async (req: any, res) => {
+    try {
+      const status = await getSyncStatus();
+      res.json(status);
+    } catch (error) {
+      console.error("Get standards status error:", error);
+      res.status(500).json({ error: "Failed to get standards status" });
+    }
+  });
+
+  // Get all jurisdictions (from database)
+  app.get("/api/admin/standards/jurisdictions", isAuthenticated, async (req: any, res) => {
+    try {
+      const country = req.query.country as string | undefined;
+      const jurisdictions = await storage.getJurisdictions(country);
+      res.json(jurisdictions);
+    } catch (error) {
+      console.error("Get jurisdictions error:", error);
+      res.status(500).json({ error: "Failed to get jurisdictions" });
+    }
+  });
+
+  // Get standard sets for a jurisdiction
+  app.get("/api/admin/standards/jurisdictions/:id/sets", isAuthenticated, async (req: any, res) => {
+    try {
+      const { id } = req.params;
+      const sets = await storage.getStandardSets(id);
+      res.json(sets);
+    } catch (error) {
+      console.error("Get standard sets error:", error);
+      res.status(500).json({ error: "Failed to get standard sets" });
+    }
+  });
+
+  // Get individual standards for a standard set
+  app.get("/api/admin/standards/sets/:id/standards", isAuthenticated, async (req: any, res) => {
+    try {
+      const { id } = req.params;
+      const standards = await storage.getEducationalStandards(id);
+      res.json(standards);
+    } catch (error) {
+      console.error("Get standards error:", error);
+      res.status(500).json({ error: "Failed to get standards" });
+    }
+  });
+
+  // Sync jurisdictions from CSP (Tier 1)
+  app.post("/api/admin/standards/sync/jurisdictions", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user?.claims?.sub;
+      const result = await syncJurisdictionsFromCSP(userId);
+      res.json(result);
+    } catch (error) {
+      console.error("Sync jurisdictions error:", error);
+      res.status(500).json({ error: "Failed to sync jurisdictions" });
+    }
+  });
+
+  // Sync a specific standard set from CSP
+  app.post("/api/admin/standards/sync/standard-set", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user?.claims?.sub;
+      const { externalSetId, jurisdictionId } = req.body;
+      
+      if (!externalSetId || !jurisdictionId) {
+        res.status(400).json({ error: "Missing externalSetId or jurisdictionId" });
+        return;
+      }
+      
+      const result = await syncStandardSetFromCSP(externalSetId, jurisdictionId, userId);
+      res.json(result);
+    } catch (error) {
+      console.error("Sync standard set error:", error);
+      res.status(500).json({ error: "Failed to sync standard set" });
+    }
+  });
+
+  // Get available jurisdictions from CSP API (for discovery)
+  app.get("/api/admin/standards/csp/jurisdictions", isAuthenticated, async (req: any, res) => {
+    try {
+      const jurisdictions = await fetchCSPJurisdictions();
+      res.json(jurisdictions);
+    } catch (error) {
+      console.error("Fetch CSP jurisdictions error:", error);
+      res.status(500).json({ error: "Failed to fetch CSP jurisdictions" });
+    }
+  });
+
+  // Get sync logs
+  app.get("/api/admin/standards/sync-logs", isAuthenticated, async (req: any, res) => {
+    try {
+      const limit = parseInt(req.query.limit as string) || 20;
+      const logs = await storage.getLatestSyncLogs(limit);
+      res.json(logs);
+    } catch (error) {
+      console.error("Get sync logs error:", error);
+      res.status(500).json({ error: "Failed to get sync logs" });
+    }
+  });
+
+  // Public API to get standards for lesson planning (used by frontend)
+  app.get("/api/standards/countries", async (req, res) => {
+    try {
+      const jurisdictions = await storage.getJurisdictions();
+      const countries = [...new Set(jurisdictions.map(j => j.country))];
+      res.json(countries);
+    } catch (error) {
+      console.error("Get countries error:", error);
+      res.status(500).json({ error: "Failed to get countries" });
+    }
+  });
+
+  app.get("/api/standards/states/:country", async (req, res) => {
+    try {
+      const { country } = req.params;
+      const jurisdictions = await storage.getJurisdictions(country);
+      res.json(jurisdictions.map(j => ({
+        state: j.name,
+        abbreviation: j.abbreviation,
+        standardsName: j.standardsName,
+      })));
+    } catch (error) {
+      console.error("Get states error:", error);
+      res.status(500).json({ error: "Failed to get states" });
+    }
+  });
+
+  app.get("/api/standards/subjects/:country/:stateAbbr", async (req, res) => {
+    try {
+      const { country, stateAbbr } = req.params;
+      const jurisdiction = await storage.getJurisdictionByAbbr(country, stateAbbr);
+      if (!jurisdiction) {
+        res.json([]);
+        return;
+      }
+      const sets = await storage.getStandardSets(jurisdiction.id);
+      const subjects = [...new Set(sets.map(s => s.subject))];
+      res.json(subjects.map(subject => ({ subject })));
+    } catch (error) {
+      console.error("Get subjects error:", error);
+      res.status(500).json({ error: "Failed to get subjects" });
+    }
+  });
+
+  app.get("/api/standards/codes/:country/:stateAbbr/:subject", async (req, res) => {
+    try {
+      const { country, stateAbbr, subject } = req.params;
+      const jurisdiction = await storage.getJurisdictionByAbbr(country, stateAbbr);
+      if (!jurisdiction) {
+        res.json([]);
+        return;
+      }
+      const sets = await storage.getStandardSets(jurisdiction.id);
+      const subjectSet = sets.find(s => s.subject === subject);
+      if (!subjectSet) {
+        res.json([]);
+        return;
+      }
+      const standards = await storage.getEducationalStandards(subjectSet.id);
+      res.json(standards.map(s => ({
+        code: s.humanCoding,
+        description: s.statement,
+      })));
+    } catch (error) {
+      console.error("Get standard codes error:", error);
+      res.status(500).json({ error: "Failed to get standard codes" });
     }
   });
 
