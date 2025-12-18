@@ -119,17 +119,22 @@ export default function ScopeSequencePage() {
     mutationFn: async (file: File) => {
       setImportProgress(10);
       
-      // Pass country/state as query params for the stub endpoint
+      const formData = new FormData();
+      formData.append("file", file);
+      
       const params = new URLSearchParams();
       params.set("country", selectedCountry || "United States");
       params.set("state", selectedState || "Texas");
       
+      setImportProgress(30);
+      
       const response = await fetch(`/api/scopes/import?${params.toString()}`, {
         method: "POST",
+        body: formData,
         credentials: "include",
       });
       
-      setImportProgress(50);
+      setImportProgress(70);
       if (!response.ok) {
         throw new Error("Import failed");
       }
@@ -137,11 +142,11 @@ export default function ScopeSequencePage() {
       setImportProgress(100);
       return await response.json();
     },
-    onSuccess: (data) => {
+    onSuccess: (data: { message?: string; unitsCreated?: number }) => {
       queryClient.invalidateQueries({ queryKey: ["/api/scopes"] });
       toast({
-        title: "Import Started",
-        description: "Your document is being processed. You'll see the scope appear shortly.",
+        title: "Import Complete",
+        description: data.message || "Your document has been processed.",
       });
       setImportDialogOpen(false);
       setUploadFile(null);

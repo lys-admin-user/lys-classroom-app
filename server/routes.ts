@@ -2,10 +2,14 @@ import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { generateLessonPlan } from "./openai";
+import { parseDocument } from "./documentParser";
 import { generateLessonRequestSchema, insertScopeSequenceSchema, insertSequenceUnitSchema, insertScopeChangeRequestSchema } from "@shared/schema";
 import { z } from "zod";
 import { setupAuth, registerAuthRoutes, isAuthenticated } from "./replit_integrations/auth";
 import { randomUUID } from "crypto";
+import multer from "multer";
+
+const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 10 * 1024 * 1024 } });
 
 const saveLessonSchema = z.object({
   title: z.string().min(1),
@@ -479,10 +483,11 @@ export async function registerRoutes(
     }
   });
 
-  // Import Scope from Document (stub - actual parsing would require file processing library)
-  app.post("/api/scopes/import", isAuthenticated, async (req: any, res) => {
+  // Import Scope from Document with file parsing
+  app.post("/api/scopes/import", isAuthenticated, upload.single("file"), async (req: any, res) => {
     try {
       const userId = req.user?.claims?.sub;
+      const file = req.file;
       
       // Get country and state from query params or use defaults
       const country = req.query.country as string || "United States";
@@ -495,18 +500,20 @@ export async function registerRoutes(
       else if (state === "New York") standardsName = "NYSLS";
       else if (state === "Common Core") standardsName = "CCSS";
       
-      // For now, return a stubbed response indicating import is being processed
-      // In a full implementation, you would:
-      // 1. Use multer to handle file upload
-      // 2. Parse PDF/DOCX content
-      // 3. Use AI to extract units and standards
-      // 4. Create the scope and units from parsed content
+      let parsedDoc = null;
+      if (file) {
+        try {
+          parsedDoc = await parseDocument(file.buffer, file.originalname, file.mimetype);
+        } catch (parseError) {
+          console.error("Document parsing error:", parseError);
+        }
+      }
       
       const scope = await storage.createScopeSequence({
         userId,
-        title: "Imported Scope & Sequence (Processing...)",
-        subject: "Social Studies",
-        gradeLevel: "7",
+        title: parsedDoc?.title || "Imported Scope & Sequence",
+        subject: parsedDoc?.subject || "General",
+        gradeLevel: parsedDoc?.gradeLevel || "7",
         country,
         state,
         standardsName,
@@ -515,15 +522,42 @@ export async function registerRoutes(
         status: "draft",
       });
       
+      // Create units from parsed document
+      if (parsedDoc?.units && parsedDoc.units.length > 0) {
+        const unitsPerNineWeeks = Math.ceil(parsedDoc.units.length / 4);
+        for (let i = 0; i < parsedDoc.units.length; i++) {
+          const parsedUnit = parsedDoc.units[i];
+          const startWeek = Math.floor((i * 36) / parsedDoc.units.length) + 1;
+          const endWeek = Math.floor(((i + 1) * 36) / parsedDoc.units.length);
+          const nineWeeksPeriod = Math.min(4, Math.floor(i / unitsPerNineWeeks) + 1);
+          
+          await storage.createSequenceUnit({
+            scopeId: scope.id,
+            unitNumber: i + 1,
+            title: parsedUnit.title,
+            summary: parsedUnit.description || null,
+            transferGoal: null,
+            startWeek,
+            endWeek,
+            nineWeeksPeriod,
+            studentsWillKnow: [],
+            studentsWillBeSkilled: [],
+            standardCodes: [],
+          });
+        }
+      }
+      
       res.json({ 
         success: true, 
-        message: "Import started. Document is being processed. You can edit the details while we extract the content.",
+        message: parsedDoc?.units?.length 
+          ? `Imported ${parsedDoc.units.length} units from your document. Review and edit as needed.`
+          : "Document imported. Add units to complete your scope.",
         scope,
-        importJobId: scope.id 
+        unitsCreated: parsedDoc?.units?.length || 0,
       });
     } catch (error) {
       console.error("Import error:", error);
-      res.status(500).json({ error: "Failed to start import" });
+      res.status(500).json({ error: "Failed to import document" });
     }
   });
 

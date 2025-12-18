@@ -14,7 +14,11 @@ export const sessions = pgTable(
 );
 
 // User tiers for feature gating
-export type UserTier = "free" | "paid" | "enterprise";
+// free: basic features with ads
+// paid: full features, no ads
+// campus: school/district license with admin features
+// enterprise: full organizational access with analytics
+export type UserTier = "free" | "paid" | "campus" | "enterprise";
 
 // User storage table.
 // (IMPORTANT) This table is mandatory for Replit Auth, don't drop it.

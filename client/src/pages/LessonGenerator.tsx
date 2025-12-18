@@ -10,13 +10,16 @@ import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Sparkles, Clock, Target, BookOpen, Users, Loader2, Copy, Download, Heart, Compass, Save, Check, GraduationCap, FileText, Globe, MapPin, Lightbulb, Play, UserCheck, Settings, Printer } from "lucide-react";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Sparkles, Clock, Target, BookOpen, Users, Loader2, Copy, Download, Heart, Compass, Save, Check, GraduationCap, FileText, Globe, MapPin, Lightbulb, Play, UserCheck, Settings, Printer, LayoutList, AlertCircle } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useAuth } from "@/hooks/use-auth";
+import { useTier } from "@/hooks/use-tier";
+import { AdBanner } from "@/components/AdBanner";
 import type { LessonPlan, EducatorProfile } from "@shared/schema";
 import { educationalStandards, getStates, getSubjects, getStandardCodes, getStandardsName, type StandardCode } from "@shared/standards";
-import { Link } from "wouter";
+import { Link, useLocation } from "wouter";
 
 const gradeLevels = [
   "Elementary (K-2)",
@@ -31,6 +34,8 @@ const durations = ["30 minutes", "45 minutes", "60 minutes", "90 minutes", "1-2 
 export default function LessonGenerator() {
   const { toast } = useToast();
   const { isAuthenticated } = useAuth();
+  const { showAds, requiresScopeSequence, tier } = useTier();
+  const [, setLocation] = useLocation();
   const [topic, setTopic] = useState("");
   const [course, setCourse] = useState("");
   const [unit, setUnit] = useState("");
@@ -47,6 +52,7 @@ export default function LessonGenerator() {
   const [generatedLesson, setGeneratedLesson] = useState<LessonPlan | null>(null);
   const [isSaved, setIsSaved] = useState(false);
   const [profileApplied, setProfileApplied] = useState(false);
+  const [scopeSkipped, setScopeSkipped] = useState(false);
 
   const { data: profileData } = useQuery<{ profile: EducatorProfile | null; tier: string }>({
     queryKey: ["/api/educator-profile"],
@@ -271,6 +277,37 @@ ${generatedLesson.lessonClose?.vocational ? `Vocational: ${generatedLesson.lesso
           </div>
         </div>
 
+        {requiresScopeSequence && !scopeSkipped && (
+          <Alert className="mb-6 border-lys-teal/50 bg-lys-teal/5" data-testid="alert-scope-required">
+            <LayoutList className="h-4 w-4 text-lys-teal" />
+            <AlertDescription className="flex items-center justify-between gap-4 flex-wrap">
+              <span className="font-roboto">
+                <strong className="font-oswald">Recommended:</strong> Create a Scope & Sequence first to organize your curriculum for the year.
+              </span>
+              <div className="flex items-center gap-2">
+                <Link href="/scope-sequence">
+                  <Button variant="default" size="sm" className="gap-1 bg-lys-teal hover:bg-lys-teal/90" data-testid="button-go-to-scope">
+                    <LayoutList className="h-3 w-3" />
+                    Build Scope
+                  </Button>
+                </Link>
+                <Button 
+                  variant="ghost" 
+                  size="sm" 
+                  onClick={() => setScopeSkipped(true)}
+                  data-testid="button-skip-scope"
+                >
+                  Skip for now
+                </Button>
+              </div>
+            </AlertDescription>
+          </Alert>
+        )}
+
+        {showAds && (
+          <AdBanner position="inline" className="mb-6" />
+        )}
+
         <div className="grid lg:grid-cols-5 gap-6">
           <div className="lg:col-span-2 no-print">
             <Card>
@@ -284,31 +321,6 @@ ${generatedLesson.lessonClose?.vocational ? `Vocational: ${generatedLesson.lesso
                 </CardDescription>
               </CardHeader>
               <CardContent className="p-6 space-y-6">
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="course" className="font-oswald">Course</Label>
-                    <Input
-                      id="course"
-                      placeholder="e.g., G8 ELAR"
-                      value={course}
-                      onChange={(e) => setCourse(e.target.value)}
-                      className="font-roboto"
-                      data-testid="input-course"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="unit" className="font-oswald">Unit</Label>
-                    <Input
-                      id="unit"
-                      placeholder="e.g., Unit 04"
-                      value={unit}
-                      onChange={(e) => setUnit(e.target.value)}
-                      className="font-roboto"
-                      data-testid="input-unit"
-                    />
-                  </div>
-                </div>
-
                 <div className="space-y-2">
                   <Label htmlFor="topic" className="font-oswald">Topic / Lesson Title</Label>
                   <Textarea
@@ -455,6 +467,33 @@ ${generatedLesson.lessonClose?.vocational ? `Vocational: ${generatedLesson.lesso
                       )}
                     </div>
                   )}
+                </div>
+
+                <Separator />
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="course" className="font-oswald">Course</Label>
+                    <Input
+                      id="course"
+                      placeholder="e.g., G8 ELAR"
+                      value={course}
+                      onChange={(e) => setCourse(e.target.value)}
+                      className="font-roboto"
+                      data-testid="input-course"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="unit" className="font-oswald">Unit</Label>
+                    <Input
+                      id="unit"
+                      placeholder="e.g., Unit 04"
+                      value={unit}
+                      onChange={(e) => setUnit(e.target.value)}
+                      className="font-roboto"
+                      data-testid="input-unit"
+                    />
+                  </div>
                 </div>
 
                 <Separator />

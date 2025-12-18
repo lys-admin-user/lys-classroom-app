@@ -17,6 +17,7 @@ import SharedLesson from "@/pages/SharedLesson";
 import Analytics from "@/pages/Analytics";
 import ScopeSequence from "@/pages/ScopeSequence";
 import ScopeEditor from "@/pages/ScopeEditor";
+import SelfDiscovery from "@/pages/SelfDiscovery";
 import NotFound from "@/pages/not-found";
 
 function Router() {
@@ -33,6 +34,7 @@ function Router() {
       <Route path="/analytics" component={Analytics} />
       <Route path="/scope-sequence" component={ScopeSequence} />
       <Route path="/scope/:id" component={ScopeEditor} />
+      <Route path="/self-discovery" component={SelfDiscovery} />
       <Route path="/shared/:shareId" component={SharedLesson} />
       <Route component={NotFound} />
     </Switch>
