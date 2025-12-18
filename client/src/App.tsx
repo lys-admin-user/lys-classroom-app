@@ -19,6 +19,7 @@ import ScopeSequence from "@/pages/ScopeSequence";
 import ScopeEditor from "@/pages/ScopeEditor";
 import SelfDiscovery from "@/pages/SelfDiscovery";
 import EducatorInfluence from "@/pages/EducatorInfluence";
+import StandardsAdmin from "@/pages/StandardsAdmin";
 import NotFound from "@/pages/not-found";
 
 function Router() {
@@ -38,6 +39,7 @@ function Router() {
       <Route path="/self-discovery" component={SelfDiscovery} />
       <Route path="/educator-influence" component={EducatorInfluence} />
       <Route path="/shared/:shareId" component={SharedLesson} />
+      <Route path="/admin/standards" component={StandardsAdmin} />
       <Route component={NotFound} />
     </Switch>
   );

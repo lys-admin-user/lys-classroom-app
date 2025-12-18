@@ -104,7 +104,7 @@ Social sharing and affiliate rewards for educators:
 
 ### Educational Standards System
 The lesson generator requires legally-compliant educational standards:
-- **Standards Database**: `shared/standards.ts` contains hierarchical standards data
+- **Static Standards**: `shared/standards.ts` contains fallback hierarchical standards data
 - **Hierarchy**: Country → State/Region → Subject → Standard Codes
 - **Supported Standards**: 
   - US: Texas TEKS, California CCSS, Florida B.E.S.T., New York NYSLS
@@ -115,6 +115,25 @@ The lesson generator requires legally-compliant educational standards:
   - Essential Questions
   - Instructional phases (Anticipatory Set, Modeling, Guided Practice, Independent Practice)
   - Lesson Close with life application connections (Educational, Social, Vocational, Financial, Spiritual, Cultural, Health)
+
+### Automated Standards Ingestion System
+Three-tier approach for importing educational standards from external sources:
+- **Tier 1 - CSP API**: Common Standards Project API integration (`server/services/cspService.ts`)
+  - Fetches jurisdictions and standard sets from `api.commonstandardsproject.com`
+  - Auto-generates UIDs using MD5 hashing of composite keys
+  - Version history tracking for standards updates
+- **Tier 2 - CASE Protocol**: (Future) Competency and Academic Standards Exchange
+- **Tier 3 - PDF/HTML Scraping**: (Future) LLM-powered extraction from PDF documents
+- **Database Tables**: `standards_jurisdictions`, `standard_sets`, `educational_standards`, `standards_sync_log`
+- **Admin Page**: `/admin/standards` for manual sync triggers, browsing standards, and viewing sync logs
+- **API Endpoints**:
+  - GET `/api/admin/standards/status` - Sync statistics and status
+  - GET `/api/admin/standards/jurisdictions` - List jurisdictions from database
+  - POST `/api/admin/standards/sync/jurisdictions` - Trigger jurisdiction sync from CSP
+  - POST `/api/admin/standards/sync/standard-set` - Sync a specific standard set
+  - GET `/api/standards/countries` - Public API for lesson planning
+  - GET `/api/standards/states/:country` - Public API for lesson planning
+  - GET `/api/standards/subjects/:country/:stateAbbr` - Public API for lesson planning
 
 ## External Dependencies
 

@@ -1,7 +1,7 @@
 import { Link, useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
 import { ThemeToggle } from "./ThemeToggle";
-import { Menu, X, Sparkles, LogIn, LogOut, BookOpen, User, BarChart3, Award } from "lucide-react";
+import { Menu, X, Sparkles, LogIn, LogOut, BookOpen, User, BarChart3, Award, Database } from "lucide-react";
 import { useState } from "react";
 import { useAuth } from "@/hooks/use-auth";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -146,6 +146,12 @@ export function Header() {
                     <DropdownMenuItem className="cursor-pointer" data-testid="menu-educator-influence">
                       <Award className="mr-2 h-4 w-4" />
                       Educator Influence
+                    </DropdownMenuItem>
+                  </Link>
+                  <Link href="/admin/standards">
+                    <DropdownMenuItem className="cursor-pointer" data-testid="menu-standards-admin">
+                      <Database className="mr-2 h-4 w-4" />
+                      Standards Admin
                     </DropdownMenuItem>
                   </Link>
                   <DropdownMenuSeparator />
