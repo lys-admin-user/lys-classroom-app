@@ -21,6 +21,12 @@ import {
   type InsertSelfDiscoveryResult,
   type SavedCareer,
   type InsertSavedCareer,
+  type EducatorAffiliate,
+  type InsertEducatorAffiliate,
+  type ReferralEvent,
+  type InsertReferralEvent,
+  type AffiliateReward,
+  type InsertAffiliateReward,
   lessons,
   goals,
   educatorProfiles,
@@ -30,6 +36,9 @@ import {
   scopeChangeRequests,
   selfDiscoveryResults,
   savedCareers,
+  educatorAffiliates,
+  referralEvents,
+  affiliateRewards,
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, desc, and, asc } from "drizzle-orm";
@@ -98,6 +107,20 @@ export interface IStorage {
   getSavedCareers(userId: string): Promise<SavedCareer[]>;
   saveCareer(career: InsertSavedCareer): Promise<SavedCareer>;
   deleteSavedCareer(id: string, userId: string): Promise<boolean>;
+  
+  // Affiliate System
+  getEducatorAffiliate(userId: string): Promise<EducatorAffiliate | undefined>;
+  getEducatorAffiliateByCode(referralCode: string): Promise<EducatorAffiliate | undefined>;
+  createEducatorAffiliate(affiliate: InsertEducatorAffiliate): Promise<EducatorAffiliate>;
+  updateEducatorAffiliate(userId: string, updates: Partial<EducatorAffiliate>): Promise<EducatorAffiliate | undefined>;
+  
+  // Referral Events
+  createReferralEvent(event: InsertReferralEvent): Promise<ReferralEvent>;
+  getReferralEvents(affiliateId: string, limit?: number): Promise<ReferralEvent[]>;
+  
+  // Affiliate Rewards
+  createAffiliateReward(reward: InsertAffiliateReward): Promise<AffiliateReward>;
+  getAffiliateRewards(affiliateId: string): Promise<AffiliateReward[]>;
 }
 
 // Seed data for careers and resources (static content)
@@ -615,6 +638,82 @@ export class DatabaseStorage implements IStorage {
     if (!existing) return false;
     await db.delete(savedCareers).where(eq(savedCareers.id, id));
     return true;
+  }
+
+  // Affiliate System
+  async getEducatorAffiliate(userId: string): Promise<EducatorAffiliate | undefined> {
+    const [affiliate] = await db.select().from(educatorAffiliates)
+      .where(eq(educatorAffiliates.userId, userId));
+    return affiliate || undefined;
+  }
+
+  async getEducatorAffiliateByCode(referralCode: string): Promise<EducatorAffiliate | undefined> {
+    const [affiliate] = await db.select().from(educatorAffiliates)
+      .where(eq(educatorAffiliates.referralCode, referralCode));
+    return affiliate || undefined;
+  }
+
+  async createEducatorAffiliate(affiliate: InsertEducatorAffiliate): Promise<EducatorAffiliate> {
+    const [created] = await db.insert(educatorAffiliates).values(affiliate as any).returning();
+    return created;
+  }
+
+  async updateEducatorAffiliate(userId: string, updates: Partial<EducatorAffiliate>): Promise<EducatorAffiliate | undefined> {
+    const [updated] = await db.update(educatorAffiliates)
+      .set({ ...updates, updatedAt: new Date() })
+      .where(eq(educatorAffiliates.userId, userId))
+      .returning();
+    return updated || undefined;
+  }
+
+  // Referral Events
+  async createReferralEvent(event: InsertReferralEvent): Promise<ReferralEvent> {
+    const [created] = await db.insert(referralEvents).values(event as any).returning();
+    
+    // Update affiliate totals based on event type
+    const affiliate = await db.select().from(educatorAffiliates)
+      .where(eq(educatorAffiliates.id, event.affiliateId));
+    if (affiliate.length > 0) {
+      const current = affiliate[0];
+      const updates: Partial<EducatorAffiliate> = { updatedAt: new Date() };
+      
+      if (event.eventType === "view") {
+        updates.totalViews = (current.totalViews || 0) + 1;
+      } else if (event.eventType === "share" || event.eventType === "copy_link") {
+        updates.totalShares = (current.totalShares || 0) + 1;
+      } else if (event.eventType === "signup" || event.eventType === "lesson_save") {
+        updates.totalReferrals = (current.totalReferrals || 0) + 1;
+      }
+      
+      if (event.pointsEarned && event.pointsEarned > 0) {
+        updates.totalPoints = (current.totalPoints || 0) + event.pointsEarned;
+      }
+      
+      await db.update(educatorAffiliates)
+        .set(updates)
+        .where(eq(educatorAffiliates.id, event.affiliateId));
+    }
+    
+    return created;
+  }
+
+  async getReferralEvents(affiliateId: string, limit: number = 50): Promise<ReferralEvent[]> {
+    return await db.select().from(referralEvents)
+      .where(eq(referralEvents.affiliateId, affiliateId))
+      .orderBy(desc(referralEvents.createdAt))
+      .limit(limit);
+  }
+
+  // Affiliate Rewards
+  async createAffiliateReward(reward: InsertAffiliateReward): Promise<AffiliateReward> {
+    const [created] = await db.insert(affiliateRewards).values(reward as any).returning();
+    return created;
+  }
+
+  async getAffiliateRewards(affiliateId: string): Promise<AffiliateReward[]> {
+    return await db.select().from(affiliateRewards)
+      .where(eq(affiliateRewards.affiliateId, affiliateId))
+      .orderBy(desc(affiliateRewards.createdAt));
   }
 }
 
