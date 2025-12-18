@@ -49,12 +49,15 @@ export function ShareDialog({ open, onOpenChange, lessonId, lessonTitle }: Share
   });
 
   const handleCopyLink = async () => {
-    if (!shareUrl) {
-      await generateLinkMutation.mutateAsync("direct");
-    }
-    
     try {
-      await navigator.clipboard.writeText(shareUrl || "");
+      let urlToCopy = shareUrl;
+      if (!urlToCopy) {
+        const result = await generateLinkMutation.mutateAsync("direct");
+        urlToCopy = result.shareUrl;
+        setShareUrl(urlToCopy);
+      }
+      
+      await navigator.clipboard.writeText(urlToCopy);
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
       toast({
@@ -71,57 +74,75 @@ export function ShareDialog({ open, onOpenChange, lessonId, lessonTitle }: Share
   };
 
   const handleSocialShare = async (channel: "twitter" | "facebook" | "linkedin") => {
-    let url = shareUrl;
-    if (!url) {
-      const result = await generateLinkMutation.mutateAsync(channel);
-      url = result.shareUrl;
-    } else {
-      await generateLinkMutation.mutateAsync(channel);
+    try {
+      let url = shareUrl;
+      if (!url) {
+        const result = await generateLinkMutation.mutateAsync(channel);
+        url = result.shareUrl;
+        setShareUrl(url);
+      } else {
+        await generateLinkMutation.mutateAsync(channel);
+      }
+
+      const encodedUrl = encodeURIComponent(url);
+      const encodedTitle = encodeURIComponent(`Check out this lesson: ${lessonTitle} - Created with LYS (Laddering Your Success)`);
+      const encodedText = encodeURIComponent(`I created this lesson using LYS and the Be-Know-Do methodology! Check it out:`);
+
+      let socialUrl = "";
+      switch (channel) {
+        case "twitter":
+          socialUrl = `https://twitter.com/intent/tweet?text=${encodedText}&url=${encodedUrl}`;
+          break;
+        case "facebook":
+          socialUrl = `https://www.facebook.com/sharer/sharer.php?u=${encodedUrl}&quote=${encodedTitle}`;
+          break;
+        case "linkedin":
+          socialUrl = `https://www.linkedin.com/sharing/share-offsite/?url=${encodedUrl}`;
+          break;
+      }
+
+      window.open(socialUrl, "_blank", "noopener,noreferrer,width=600,height=400");
+      
+      toast({
+        title: "Shared!",
+        description: `Lesson shared to ${channel}. You earned 5 points!`,
+      });
+    } catch (err) {
+      toast({
+        title: "Error",
+        description: "Failed to share. Please try again.",
+        variant: "destructive",
+      });
     }
-
-    const encodedUrl = encodeURIComponent(url);
-    const encodedTitle = encodeURIComponent(`Check out this lesson: ${lessonTitle} - Created with LYS (Laddering Your Success)`);
-    const encodedText = encodeURIComponent(`I created this lesson using LYS and the Be-Know-Do methodology! Check it out:`);
-
-    let socialUrl = "";
-    switch (channel) {
-      case "twitter":
-        socialUrl = `https://twitter.com/intent/tweet?text=${encodedText}&url=${encodedUrl}`;
-        break;
-      case "facebook":
-        socialUrl = `https://www.facebook.com/sharer/sharer.php?u=${encodedUrl}&quote=${encodedTitle}`;
-        break;
-      case "linkedin":
-        socialUrl = `https://www.linkedin.com/sharing/share-offsite/?url=${encodedUrl}`;
-        break;
-    }
-
-    window.open(socialUrl, "_blank", "noopener,noreferrer,width=600,height=400");
-    
-    toast({
-      title: "Shared!",
-      description: `Lesson shared to ${channel}. You earned 5 points!`,
-    });
   };
 
   const handleEmailShare = async () => {
-    let url = shareUrl;
-    if (!url) {
-      const result = await generateLinkMutation.mutateAsync("email");
-      url = result.shareUrl;
-    } else {
-      await generateLinkMutation.mutateAsync("email");
-    }
+    try {
+      let url = shareUrl;
+      if (!url) {
+        const result = await generateLinkMutation.mutateAsync("email");
+        url = result.shareUrl;
+        setShareUrl(url);
+      } else {
+        await generateLinkMutation.mutateAsync("email");
+      }
 
-    const subject = encodeURIComponent(`Check out this lesson: ${lessonTitle}`);
-    const body = encodeURIComponent(`I created this lesson using LYS (Laddering Your Success) and wanted to share it with you!\n\n${url}\n\nThe Be-Know-Do methodology helps students connect learning to real-world success.`);
-    
-    window.location.href = `mailto:?subject=${subject}&body=${body}`;
-    
-    toast({
-      title: "Email Draft Opened",
-      description: "You earned 5 points for sharing!",
-    });
+      const subject = encodeURIComponent(`Check out this lesson: ${lessonTitle}`);
+      const body = encodeURIComponent(`I created this lesson using LYS (Laddering Your Success) and wanted to share it with you!\n\n${url}\n\nThe Be-Know-Do methodology helps students connect learning to real-world success.`);
+      
+      window.location.href = `mailto:?subject=${subject}&body=${body}`;
+      
+      toast({
+        title: "Email Draft Opened",
+        description: "You earned 5 points for sharing!",
+      });
+    } catch (err) {
+      toast({
+        title: "Error",
+        description: "Failed to share via email. Please try again.",
+        variant: "destructive",
+      });
+    }
   };
 
   return (

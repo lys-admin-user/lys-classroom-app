@@ -83,6 +83,25 @@ KNOW pillar features:
 - **Pathway Types**: College, Military, Trade School, Certification options
 - **Page**: `/careers`
 
+### Educator Influence & Affiliate System
+Social sharing and affiliate rewards for educators:
+- **Affiliate Profile**: Each educator gets a unique referral code (auto-generated on first share)
+- **ShareDialog Component**: Social media sharing with Twitter/X, Facebook, LinkedIn, Email buttons
+- **Referral Tracking**: View events tracked when shared lessons are accessed with referral codes
+- **Points System**:
+  - View = 1 point (when someone views a shared lesson)
+  - Share = 5 points (for each social media share)
+  - Link Copy = 2 points
+  - Lesson Save = 25 points (when someone saves a shared lesson)
+  - Signup = 50 points (when someone registers through a referral link)
+- **Dashboard**: `/educator-influence` shows total points, views, shares, referrals, and recent activity
+- **Database Tables**: `educator_affiliates`, `referral_events`, `affiliate_rewards`
+- **API Endpoints**:
+  - GET `/api/affiliate/me` - Get/create affiliate profile
+  - GET `/api/affiliate/dashboard` - Dashboard with stats and recent events
+  - POST `/api/lessons/:id/share-link` - Generate share URL with referral code
+  - POST `/api/referral/track` - Public endpoint for tracking referral events
+
 ### Educational Standards System
 The lesson generator requires legally-compliant educational standards:
 - **Standards Database**: `shared/standards.ts` contains hierarchical standards data

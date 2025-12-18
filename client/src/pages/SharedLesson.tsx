@@ -1,21 +1,48 @@
+import { useEffect, useRef } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { useRoute } from "wouter";
+import { useRoute, useSearch, Link } from "wouter";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { Button } from "@/components/ui/button";
 import { Heart, Compass, Target, Lightbulb, GraduationCap, Play, UserCheck, Printer, ArrowLeft } from "lucide-react";
 import type { Lesson } from "@shared/schema";
-import { Link } from "wouter";
+import { apiRequest } from "@/lib/queryClient";
 
 export default function SharedLesson() {
   const [, params] = useRoute("/shared/:shareId");
   const shareId = params?.shareId;
+  const search = useSearch();
+  const trackedRef = useRef(false);
 
   const { data: lesson, isLoading, error } = useQuery<Lesson>({
     queryKey: ["/api/shared", shareId],
     enabled: !!shareId,
   });
+
+  useEffect(() => {
+    if (shareId && lesson && !trackedRef.current) {
+      trackedRef.current = true;
+      
+      const searchParams = new URLSearchParams(search);
+      const referralCode = searchParams.get("ref");
+      const channel = searchParams.get("utm_source") || "direct";
+      
+      const visitorId = localStorage.getItem("lys_visitor_id") || `v_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
+      if (!localStorage.getItem("lys_visitor_id")) {
+        localStorage.setItem("lys_visitor_id", visitorId);
+      }
+      
+      apiRequest("POST", "/api/referral/track", {
+        shareId,
+        referralCode,
+        eventType: "view",
+        channel,
+        visitorId,
+      }).catch(() => {
+      });
+    }
+  }, [shareId, lesson, search]);
 
   if (isLoading) {
     return (
