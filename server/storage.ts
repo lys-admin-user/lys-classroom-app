@@ -45,6 +45,18 @@ import {
   type InsertSourceChecksum,
   type PdfImport,
   type InsertPdfImport,
+  type Class,
+  type InsertClass,
+  type Student,
+  type InsertStudent,
+  type ClassStudent,
+  type InsertClassStudent,
+  type StudentGroup,
+  type InsertStudentGroup,
+  type Assignment,
+  type InsertAssignment,
+  type AssignmentRecipient,
+  type InsertAssignmentRecipient,
   lessons,
   goals,
   educatorProfiles,
@@ -65,6 +77,12 @@ import {
   standardsStaging,
   sourceChecksums,
   pdfImportQueue,
+  classes,
+  students,
+  classStudents,
+  studentGroups,
+  assignments,
+  assignmentRecipients,
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, desc, and, asc } from "drizzle-orm";
@@ -201,6 +219,39 @@ export interface IStorage {
   
   // Soft Delete for Standards
   deprecateStandard(id: string): Promise<EducationalStandard | undefined>;
+
+  // Assignment System (Paid Feature)
+  getClasses(userId: string): Promise<Class[]>;
+  getClass(id: string): Promise<Class | undefined>;
+  createClass(classData: InsertClass): Promise<Class>;
+  updateClass(id: string, updates: Partial<Class>, userId: string): Promise<Class | undefined>;
+  deleteClass(id: string, userId: string): Promise<boolean>;
+
+  getStudents(userId: string): Promise<Student[]>;
+  getStudent(id: string): Promise<Student | undefined>;
+  createStudent(student: InsertStudent): Promise<Student>;
+  updateStudent(id: string, updates: Partial<Student>, userId: string): Promise<Student | undefined>;
+  deleteStudent(id: string, userId: string): Promise<boolean>;
+
+  getClassStudents(classId: string): Promise<Student[]>;
+  addStudentToClass(classId: string, studentId: string): Promise<ClassStudent>;
+  removeStudentFromClass(classId: string, studentId: string): Promise<boolean>;
+
+  getStudentGroups(userId: string): Promise<StudentGroup[]>;
+  getStudentGroup(id: string): Promise<StudentGroup | undefined>;
+  createStudentGroup(group: InsertStudentGroup): Promise<StudentGroup>;
+  updateStudentGroup(id: string, updates: Partial<StudentGroup>, userId: string): Promise<StudentGroup | undefined>;
+  deleteStudentGroup(id: string, userId: string): Promise<boolean>;
+
+  getAssignments(userId: string): Promise<Assignment[]>;
+  getAssignment(id: string): Promise<Assignment | undefined>;
+  createAssignment(assignment: InsertAssignment): Promise<Assignment>;
+  updateAssignment(id: string, updates: Partial<Assignment>, userId: string): Promise<Assignment | undefined>;
+  deleteAssignment(id: string, userId: string): Promise<boolean>;
+
+  getAssignmentRecipients(assignmentId: string): Promise<AssignmentRecipient[]>;
+  createAssignmentRecipient(recipient: InsertAssignmentRecipient): Promise<AssignmentRecipient>;
+  updateAssignmentRecipient(id: string, updates: Partial<AssignmentRecipient>): Promise<AssignmentRecipient | undefined>;
 }
 
 // Seed data for careers and resources (static content)
@@ -1097,6 +1148,202 @@ export class DatabaseStorage implements IStorage {
     const [updated] = await db.update(educationalStandardsDb)
       .set({ isActive: false, versionHistory, updatedAt: new Date() })
       .where(eq(educationalStandardsDb.id, id))
+      .returning();
+    return updated || undefined;
+  }
+
+  // ================================
+  // Assignment System (Paid Feature)
+  // ================================
+
+  // Classes
+  async getClasses(userId: string): Promise<Class[]> {
+    return await db.select().from(classes)
+      .where(eq(classes.userId, userId))
+      .orderBy(desc(classes.createdAt));
+  }
+
+  async getClass(id: string): Promise<Class | undefined> {
+    const [result] = await db.select().from(classes).where(eq(classes.id, id));
+    return result || undefined;
+  }
+
+  async createClass(classData: InsertClass): Promise<Class> {
+    const [created] = await db.insert(classes).values(classData as any).returning();
+    return created;
+  }
+
+  async updateClass(id: string, updates: Partial<Class>, userId: string): Promise<Class | undefined> {
+    const existing = await this.getClass(id);
+    if (!existing || existing.userId !== userId) return undefined;
+    
+    const [updated] = await db.update(classes)
+      .set({ ...updates, updatedAt: new Date() })
+      .where(eq(classes.id, id))
+      .returning();
+    return updated || undefined;
+  }
+
+  async deleteClass(id: string, userId: string): Promise<boolean> {
+    const existing = await this.getClass(id);
+    if (!existing || existing.userId !== userId) return false;
+    
+    await db.delete(classes).where(eq(classes.id, id));
+    return true;
+  }
+
+  // Students
+  async getStudents(userId: string): Promise<Student[]> {
+    return await db.select().from(students)
+      .where(eq(students.userId, userId))
+      .orderBy(asc(students.lastName), asc(students.firstName));
+  }
+
+  async getStudent(id: string): Promise<Student | undefined> {
+    const [result] = await db.select().from(students).where(eq(students.id, id));
+    return result || undefined;
+  }
+
+  async createStudent(student: InsertStudent): Promise<Student> {
+    const [created] = await db.insert(students).values(student as any).returning();
+    return created;
+  }
+
+  async updateStudent(id: string, updates: Partial<Student>, userId: string): Promise<Student | undefined> {
+    const existing = await this.getStudent(id);
+    if (!existing || existing.userId !== userId) return undefined;
+    
+    const [updated] = await db.update(students)
+      .set({ ...updates, updatedAt: new Date() })
+      .where(eq(students.id, id))
+      .returning();
+    return updated || undefined;
+  }
+
+  async deleteStudent(id: string, userId: string): Promise<boolean> {
+    const existing = await this.getStudent(id);
+    if (!existing || existing.userId !== userId) return false;
+    
+    await db.delete(students).where(eq(students.id, id));
+    return true;
+  }
+
+  // Class-Student Relationships
+  async getClassStudents(classId: string): Promise<Student[]> {
+    const enrollments = await db.select().from(classStudents)
+      .where(eq(classStudents.classId, classId));
+    
+    if (enrollments.length === 0) return [];
+    
+    const studentIds = enrollments.map(e => e.studentId);
+    const result: Student[] = [];
+    for (const sid of studentIds) {
+      const student = await this.getStudent(sid);
+      if (student) result.push(student);
+    }
+    return result;
+  }
+
+  async addStudentToClass(classId: string, studentId: string): Promise<ClassStudent> {
+    const [created] = await db.insert(classStudents)
+      .values({ classId, studentId } as any)
+      .returning();
+    return created;
+  }
+
+  async removeStudentFromClass(classId: string, studentId: string): Promise<boolean> {
+    await db.delete(classStudents)
+      .where(and(eq(classStudents.classId, classId), eq(classStudents.studentId, studentId)));
+    return true;
+  }
+
+  // Student Groups
+  async getStudentGroups(userId: string): Promise<StudentGroup[]> {
+    return await db.select().from(studentGroups)
+      .where(eq(studentGroups.userId, userId))
+      .orderBy(desc(studentGroups.createdAt));
+  }
+
+  async getStudentGroup(id: string): Promise<StudentGroup | undefined> {
+    const [result] = await db.select().from(studentGroups).where(eq(studentGroups.id, id));
+    return result || undefined;
+  }
+
+  async createStudentGroup(group: InsertStudentGroup): Promise<StudentGroup> {
+    const [created] = await db.insert(studentGroups).values(group as any).returning();
+    return created;
+  }
+
+  async updateStudentGroup(id: string, updates: Partial<StudentGroup>, userId: string): Promise<StudentGroup | undefined> {
+    const existing = await this.getStudentGroup(id);
+    if (!existing || existing.userId !== userId) return undefined;
+    
+    const [updated] = await db.update(studentGroups)
+      .set(updates)
+      .where(eq(studentGroups.id, id))
+      .returning();
+    return updated || undefined;
+  }
+
+  async deleteStudentGroup(id: string, userId: string): Promise<boolean> {
+    const existing = await this.getStudentGroup(id);
+    if (!existing || existing.userId !== userId) return false;
+    
+    await db.delete(studentGroups).where(eq(studentGroups.id, id));
+    return true;
+  }
+
+  // Assignments
+  async getAssignments(userId: string): Promise<Assignment[]> {
+    return await db.select().from(assignments)
+      .where(eq(assignments.userId, userId))
+      .orderBy(desc(assignments.createdAt));
+  }
+
+  async getAssignment(id: string): Promise<Assignment | undefined> {
+    const [result] = await db.select().from(assignments).where(eq(assignments.id, id));
+    return result || undefined;
+  }
+
+  async createAssignment(assignment: InsertAssignment): Promise<Assignment> {
+    const [created] = await db.insert(assignments).values(assignment as any).returning();
+    return created;
+  }
+
+  async updateAssignment(id: string, updates: Partial<Assignment>, userId: string): Promise<Assignment | undefined> {
+    const existing = await this.getAssignment(id);
+    if (!existing || existing.userId !== userId) return undefined;
+    
+    const [updated] = await db.update(assignments)
+      .set({ ...updates, updatedAt: new Date() })
+      .where(eq(assignments.id, id))
+      .returning();
+    return updated || undefined;
+  }
+
+  async deleteAssignment(id: string, userId: string): Promise<boolean> {
+    const existing = await this.getAssignment(id);
+    if (!existing || existing.userId !== userId) return false;
+    
+    await db.delete(assignments).where(eq(assignments.id, id));
+    return true;
+  }
+
+  // Assignment Recipients
+  async getAssignmentRecipients(assignmentId: string): Promise<AssignmentRecipient[]> {
+    return await db.select().from(assignmentRecipients)
+      .where(eq(assignmentRecipients.assignmentId, assignmentId));
+  }
+
+  async createAssignmentRecipient(recipient: InsertAssignmentRecipient): Promise<AssignmentRecipient> {
+    const [created] = await db.insert(assignmentRecipients).values(recipient as any).returning();
+    return created;
+  }
+
+  async updateAssignmentRecipient(id: string, updates: Partial<AssignmentRecipient>): Promise<AssignmentRecipient | undefined> {
+    const [updated] = await db.update(assignmentRecipients)
+      .set(updates)
+      .where(eq(assignmentRecipients.id, id))
       .returning();
     return updated || undefined;
   }

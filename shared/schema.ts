@@ -649,3 +649,159 @@ export const sourceChecksums = pgTable("source_checksums", {
 export const insertChecksumSchema = createInsertSchema(sourceChecksums).omit({ id: true, createdAt: true });
 export type InsertSourceChecksum = z.infer<typeof insertChecksumSchema>;
 export type SourceChecksum = typeof sourceChecksums.$inferSelect;
+
+// ================================
+// Assignment System (Paid Feature)
+// ================================
+
+// Accommodation Types
+export const accommodationTypes = ["IEP", "504", "BIP"] as const;
+export type AccommodationType = typeof accommodationTypes[number];
+
+// Classes Table (educator's classes)
+export const classes = pgTable("classes", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull(),
+  name: text("name").notNull(),
+  subject: text("subject"),
+  gradeLevel: text("grade_level"),
+  period: text("period"),
+  schoolYear: text("school_year"),
+  isActive: boolean("is_active").default(true),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertClassSchema = createInsertSchema(classes).omit({ id: true, createdAt: true, updatedAt: true });
+export type InsertClass = z.infer<typeof insertClassSchema>;
+export type Class = typeof classes.$inferSelect;
+
+// Students Table
+export const students = pgTable("students", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull(),
+  firstName: text("first_name").notNull(),
+  lastName: text("last_name").notNull(),
+  studentId: text("student_id"),
+  gradeLevel: text("grade_level"),
+  accommodations: jsonb("accommodations").$type<{
+    type: AccommodationType;
+    description: string;
+    active: boolean;
+  }[]>(),
+  notes: text("notes"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertStudentSchema = createInsertSchema(students).omit({ id: true, createdAt: true, updatedAt: true });
+export type InsertStudent = z.infer<typeof insertStudentSchema>;
+export type Student = typeof students.$inferSelect;
+
+// Class-Student Junction Table
+export const classStudents = pgTable("class_students", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  classId: varchar("class_id").notNull(),
+  studentId: varchar("student_id").notNull(),
+  enrolledAt: timestamp("enrolled_at").defaultNow(),
+});
+
+export const insertClassStudentSchema = createInsertSchema(classStudents).omit({ id: true, enrolledAt: true });
+export type InsertClassStudent = z.infer<typeof insertClassStudentSchema>;
+export type ClassStudent = typeof classStudents.$inferSelect;
+
+// Student Groups (for group assignments)
+export const studentGroups = pgTable("student_groups", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull(),
+  classId: varchar("class_id"),
+  name: text("name").notNull(),
+  description: text("description"),
+  studentIds: jsonb("student_ids").notNull().$type<string[]>(),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertStudentGroupSchema = createInsertSchema(studentGroups).omit({ id: true, createdAt: true });
+export type InsertStudentGroup = z.infer<typeof insertStudentGroupSchema>;
+export type StudentGroup = typeof studentGroups.$inferSelect;
+
+// Assignments Table
+export const assignments = pgTable("assignments", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull(),
+  lessonId: varchar("lesson_id").notNull(),
+  title: text("title").notNull(),
+  description: text("description"),
+  instructions: text("instructions").notNull(),
+  questions: jsonb("questions").notNull().$type<{
+    id: string;
+    type: "multiple_choice" | "short_answer" | "essay" | "true_false" | "matching";
+    question: string;
+    options?: string[];
+    correctAnswer?: string;
+    points: number;
+    bkdFocus?: "be" | "know" | "do";
+  }[]>(),
+  totalPoints: integer("total_points").notNull(),
+  dueDate: timestamp("due_date"),
+  assignmentType: text("assignment_type").notNull().default("individual"),
+  status: text("status").notNull().default("draft"),
+  accommodationModified: boolean("accommodation_modified").default(false),
+  accommodationType: text("accommodation_type"),
+  accommodationNotes: text("accommodation_notes"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertAssignmentSchema = createInsertSchema(assignments).omit({ id: true, createdAt: true, updatedAt: true });
+export type InsertAssignment = z.infer<typeof insertAssignmentSchema>;
+export type Assignment = typeof assignments.$inferSelect;
+
+// Assignment Recipients (who the assignment is assigned to)
+export const assignmentRecipients = pgTable("assignment_recipients", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  assignmentId: varchar("assignment_id").notNull(),
+  recipientType: text("recipient_type").notNull(),
+  recipientId: varchar("recipient_id").notNull(),
+  assignedAt: timestamp("assigned_at").defaultNow(),
+  status: text("status").notNull().default("assigned"),
+  submittedAt: timestamp("submitted_at"),
+  score: integer("score"),
+  feedback: text("feedback"),
+});
+
+export const insertAssignmentRecipientSchema = createInsertSchema(assignmentRecipients).omit({ id: true, assignedAt: true });
+export type InsertAssignmentRecipient = z.infer<typeof insertAssignmentRecipientSchema>;
+export type AssignmentRecipient = typeof assignmentRecipients.$inferSelect;
+
+// IEP/504/BIP Accommodation Suggestions (static reference data)
+export const accommodationSuggestions = [
+  { id: "1", type: "IEP" as AccommodationType, category: "Presentation", suggestion: "Provide audio recordings of written materials", source: "IDEA Best Practices" },
+  { id: "2", type: "IEP" as AccommodationType, category: "Presentation", suggestion: "Use larger print or visual aids", source: "IDEA Best Practices" },
+  { id: "3", type: "IEP" as AccommodationType, category: "Response", suggestion: "Allow verbal responses instead of written", source: "IDEA Best Practices" },
+  { id: "4", type: "IEP" as AccommodationType, category: "Response", suggestion: "Permit use of assistive technology for responses", source: "IDEA Best Practices" },
+  { id: "5", type: "IEP" as AccommodationType, category: "Timing", suggestion: "Provide extended time (typically 1.5x to 2x)", source: "IDEA Best Practices" },
+  { id: "6", type: "504" as AccommodationType, category: "Setting", suggestion: "Preferential seating near instruction", source: "Section 504 Guidelines" },
+  { id: "7", type: "504" as AccommodationType, category: "Setting", suggestion: "Reduce distractions in testing environment", source: "Section 504 Guidelines" },
+  { id: "8", type: "504" as AccommodationType, category: "Timing", suggestion: "Allow frequent breaks during extended tasks", source: "Section 504 Guidelines" },
+  { id: "9", type: "504" as AccommodationType, category: "Presentation", suggestion: "Provide written instructions alongside verbal", source: "Section 504 Guidelines" },
+  { id: "10", type: "504" as AccommodationType, category: "Response", suggestion: "Allow use of calculator for math problems", source: "Section 504 Guidelines" },
+  { id: "11", type: "BIP" as AccommodationType, category: "Environment", suggestion: "Establish clear behavioral expectations before activity", source: "PBIS Framework" },
+  { id: "12", type: "BIP" as AccommodationType, category: "Environment", suggestion: "Provide structured check-ins during independent work", source: "PBIS Framework" },
+  { id: "13", type: "BIP" as AccommodationType, category: "Support", suggestion: "Use positive reinforcement for on-task behavior", source: "PBIS Framework" },
+  { id: "14", type: "BIP" as AccommodationType, category: "Support", suggestion: "Offer choice in assignment format or order", source: "PBIS Framework" },
+  { id: "15", type: "BIP" as AccommodationType, category: "Environment", suggestion: "Provide sensory breaks or movement opportunities", source: "PBIS Framework" },
+] as const;
+
+export type AccommodationSuggestion = typeof accommodationSuggestions[number];
+
+// Generate Assignment Request Schema
+export const generateAssignmentRequestSchema = z.object({
+  lessonId: z.string(),
+  assignmentType: z.enum(["quiz", "worksheet", "project", "discussion", "reflection"]),
+  questionCount: z.number().min(1).max(20).default(5),
+  difficulty: z.enum(["easy", "medium", "hard"]).default("medium"),
+  includeBeKnowDo: z.boolean().default(true),
+  accommodationType: z.enum(["IEP", "504", "BIP"]).optional(),
+  accommodationNotes: z.string().optional(),
+});

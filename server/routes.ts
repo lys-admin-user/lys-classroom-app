@@ -870,6 +870,376 @@ export async function registerRoutes(
     }
   });
 
+  // ================================
+  // Assignment System (Paid Feature)
+  // ================================
+
+  // Helper to check paid tier
+  const requirePaidTier = async (req: any, res: any, next: any) => {
+    const userId = req.user?.claims?.sub;
+    if (!userId) {
+      res.status(401).json({ error: "Authentication required" });
+      return;
+    }
+    const tier = await storage.getUserTier(userId);
+    if (tier === "free") {
+      res.status(403).json({ 
+        error: "Paid subscription required",
+        message: "Assignment generation is a Pro/Campus feature. Upgrade your plan to access this feature.",
+        requiredTier: "pro"
+      });
+      return;
+    }
+    next();
+  };
+
+  // Get accommodation suggestions
+  app.get("/api/accommodations/suggestions", isAuthenticated, async (req: any, res) => {
+    try {
+      const { type } = req.query;
+      const { accommodationSuggestions } = await import("@shared/schema");
+      const suggestions = type 
+        ? accommodationSuggestions.filter(s => s.type === type)
+        : accommodationSuggestions;
+      res.json(suggestions);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to get accommodation suggestions" });
+    }
+  });
+
+  // Generate assignment from lesson (PAID FEATURE)
+  app.post("/api/assignments/generate", isAuthenticated, requirePaidTier, async (req: any, res) => {
+    try {
+      const userId = req.user?.claims?.sub;
+      const { lessonId, assignmentType, questionCount, difficulty, includeBeKnowDo, accommodationType, accommodationNotes } = req.body;
+      
+      const lesson = await storage.getLesson(lessonId);
+      if (!lesson) {
+        res.status(404).json({ error: "Lesson not found" });
+        return;
+      }
+      
+      if (lesson.userId !== userId) {
+        res.status(403).json({ error: "You can only generate assignments from your own lessons" });
+        return;
+      }
+      
+      const { generateAssignment } = await import("./assignmentGenerator");
+      const generated = await generateAssignment({
+        lesson,
+        assignmentType: assignmentType || "quiz",
+        questionCount: questionCount || 5,
+        difficulty: difficulty || "medium",
+        includeBeKnowDo: includeBeKnowDo !== false,
+        accommodationType,
+        accommodationNotes,
+      });
+      
+      res.json(generated);
+    } catch (error) {
+      console.error("Generate assignment error:", error);
+      res.status(500).json({ error: "Failed to generate assignment" });
+    }
+  });
+
+  // Save assignment (PAID FEATURE)
+  app.post("/api/assignments", isAuthenticated, requirePaidTier, async (req: any, res) => {
+    try {
+      const userId = req.user?.claims?.sub;
+      const assignment = await storage.createAssignment({
+        ...req.body,
+        userId,
+      });
+      res.json(assignment);
+    } catch (error) {
+      console.error("Create assignment error:", error);
+      res.status(500).json({ error: "Failed to create assignment" });
+    }
+  });
+
+  // Get user's assignments
+  app.get("/api/assignments", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user?.claims?.sub;
+      const assignmentsList = await storage.getAssignments(userId);
+      res.json(assignmentsList);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch assignments" });
+    }
+  });
+
+  // Get single assignment
+  app.get("/api/assignments/:id", isAuthenticated, async (req: any, res) => {
+    try {
+      const { id } = req.params;
+      const assignment = await storage.getAssignment(id);
+      if (!assignment) {
+        res.status(404).json({ error: "Assignment not found" });
+        return;
+      }
+      res.json(assignment);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch assignment" });
+    }
+  });
+
+  // Update assignment
+  app.patch("/api/assignments/:id", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user?.claims?.sub;
+      const { id } = req.params;
+      const updated = await storage.updateAssignment(id, req.body, userId);
+      if (!updated) {
+        res.status(404).json({ error: "Assignment not found or not authorized" });
+        return;
+      }
+      res.json(updated);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to update assignment" });
+    }
+  });
+
+  // Delete assignment
+  app.delete("/api/assignments/:id", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user?.claims?.sub;
+      const { id } = req.params;
+      const deleted = await storage.deleteAssignment(id, userId);
+      if (!deleted) {
+        res.status(404).json({ error: "Assignment not found or not authorized" });
+        return;
+      }
+      res.json({ success: true });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to delete assignment" });
+    }
+  });
+
+  // Assign to recipients (student, group, or class)
+  app.post("/api/assignments/:id/assign", isAuthenticated, requirePaidTier, async (req: any, res) => {
+    try {
+      const userId = req.user?.claims?.sub;
+      const { id } = req.params;
+      const { recipientType, recipientIds } = req.body;
+      
+      const assignment = await storage.getAssignment(id);
+      if (!assignment || assignment.userId !== userId) {
+        res.status(404).json({ error: "Assignment not found or not authorized" });
+        return;
+      }
+      
+      const recipients = [];
+      for (const recipientId of recipientIds) {
+        const recipient = await storage.createAssignmentRecipient({
+          assignmentId: id,
+          recipientType,
+          recipientId,
+          status: "assigned",
+        });
+        recipients.push(recipient);
+      }
+      
+      res.json({ success: true, recipients });
+    } catch (error) {
+      console.error("Assign error:", error);
+      res.status(500).json({ error: "Failed to assign" });
+    }
+  });
+
+  // Classes management
+  app.get("/api/classes", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user?.claims?.sub;
+      const classesList = await storage.getClasses(userId);
+      res.json(classesList);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch classes" });
+    }
+  });
+
+  app.post("/api/classes", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user?.claims?.sub;
+      const newClass = await storage.createClass({
+        ...req.body,
+        userId,
+      });
+      res.json(newClass);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to create class" });
+    }
+  });
+
+  app.patch("/api/classes/:id", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user?.claims?.sub;
+      const { id } = req.params;
+      const updated = await storage.updateClass(id, req.body, userId);
+      if (!updated) {
+        res.status(404).json({ error: "Class not found or not authorized" });
+        return;
+      }
+      res.json(updated);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to update class" });
+    }
+  });
+
+  app.delete("/api/classes/:id", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user?.claims?.sub;
+      const { id } = req.params;
+      const deleted = await storage.deleteClass(id, userId);
+      if (!deleted) {
+        res.status(404).json({ error: "Class not found or not authorized" });
+        return;
+      }
+      res.json({ success: true });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to delete class" });
+    }
+  });
+
+  // Students management
+  app.get("/api/students", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user?.claims?.sub;
+      const studentsList = await storage.getStudents(userId);
+      res.json(studentsList);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch students" });
+    }
+  });
+
+  app.post("/api/students", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user?.claims?.sub;
+      const student = await storage.createStudent({
+        ...req.body,
+        userId,
+      });
+      res.json(student);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to create student" });
+    }
+  });
+
+  app.patch("/api/students/:id", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user?.claims?.sub;
+      const { id } = req.params;
+      const updated = await storage.updateStudent(id, req.body, userId);
+      if (!updated) {
+        res.status(404).json({ error: "Student not found or not authorized" });
+        return;
+      }
+      res.json(updated);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to update student" });
+    }
+  });
+
+  app.delete("/api/students/:id", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user?.claims?.sub;
+      const { id } = req.params;
+      const deleted = await storage.deleteStudent(id, userId);
+      if (!deleted) {
+        res.status(404).json({ error: "Student not found or not authorized" });
+        return;
+      }
+      res.json({ success: true });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to delete student" });
+    }
+  });
+
+  // Class-student enrollment
+  app.get("/api/classes/:id/students", isAuthenticated, async (req: any, res) => {
+    try {
+      const { id } = req.params;
+      const studentsList = await storage.getClassStudents(id);
+      res.json(studentsList);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch class students" });
+    }
+  });
+
+  app.post("/api/classes/:id/students", isAuthenticated, async (req: any, res) => {
+    try {
+      const { id } = req.params;
+      const { studentId } = req.body;
+      const enrollment = await storage.addStudentToClass(id, studentId);
+      res.json(enrollment);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to add student to class" });
+    }
+  });
+
+  app.delete("/api/classes/:classId/students/:studentId", isAuthenticated, async (req: any, res) => {
+    try {
+      const { classId, studentId } = req.params;
+      await storage.removeStudentFromClass(classId, studentId);
+      res.json({ success: true });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to remove student from class" });
+    }
+  });
+
+  // Student groups
+  app.get("/api/student-groups", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user?.claims?.sub;
+      const groups = await storage.getStudentGroups(userId);
+      res.json(groups);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch student groups" });
+    }
+  });
+
+  app.post("/api/student-groups", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user?.claims?.sub;
+      const group = await storage.createStudentGroup({
+        ...req.body,
+        userId,
+      });
+      res.json(group);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to create student group" });
+    }
+  });
+
+  app.patch("/api/student-groups/:id", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user?.claims?.sub;
+      const { id } = req.params;
+      const updated = await storage.updateStudentGroup(id, req.body, userId);
+      if (!updated) {
+        res.status(404).json({ error: "Group not found or not authorized" });
+        return;
+      }
+      res.json(updated);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to update student group" });
+    }
+  });
+
+  app.delete("/api/student-groups/:id", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user?.claims?.sub;
+      const { id } = req.params;
+      const deleted = await storage.deleteStudentGroup(id, userId);
+      if (!deleted) {
+        res.status(404).json({ error: "Group not found or not authorized" });
+        return;
+      }
+      res.json({ success: true });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to delete student group" });
+    }
+  });
+
   // Affiliate System - Get or create affiliate profile
   app.get("/api/affiliate/me", isAuthenticated, async (req: any, res) => {
     try {

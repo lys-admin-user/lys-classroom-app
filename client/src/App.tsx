@@ -22,6 +22,7 @@ import EducatorInfluence from "@/pages/EducatorInfluence";
 import StandardsAdmin from "@/pages/StandardsAdmin";
 import Pricing from "@/pages/Pricing";
 import Onboarding from "@/pages/Onboarding";
+import Assignments from "@/pages/Assignments";
 import NotFound from "@/pages/not-found";
 
 function Router() {
@@ -44,6 +45,7 @@ function Router() {
       <Route path="/admin/standards" component={StandardsAdmin} />
       <Route path="/pricing" component={Pricing} />
       <Route path="/onboarding" component={Onboarding} />
+      <Route path="/assignments" component={Assignments} />
       <Route component={NotFound} />
     </Switch>
   );
