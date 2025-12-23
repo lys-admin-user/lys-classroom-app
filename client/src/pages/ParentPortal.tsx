@@ -77,16 +77,32 @@ export default function ParentPortal() {
 
   const userRole = user?.role;
   const isStudent = userRole === 'student';
-  const isParent = !isStudent;
+
+  const { data: parentLinks = [], isLoading: parentLinksLoading } = useQuery<EnrichedLink[]>({
+    queryKey: ["/api/parent-portal/links", "parent"],
+    queryFn: async () => {
+      const res = await fetch(`/api/parent-portal/links?role=parent`);
+      if (!res.ok) {
+        if (res.status === 403) return [];
+        throw new Error("Failed to fetch parent links");
+      }
+      return res.json();
+    },
+    enabled: isAuthenticated && !isStudent,
+  });
+
+  const hasParentLinks = parentLinks.length > 0;
+  const isParent = !isStudent && hasParentLinks;
+  const isUnrelatedRole = !isStudent && !parentLinksLoading && !hasParentLinks;
 
   const { data: links = [], isLoading: linksLoading } = useQuery<EnrichedLink[]>({
-    queryKey: ["/api/parent-portal/links", isStudent ? "student" : "parent"],
+    queryKey: ["/api/parent-portal/links", "student"],
     queryFn: async () => {
-      const res = await fetch(`/api/parent-portal/links?role=${isStudent ? 'student' : 'parent'}`);
+      const res = await fetch(`/api/parent-portal/links?role=student`);
       if (!res.ok) throw new Error("Failed to fetch links");
       return res.json();
     },
-    enabled: isAuthenticated,
+    enabled: isAuthenticated && isStudent,
   });
 
   const { data: invitations = [], isLoading: invitationsLoading } = useQuery<ParentInvitation[]>({
@@ -101,7 +117,7 @@ export default function ParentPortal() {
       if (!res.ok) throw new Error("Failed to fetch student data");
       return res.json();
     },
-    enabled: isAuthenticated && isParent && !!selectedStudent,
+    enabled: isAuthenticated && hasParentLinks && !!selectedStudent,
   });
 
   const inviteParentMutation = useMutation({
@@ -223,7 +239,7 @@ export default function ParentPortal() {
 
   const handleAddNote = () => {
     if (!noteContent.trim() || !selectedStudent) return;
-    const link = links.find(l => l.studentUserId === selectedStudent);
+    const link = parentLinks.find(l => l.studentUserId === selectedStudent);
     if (!link) return;
     addNoteMutation.mutate({
       linkId: link.id,
@@ -264,7 +280,7 @@ export default function ParentPortal() {
     );
   }
 
-  if (linksLoading) {
+  if (linksLoading || parentLinksLoading) {
     return (
       <div className="space-y-6 p-6">
         <Skeleton className="h-8 w-48" />
@@ -272,6 +288,29 @@ export default function ParentPortal() {
           <Skeleton className="h-40" />
           <Skeleton className="h-40" />
         </div>
+      </div>
+    );
+  }
+
+  if (isUnrelatedRole) {
+    return (
+      <div className="flex items-center justify-center min-h-[60vh]">
+        <Card className="w-full max-w-md">
+          <CardHeader className="text-center">
+            <div className="mx-auto mb-4 h-16 w-16 rounded-full bg-muted flex items-center justify-center">
+              <Users className="h-8 w-8 text-muted-foreground" />
+            </div>
+            <CardTitle>Parent Portal</CardTitle>
+            <CardDescription>
+              This feature is designed for students to share their progress with family members, 
+              and for parents/guardians to view their children's educational journey.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="text-center text-sm text-muted-foreground">
+            <p>As an educator or administrator, you can encourage your students to use this feature 
+            to engage their families in their educational success.</p>
+          </CardContent>
+        </Card>
       </div>
     );
   }
@@ -496,7 +535,7 @@ export default function ParentPortal() {
                 <CardDescription>Select a student to view their progress</CardDescription>
               </CardHeader>
               <CardContent className="space-y-2">
-                {links.length === 0 ? (
+                {parentLinks.length === 0 ? (
                   <div className="text-center py-8">
                     <Users className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
                     <p className="text-muted-foreground">No linked students yet</p>
@@ -505,7 +544,7 @@ export default function ParentPortal() {
                     </p>
                   </div>
                 ) : (
-                  links.map((link) => (
+                  parentLinks.map((link) => (
                     <button
                       key={link.id}
                       onClick={() => setSelectedStudent(link.studentUserId)}
