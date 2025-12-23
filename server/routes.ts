@@ -2501,7 +2501,7 @@ export async function registerRoutes(
         return;
       }
       
-      const permissions = link.permissions || {};
+      const permissions = (link.permissions || {}) as { viewGoals?: boolean; viewAssessments?: boolean; viewCareers?: boolean; viewLessons?: boolean; receiveNotifications?: boolean };
       const studentData: any = {};
       
       // Get student user info

@@ -1,7 +1,7 @@
 import { Link, useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
 import { ThemeToggle } from "./ThemeToggle";
-import { Menu, X, Sparkles, LogIn, LogOut, BookOpen, User, BarChart3, Award, Database } from "lucide-react";
+import { Menu, X, Sparkles, LogIn, LogOut, BookOpen, User, BarChart3, Award, Database, Users } from "lucide-react";
 import { useState } from "react";
 import { useAuth } from "@/hooks/use-auth";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -148,6 +148,12 @@ export function Header() {
                       Educator Influence
                     </DropdownMenuItem>
                   </Link>
+                  <Link href="/parent-portal">
+                    <DropdownMenuItem className="cursor-pointer" data-testid="menu-parent-portal">
+                      <Users className="mr-2 h-4 w-4" />
+                      Parent Portal
+                    </DropdownMenuItem>
+                  </Link>
                   <Link href="/admin/standards">
                     <DropdownMenuItem className="cursor-pointer" data-testid="menu-standards-admin">
                       <Database className="mr-2 h-4 w-4" />
@@ -247,6 +253,17 @@ export function Header() {
                     >
                       <Award className="mr-2 h-4 w-4" />
                       Educator Influence
+                    </Button>
+                  </Link>
+                  <Link href="/parent-portal">
+                    <Button
+                      variant={location === "/parent-portal" ? "secondary" : "ghost"}
+                      className="w-full justify-start font-roboto"
+                      onClick={() => setMobileMenuOpen(false)}
+                      data-testid="mobile-nav-parent-portal"
+                    >
+                      <Users className="mr-2 h-4 w-4" />
+                      Parent Portal
                     </Button>
                   </Link>
                 </>
