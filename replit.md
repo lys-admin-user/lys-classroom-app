@@ -123,14 +123,33 @@ Three-tier approach for importing educational standards from external sources:
   - Auto-generates UIDs using MD5 hashing of composite keys
   - Version history tracking for standards updates
 - **Tier 2 - CASE Protocol**: (Future) Competency and Academic Standards Exchange
-- **Tier 3 - PDF/HTML Scraping**: (Future) LLM-powered extraction from PDF documents
-- **Database Tables**: `standards_jurisdictions`, `standard_sets`, `educational_standards`, `standards_sync_log`
-- **Admin Page**: `/admin/standards` for manual sync triggers, browsing standards, and viewing sync logs
+- **Tier 3 - LLM Extraction**: AI-powered extraction from raw text (`server/services/llmExtractionService.ts`)
+  - Uses OpenAI to parse standards from PDF/document text
+  - Bullet-point validation ensures data integrity (compares extracted count vs raw bullets)
+  - Confidence scoring for extraction quality
+  - All extracted standards go to staging queue for human review
+- **Staging Workflow**: Approval system for new standards
+  - New standards from LLM extraction enter staging queue as "pending"
+  - Admin can approve (moves to live standards) or reject (with reason)
+  - Bulk approval for efficient batch processing
+  - Soft delete strategy: deprecated standards marked inactive to preserve user data
+- **Change Detection**: Source URL checksum monitoring
+  - MD5 checksums stored for source URLs
+  - Detects when source documents have been updated
+  - Triggers re-scraping when changes detected
+- **Database Tables**: `standards_jurisdictions`, `standard_sets`, `educational_standards`, `standards_sync_log`, `standards_staging`, `source_checksums`
+- **Admin Page**: `/admin/standards` with tabs for Browse Standards, Staging Queue, LLM Extract, and Sync Logs
 - **API Endpoints**:
   - GET `/api/admin/standards/status` - Sync statistics and status
   - GET `/api/admin/standards/jurisdictions` - List jurisdictions from database
   - POST `/api/admin/standards/sync/jurisdictions` - Trigger jurisdiction sync from CSP
   - POST `/api/admin/standards/sync/standard-set` - Sync a specific standard set
+  - GET `/api/admin/standards/staging` - Get staging queue standards
+  - POST `/api/admin/standards/staging/:id/approve` - Approve a staging standard
+  - POST `/api/admin/standards/staging/:id/reject` - Reject a staging standard
+  - POST `/api/admin/standards/staging/bulk-approve` - Bulk approve staging standards
+  - POST `/api/admin/standards/extract` - Extract standards from text using LLM
+  - POST `/api/admin/standards/check-source` - Check source URL for changes
   - GET `/api/standards/countries` - Public API for lesson planning
   - GET `/api/standards/states/:country` - Public API for lesson planning
   - GET `/api/standards/subjects/:country/:stateAbbr` - Public API for lesson planning
