@@ -832,32 +832,86 @@ ${addedResources.length > 0 ? addedResources.map(r => `- ${r.title}: ${r.url}`).
 
                       <Separator />
 
-                      {generatedLesson.synchronousInstruction && (
-                        <div>
+                      <div>
                           <h3 className="font-oswald text-lg font-semibold mb-3 flex items-center gap-2">
                             <Play className="h-5 w-5 text-lys-teal" />
                             Instructional Input
                           </h3>
-                          <div className="space-y-4">
-                            <div className="p-4 rounded-md bg-muted/30">
-                              <h4 className="font-oswald font-semibold text-sm mb-2">Anticipatory Set (Introduction)</h4>
-                              <p className="font-roboto text-sm text-muted-foreground">{generatedLesson.synchronousInstruction.anticipatorySet}</p>
-                            </div>
-                            <div className="p-4 rounded-md bg-muted/30">
-                              <h4 className="font-oswald font-semibold text-sm mb-2">Modeling (I Do)</h4>
-                              <p className="font-roboto text-sm text-muted-foreground">{generatedLesson.synchronousInstruction.modeling}</p>
-                            </div>
-                            <div className="p-4 rounded-md bg-muted/30">
-                              <h4 className="font-oswald font-semibold text-sm mb-2">Guided Practice (We Do)</h4>
-                              <p className="font-roboto text-sm text-muted-foreground">{generatedLesson.synchronousInstruction.guidedPractice}</p>
-                            </div>
-                            <div className="p-4 rounded-md bg-muted/30">
-                              <h4 className="font-oswald font-semibold text-sm mb-2">Independent Practice</h4>
-                              <p className="font-roboto text-sm text-muted-foreground">{generatedLesson.synchronousInstruction.independentPractice}</p>
-                            </div>
-                          </div>
+                          <Tabs defaultValue="synchronous" className="w-full">
+                            <TabsList className="grid w-full grid-cols-2 mb-4">
+                              <TabsTrigger value="synchronous" className="gap-2" data-testid="tab-synchronous">
+                                <Users className="h-4 w-4" />
+                                Synchronous
+                              </TabsTrigger>
+                              <TabsTrigger value="asynchronous" className="gap-2" data-testid="tab-asynchronous">
+                                <Clock className="h-4 w-4" />
+                                Asynchronous
+                              </TabsTrigger>
+                            </TabsList>
+                            
+                            <TabsContent value="synchronous" className="space-y-4">
+                              <p className="text-xs text-muted-foreground font-roboto mb-2">
+                                Live, real-time instruction with direct student interaction
+                              </p>
+                              {generatedLesson.synchronousInstruction && (
+                                <>
+                                  <div className="p-4 rounded-md bg-muted/30">
+                                    <h4 className="font-oswald font-semibold text-sm mb-2">Anticipatory Set (Introduction)</h4>
+                                    <p className="font-roboto text-sm text-muted-foreground">{generatedLesson.synchronousInstruction.anticipatorySet}</p>
+                                  </div>
+                                  <div className="p-4 rounded-md bg-muted/30">
+                                    <h4 className="font-oswald font-semibold text-sm mb-2">Modeling (I Do)</h4>
+                                    <p className="font-roboto text-sm text-muted-foreground">{generatedLesson.synchronousInstruction.modeling}</p>
+                                  </div>
+                                  <div className="p-4 rounded-md bg-muted/30">
+                                    <h4 className="font-oswald font-semibold text-sm mb-2">Guided Practice (We Do)</h4>
+                                    <p className="font-roboto text-sm text-muted-foreground">{generatedLesson.synchronousInstruction.guidedPractice}</p>
+                                  </div>
+                                  <div className="p-4 rounded-md bg-muted/30">
+                                    <h4 className="font-oswald font-semibold text-sm mb-2">Independent Practice</h4>
+                                    <p className="font-roboto text-sm text-muted-foreground">{generatedLesson.synchronousInstruction.independentPractice}</p>
+                                  </div>
+                                </>
+                              )}
+                            </TabsContent>
+                            
+                            <TabsContent value="asynchronous" className="space-y-4">
+                              <p className="text-xs text-muted-foreground font-roboto mb-2">
+                                Self-paced learning activities students complete on their own time
+                              </p>
+                              {generatedLesson.asynchronousInstruction ? (
+                                <>
+                                  <div className="p-4 rounded-md bg-muted/30">
+                                    <h4 className="font-oswald font-semibold text-sm mb-2">Introduction / Hook</h4>
+                                    <p className="font-roboto text-sm text-muted-foreground">{generatedLesson.asynchronousInstruction.anticipatorySet}</p>
+                                  </div>
+                                  <div className="p-4 rounded-md bg-muted/30">
+                                    <h4 className="font-oswald font-semibold text-sm mb-2">Video / Content Review</h4>
+                                    <p className="font-roboto text-sm text-muted-foreground">{generatedLesson.asynchronousInstruction.modeling}</p>
+                                  </div>
+                                  <div className="p-4 rounded-md bg-muted/30">
+                                    <h4 className="font-oswald font-semibold text-sm mb-2">Discussion / Collaboration</h4>
+                                    <p className="font-roboto text-sm text-muted-foreground">{generatedLesson.asynchronousInstruction.guidedPractice}</p>
+                                  </div>
+                                  <div className="p-4 rounded-md bg-muted/30">
+                                    <h4 className="font-oswald font-semibold text-sm mb-2">Self-Paced Practice</h4>
+                                    <p className="font-roboto text-sm text-muted-foreground">{generatedLesson.asynchronousInstruction.independentPractice}</p>
+                                  </div>
+                                </>
+                              ) : (
+                                <div className="p-6 rounded-md bg-muted/20 text-center">
+                                  <Clock className="h-8 w-8 text-muted-foreground mx-auto mb-2" />
+                                  <p className="font-roboto text-sm text-muted-foreground">
+                                    Asynchronous instruction will be generated when available.
+                                  </p>
+                                  <p className="font-roboto text-xs text-muted-foreground mt-1">
+                                    You can adapt the synchronous content for self-paced learning.
+                                  </p>
+                                </div>
+                              )}
+                            </TabsContent>
+                          </Tabs>
                         </div>
-                      )}
 
                       <Separator />
 
