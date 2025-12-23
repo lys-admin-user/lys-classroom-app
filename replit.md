@@ -134,13 +134,13 @@ Community-driven resource sharing for educators:
 - **Database Tables**: `shared_resources`, `resource_likes`
 - **Page**: `/resource-library`
 - **API Endpoints**:
-  - GET `/api/resources/shared` - Browse public resources with filters
-  - GET `/api/resources/mine` - List user's own resources
-  - POST `/api/resources` - Create new resource
-  - PATCH `/api/resources/:id` - Update resource
-  - DELETE `/api/resources/:id` - Delete resource
-  - POST `/api/resources/:id/like` - Toggle like
-  - POST `/api/resources/:id/download` - Track download
+  - GET `/api/shared-resources` - Browse public resources with filters
+  - GET `/api/shared-resources/mine` - List user's own resources
+  - POST `/api/shared-resources` - Create new resource
+  - PATCH `/api/shared-resources/:id` - Update resource
+  - DELETE `/api/shared-resources/:id` - Delete resource
+  - POST `/api/shared-resources/:id/like` - Toggle like
+  - POST `/api/shared-resources/:id/download` - Track download
 
 ### Educational Standards System
 The lesson generator requires legally-compliant educational standards:

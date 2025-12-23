@@ -69,19 +69,19 @@ export default function ResourceLibrary() {
   });
 
   const { data: publicResources, isLoading: publicLoading } = useQuery<SharedResource[]>({
-    queryKey: ["/api/resources/shared", categoryFilter, subjectFilter],
+    queryKey: ["/api/shared-resources", categoryFilter, subjectFilter],
   });
 
   const { data: myResources, isLoading: myLoading } = useQuery<SharedResource[]>({
-    queryKey: ["/api/resources/mine"],
+    queryKey: ["/api/shared-resources/mine"],
     enabled: isAuthenticated,
   });
 
   const createResourceMutation = useMutation({
-    mutationFn: (data: any) => apiRequest("POST", "/api/resources", data),
+    mutationFn: (data: any) => apiRequest("POST", "/api/shared-resources", data),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/resources/mine"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/resources/shared"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/shared-resources/mine"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/shared-resources"] });
       toast({ title: "Resource Created", description: "Your resource has been added to the library." });
       setCreateDialogOpen(false);
       resetForm();
@@ -92,23 +92,23 @@ export default function ResourceLibrary() {
   });
 
   const deleteResourceMutation = useMutation({
-    mutationFn: (id: string) => apiRequest("DELETE", `/api/resources/${id}`, {}),
+    mutationFn: (id: string) => apiRequest("DELETE", `/api/shared-resources/${id}`, {}),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/resources/mine"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/resources/shared"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/shared-resources/mine"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/shared-resources"] });
       toast({ title: "Deleted", description: "Resource removed from library." });
     },
   });
 
   const likeResourceMutation = useMutation({
-    mutationFn: (id: string) => apiRequest("POST", `/api/resources/${id}/like`, {}),
+    mutationFn: (id: string) => apiRequest("POST", `/api/shared-resources/${id}/like`, {}),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/resources/shared"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/shared-resources"] });
     },
   });
 
   const downloadResourceMutation = useMutation({
-    mutationFn: (id: string) => apiRequest("POST", `/api/resources/${id}/download`, {}),
+    mutationFn: (id: string) => apiRequest("POST", `/api/shared-resources/${id}/download`, {}),
   });
 
   const resetForm = () => {

@@ -1431,8 +1431,8 @@ export async function registerRoutes(
   // Shared Resources Library
   // ================================
 
-  // Get public resources
-  app.get("/api/resources/shared", async (req, res) => {
+  // Get public shared resources
+  app.get("/api/shared-resources", async (req, res) => {
     try {
       const { category, subject } = req.query;
       const resources = await storage.getSharedResources({ 
@@ -1446,8 +1446,8 @@ export async function registerRoutes(
     }
   });
 
-  // Get user's resources
-  app.get("/api/resources/mine", isAuthenticated, async (req: any, res) => {
+  // Get user's shared resources
+  app.get("/api/shared-resources/mine", isAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user?.claims?.sub;
       const resources = await storage.getUserSharedResources(userId);
@@ -1457,8 +1457,8 @@ export async function registerRoutes(
     }
   });
 
-  // Get single resource
-  app.get("/api/resources/:id", async (req, res) => {
+  // Get single shared resource
+  app.get("/api/shared-resources/:id", async (req, res) => {
     try {
       const { id } = req.params;
       const resource = await storage.getSharedResource(id);
@@ -1472,8 +1472,8 @@ export async function registerRoutes(
     }
   });
 
-  // Create resource
-  app.post("/api/resources", isAuthenticated, async (req: any, res) => {
+  // Create shared resource
+  app.post("/api/shared-resources", isAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user?.claims?.sub;
       const resource = await storage.createSharedResource({
@@ -1487,8 +1487,8 @@ export async function registerRoutes(
     }
   });
 
-  // Update resource
-  app.patch("/api/resources/:id", isAuthenticated, async (req: any, res) => {
+  // Update shared resource
+  app.patch("/api/shared-resources/:id", isAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user?.claims?.sub;
       const { id } = req.params;
@@ -1503,8 +1503,8 @@ export async function registerRoutes(
     }
   });
 
-  // Delete resource
-  app.delete("/api/resources/:id", isAuthenticated, async (req: any, res) => {
+  // Delete shared resource
+  app.delete("/api/shared-resources/:id", isAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user?.claims?.sub;
       const { id } = req.params;
@@ -1519,8 +1519,8 @@ export async function registerRoutes(
     }
   });
 
-  // Like/unlike resource
-  app.post("/api/resources/:id/like", isAuthenticated, async (req: any, res) => {
+  // Like/unlike shared resource
+  app.post("/api/shared-resources/:id/like", isAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user?.claims?.sub;
       const { id } = req.params;
@@ -1531,8 +1531,8 @@ export async function registerRoutes(
     }
   });
 
-  // Track resource download
-  app.post("/api/resources/:id/download", async (req, res) => {
+  // Track shared resource download
+  app.post("/api/shared-resources/:id/download", async (req, res) => {
     try {
       const { id } = req.params;
       await storage.incrementResourceDownload(id);
