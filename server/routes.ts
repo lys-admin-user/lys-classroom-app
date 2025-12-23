@@ -68,6 +68,41 @@ const updateGoalSchema = z.object({
   })).optional(),
 });
 
+const updatePreferencesSchema = z.object({
+  language: z.string().optional(),
+  country: z.string().optional(),
+  state: z.string().optional(),
+  jurisdictionId: z.string().optional(),
+  standardSetId: z.string().optional(),
+  needsAnalysis: z.object({
+    primaryGoal: z.string().optional(),
+    interests: z.array(z.string()).optional(),
+    experienceLevel: z.string().optional(),
+    recommendedFeatures: z.array(z.string()).optional(),
+  }).optional(),
+});
+
+const completeOnboardingSchema = z.object({
+  role: z.enum(["student", "educator", "campus_admin"]).optional(),
+  preferences: z.object({
+    language: z.string().optional(),
+    country: z.string().optional(),
+    state: z.string().optional(),
+    jurisdictionId: z.string().optional(),
+    standardSetId: z.string().optional(),
+  }).optional(),
+  needsAnalysis: z.object({
+    primaryGoal: z.string(),
+    interests: z.array(z.string()),
+    experienceLevel: z.string().optional(),
+    recommendedFeatures: z.array(z.string()),
+  }),
+});
+
+const updateRoleSchema = z.object({
+  role: z.enum(["student", "educator", "campus_admin"]),
+});
+
 export async function registerRoutes(
   httpServer: Server,
   app: Express
@@ -750,6 +785,88 @@ export async function registerRoutes(
       res.json({ success: true });
     } catch (error) {
       res.status(500).json({ error: "Failed to delete saved career" });
+    }
+  });
+
+  // ================================
+  // User Preferences & Onboarding
+  // ================================
+
+  // Get user preferences
+  app.get("/api/preferences", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user?.claims?.sub;
+      const prefs = await storage.getUserPreferences(userId);
+      res.json(prefs || {});
+    } catch (error) {
+      console.error("Get preferences error:", error);
+      res.status(500).json({ error: "Failed to get preferences" });
+    }
+  });
+
+  // Update user preferences
+  app.patch("/api/preferences", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user?.claims?.sub;
+      const validated = updatePreferencesSchema.parse(req.body);
+      const prefs = await storage.updateUserPreferences(userId, validated);
+      res.json(prefs);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        res.status(400).json({ error: "Invalid preferences data", details: error.errors });
+        return;
+      }
+      console.error("Update preferences error:", error);
+      res.status(500).json({ error: "Failed to update preferences" });
+    }
+  });
+
+  // Complete onboarding
+  app.post("/api/onboarding/complete", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user?.claims?.sub;
+      const validated = completeOnboardingSchema.parse(req.body);
+      const { role, preferences, needsAnalysis } = validated;
+      
+      // Update user role
+      if (role) {
+        await storage.updateUserRole(userId, role);
+      }
+      
+      // Save preferences with needs analysis
+      await storage.updateUserPreferences(userId, {
+        ...preferences,
+        needsAnalysis,
+      });
+      
+      // Mark onboarding complete
+      const user = await storage.completeOnboarding(userId);
+      
+      res.json({ success: true, user });
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        res.status(400).json({ error: "Invalid onboarding data", details: error.errors });
+        return;
+      }
+      console.error("Complete onboarding error:", error);
+      res.status(500).json({ error: "Failed to complete onboarding" });
+    }
+  });
+
+  // Update user role
+  app.patch("/api/user/role", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user?.claims?.sub;
+      const validated = updateRoleSchema.parse(req.body);
+      const user = await storage.updateUserRole(userId, validated.role);
+      res.json(user);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        res.status(400).json({ error: "Invalid role data", details: error.errors });
+        return;
+      }
+      console.error("Update role error:", error);
+      res.status(500).json({ error: "Failed to update role" });
     }
   });
 

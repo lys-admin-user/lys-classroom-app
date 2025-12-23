@@ -11,6 +11,10 @@ import {
   type EducatorProfile,
   type InsertEducatorProfile,
   type User,
+  type UserRole,
+  type UserTier,
+  type UserPreferences,
+  type InsertUserPreferences,
   type ScopeSequence,
   type InsertScopeSequence,
   type SequenceUnit,
@@ -45,6 +49,7 @@ import {
   goals,
   educatorProfiles,
   users,
+  userPreferences,
   scopeSequences,
   sequenceUnits,
   scopeChangeRequests,
@@ -87,9 +92,16 @@ export interface IStorage {
   createEducatorProfile(profile: InsertEducatorProfile): Promise<EducatorProfile>;
   updateEducatorProfile(userId: string, updates: Partial<EducatorProfile>): Promise<EducatorProfile | undefined>;
   
-  // User tier management
+  // User tier and role management
   getUserTier(userId: string): Promise<string>;
   updateUserTier(userId: string, tier: string): Promise<User | undefined>;
+  updateUserRole(userId: string, role: UserRole): Promise<User | undefined>;
+  completeOnboarding(userId: string): Promise<User | undefined>;
+  
+  // User Preferences
+  getUserPreferences(userId: string): Promise<UserPreferences | undefined>;
+  createUserPreferences(prefs: InsertUserPreferences): Promise<UserPreferences>;
+  updateUserPreferences(userId: string, updates: Partial<UserPreferences>): Promise<UserPreferences | undefined>;
   
   // Static data (in-memory)
   getCareers(): Promise<Career[]>;
@@ -531,6 +543,53 @@ export class DatabaseStorage implements IStorage {
     const [updated] = await db.update(users)
       .set({ tier: tier as any, updatedAt: new Date() })
       .where(eq(users.id, userId))
+      .returning();
+    return updated || undefined;
+  }
+
+  async updateUserRole(userId: string, role: UserRole): Promise<User | undefined> {
+    const [updated] = await db.update(users)
+      .set({ role, updatedAt: new Date() })
+      .where(eq(users.id, userId))
+      .returning();
+    return updated || undefined;
+  }
+
+  async completeOnboarding(userId: string): Promise<User | undefined> {
+    const [updated] = await db.update(users)
+      .set({ onboardingCompleted: true, updatedAt: new Date() })
+      .where(eq(users.id, userId))
+      .returning();
+    return updated || undefined;
+  }
+
+  // User Preferences
+  async getUserPreferences(userId: string): Promise<UserPreferences | undefined> {
+    const [prefs] = await db.select().from(userPreferences).where(eq(userPreferences.userId, userId));
+    return prefs || undefined;
+  }
+
+  async createUserPreferences(prefs: InsertUserPreferences): Promise<UserPreferences> {
+    const [created] = await db.insert(userPreferences).values(prefs as any).returning();
+    return created;
+  }
+
+  async updateUserPreferences(userId: string, updates: Partial<UserPreferences>): Promise<UserPreferences | undefined> {
+    const existing = await this.getUserPreferences(userId);
+    
+    // Filter out undefined values to prevent overwriting existing data
+    const filteredUpdates = Object.fromEntries(
+      Object.entries(updates).filter(([_, value]) => value !== undefined)
+    );
+    
+    if (!existing) {
+      return await this.createUserPreferences({ userId, ...filteredUpdates } as InsertUserPreferences);
+    }
+    
+    // Merge with existing preferences
+    const [updated] = await db.update(userPreferences)
+      .set({ ...filteredUpdates, updatedAt: new Date() })
+      .where(eq(userPreferences.userId, userId))
       .returning();
     return updated || undefined;
   }
