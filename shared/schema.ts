@@ -922,3 +922,60 @@ export const sessionEditHistory = pgTable("session_edit_history", {
 export const insertSessionEditHistorySchema = createInsertSchema(sessionEditHistory).omit({ id: true, createdAt: true });
 export type InsertSessionEditHistory = z.infer<typeof insertSessionEditHistorySchema>;
 export type SessionEditHistory = typeof sessionEditHistory.$inferSelect;
+
+// Parent-Student Relationships Table
+export const parentStudentLinks = pgTable("parent_student_links", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  parentUserId: varchar("parent_user_id").notNull(),
+  studentUserId: varchar("student_user_id").notNull(),
+  relationship: text("relationship").notNull().default("parent"), // parent, guardian, family_member
+  status: text("status").notNull().default("pending"), // pending, active, revoked
+  permissions: jsonb("permissions").$type<{
+    viewGoals: boolean;
+    viewAssessments: boolean;
+    viewCareers: boolean;
+    viewLessons: boolean;
+    receiveNotifications: boolean;
+  }>().default({ viewGoals: true, viewAssessments: true, viewCareers: true, viewLessons: false, receiveNotifications: true }),
+  invitedAt: timestamp("invited_at").defaultNow(),
+  acceptedAt: timestamp("accepted_at"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertParentStudentLinkSchema = createInsertSchema(parentStudentLinks).omit({ id: true, createdAt: true, invitedAt: true });
+export type InsertParentStudentLink = z.infer<typeof insertParentStudentLinkSchema>;
+export type ParentStudentLink = typeof parentStudentLinks.$inferSelect;
+
+// Parent Invitations Table
+export const parentInvitations = pgTable("parent_invitations", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  studentUserId: varchar("student_user_id").notNull(),
+  parentEmail: text("parent_email").notNull(),
+  relationship: text("relationship").notNull().default("parent"),
+  token: varchar("token").notNull().unique(),
+  status: text("status").notNull().default("pending"), // pending, accepted, expired, revoked
+  expiresAt: timestamp("expires_at").notNull(),
+  acceptedAt: timestamp("accepted_at"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertParentInvitationSchema = createInsertSchema(parentInvitations).omit({ id: true, createdAt: true });
+export type InsertParentInvitation = z.infer<typeof insertParentInvitationSchema>;
+export type ParentInvitation = typeof parentInvitations.$inferSelect;
+
+// Parent Progress Notes (for parents to add notes/comments)
+export const parentProgressNotes = pgTable("parent_progress_notes", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  linkId: varchar("link_id").notNull(), // references parent_student_links.id
+  parentUserId: varchar("parent_user_id").notNull(),
+  studentUserId: varchar("student_user_id").notNull(),
+  noteType: text("note_type").notNull().default("general"), // general, encouragement, question, milestone_celebration
+  content: text("content").notNull(),
+  relatedGoalId: varchar("related_goal_id"),
+  isPrivate: boolean("is_private").default(false), // private notes only visible to parent
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertParentProgressNoteSchema = createInsertSchema(parentProgressNotes).omit({ id: true, createdAt: true });
+export type InsertParentProgressNote = z.infer<typeof insertParentProgressNoteSchema>;
+export type ParentProgressNote = typeof parentProgressNotes.$inferSelect;
