@@ -11,7 +11,7 @@ import { Separator } from "@/components/ui/separator";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Sparkles, Clock, Target, BookOpen, Users, Loader2, Copy, Download, Heart, Compass, Save, Check, GraduationCap, FileText, Globe, MapPin, Lightbulb, Play, UserCheck, Settings, Printer, LayoutList, AlertCircle } from "lucide-react";
+import { Sparkles, Clock, Target, BookOpen, Users, Loader2, Copy, Download, Heart, Compass, Save, Check, GraduationCap, FileText, Globe, MapPin, Lightbulb, Play, UserCheck, Settings, Printer, LayoutList, AlertCircle, ExternalLink, Plus, X, Search, Library } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useAuth } from "@/hooks/use-auth";
@@ -19,7 +19,10 @@ import { useTier } from "@/hooks/use-tier";
 import { AdBanner } from "@/components/AdBanner";
 import type { LessonPlan, EducatorProfile } from "@shared/schema";
 import { educationalStandards, getStates, getSubjects, getStandardCodes, getStandardsName, type StandardCode } from "@shared/standards";
+import { educationalResourceProviders, getSearchUrl, type EducationalResourceProvider, type EducationalResource } from "@shared/educationalResources";
 import { Link, useLocation } from "wouter";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 const gradeLevels = [
   "Elementary (K-2)",
@@ -53,6 +56,14 @@ export default function LessonGenerator() {
   const [isSaved, setIsSaved] = useState(false);
   const [profileApplied, setProfileApplied] = useState(false);
   const [scopeSkipped, setScopeSkipped] = useState(false);
+  
+  // Educational Resources state
+  const [addedResources, setAddedResources] = useState<EducationalResource[]>([]);
+  const [resourceDialogOpen, setResourceDialogOpen] = useState(false);
+  const [resourceSearch, setResourceSearch] = useState("");
+  const [customResourceUrl, setCustomResourceUrl] = useState("");
+  const [customResourceTitle, setCustomResourceTitle] = useState("");
+  const [selectedResourceCategory, setSelectedResourceCategory] = useState<"all" | "oer" | "government" | "video" | "interactive" | "textbooks">("all");
 
   const { data: profileData } = useQuery<{ profile: EducatorProfile | null; tier: string }>({
     queryKey: ["/api/educator-profile"],
@@ -105,6 +116,70 @@ export default function LessonGenerator() {
       }
       return [...prev, code];
     });
+  };
+
+  // Educational Resources functions
+  const filteredProviders = useMemo(() => {
+    return educationalResourceProviders.filter(p => {
+      if (selectedResourceCategory !== "all" && p.category !== selectedResourceCategory) return false;
+      if (resourceSearch) {
+        const search = resourceSearch.toLowerCase();
+        return p.name.toLowerCase().includes(search) || 
+               p.description.toLowerCase().includes(search) ||
+               p.subjects.some(s => s.toLowerCase().includes(search));
+      }
+      return true;
+    });
+  }, [selectedResourceCategory, resourceSearch]);
+
+  const addResourceFromProvider = (provider: EducationalResourceProvider) => {
+    const searchTerm = topic || generatedLesson?.topic || "";
+    const url = getSearchUrl(provider, searchTerm);
+    const resource: EducationalResource = {
+      providerId: provider.id,
+      providerName: provider.name,
+      title: `${provider.name} - ${searchTerm || "Resources"}`,
+      url,
+      description: provider.description,
+      type: provider.category === "video" ? "video" : 
+            provider.category === "interactive" ? "interactive" :
+            provider.category === "textbooks" ? "textbook" : "article",
+    };
+    setAddedResources(prev => [...prev, resource]);
+    toast({ title: "Resource Added", description: `${provider.name} added to lesson resources` });
+  };
+
+  const addCustomResource = () => {
+    if (!customResourceUrl || !customResourceTitle) {
+      toast({ title: "Missing Info", description: "Please enter both title and URL", variant: "destructive" });
+      return;
+    }
+    const resource: EducationalResource = {
+      providerId: "custom",
+      providerName: "Custom Resource",
+      title: customResourceTitle,
+      url: customResourceUrl,
+      type: "other",
+    };
+    setAddedResources(prev => [...prev, resource]);
+    setCustomResourceUrl("");
+    setCustomResourceTitle("");
+    toast({ title: "Resource Added", description: "Custom resource added to lesson" });
+  };
+
+  const removeResource = (index: number) => {
+    setAddedResources(prev => prev.filter((_, i) => i !== index));
+  };
+
+  const getCategoryLabel = (category: string) => {
+    switch (category) {
+      case "oer": return "Open Educational Resources";
+      case "government": return "Government & Institutional";
+      case "video": return "Video Resources";
+      case "interactive": return "Interactive Simulations";
+      case "textbooks": return "Free Textbooks";
+      default: return category;
+    }
   };
 
   const generateMutation = useMutation({
@@ -825,6 +900,179 @@ ${generatedLesson.lessonClose?.vocational ? `Vocational: ${generatedLesson.lesso
                           </div>
                         </>
                       )}
+
+                      <Separator />
+
+                      <div className="p-4 rounded-md bg-lys-teal/5 border border-lys-teal/20">
+                        <div className="flex items-center justify-between gap-4 mb-4 flex-wrap">
+                          <h3 className="font-oswald text-lg font-semibold flex items-center gap-2">
+                            <Library className="h-5 w-5 text-lys-teal" />
+                            Educational Resources
+                          </h3>
+                          <Dialog open={resourceDialogOpen} onOpenChange={setResourceDialogOpen}>
+                            <DialogTrigger asChild>
+                              <Button variant="outline" size="sm" className="gap-1" data-testid="button-add-resources">
+                                <Plus className="h-4 w-4" />
+                                Add Resources
+                              </Button>
+                            </DialogTrigger>
+                            <DialogContent className="max-w-3xl max-h-[80vh] overflow-hidden flex flex-col">
+                              <DialogHeader>
+                                <DialogTitle className="font-oswald">Add Educational Resources</DialogTitle>
+                                <DialogDescription>
+                                  Browse trusted open educational resources or add custom links
+                                </DialogDescription>
+                              </DialogHeader>
+                              
+                              <Tabs defaultValue="browse" className="flex-1 overflow-hidden flex flex-col">
+                                <TabsList className="grid w-full grid-cols-2">
+                                  <TabsTrigger value="browse" data-testid="tab-browse-resources">Browse Resources</TabsTrigger>
+                                  <TabsTrigger value="custom" data-testid="tab-custom-resource">Add Custom URL</TabsTrigger>
+                                </TabsList>
+                                
+                                <TabsContent value="browse" className="flex-1 overflow-hidden flex flex-col mt-4">
+                                  <div className="flex items-center gap-2 mb-4 flex-wrap">
+                                    <div className="relative flex-1 min-w-[200px]">
+                                      <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                                      <Input
+                                        placeholder="Search resources..."
+                                        value={resourceSearch}
+                                        onChange={(e) => setResourceSearch(e.target.value)}
+                                        className="pl-10"
+                                        data-testid="input-resource-search"
+                                      />
+                                    </div>
+                                    <Select value={selectedResourceCategory} onValueChange={(v: any) => setSelectedResourceCategory(v)}>
+                                      <SelectTrigger className="w-[200px]" data-testid="select-resource-category">
+                                        <SelectValue placeholder="Category" />
+                                      </SelectTrigger>
+                                      <SelectContent>
+                                        <SelectItem value="all">All Categories</SelectItem>
+                                        <SelectItem value="oer">Open Educational</SelectItem>
+                                        <SelectItem value="government">Government</SelectItem>
+                                        <SelectItem value="video">Video</SelectItem>
+                                        <SelectItem value="interactive">Interactive</SelectItem>
+                                        <SelectItem value="textbooks">Textbooks</SelectItem>
+                                      </SelectContent>
+                                    </Select>
+                                  </div>
+                                  
+                                  <ScrollArea className="flex-1 pr-4">
+                                    <div className="grid gap-3">
+                                      {filteredProviders.map((provider) => (
+                                        <div 
+                                          key={provider.id}
+                                          className="flex items-start gap-3 p-3 rounded-md border hover-elevate cursor-pointer"
+                                          data-testid={`resource-provider-${provider.id}`}
+                                        >
+                                          <div className="flex-1">
+                                            <div className="flex items-center gap-2 mb-1">
+                                              <span className="font-oswald font-semibold">{provider.name}</span>
+                                              <Badge variant="outline" className="text-xs">
+                                                {getCategoryLabel(provider.category)}
+                                              </Badge>
+                                            </div>
+                                            <p className="text-sm text-muted-foreground font-roboto mb-2">{provider.description}</p>
+                                            <div className="flex flex-wrap gap-1">
+                                              {provider.subjects.slice(0, 5).map((subject) => (
+                                                <Badge key={subject} variant="secondary" className="text-xs">{subject}</Badge>
+                                              ))}
+                                            </div>
+                                          </div>
+                                          <div className="flex flex-col gap-2">
+                                            <Button 
+                                              size="sm" 
+                                              onClick={() => addResourceFromProvider(provider)}
+                                              className="gap-1"
+                                              data-testid={`button-add-${provider.id}`}
+                                            >
+                                              <Plus className="h-3 w-3" />
+                                              Add
+                                            </Button>
+                                            <Button 
+                                              size="sm" 
+                                              variant="outline"
+                                              onClick={() => window.open(provider.url, '_blank')}
+                                              className="gap-1"
+                                            >
+                                              <ExternalLink className="h-3 w-3" />
+                                              Visit
+                                            </Button>
+                                          </div>
+                                        </div>
+                                      ))}
+                                    </div>
+                                  </ScrollArea>
+                                </TabsContent>
+                                
+                                <TabsContent value="custom" className="mt-4 space-y-4">
+                                  <div className="space-y-2">
+                                    <Label className="font-oswald">Resource Title</Label>
+                                    <Input
+                                      placeholder="e.g., NASA Mars Exploration Video"
+                                      value={customResourceTitle}
+                                      onChange={(e) => setCustomResourceTitle(e.target.value)}
+                                      data-testid="input-custom-title"
+                                    />
+                                  </div>
+                                  <div className="space-y-2">
+                                    <Label className="font-oswald">Resource URL</Label>
+                                    <Input
+                                      placeholder="https://..."
+                                      value={customResourceUrl}
+                                      onChange={(e) => setCustomResourceUrl(e.target.value)}
+                                      data-testid="input-custom-url"
+                                    />
+                                  </div>
+                                  <Button onClick={addCustomResource} className="w-full gap-2" data-testid="button-add-custom">
+                                    <Plus className="h-4 w-4" />
+                                    Add Custom Resource
+                                  </Button>
+                                </TabsContent>
+                              </Tabs>
+                            </DialogContent>
+                          </Dialog>
+                        </div>
+
+                        {addedResources.length === 0 ? (
+                          <p className="text-sm text-muted-foreground font-roboto text-center py-4">
+                            No resources added yet. Click "Add Resources" to browse trusted educational sites like Khan Academy, NASA, MIT, and more.
+                          </p>
+                        ) : (
+                          <div className="space-y-2">
+                            {addedResources.map((resource, index) => (
+                              <div 
+                                key={index} 
+                                className="flex items-center gap-3 p-2 rounded-md bg-background/50 border"
+                                data-testid={`added-resource-${index}`}
+                              >
+                                <div className="flex-1 min-w-0">
+                                  <p className="font-roboto text-sm font-medium truncate">{resource.title}</p>
+                                  <p className="text-xs text-muted-foreground truncate">{resource.providerName}</p>
+                                </div>
+                                <div className="flex items-center gap-1">
+                                  <Button
+                                    size="icon"
+                                    variant="ghost"
+                                    onClick={() => window.open(resource.url, '_blank')}
+                                    data-testid={`button-open-resource-${index}`}
+                                  >
+                                    <ExternalLink className="h-4 w-4" />
+                                  </Button>
+                                  <Button
+                                    size="icon"
+                                    variant="ghost"
+                                    onClick={() => removeResource(index)}
+                                    data-testid={`button-remove-resource-${index}`}
+                                  >
+                                    <X className="h-4 w-4" />
+                                  </Button>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
                     </div>
                   </ScrollArea>
                 ) : (
