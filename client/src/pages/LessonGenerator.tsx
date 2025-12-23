@@ -206,6 +206,19 @@ export default function LessonGenerator() {
     onSuccess: (data) => {
       setGeneratedLesson(data);
       setIsSaved(false);
+      // Initialize resources from generated lesson if any
+      if (data.resources && data.resources.length > 0) {
+        setAddedResources(data.resources.map(r => ({
+          providerId: "ai-suggested",
+          providerName: "AI Suggested",
+          title: r.title,
+          url: r.url || "",
+          description: "",
+          type: r.type as any || "other",
+        })));
+      } else {
+        setAddedResources([]);
+      }
       toast({
         title: "Lesson Generated!",
         description: "Great job! You just saved yourself 30+ minutes.",
@@ -226,6 +239,12 @@ export default function LessonGenerator() {
       const standardsString = generatedLesson.standards 
         ? `${generatedLesson.standards.standardsName}: ${generatedLesson.standards.codes.map(c => c.code).join(", ")}`
         : "";
+      // Combine AI resources with user-added resources
+      const allResources = addedResources.map(r => ({
+        title: r.title,
+        url: r.url,
+        type: r.type,
+      }));
       const response = await apiRequest("POST", "/api/lessons/save", {
         title: generatedLesson.title,
         topic: generatedLesson.topic,
@@ -235,7 +254,7 @@ export default function LessonGenerator() {
         duration: generatedLesson.duration,
         objectives: generatedLesson.objectives,
         activities: generatedLesson.activities,
-        materials: generatedLesson.materials,
+        materials: [...generatedLesson.materials, ...allResources.map(r => `${r.title}: ${r.url}`)],
         assessment: generatedLesson.assessment,
         reflection: generatedLesson.reflection,
       });
@@ -318,6 +337,9 @@ LESSON CLOSE:
 ${generatedLesson.lessonClose?.educational ? `Educational: ${generatedLesson.lessonClose.educational}` : ""}
 ${generatedLesson.lessonClose?.social ? `Social: ${generatedLesson.lessonClose.social}` : ""}
 ${generatedLesson.lessonClose?.vocational ? `Vocational: ${generatedLesson.lessonClose.vocational}` : ""}
+
+EDUCATIONAL RESOURCES:
+${addedResources.length > 0 ? addedResources.map(r => `- ${r.title}: ${r.url}`).join("\n") : "No additional resources added"}
       `.trim();
       navigator.clipboard.writeText(text);
       toast({
