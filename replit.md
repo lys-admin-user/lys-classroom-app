@@ -57,3 +57,12 @@ Preferred communication style: Simple, everyday language.
 -   **TypeScript**: Used across the stack with strict mode.
 -   **Vite**: Frontend build tool.
 -   **esbuild**: Server bundling.
+
+### Payment Integration (Pending)
+-   **Demo Mode**: Currently the platform operates in demo mode for tier upgrades. Users can simulate upgrading to Pro or Campus tiers via `/api/subscription/demo-upgrade`.
+-   **Future**: When ready for production payments, connect Stripe via Replit's Stripe connector integration. The user fields `stripeCustomerId`, `stripeSubscriptionId`, and `subscriptionStatus` are ready in the database schema.
+
+## Onboarding Flow
+-   New users are automatically redirected to `/onboarding` if they haven't completed the onboarding wizard.
+-   Onboarding collects: role (student/educator/campus_admin), primary goals, interests, language, and location preferences.
+-   Exempt paths from onboarding redirect: `/onboarding`, `/pricing`, `/shared/*`

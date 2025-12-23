@@ -155,7 +155,8 @@ export interface IStorage {
   createEducatorProfile(profile: InsertEducatorProfile): Promise<EducatorProfile>;
   updateEducatorProfile(userId: string, updates: Partial<EducatorProfile>): Promise<EducatorProfile | undefined>;
   
-  // User tier and role management
+  // User management
+  getUser(userId: string): Promise<User | undefined>;
   getUserTier(userId: string): Promise<string>;
   updateUserTier(userId: string, tier: string): Promise<User | undefined>;
   updateUserRole(userId: string, role: UserRole): Promise<User | undefined>;
@@ -696,7 +697,12 @@ export class DatabaseStorage implements IStorage {
     return updated || undefined;
   }
 
-  // User tier management
+  // User management
+  async getUser(userId: string): Promise<User | undefined> {
+    const [user] = await db.select().from(users).where(eq(users.id, userId));
+    return user || undefined;
+  }
+
   async getUserTier(userId: string): Promise<string> {
     const [user] = await db.select().from(users).where(eq(users.id, userId));
     return user?.tier || "free";

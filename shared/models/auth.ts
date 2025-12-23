@@ -39,6 +39,9 @@ export const users = pgTable("users", {
   tier: varchar("tier").default("free").$type<UserTier>(),
   role: varchar("role").default("student").$type<UserRole>(),
   onboardingCompleted: boolean("onboarding_completed").default(false),
+  stripeCustomerId: varchar("stripe_customer_id"),
+  stripeSubscriptionId: varchar("stripe_subscription_id"),
+  subscriptionStatus: varchar("subscription_status"),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });

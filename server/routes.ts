@@ -96,7 +96,7 @@ const completeOnboardingSchema = z.object({
   needsAnalysis: z.object({
     primaryGoal: z.string(),
     interests: z.array(z.string()),
-    experienceLevel: z.string().optional(),
+    experienceLevel: z.string().default("beginner"),
     recommendedFeatures: z.array(z.string()),
   }),
 });
@@ -382,14 +382,13 @@ export async function registerRoutes(
   app.post("/api/educator-profile/complete-onboarding", isAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user?.claims?.sub;
-      const profile = await storage.updateEducatorProfile(userId, {
-        onboardingCompleted: new Date(),
-      });
-      if (!profile) {
-        res.status(404).json({ error: "Profile not found" });
+      // Mark onboarding complete on user record
+      const user = await storage.completeOnboarding(userId);
+      if (!user) {
+        res.status(404).json({ error: "User not found" });
         return;
       }
-      res.json(profile);
+      res.json(user);
     } catch (error) {
       res.status(500).json({ error: "Failed to complete onboarding" });
     }
@@ -811,7 +810,7 @@ export async function registerRoutes(
     try {
       const userId = req.user?.claims?.sub;
       const validated = updatePreferencesSchema.parse(req.body);
-      const prefs = await storage.updateUserPreferences(userId, validated);
+      const prefs = await storage.updateUserPreferences(userId, validated as any);
       res.json(prefs);
     } catch (error) {
       if (error instanceof z.ZodError) {
@@ -838,7 +837,7 @@ export async function registerRoutes(
       // Save preferences with needs analysis
       await storage.updateUserPreferences(userId, {
         ...preferences,
-        needsAnalysis,
+        needsAnalysis: needsAnalysis as any,
       });
       
       // Mark onboarding complete
@@ -1845,7 +1844,7 @@ export async function registerRoutes(
   app.get("/api/standards/countries", async (req, res) => {
     try {
       const jurisdictions = await storage.getJurisdictions();
-      const countries = [...new Set(jurisdictions.map(j => j.country))];
+      const countries = Array.from(new Set(jurisdictions.map(j => j.country)));
       res.json(countries);
     } catch (error) {
       console.error("Get countries error:", error);
@@ -1877,7 +1876,7 @@ export async function registerRoutes(
         return;
       }
       const sets = await storage.getStandardSets(jurisdiction.id);
-      const subjects = [...new Set(sets.map(s => s.subject))];
+      const subjects = Array.from(new Set(sets.map(s => s.subject)));
       res.json(subjects.map(subject => ({ subject })));
     } catch (error) {
       console.error("Get subjects error:", error);
@@ -2208,7 +2207,7 @@ export async function registerRoutes(
         res.status(400).json({ error: "Invalid feature flag data", details: parsed.error.flatten() });
         return;
       }
-      const updated = await storage.updateFeatureFlag(id, parsed.data);
+      const updated = await storage.updateFeatureFlag(id, parsed.data as any);
       if (!updated) {
         res.status(404).json({ error: "Feature flag not found" });
         return;
@@ -2267,7 +2266,7 @@ export async function registerRoutes(
         res.status(400).json({ error: "Invalid email template data", details: parsed.error.flatten() });
         return;
       }
-      const updated = await storage.updateEmailTemplate(id, parsed.data);
+      const updated = await storage.updateEmailTemplate(id, parsed.data as any);
       if (!updated) {
         res.status(404).json({ error: "Email template not found" });
         return;
@@ -2695,6 +2694,90 @@ export async function registerRoutes(
       res.json({ success: true });
     } catch (error) {
       res.status(500).json({ error: "Failed to delete note" });
+    }
+  });
+
+  // ================================
+  // Subscription / Tier Management (Demo Mode)
+  // ================================
+  // NOTE: This is a demo/development mode that simulates tier upgrades
+  // For production, integrate Stripe via Replit's Stripe connector
+  
+  app.get("/api/subscription/status", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user?.claims?.sub;
+      const user = await storage.getUser(userId);
+      
+      if (!user) {
+        res.status(404).json({ error: "User not found" });
+        return;
+      }
+      
+      res.json({
+        tier: user.tier || "free",
+        subscriptionStatus: user.subscriptionStatus || null,
+        stripeCustomerId: user.stripeCustomerId || null,
+        stripeSubscriptionId: user.stripeSubscriptionId || null,
+        isDemo: !process.env.STRIPE_SECRET_KEY,
+      });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to get subscription status" });
+    }
+  });
+
+  // Demo tier upgrade (for development/testing only)
+  app.post("/api/subscription/demo-upgrade", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user?.claims?.sub;
+      const { tier } = req.body;
+      
+      if (!["pro", "campus"].includes(tier)) {
+        res.status(400).json({ error: "Invalid tier. Choose 'pro' or 'campus'" });
+        return;
+      }
+      
+      // Update user tier directly for demo purposes
+      await db.update(users)
+        .set({ 
+          tier: tier,
+          subscriptionStatus: "demo_active",
+          updatedAt: new Date()
+        })
+        .where(eq(users.id, userId));
+      
+      res.json({ 
+        success: true, 
+        message: `Upgraded to ${tier} tier (demo mode)`,
+        tier: tier,
+        isDemo: true,
+        note: "For production, connect Stripe via Replit integrations"
+      });
+    } catch (error) {
+      console.error("Demo upgrade error:", error);
+      res.status(500).json({ error: "Failed to upgrade tier" });
+    }
+  });
+
+  // Demo tier downgrade
+  app.post("/api/subscription/demo-downgrade", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user?.claims?.sub;
+      
+      await db.update(users)
+        .set({ 
+          tier: "free",
+          subscriptionStatus: null,
+          updatedAt: new Date()
+        })
+        .where(eq(users.id, userId));
+      
+      res.json({ 
+        success: true, 
+        message: "Downgraded to free tier",
+        tier: "free"
+      });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to downgrade tier" });
     }
   });
 
