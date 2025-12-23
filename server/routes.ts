@@ -3,13 +3,15 @@ import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { generateLessonPlan } from "./openai";
 import { parseDocument } from "./documentParser";
-import { generateLessonRequestSchema, insertScopeSequenceSchema, insertSequenceUnitSchema, insertScopeChangeRequestSchema } from "@shared/schema";
+import { generateLessonRequestSchema, insertScopeSequenceSchema, insertSequenceUnitSchema, insertScopeChangeRequestSchema, users } from "@shared/schema";
 import { z } from "zod";
 import { setupAuth, registerAuthRoutes, isAuthenticated } from "./replit_integrations/auth";
 import { randomUUID } from "crypto";
 import multer from "multer";
 import { syncJurisdictionsFromCSP, syncStandardSetFromCSP, getSyncStatus, fetchCSPJurisdictions } from "./services/cspService";
 import { extractStandardsFromText, processPdfImport, checkSourceForChanges } from "./services/llmExtractionService";
+import { db } from "./db";
+import { eq } from "drizzle-orm";
 
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 10 * 1024 * 1024 } });
 
@@ -2316,6 +2318,265 @@ export async function registerRoutes(
       });
     } catch (error) {
       res.status(500).json({ error: "Failed to fetch stats" });
+    }
+  });
+
+  // ============ Parent Portal Routes ============
+  
+  // Get linked students (for parents) or linked parents (for students)
+  app.get("/api/parent-portal/links", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user?.claims?.sub;
+      const role = req.query.role as 'parent' | 'student' || 'parent';
+      
+      const links = await storage.getParentStudentLinks(userId, role);
+      
+      // Enrich with user details
+      const enrichedLinks = await Promise.all(links.map(async (link) => {
+        const targetUserId = role === 'parent' ? link.studentUserId : link.parentUserId;
+        const user = await db.select().from(users).where(eq(users.id, targetUserId)).limit(1);
+        return {
+          ...link,
+          linkedUser: user[0] ? {
+            id: user[0].id,
+            firstName: user[0].firstName,
+            lastName: user[0].lastName,
+            email: user[0].email,
+          } : null,
+        };
+      }));
+      
+      res.json(enrichedLinks);
+    } catch (error) {
+      console.error("Error fetching parent-student links:", error);
+      res.status(500).json({ error: "Failed to fetch links" });
+    }
+  });
+
+  // Get a specific link
+  app.get("/api/parent-portal/links/:id", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user?.claims?.sub;
+      const link = await storage.getParentStudentLink(req.params.id);
+      
+      if (!link || (link.parentUserId !== userId && link.studentUserId !== userId)) {
+        res.status(404).json({ error: "Link not found" });
+        return;
+      }
+      
+      res.json(link);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch link" });
+    }
+  });
+
+  // Update link permissions (student controls what parent can see)
+  app.patch("/api/parent-portal/links/:id", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user?.claims?.sub;
+      const link = await storage.getParentStudentLink(req.params.id);
+      
+      if (!link || link.studentUserId !== userId) {
+        res.status(403).json({ error: "Only the student can update permissions" });
+        return;
+      }
+      
+      const { permissions, status } = req.body;
+      const updated = await storage.updateParentStudentLink(req.params.id, { permissions, status });
+      res.json(updated);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to update link" });
+    }
+  });
+
+  // Delete a parent-student link
+  app.delete("/api/parent-portal/links/:id", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user?.claims?.sub;
+      const link = await storage.getParentStudentLink(req.params.id);
+      
+      if (!link || (link.studentUserId !== userId && link.parentUserId !== userId)) {
+        res.status(403).json({ error: "Not authorized to delete this link" });
+        return;
+      }
+      
+      await storage.deleteParentStudentLink(req.params.id);
+      res.json({ success: true });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to delete link" });
+    }
+  });
+
+  // Get student's invitations sent to parents
+  app.get("/api/parent-portal/invitations", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user?.claims?.sub;
+      const invitations = await storage.getParentInvitations(userId);
+      res.json(invitations);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch invitations" });
+    }
+  });
+
+  // Student invites a parent
+  app.post("/api/parent-portal/invitations", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user?.claims?.sub;
+      const { parentEmail, relationship } = req.body;
+      
+      if (!parentEmail) {
+        res.status(400).json({ error: "Parent email is required" });
+        return;
+      }
+      
+      const token = randomUUID().replace(/-/g, "").substring(0, 32);
+      const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000); // 7 days
+      
+      const invitation = await storage.createParentInvitation({
+        studentUserId: userId,
+        parentEmail,
+        relationship: relationship || "parent",
+        token,
+        status: "pending",
+        expiresAt,
+      });
+      
+      res.json(invitation);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to create invitation" });
+    }
+  });
+
+  // Accept parent invitation (parent uses this after signing in)
+  app.post("/api/parent-portal/invitations/accept", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user?.claims?.sub;
+      const { token } = req.body;
+      
+      if (!token) {
+        res.status(400).json({ error: "Invitation token is required" });
+        return;
+      }
+      
+      const link = await storage.acceptParentInvitation(token, userId);
+      if (!link) {
+        res.status(400).json({ error: "Invalid or expired invitation" });
+        return;
+      }
+      
+      res.json(link);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to accept invitation" });
+    }
+  });
+
+  // Delete invitation
+  app.delete("/api/parent-portal/invitations/:id", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user?.claims?.sub;
+      const invitations = await storage.getParentInvitations(userId);
+      const invitation = invitations.find(i => i.id === req.params.id);
+      
+      if (!invitation) {
+        res.status(404).json({ error: "Invitation not found" });
+        return;
+      }
+      
+      await storage.deleteParentInvitation(req.params.id);
+      res.json({ success: true });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to delete invitation" });
+    }
+  });
+
+  // Get student data for parent view (respects permissions)
+  app.get("/api/parent-portal/student/:studentId", isAuthenticated, async (req: any, res) => {
+    try {
+      const parentUserId = req.user?.claims?.sub;
+      const { studentId } = req.params;
+      
+      const link = await storage.getParentStudentLinkByUsers(parentUserId, studentId);
+      if (!link || link.status !== 'active') {
+        res.status(403).json({ error: "You don't have access to this student's data" });
+        return;
+      }
+      
+      const permissions = link.permissions || {};
+      const studentData: any = {};
+      
+      // Get student user info
+      const [student] = await db.select().from(users).where(eq(users.id, studentId));
+      if (student) {
+        studentData.student = {
+          id: student.id,
+          firstName: student.firstName,
+          lastName: student.lastName,
+        };
+      }
+      
+      // Get goals if permitted
+      if (permissions.viewGoals) {
+        studentData.goals = await storage.getGoals(studentId);
+      }
+      
+      // Get self-discovery results if permitted
+      if (permissions.viewAssessments) {
+        studentData.assessments = await storage.getSelfDiscoveryResults(studentId);
+      }
+      
+      // Get saved careers if permitted
+      if (permissions.viewCareers) {
+        studentData.savedCareers = await storage.getSavedCareers(studentId);
+      }
+      
+      // Get parent's notes for this link
+      const notes = await storage.getParentProgressNotes(link.id);
+      studentData.notes = notes.filter(n => !n.isPrivate || n.parentUserId === parentUserId);
+      
+      res.json(studentData);
+    } catch (error) {
+      console.error("Error fetching student data:", error);
+      res.status(500).json({ error: "Failed to fetch student data" });
+    }
+  });
+
+  // Parent adds a progress note
+  app.post("/api/parent-portal/notes", isAuthenticated, async (req: any, res) => {
+    try {
+      const parentUserId = req.user?.claims?.sub;
+      const { linkId, studentUserId, noteType, content, relatedGoalId, isPrivate } = req.body;
+      
+      // Verify parent has access to this link
+      const link = await storage.getParentStudentLink(linkId);
+      if (!link || link.parentUserId !== parentUserId) {
+        res.status(403).json({ error: "Not authorized to add notes for this student" });
+        return;
+      }
+      
+      const note = await storage.createParentProgressNote({
+        linkId,
+        parentUserId,
+        studentUserId,
+        noteType: noteType || "general",
+        content,
+        relatedGoalId,
+        isPrivate: isPrivate || false,
+      });
+      
+      res.json(note);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to create note" });
+    }
+  });
+
+  // Delete a note
+  app.delete("/api/parent-portal/notes/:id", isAuthenticated, async (req: any, res) => {
+    try {
+      const parentUserId = req.user?.claims?.sub;
+      await storage.deleteParentProgressNote(req.params.id, parentUserId);
+      res.json({ success: true });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to delete note" });
     }
   });
 
