@@ -83,6 +83,10 @@ import {
   type InsertParentInvitation,
   type ParentProgressNote,
   type InsertParentProgressNote,
+  type FeatureFlag,
+  type InsertFeatureFlag,
+  type EmailTemplate,
+  type InsertEmailTemplate,
   lessons,
   goals,
   educatorProfiles,
@@ -122,6 +126,8 @@ import {
   parentStudentLinks,
   parentInvitations,
   parentProgressNotes,
+  featureFlags,
+  emailTemplates,
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, desc, and, asc } from "drizzle-orm";
@@ -342,6 +348,22 @@ export interface IStorage {
   getParentProgressNotes(linkId: string): Promise<ParentProgressNote[]>;
   createParentProgressNote(note: InsertParentProgressNote): Promise<ParentProgressNote>;
   deleteParentProgressNote(id: string, parentUserId: string): Promise<boolean>;
+  
+  // Feature Flags
+  getFeatureFlags(): Promise<FeatureFlag[]>;
+  getFeatureFlag(id: string): Promise<FeatureFlag | undefined>;
+  getFeatureFlagByName(name: string): Promise<FeatureFlag | undefined>;
+  createFeatureFlag(flag: InsertFeatureFlag): Promise<FeatureFlag>;
+  updateFeatureFlag(id: string, updates: Partial<FeatureFlag>): Promise<FeatureFlag | undefined>;
+  deleteFeatureFlag(id: string): Promise<boolean>;
+  
+  // Email Templates
+  getEmailTemplates(): Promise<EmailTemplate[]>;
+  getEmailTemplate(id: string): Promise<EmailTemplate | undefined>;
+  getEmailTemplateByName(name: string): Promise<EmailTemplate | undefined>;
+  createEmailTemplate(template: InsertEmailTemplate): Promise<EmailTemplate>;
+  updateEmailTemplate(id: string, updates: Partial<EmailTemplate>): Promise<EmailTemplate | undefined>;
+  deleteEmailTemplate(id: string): Promise<boolean>;
 }
 
 // Seed data for careers and resources (static content)
@@ -1936,6 +1958,72 @@ export class DatabaseStorage implements IStorage {
         eq(parentProgressNotes.parentUserId, parentUserId)
       )
     );
+    return true;
+  }
+
+  // Feature Flags
+  async getFeatureFlags(): Promise<FeatureFlag[]> {
+    return await db.select().from(featureFlags).orderBy(asc(featureFlags.name));
+  }
+
+  async getFeatureFlag(id: string): Promise<FeatureFlag | undefined> {
+    const [flag] = await db.select().from(featureFlags).where(eq(featureFlags.id, id));
+    return flag || undefined;
+  }
+
+  async getFeatureFlagByName(name: string): Promise<FeatureFlag | undefined> {
+    const [flag] = await db.select().from(featureFlags).where(eq(featureFlags.name, name));
+    return flag || undefined;
+  }
+
+  async createFeatureFlag(flag: InsertFeatureFlag): Promise<FeatureFlag> {
+    const [created] = await db.insert(featureFlags).values(flag as any).returning();
+    return created;
+  }
+
+  async updateFeatureFlag(id: string, updates: Partial<FeatureFlag>): Promise<FeatureFlag | undefined> {
+    const [updated] = await db.update(featureFlags)
+      .set({ ...updates, updatedAt: new Date() })
+      .where(eq(featureFlags.id, id))
+      .returning();
+    return updated || undefined;
+  }
+
+  async deleteFeatureFlag(id: string): Promise<boolean> {
+    await db.delete(featureFlags).where(eq(featureFlags.id, id));
+    return true;
+  }
+
+  // Email Templates
+  async getEmailTemplates(): Promise<EmailTemplate[]> {
+    return await db.select().from(emailTemplates).orderBy(asc(emailTemplates.name));
+  }
+
+  async getEmailTemplate(id: string): Promise<EmailTemplate | undefined> {
+    const [template] = await db.select().from(emailTemplates).where(eq(emailTemplates.id, id));
+    return template || undefined;
+  }
+
+  async getEmailTemplateByName(name: string): Promise<EmailTemplate | undefined> {
+    const [template] = await db.select().from(emailTemplates).where(eq(emailTemplates.name, name));
+    return template || undefined;
+  }
+
+  async createEmailTemplate(template: InsertEmailTemplate): Promise<EmailTemplate> {
+    const [created] = await db.insert(emailTemplates).values(template as any).returning();
+    return created;
+  }
+
+  async updateEmailTemplate(id: string, updates: Partial<EmailTemplate>): Promise<EmailTemplate | undefined> {
+    const [updated] = await db.update(emailTemplates)
+      .set({ ...updates, updatedAt: new Date() })
+      .where(eq(emailTemplates.id, id))
+      .returning();
+    return updated || undefined;
+  }
+
+  async deleteEmailTemplate(id: string): Promise<boolean> {
+    await db.delete(emailTemplates).where(eq(emailTemplates.id, id));
     return true;
   }
 }

@@ -979,3 +979,42 @@ export const parentProgressNotes = pgTable("parent_progress_notes", {
 export const insertParentProgressNoteSchema = createInsertSchema(parentProgressNotes).omit({ id: true, createdAt: true });
 export type InsertParentProgressNote = z.infer<typeof insertParentProgressNoteSchema>;
 export type ParentProgressNote = typeof parentProgressNotes.$inferSelect;
+
+// ================================
+// Platform Configuration System
+// ================================
+
+// Feature Flags Table
+export const featureFlags = pgTable("feature_flags", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  name: varchar("name").notNull().unique(),
+  description: text("description"),
+  isEnabled: boolean("enabled").notNull().default(false),
+  rolloutPercentage: integer("rollout_percentage").notNull().default(100),
+  allowedRoles: jsonb("allowed_roles").$type<string[]>().default([]),
+  metadata: jsonb("metadata").$type<Record<string, any>>(),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertFeatureFlagSchema = createInsertSchema(featureFlags).omit({ id: true, createdAt: true, updatedAt: true });
+export type InsertFeatureFlag = z.infer<typeof insertFeatureFlagSchema>;
+export type FeatureFlag = typeof featureFlags.$inferSelect;
+
+// Email Templates Table
+export const emailTemplates = pgTable("email_templates", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  name: varchar("name").notNull().unique(),
+  subject: text("subject").notNull(),
+  htmlContent: text("html_content"),
+  textContent: text("text_content"),
+  category: varchar("category").notNull().default("notification"),
+  variables: jsonb("variables").$type<string[]>().default([]),
+  isActive: boolean("is_active").notNull().default(true),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertEmailTemplateSchema = createInsertSchema(emailTemplates).omit({ id: true, createdAt: true, updatedAt: true });
+export type InsertEmailTemplate = z.infer<typeof insertEmailTemplateSchema>;
+export type EmailTemplate = typeof emailTemplates.$inferSelect;

@@ -3,7 +3,7 @@ import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { generateLessonPlan } from "./openai";
 import { parseDocument } from "./documentParser";
-import { generateLessonRequestSchema, insertScopeSequenceSchema, insertSequenceUnitSchema, insertScopeChangeRequestSchema, users } from "@shared/schema";
+import { generateLessonRequestSchema, insertScopeSequenceSchema, insertSequenceUnitSchema, insertScopeChangeRequestSchema, users, insertFeatureFlagSchema, insertEmailTemplateSchema } from "@shared/schema";
 import { z } from "zod";
 import { setupAuth, registerAuthRoutes, isAuthenticated } from "./replit_integrations/auth";
 import { randomUUID } from "crypto";
@@ -2168,6 +2168,124 @@ export async function registerRoutes(
       res.json({ success: true });
     } catch (error) {
       res.status(500).json({ error: "Failed to delete organization" });
+    }
+  });
+
+  // =============== Feature Flags Routes ===============
+  
+  // Get all feature flags (site admin only)
+  app.get("/api/admin/feature-flags", isAuthenticated, isSiteAdmin, async (req: any, res) => {
+    try {
+      const flags = await storage.getFeatureFlags();
+      res.json(flags);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch feature flags" });
+    }
+  });
+
+  // Create feature flag (site admin only)
+  app.post("/api/admin/feature-flags", isAuthenticated, isSiteAdmin, async (req: any, res) => {
+    try {
+      const parsed = insertFeatureFlagSchema.safeParse(req.body);
+      if (!parsed.success) {
+        res.status(400).json({ error: "Invalid feature flag data", details: parsed.error.flatten() });
+        return;
+      }
+      const flag = await storage.createFeatureFlag(parsed.data);
+      res.json(flag);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to create feature flag" });
+    }
+  });
+
+  // Update feature flag (site admin only)
+  app.patch("/api/admin/feature-flags/:id", isAuthenticated, isSiteAdmin, async (req: any, res) => {
+    try {
+      const { id } = req.params;
+      const updateSchema = insertFeatureFlagSchema.partial();
+      const parsed = updateSchema.safeParse(req.body);
+      if (!parsed.success) {
+        res.status(400).json({ error: "Invalid feature flag data", details: parsed.error.flatten() });
+        return;
+      }
+      const updated = await storage.updateFeatureFlag(id, parsed.data);
+      if (!updated) {
+        res.status(404).json({ error: "Feature flag not found" });
+        return;
+      }
+      res.json(updated);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to update feature flag" });
+    }
+  });
+
+  // Delete feature flag (site admin only)
+  app.delete("/api/admin/feature-flags/:id", isAuthenticated, isSiteAdmin, async (req: any, res) => {
+    try {
+      const { id } = req.params;
+      await storage.deleteFeatureFlag(id);
+      res.json({ success: true });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to delete feature flag" });
+    }
+  });
+
+  // =============== Email Templates Routes ===============
+  
+  // Get all email templates (site admin only)
+  app.get("/api/admin/email-templates", isAuthenticated, isSiteAdmin, async (req: any, res) => {
+    try {
+      const templates = await storage.getEmailTemplates();
+      res.json(templates);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch email templates" });
+    }
+  });
+
+  // Create email template (site admin only)
+  app.post("/api/admin/email-templates", isAuthenticated, isSiteAdmin, async (req: any, res) => {
+    try {
+      const parsed = insertEmailTemplateSchema.safeParse(req.body);
+      if (!parsed.success) {
+        res.status(400).json({ error: "Invalid email template data", details: parsed.error.flatten() });
+        return;
+      }
+      const template = await storage.createEmailTemplate(parsed.data);
+      res.json(template);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to create email template" });
+    }
+  });
+
+  // Update email template (site admin only)
+  app.patch("/api/admin/email-templates/:id", isAuthenticated, isSiteAdmin, async (req: any, res) => {
+    try {
+      const { id } = req.params;
+      const updateSchema = insertEmailTemplateSchema.partial();
+      const parsed = updateSchema.safeParse(req.body);
+      if (!parsed.success) {
+        res.status(400).json({ error: "Invalid email template data", details: parsed.error.flatten() });
+        return;
+      }
+      const updated = await storage.updateEmailTemplate(id, parsed.data);
+      if (!updated) {
+        res.status(404).json({ error: "Email template not found" });
+        return;
+      }
+      res.json(updated);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to update email template" });
+    }
+  });
+
+  // Delete email template (site admin only)
+  app.delete("/api/admin/email-templates/:id", isAuthenticated, isSiteAdmin, async (req: any, res) => {
+    try {
+      const { id } = req.params;
+      await storage.deleteEmailTemplate(id);
+      res.json({ success: true });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to delete email template" });
     }
   });
 

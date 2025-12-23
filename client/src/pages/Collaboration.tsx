@@ -395,6 +395,34 @@ function CollaborationRoom({ session, user, onEnd, onLeave }: CollaborationRoomP
   const [chatMessage, setChatMessage] = useState("");
   const chatScrollRef = useRef<HTMLDivElement>(null);
   const isHost = session.hostUserId === user.id;
+  const [lessonContent, setLessonContent] = useState<Record<string, any>>({});
+  const [editingField, setEditingField] = useState<string | null>(null);
+
+  const { data: linkedLesson, isLoading: lessonLoading } = useQuery<Lesson>({
+    queryKey: ["/api/lessons", session.lessonId],
+    enabled: !!session.lessonId,
+  });
+
+  useEffect(() => {
+    if (linkedLesson) {
+      setLessonContent({
+        title: linkedLesson.title || "",
+        topic: linkedLesson.topic || "",
+        gradeLevel: linkedLesson.gradeLevel || "",
+        objectives: (linkedLesson.objectives || []).join("\n"),
+        assessment: linkedLesson.assessment || "",
+        reflection: linkedLesson.reflection || "",
+        materials: (linkedLesson.materials || []).join("\n"),
+      });
+    }
+  }, [linkedLesson]);
+
+  const handleEdit = (edit: { fieldPath: string; newValue: string }) => {
+    setLessonContent(prev => ({
+      ...prev,
+      [edit.fieldPath]: edit.newValue,
+    }));
+  };
 
   const {
     isConnected,
@@ -404,6 +432,7 @@ function CollaborationRoom({ session, user, onEnd, onLeave }: CollaborationRoomP
     role,
     error,
     sendChat,
+    sendEdit,
   } = useCollaboration({
     sessionId: session.id,
     userId: user.id,
@@ -414,7 +443,14 @@ function CollaborationRoom({ session, user, onEnd, onLeave }: CollaborationRoomP
     onParticipantLeave: (p) => {
       toast({ title: "Left", description: `${p.name} left the session` });
     },
+    onEdit: handleEdit,
   });
+
+  const handleFieldChange = (fieldPath: string, newValue: string) => {
+    const previousValue = lessonContent[fieldPath] || "";
+    setLessonContent(prev => ({ ...prev, [fieldPath]: newValue }));
+    sendEdit({ fieldPath, previousValue, newValue, editType: "update" });
+  };
 
   useEffect(() => {
     if (chatScrollRef.current) {
@@ -498,10 +534,91 @@ function CollaborationRoom({ session, user, onEnd, onLeave }: CollaborationRoomP
               </CardHeader>
               <CardContent>
                 {session.lessonId ? (
-                  <div className="text-center py-12 text-muted-foreground">
-                    <FileText className="h-12 w-12 mx-auto mb-4" />
-                    <p>Connected to lesson - editing coming soon</p>
-                  </div>
+                  lessonLoading ? (
+                    <div className="text-center py-12 text-muted-foreground">
+                      <FileText className="h-12 w-12 mx-auto mb-4 animate-pulse" />
+                      <p>Loading lesson...</p>
+                    </div>
+                  ) : (
+                    <div className="space-y-6">
+                      <div className="grid gap-4 md:grid-cols-2">
+                        <div className="space-y-2">
+                          <Label htmlFor="collab-title">Lesson Title</Label>
+                          <Input
+                            id="collab-title"
+                            value={lessonContent.title || ""}
+                            onChange={(e) => handleFieldChange("title", e.target.value)}
+                            placeholder="Enter lesson title"
+                            data-testid="input-collab-title"
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <Label htmlFor="collab-topic">Topic</Label>
+                          <Input
+                            id="collab-topic"
+                            value={lessonContent.topic || ""}
+                            onChange={(e) => handleFieldChange("topic", e.target.value)}
+                            placeholder="Enter topic"
+                            data-testid="input-collab-topic"
+                          />
+                        </div>
+                      </div>
+                      
+                      <div className="space-y-2">
+                        <Label htmlFor="collab-objectives">Learning Objectives</Label>
+                        <Textarea
+                          id="collab-objectives"
+                          value={lessonContent.objectives || ""}
+                          onChange={(e) => handleFieldChange("objectives", e.target.value)}
+                          placeholder="Enter learning objectives (one per line)"
+                          rows={4}
+                          data-testid="input-collab-objectives"
+                        />
+                        <p className="text-xs text-muted-foreground">Enter one objective per line</p>
+                      </div>
+                      
+                      <div className="space-y-2">
+                        <Label htmlFor="collab-assessment">Assessment</Label>
+                        <Textarea
+                          id="collab-assessment"
+                          value={lessonContent.assessment || ""}
+                          onChange={(e) => handleFieldChange("assessment", e.target.value)}
+                          placeholder="Describe how students will be assessed"
+                          rows={3}
+                          data-testid="input-collab-assessment"
+                        />
+                      </div>
+                      
+                      <div className="space-y-2">
+                        <Label htmlFor="collab-materials">Materials Needed</Label>
+                        <Textarea
+                          id="collab-materials"
+                          value={lessonContent.materials || ""}
+                          onChange={(e) => handleFieldChange("materials", e.target.value)}
+                          placeholder="List materials needed (one per line)"
+                          rows={3}
+                          data-testid="input-collab-materials"
+                        />
+                      </div>
+                      
+                      <div className="space-y-2">
+                        <Label htmlFor="collab-reflection">Reflection Notes</Label>
+                        <Textarea
+                          id="collab-reflection"
+                          value={lessonContent.reflection || ""}
+                          onChange={(e) => handleFieldChange("reflection", e.target.value)}
+                          placeholder="Add reflection notes for this lesson"
+                          rows={3}
+                          data-testid="input-collab-reflection"
+                        />
+                      </div>
+                      
+                      <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                        <CheckCircle className="h-4 w-4 text-green-500" />
+                        <span>Changes sync automatically with all collaborators</span>
+                      </div>
+                    </div>
+                  )
                 ) : (
                   <div className="text-center py-12 text-muted-foreground">
                     <FileText className="h-12 w-12 mx-auto mb-4" />
