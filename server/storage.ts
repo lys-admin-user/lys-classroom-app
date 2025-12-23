@@ -57,6 +57,18 @@ import {
   type InsertAssignment,
   type AssignmentRecipient,
   type InsertAssignmentRecipient,
+  type CollaborationSession,
+  type InsertCollaborationSession,
+  type SessionParticipant,
+  type InsertSessionParticipant,
+  type CollaborationMessage,
+  type InsertCollaborationMessage,
+  type SharedResource,
+  type InsertSharedResource,
+  type ResourceLike,
+  type InsertResourceLike,
+  type SessionEditHistory,
+  type InsertSessionEditHistory,
   lessons,
   goals,
   educatorProfiles,
@@ -83,6 +95,12 @@ import {
   studentGroups,
   assignments,
   assignmentRecipients,
+  collaborationSessions,
+  sessionParticipants,
+  collaborationMessages,
+  sharedResources,
+  resourceLikes,
+  sessionEditHistory,
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, desc, and, asc } from "drizzle-orm";
@@ -1346,6 +1364,246 @@ export class DatabaseStorage implements IStorage {
       .where(eq(assignmentRecipients.id, id))
       .returning();
     return updated || undefined;
+  }
+
+  // ================================
+  // Real-Time Collaboration System
+  // ================================
+
+  // Collaboration Sessions
+  async getCollaborationSessions(userId: string): Promise<CollaborationSession[]> {
+    return await db.select().from(collaborationSessions)
+      .where(eq(collaborationSessions.hostUserId, userId))
+      .orderBy(desc(collaborationSessions.createdAt));
+  }
+
+  async getActiveCollaborationSessions(userId: string): Promise<CollaborationSession[]> {
+    return await db.select().from(collaborationSessions)
+      .where(and(
+        eq(collaborationSessions.hostUserId, userId),
+        eq(collaborationSessions.status, "active")
+      ))
+      .orderBy(desc(collaborationSessions.createdAt));
+  }
+
+  async getCollaborationSession(id: string): Promise<CollaborationSession | undefined> {
+    const [result] = await db.select().from(collaborationSessions)
+      .where(eq(collaborationSessions.id, id));
+    return result || undefined;
+  }
+
+  async getCollaborationSessionByInviteCode(inviteCode: string): Promise<CollaborationSession | undefined> {
+    const [result] = await db.select().from(collaborationSessions)
+      .where(eq(collaborationSessions.inviteCode, inviteCode));
+    return result || undefined;
+  }
+
+  async createCollaborationSession(session: InsertCollaborationSession): Promise<CollaborationSession> {
+    const [created] = await db.insert(collaborationSessions)
+      .values(session as any)
+      .returning();
+    return created;
+  }
+
+  async updateCollaborationSession(id: string, updates: Partial<CollaborationSession>, hostUserId: string): Promise<CollaborationSession | undefined> {
+    const existing = await this.getCollaborationSession(id);
+    if (!existing || existing.hostUserId !== hostUserId) return undefined;
+    
+    const [updated] = await db.update(collaborationSessions)
+      .set(updates)
+      .where(eq(collaborationSessions.id, id))
+      .returning();
+    return updated || undefined;
+  }
+
+  async endCollaborationSession(id: string, hostUserId: string): Promise<CollaborationSession | undefined> {
+    return await this.updateCollaborationSession(id, { 
+      status: "ended", 
+      endedAt: new Date() 
+    }, hostUserId);
+  }
+
+  // Session Participants
+  async getSessionParticipants(sessionId: string): Promise<SessionParticipant[]> {
+    return await db.select().from(sessionParticipants)
+      .where(eq(sessionParticipants.sessionId, sessionId))
+      .orderBy(desc(sessionParticipants.joinedAt));
+  }
+
+  async getActiveSessionParticipants(sessionId: string): Promise<SessionParticipant[]> {
+    return await db.select().from(sessionParticipants)
+      .where(and(
+        eq(sessionParticipants.sessionId, sessionId),
+        eq(sessionParticipants.status, "active")
+      ));
+  }
+
+  async getSessionParticipant(sessionId: string, userId: string): Promise<SessionParticipant | undefined> {
+    const [result] = await db.select().from(sessionParticipants)
+      .where(and(
+        eq(sessionParticipants.sessionId, sessionId),
+        eq(sessionParticipants.userId, userId)
+      ));
+    return result || undefined;
+  }
+
+  async createSessionParticipant(participant: InsertSessionParticipant): Promise<SessionParticipant> {
+    const [created] = await db.insert(sessionParticipants)
+      .values(participant as any)
+      .returning();
+    return created;
+  }
+
+  async updateSessionParticipant(id: string, updates: Partial<SessionParticipant>): Promise<SessionParticipant | undefined> {
+    const [updated] = await db.update(sessionParticipants)
+      .set({ ...updates, lastActiveAt: new Date() })
+      .where(eq(sessionParticipants.id, id))
+      .returning();
+    return updated || undefined;
+  }
+
+  async leaveSession(sessionId: string, userId: string): Promise<boolean> {
+    const participant = await this.getSessionParticipant(sessionId, userId);
+    if (!participant) return false;
+    
+    await db.update(sessionParticipants)
+      .set({ status: "left", leftAt: new Date() })
+      .where(eq(sessionParticipants.id, participant.id));
+    return true;
+  }
+
+  // Collaboration Messages
+  async getCollaborationMessages(sessionId: string, limit = 50): Promise<CollaborationMessage[]> {
+    return await db.select().from(collaborationMessages)
+      .where(eq(collaborationMessages.sessionId, sessionId))
+      .orderBy(desc(collaborationMessages.createdAt))
+      .limit(limit);
+  }
+
+  async createCollaborationMessage(message: InsertCollaborationMessage): Promise<CollaborationMessage> {
+    const [created] = await db.insert(collaborationMessages)
+      .values(message as any)
+      .returning();
+    return created;
+  }
+
+  // Shared Resources
+  async getSharedResources(filters?: { visibility?: string; category?: string; subject?: string }): Promise<SharedResource[]> {
+    let query = db.select().from(sharedResources);
+    
+    if (filters?.visibility) {
+      query = query.where(eq(sharedResources.visibility, filters.visibility)) as any;
+    }
+    
+    return await query.orderBy(desc(sharedResources.createdAt));
+  }
+
+  async getUserSharedResources(userId: string): Promise<SharedResource[]> {
+    return await db.select().from(sharedResources)
+      .where(eq(sharedResources.userId, userId))
+      .orderBy(desc(sharedResources.createdAt));
+  }
+
+  async getSharedResource(id: string): Promise<SharedResource | undefined> {
+    const [result] = await db.select().from(sharedResources)
+      .where(eq(sharedResources.id, id));
+    return result || undefined;
+  }
+
+  async createSharedResource(resource: InsertSharedResource): Promise<SharedResource> {
+    const [created] = await db.insert(sharedResources)
+      .values(resource as any)
+      .returning();
+    return created;
+  }
+
+  async updateSharedResource(id: string, updates: Partial<SharedResource>, userId: string): Promise<SharedResource | undefined> {
+    const existing = await this.getSharedResource(id);
+    if (!existing || existing.userId !== userId) return undefined;
+    
+    const [updated] = await db.update(sharedResources)
+      .set({ ...updates, updatedAt: new Date() })
+      .where(eq(sharedResources.id, id))
+      .returning();
+    return updated || undefined;
+  }
+
+  async deleteSharedResource(id: string, userId: string): Promise<boolean> {
+    const existing = await this.getSharedResource(id);
+    if (!existing || existing.userId !== userId) return false;
+    
+    await db.delete(sharedResources).where(eq(sharedResources.id, id));
+    return true;
+  }
+
+  async incrementResourceDownload(id: string): Promise<void> {
+    const resource = await this.getSharedResource(id);
+    if (resource) {
+      await db.update(sharedResources)
+        .set({ downloadCount: (resource.downloadCount || 0) + 1 })
+        .where(eq(sharedResources.id, id));
+    }
+  }
+
+  // Resource Likes
+  async getResourceLike(resourceId: string, userId: string): Promise<ResourceLike | undefined> {
+    const [result] = await db.select().from(resourceLikes)
+      .where(and(
+        eq(resourceLikes.resourceId, resourceId),
+        eq(resourceLikes.userId, userId)
+      ));
+    return result || undefined;
+  }
+
+  async toggleResourceLike(resourceId: string, userId: string): Promise<boolean> {
+    const existing = await this.getResourceLike(resourceId, userId);
+    const resource = await this.getSharedResource(resourceId);
+    
+    if (!resource) return false;
+    
+    if (existing) {
+      await db.delete(resourceLikes).where(eq(resourceLikes.id, existing.id));
+      await db.update(sharedResources)
+        .set({ likeCount: Math.max(0, (resource.likeCount || 0) - 1) })
+        .where(eq(sharedResources.id, resourceId));
+      return false;
+    } else {
+      await db.insert(resourceLikes).values({ resourceId, userId } as any);
+      await db.update(sharedResources)
+        .set({ likeCount: (resource.likeCount || 0) + 1 })
+        .where(eq(sharedResources.id, resourceId));
+      return true;
+    }
+  }
+
+  // Session Edit History
+  async getSessionEditHistory(sessionId: string, limit = 100): Promise<SessionEditHistory[]> {
+    return await db.select().from(sessionEditHistory)
+      .where(eq(sessionEditHistory.sessionId, sessionId))
+      .orderBy(desc(sessionEditHistory.createdAt))
+      .limit(limit);
+  }
+
+  async createSessionEdit(edit: InsertSessionEditHistory): Promise<SessionEditHistory> {
+    const [created] = await db.insert(sessionEditHistory)
+      .values(edit as any)
+      .returning();
+    return created;
+  }
+
+  // Get sessions user is participating in
+  async getUserParticipatedSessions(userId: string): Promise<CollaborationSession[]> {
+    const participations = await db.select().from(sessionParticipants)
+      .where(eq(sessionParticipants.userId, userId));
+    
+    const sessions: CollaborationSession[] = [];
+    for (const p of participations) {
+      const session = await this.getCollaborationSession(p.sessionId);
+      if (session && session.status === "active") {
+        sessions.push(session);
+      }
+    }
+    return sessions;
   }
 }
 

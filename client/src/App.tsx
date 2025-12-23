@@ -23,6 +23,8 @@ import StandardsAdmin from "@/pages/StandardsAdmin";
 import Pricing from "@/pages/Pricing";
 import Onboarding from "@/pages/Onboarding";
 import Assignments from "@/pages/Assignments";
+import Collaboration from "@/pages/Collaboration";
+import ResourceLibrary from "@/pages/ResourceLibrary";
 import NotFound from "@/pages/not-found";
 
 function Router() {
@@ -46,6 +48,9 @@ function Router() {
       <Route path="/pricing" component={Pricing} />
       <Route path="/onboarding" component={Onboarding} />
       <Route path="/assignments" component={Assignments} />
+      <Route path="/collaboration" component={Collaboration} />
+      <Route path="/collaboration/:id" component={Collaboration} />
+      <Route path="/resource-library" component={ResourceLibrary} />
       <Route component={NotFound} />
     </Switch>
   );

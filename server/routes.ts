@@ -1240,6 +1240,308 @@ export async function registerRoutes(
     }
   });
 
+  // ================================
+  // Real-Time Collaboration System
+  // ================================
+
+  // Generate unique invite code
+  function generateInviteCode(): string {
+    const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+    let code = "";
+    for (let i = 0; i < 8; i++) {
+      code += chars.charAt(Math.floor(Math.random() * chars.length));
+    }
+    return code;
+  }
+
+  // Create collaboration session
+  app.post("/api/collaboration/sessions", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user?.claims?.sub;
+      const { title, description, lessonId, sessionType, maxParticipants, settings } = req.body;
+      
+      const session = await storage.createCollaborationSession({
+        hostUserId: userId,
+        title,
+        description,
+        lessonId,
+        sessionType: sessionType || "lesson_planning",
+        status: "active",
+        inviteCode: generateInviteCode(),
+        maxParticipants: maxParticipants || 10,
+        settings: settings || {
+          allowEditing: true,
+          allowChat: true,
+          allowComments: true,
+          requireApproval: false,
+        },
+      });
+      
+      await storage.createSessionParticipant({
+        sessionId: session.id,
+        userId,
+        role: "host",
+        status: "active",
+      });
+      
+      res.json(session);
+    } catch (error) {
+      console.error("Create collaboration session error:", error);
+      res.status(500).json({ error: "Failed to create collaboration session" });
+    }
+  });
+
+  // Get user's hosted sessions
+  app.get("/api/collaboration/sessions", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user?.claims?.sub;
+      const sessions = await storage.getCollaborationSessions(userId);
+      res.json(sessions);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch collaboration sessions" });
+    }
+  });
+
+  // Get sessions user is participating in
+  app.get("/api/collaboration/participating", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user?.claims?.sub;
+      const sessions = await storage.getUserParticipatedSessions(userId);
+      res.json(sessions);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch participated sessions" });
+    }
+  });
+
+  // Get single session
+  app.get("/api/collaboration/sessions/:id", isAuthenticated, async (req: any, res) => {
+    try {
+      const { id } = req.params;
+      const session = await storage.getCollaborationSession(id);
+      if (!session) {
+        res.status(404).json({ error: "Session not found" });
+        return;
+      }
+      
+      const participants = await storage.getActiveSessionParticipants(id);
+      res.json({ session, participants });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch session" });
+    }
+  });
+
+  // Join session by invite code
+  app.post("/api/collaboration/join", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user?.claims?.sub;
+      const { inviteCode } = req.body;
+      
+      const session = await storage.getCollaborationSessionByInviteCode(inviteCode);
+      if (!session) {
+        res.status(404).json({ error: "Invalid invite code" });
+        return;
+      }
+      
+      if (session.status !== "active") {
+        res.status(400).json({ error: "This session has ended" });
+        return;
+      }
+      
+      const existingParticipant = await storage.getSessionParticipant(session.id, userId);
+      if (existingParticipant) {
+        await storage.updateSessionParticipant(existingParticipant.id, { status: "active" });
+        res.json({ session, participant: existingParticipant });
+        return;
+      }
+      
+      const activeParticipants = await storage.getActiveSessionParticipants(session.id);
+      if (session.maxParticipants && activeParticipants.length >= session.maxParticipants) {
+        res.status(400).json({ error: "Session is full" });
+        return;
+      }
+      
+      const participant = await storage.createSessionParticipant({
+        sessionId: session.id,
+        userId,
+        role: "editor",
+        status: "active",
+      });
+      
+      res.json({ session, participant });
+    } catch (error) {
+      console.error("Join session error:", error);
+      res.status(500).json({ error: "Failed to join session" });
+    }
+  });
+
+  // End collaboration session
+  app.post("/api/collaboration/sessions/:id/end", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user?.claims?.sub;
+      const { id } = req.params;
+      
+      const session = await storage.endCollaborationSession(id, userId);
+      if (!session) {
+        res.status(404).json({ error: "Session not found or not authorized" });
+        return;
+      }
+      
+      res.json(session);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to end session" });
+    }
+  });
+
+  // Leave session
+  app.post("/api/collaboration/sessions/:id/leave", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user?.claims?.sub;
+      const { id } = req.params;
+      
+      await storage.leaveSession(id, userId);
+      res.json({ success: true });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to leave session" });
+    }
+  });
+
+  // Get session messages
+  app.get("/api/collaboration/sessions/:id/messages", isAuthenticated, async (req: any, res) => {
+    try {
+      const { id } = req.params;
+      const messages = await storage.getCollaborationMessages(id, 100);
+      res.json(messages);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch messages" });
+    }
+  });
+
+  // Get session edit history
+  app.get("/api/collaboration/sessions/:id/history", isAuthenticated, async (req: any, res) => {
+    try {
+      const { id } = req.params;
+      const history = await storage.getSessionEditHistory(id);
+      res.json(history);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch edit history" });
+    }
+  });
+
+  // ================================
+  // Shared Resources Library
+  // ================================
+
+  // Get public resources
+  app.get("/api/resources/shared", async (req, res) => {
+    try {
+      const { category, subject } = req.query;
+      const resources = await storage.getSharedResources({ 
+        visibility: "public",
+        category: category as string,
+        subject: subject as string,
+      });
+      res.json(resources);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch shared resources" });
+    }
+  });
+
+  // Get user's resources
+  app.get("/api/resources/mine", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user?.claims?.sub;
+      const resources = await storage.getUserSharedResources(userId);
+      res.json(resources);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch your resources" });
+    }
+  });
+
+  // Get single resource
+  app.get("/api/resources/:id", async (req, res) => {
+    try {
+      const { id } = req.params;
+      const resource = await storage.getSharedResource(id);
+      if (!resource) {
+        res.status(404).json({ error: "Resource not found" });
+        return;
+      }
+      res.json(resource);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch resource" });
+    }
+  });
+
+  // Create resource
+  app.post("/api/resources", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user?.claims?.sub;
+      const resource = await storage.createSharedResource({
+        ...req.body,
+        userId,
+      });
+      res.json(resource);
+    } catch (error) {
+      console.error("Create resource error:", error);
+      res.status(500).json({ error: "Failed to create resource" });
+    }
+  });
+
+  // Update resource
+  app.patch("/api/resources/:id", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user?.claims?.sub;
+      const { id } = req.params;
+      const updated = await storage.updateSharedResource(id, req.body, userId);
+      if (!updated) {
+        res.status(404).json({ error: "Resource not found or not authorized" });
+        return;
+      }
+      res.json(updated);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to update resource" });
+    }
+  });
+
+  // Delete resource
+  app.delete("/api/resources/:id", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user?.claims?.sub;
+      const { id } = req.params;
+      const deleted = await storage.deleteSharedResource(id, userId);
+      if (!deleted) {
+        res.status(404).json({ error: "Resource not found or not authorized" });
+        return;
+      }
+      res.json({ success: true });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to delete resource" });
+    }
+  });
+
+  // Like/unlike resource
+  app.post("/api/resources/:id/like", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user?.claims?.sub;
+      const { id } = req.params;
+      const liked = await storage.toggleResourceLike(id, userId);
+      res.json({ liked });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to toggle like" });
+    }
+  });
+
+  // Track resource download
+  app.post("/api/resources/:id/download", async (req, res) => {
+    try {
+      const { id } = req.params;
+      await storage.incrementResourceDownload(id);
+      res.json({ success: true });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to track download" });
+    }
+  });
+
   // Affiliate System - Get or create affiliate profile
   app.get("/api/affiliate/me", isAuthenticated, async (req: any, res) => {
     try {

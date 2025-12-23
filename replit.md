@@ -102,6 +102,46 @@ Social sharing and affiliate rewards for educators:
   - POST `/api/lessons/:id/share-link` - Generate share URL with referral code
   - POST `/api/referral/track` - Public endpoint for tracking referral events
 
+### Real-Time Collaboration System
+Enables educators to co-create lesson plans and share resources:
+- **WebSocket Server**: Real-time communication via `/ws/collaboration` endpoint
+  - Auto-reconnect with exponential backoff (max 5 attempts)
+  - Participant presence tracking with color-coded avatars
+  - Live cursor positions and edit streaming
+- **Collaboration Sessions**:
+  - 8-character invite codes for session joining
+  - Host/editor role differentiation
+  - Configurable max participants (default 10)
+  - Settings for editing, chat, and comment permissions
+- **Live Chat**: Real-time messaging within collaboration rooms
+- **Edit History**: Tracks all changes with user attribution and timestamps
+- **Database Tables**: `collaboration_sessions`, `session_participants`, `collaboration_messages`, `session_edit_history`
+- **Pages**: `/collaboration` (hub for sessions), `/collaboration/:id` (active session room)
+- **API Endpoints**:
+  - POST `/api/collaboration/sessions` - Create new session
+  - GET `/api/collaboration/sessions` - List hosted sessions
+  - GET `/api/collaboration/participating` - List joined sessions
+  - POST `/api/collaboration/join` - Join via invite code
+  - POST `/api/collaboration/sessions/:id/end` - End session (host only)
+  - POST `/api/collaboration/sessions/:id/leave` - Leave session
+
+### Shared Resource Library
+Community-driven resource sharing for educators:
+- **Resource Types**: Lesson plans, worksheets, presentations, assessments, activities, templates
+- **Visibility Control**: Public (discoverable) or private
+- **Engagement Tracking**: Like count and download count
+- **Categorization**: By category, subject, grade level, and custom tags
+- **Database Tables**: `shared_resources`, `resource_likes`
+- **Page**: `/resource-library`
+- **API Endpoints**:
+  - GET `/api/resources/shared` - Browse public resources with filters
+  - GET `/api/resources/mine` - List user's own resources
+  - POST `/api/resources` - Create new resource
+  - PATCH `/api/resources/:id` - Update resource
+  - DELETE `/api/resources/:id` - Delete resource
+  - POST `/api/resources/:id/like` - Toggle like
+  - POST `/api/resources/:id/download` - Track download
+
 ### Educational Standards System
 The lesson generator requires legally-compliant educational standards:
 - **Static Standards**: `shared/standards.ts` contains fallback hierarchical standards data

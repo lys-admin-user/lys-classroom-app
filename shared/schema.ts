@@ -805,3 +805,120 @@ export const generateAssignmentRequestSchema = z.object({
   accommodationType: z.enum(["IEP", "504", "BIP"]).optional(),
   accommodationNotes: z.string().optional(),
 });
+
+// ================================
+// Real-Time Collaboration System
+// ================================
+
+// Collaboration Sessions Table
+export const collaborationSessions = pgTable("collaboration_sessions", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  hostUserId: varchar("host_user_id").notNull(),
+  lessonId: varchar("lesson_id"),
+  title: text("title").notNull(),
+  description: text("description"),
+  sessionType: text("session_type").notNull().default("lesson_planning"),
+  status: text("status").notNull().default("active"),
+  inviteCode: varchar("invite_code").notNull(),
+  maxParticipants: integer("max_participants").default(10),
+  settings: jsonb("settings").$type<{
+    allowEditing: boolean;
+    allowChat: boolean;
+    allowComments: boolean;
+    requireApproval: boolean;
+  }>(),
+  createdAt: timestamp("created_at").defaultNow(),
+  endedAt: timestamp("ended_at"),
+});
+
+export const insertCollaborationSessionSchema = createInsertSchema(collaborationSessions).omit({ id: true, createdAt: true });
+export type InsertCollaborationSession = z.infer<typeof insertCollaborationSessionSchema>;
+export type CollaborationSession = typeof collaborationSessions.$inferSelect;
+
+// Session Participants Table
+export const sessionParticipants = pgTable("session_participants", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  sessionId: varchar("session_id").notNull(),
+  userId: varchar("user_id").notNull(),
+  role: text("role").notNull().default("viewer"),
+  status: text("status").notNull().default("active"),
+  cursorPosition: jsonb("cursor_position").$type<{ line: number; column: number; section?: string }>(),
+  lastActiveAt: timestamp("last_active_at").defaultNow(),
+  joinedAt: timestamp("joined_at").defaultNow(),
+  leftAt: timestamp("left_at"),
+});
+
+export const insertSessionParticipantSchema = createInsertSchema(sessionParticipants).omit({ id: true, joinedAt: true });
+export type InsertSessionParticipant = z.infer<typeof insertSessionParticipantSchema>;
+export type SessionParticipant = typeof sessionParticipants.$inferSelect;
+
+// Collaboration Messages (Chat) Table
+export const collaborationMessages = pgTable("collaboration_messages", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  sessionId: varchar("session_id").notNull(),
+  userId: varchar("user_id").notNull(),
+  messageType: text("message_type").notNull().default("chat"),
+  content: text("content").notNull(),
+  metadata: jsonb("metadata").$type<{
+    mentionedUserIds?: string[];
+    replyToId?: string;
+    attachmentUrl?: string;
+  }>(),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertCollaborationMessageSchema = createInsertSchema(collaborationMessages).omit({ id: true, createdAt: true });
+export type InsertCollaborationMessage = z.infer<typeof insertCollaborationMessageSchema>;
+export type CollaborationMessage = typeof collaborationMessages.$inferSelect;
+
+// Shared Resources Table
+export const sharedResources = pgTable("shared_resources", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull(),
+  title: text("title").notNull(),
+  description: text("description"),
+  resourceType: text("resource_type").notNull(),
+  category: text("category"),
+  tags: jsonb("tags").$type<string[]>(),
+  fileUrl: text("file_url"),
+  content: text("content"),
+  gradeLevel: text("grade_level"),
+  subject: text("subject"),
+  visibility: text("visibility").notNull().default("private"),
+  downloadCount: integer("download_count").default(0),
+  likeCount: integer("like_count").default(0),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertSharedResourceSchema = createInsertSchema(sharedResources).omit({ id: true, createdAt: true, updatedAt: true, downloadCount: true, likeCount: true });
+export type InsertSharedResource = z.infer<typeof insertSharedResourceSchema>;
+export type SharedResource = typeof sharedResources.$inferSelect;
+
+// Resource Likes Table
+export const resourceLikes = pgTable("resource_likes", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  resourceId: varchar("resource_id").notNull(),
+  userId: varchar("user_id").notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertResourceLikeSchema = createInsertSchema(resourceLikes).omit({ id: true, createdAt: true });
+export type InsertResourceLike = z.infer<typeof insertResourceLikeSchema>;
+export type ResourceLike = typeof resourceLikes.$inferSelect;
+
+// Session Edit History (for tracking collaborative changes)
+export const sessionEditHistory = pgTable("session_edit_history", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  sessionId: varchar("session_id").notNull(),
+  userId: varchar("user_id").notNull(),
+  editType: text("edit_type").notNull(),
+  fieldPath: text("field_path").notNull(),
+  previousValue: text("previous_value"),
+  newValue: text("new_value"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertSessionEditHistorySchema = createInsertSchema(sessionEditHistory).omit({ id: true, createdAt: true });
+export type InsertSessionEditHistory = z.infer<typeof insertSessionEditHistorySchema>;
+export type SessionEditHistory = typeof sessionEditHistory.$inferSelect;
