@@ -77,6 +77,12 @@ import {
   type InsertOrgInvitation,
   type SiteAdmin,
   type InsertSiteAdmin,
+  type ParentStudentLink,
+  type InsertParentStudentLink,
+  type ParentInvitation,
+  type InsertParentInvitation,
+  type ParentProgressNote,
+  type InsertParentProgressNote,
   lessons,
   goals,
   educatorProfiles,
@@ -113,6 +119,9 @@ import {
   organizationMemberships,
   organizationInvitations,
   siteAdmins,
+  parentStudentLinks,
+  parentInvitations,
+  parentProgressNotes,
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, desc, and, asc } from "drizzle-orm";
@@ -312,6 +321,27 @@ export interface IStorage {
   isSiteAdmin(userId: string): Promise<boolean>;
   createSiteAdmin(admin: InsertSiteAdmin): Promise<SiteAdmin>;
   deleteSiteAdmin(userId: string): Promise<boolean>;
+  
+  // Parent Portal
+  getParentStudentLinks(userId: string, role: 'parent' | 'student'): Promise<ParentStudentLink[]>;
+  getParentStudentLink(id: string): Promise<ParentStudentLink | undefined>;
+  getParentStudentLinkByUsers(parentUserId: string, studentUserId: string): Promise<ParentStudentLink | undefined>;
+  createParentStudentLink(link: InsertParentStudentLink): Promise<ParentStudentLink>;
+  updateParentStudentLink(id: string, updates: Partial<ParentStudentLink>): Promise<ParentStudentLink | undefined>;
+  deleteParentStudentLink(id: string): Promise<boolean>;
+  
+  // Parent Invitations
+  getParentInvitations(studentUserId: string): Promise<ParentInvitation[]>;
+  getParentInvitationByToken(token: string): Promise<ParentInvitation | undefined>;
+  createParentInvitation(invitation: InsertParentInvitation): Promise<ParentInvitation>;
+  updateParentInvitation(id: string, updates: Partial<ParentInvitation>): Promise<ParentInvitation | undefined>;
+  acceptParentInvitation(token: string, parentUserId: string): Promise<ParentStudentLink | undefined>;
+  deleteParentInvitation(id: string): Promise<boolean>;
+  
+  // Parent Progress Notes
+  getParentProgressNotes(linkId: string): Promise<ParentProgressNote[]>;
+  createParentProgressNote(note: InsertParentProgressNote): Promise<ParentProgressNote>;
+  deleteParentProgressNote(id: string, parentUserId: string): Promise<boolean>;
 }
 
 // Seed data for careers and resources (static content)
@@ -1786,6 +1816,126 @@ export class DatabaseStorage implements IStorage {
 
   async deleteSiteAdmin(userId: string): Promise<boolean> {
     await db.delete(siteAdmins).where(eq(siteAdmins.userId, userId));
+    return true;
+  }
+
+  // Parent Portal
+  async getParentStudentLinks(userId: string, role: 'parent' | 'student'): Promise<ParentStudentLink[]> {
+    if (role === 'parent') {
+      return await db.select().from(parentStudentLinks)
+        .where(eq(parentStudentLinks.parentUserId, userId))
+        .orderBy(desc(parentStudentLinks.createdAt));
+    } else {
+      return await db.select().from(parentStudentLinks)
+        .where(eq(parentStudentLinks.studentUserId, userId))
+        .orderBy(desc(parentStudentLinks.createdAt));
+    }
+  }
+
+  async getParentStudentLink(id: string): Promise<ParentStudentLink | undefined> {
+    const [result] = await db.select().from(parentStudentLinks)
+      .where(eq(parentStudentLinks.id, id));
+    return result || undefined;
+  }
+
+  async getParentStudentLinkByUsers(parentUserId: string, studentUserId: string): Promise<ParentStudentLink | undefined> {
+    const [result] = await db.select().from(parentStudentLinks)
+      .where(and(
+        eq(parentStudentLinks.parentUserId, parentUserId),
+        eq(parentStudentLinks.studentUserId, studentUserId)
+      ));
+    return result || undefined;
+  }
+
+  async createParentStudentLink(link: InsertParentStudentLink): Promise<ParentStudentLink> {
+    const [created] = await db.insert(parentStudentLinks).values(link as any).returning();
+    return created;
+  }
+
+  async updateParentStudentLink(id: string, updates: Partial<ParentStudentLink>): Promise<ParentStudentLink | undefined> {
+    const [updated] = await db.update(parentStudentLinks)
+      .set(updates)
+      .where(eq(parentStudentLinks.id, id))
+      .returning();
+    return updated || undefined;
+  }
+
+  async deleteParentStudentLink(id: string): Promise<boolean> {
+    await db.delete(parentStudentLinks).where(eq(parentStudentLinks.id, id));
+    return true;
+  }
+
+  // Parent Invitations
+  async getParentInvitations(studentUserId: string): Promise<ParentInvitation[]> {
+    return await db.select().from(parentInvitations)
+      .where(eq(parentInvitations.studentUserId, studentUserId))
+      .orderBy(desc(parentInvitations.createdAt));
+  }
+
+  async getParentInvitationByToken(token: string): Promise<ParentInvitation | undefined> {
+    const [result] = await db.select().from(parentInvitations)
+      .where(eq(parentInvitations.token, token));
+    return result || undefined;
+  }
+
+  async createParentInvitation(invitation: InsertParentInvitation): Promise<ParentInvitation> {
+    const [created] = await db.insert(parentInvitations).values(invitation as any).returning();
+    return created;
+  }
+
+  async updateParentInvitation(id: string, updates: Partial<ParentInvitation>): Promise<ParentInvitation | undefined> {
+    const [updated] = await db.update(parentInvitations)
+      .set(updates)
+      .where(eq(parentInvitations.id, id))
+      .returning();
+    return updated || undefined;
+  }
+
+  async acceptParentInvitation(token: string, parentUserId: string): Promise<ParentStudentLink | undefined> {
+    const invitation = await this.getParentInvitationByToken(token);
+    if (!invitation || invitation.status !== 'pending' || new Date() > invitation.expiresAt) {
+      return undefined;
+    }
+    
+    await db.update(parentInvitations)
+      .set({ status: 'accepted', acceptedAt: new Date() })
+      .where(eq(parentInvitations.id, invitation.id));
+    
+    const link = await this.createParentStudentLink({
+      parentUserId,
+      studentUserId: invitation.studentUserId,
+      relationship: invitation.relationship,
+      status: 'active',
+      acceptedAt: new Date(),
+    });
+    
+    return link;
+  }
+
+  async deleteParentInvitation(id: string): Promise<boolean> {
+    await db.delete(parentInvitations).where(eq(parentInvitations.id, id));
+    return true;
+  }
+
+  // Parent Progress Notes
+  async getParentProgressNotes(linkId: string): Promise<ParentProgressNote[]> {
+    return await db.select().from(parentProgressNotes)
+      .where(eq(parentProgressNotes.linkId, linkId))
+      .orderBy(desc(parentProgressNotes.createdAt));
+  }
+
+  async createParentProgressNote(note: InsertParentProgressNote): Promise<ParentProgressNote> {
+    const [created] = await db.insert(parentProgressNotes).values(note as any).returning();
+    return created;
+  }
+
+  async deleteParentProgressNote(id: string, parentUserId: string): Promise<boolean> {
+    await db.delete(parentProgressNotes).where(
+      and(
+        eq(parentProgressNotes.id, id),
+        eq(parentProgressNotes.parentUserId, parentUserId)
+      )
+    );
     return true;
   }
 }
