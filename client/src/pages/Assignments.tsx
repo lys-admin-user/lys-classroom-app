@@ -270,7 +270,7 @@ export default function Assignments() {
                                 <p className="font-medium truncate">{lesson.title}</p>
                                 <p className="text-sm text-muted-foreground truncate">{lesson.topic}</p>
                               </div>
-                              <Badge variant="outline" size="sm">{lesson.gradeLevel}</Badge>
+                              <Badge variant="outline">{lesson.gradeLevel}</Badge>
                             </div>
                           </div>
                         ))}
@@ -360,7 +360,7 @@ export default function Assignments() {
                       <Label className="font-oswald">Accommodation Modifications</Label>
                       <Button
                         variant="ghost"
-                        size="sm"
+                       
                         onClick={() => setSuggestionsDialogOpen(true)}
                         disabled={!accommodationType}
                         data-testid="button-suggestions"
@@ -369,12 +369,12 @@ export default function Assignments() {
                         View Suggestions
                       </Button>
                     </div>
-                    <Select value={accommodationType || ""} onValueChange={(v) => setAccommodationType(v as AccommodationType || undefined)}>
+                    <Select value={accommodationType || "none"} onValueChange={(v) => setAccommodationType(v === "none" ? undefined : v as AccommodationType)}>
                       <SelectTrigger data-testid="select-accommodation">
                         <SelectValue placeholder="No accommodation (standard)" />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="">No accommodation</SelectItem>
+                        <SelectItem value="none">No accommodation</SelectItem>
                         <SelectItem value="IEP">IEP (Individualized Education Program)</SelectItem>
                         <SelectItem value="504">504 Plan</SelectItem>
                         <SelectItem value="BIP">BIP (Behavior Intervention Plan)</SelectItem>
@@ -441,8 +441,8 @@ export default function Assignments() {
                           <div className="flex-1">
                             <div className="flex items-center gap-2 mb-2 flex-wrap">
                               {getBkdIcon(q.bkdFocus)}
-                              <Badge variant="outline" size="sm">{q.type.replace("_", " ")}</Badge>
-                              <Badge size="sm">{q.points} pts</Badge>
+                              <Badge variant="outline">{q.type.replace("_", " ")}</Badge>
+                              <Badge>{q.points} pts</Badge>
                             </div>
                             <p className="font-medium">{q.question}</p>
                             {q.options && (
@@ -486,7 +486,7 @@ export default function Assignments() {
                       <div className="flex items-start justify-between gap-2">
                         <CardTitle className="font-oswald text-lg">{assignment.title}</CardTitle>
                         {assignment.accommodationModified && (
-                          <Badge variant="outline" size="sm">{assignment.accommodationType}</Badge>
+                          <Badge variant="outline">{assignment.accommodationType}</Badge>
                         )}
                       </div>
                       <CardDescription className="line-clamp-2">{assignment.description}</CardDescription>
@@ -506,7 +506,7 @@ export default function Assignments() {
                     <CardFooter className="gap-2">
                       <Dialog open={assignDialogOpen} onOpenChange={setAssignDialogOpen}>
                         <DialogTrigger asChild>
-                          <Button variant="outline" size="sm" data-testid={`button-assign-${assignment.id}`}>
+                          <Button variant="outline" data-testid={`button-assign-${assignment.id}`}>
                             <Users className="h-4 w-4 mr-1" />
                             Assign
                           </Button>
@@ -548,7 +548,7 @@ export default function Assignments() {
                                   />
                                   <span>{s.firstName} {s.lastName}</span>
                                   {s.accommodations && s.accommodations.length > 0 && (
-                                    <Badge variant="outline" size="sm">
+                                    <Badge variant="outline">
                                       {(s.accommodations as any[])[0].type}
                                     </Badge>
                                   )}
@@ -567,7 +567,7 @@ export default function Assignments() {
                                     }}
                                   />
                                   <span>{g.name}</span>
-                                  <Badge variant="outline" size="sm">
+                                  <Badge variant="outline">
                                     {(g.studentIds as string[]).length} students
                                   </Badge>
                                 </div>
@@ -585,7 +585,7 @@ export default function Assignments() {
                                     }}
                                   />
                                   <span>{c.name}</span>
-                                  {c.period && <Badge variant="outline" size="sm">Period {c.period}</Badge>}
+                                  {c.period && <Badge variant="outline">Period {c.period}</Badge>}
                                 </div>
                               ))}
                               {((recipientType === "student" && (!students || students.length === 0)) ||
@@ -640,7 +640,7 @@ export default function Assignments() {
                     <div className="flex items-start gap-3">
                       <Check className="h-5 w-5 text-green-500 shrink-0 mt-0.5" />
                       <div>
-                        <Badge variant="outline" size="sm" className="mb-1">{s.category}</Badge>
+                        <Badge variant="outline" className="mb-1">{s.category}</Badge>
                         <p>{s.suggestion}</p>
                         <p className="text-xs text-muted-foreground mt-1">Source: {s.source}</p>
                       </div>

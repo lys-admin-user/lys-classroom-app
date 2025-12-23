@@ -25,6 +25,7 @@ import Onboarding from "@/pages/Onboarding";
 import Assignments from "@/pages/Assignments";
 import Collaboration from "@/pages/Collaboration";
 import ResourceLibrary from "@/pages/ResourceLibrary";
+import SiteAdmin from "@/pages/SiteAdmin";
 import NotFound from "@/pages/not-found";
 
 function Router() {
@@ -51,6 +52,7 @@ function Router() {
       <Route path="/collaboration" component={Collaboration} />
       <Route path="/collaboration/:id" component={Collaboration} />
       <Route path="/resource-library" component={ResourceLibrary} />
+      <Route path="/admin" component={SiteAdmin} />
       <Route component={NotFound} />
     </Switch>
   );

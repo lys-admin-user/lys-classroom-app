@@ -31,9 +31,11 @@ import {
   MessageSquare
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { useTier } from "@/hooks/use-tier";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import type { Goal, Career } from "@shared/schema";
 import { Link } from "wouter";
+import { AdBanner } from "@/components/AdBanner";
 
 const categoryConfig = {
   academic: { label: "Academic", icon: BookOpen, color: "bg-blue-500/10 text-blue-600" },
@@ -67,6 +69,7 @@ const categoryToCareerType: Record<string, string[]> = {
 
 export default function ActionPlans() {
   const { toast } = useToast();
+  const { showAds } = useTier();
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [newGoal, setNewGoal] = useState({
     title: "",
@@ -201,6 +204,8 @@ export default function ActionPlans() {
               </p>
             </div>
           </div>
+          
+          {showAds && <AdBanner position="inline" className="mb-6" />}
           <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
             <DialogTrigger asChild>
               <Button className="bg-lys-teal hover:bg-lys-teal/90 text-white font-oswald gap-2" data-testid="button-new-goal">

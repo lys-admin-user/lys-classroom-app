@@ -55,7 +55,10 @@ export default function Collaboration() {
   });
 
   const createSessionMutation = useMutation({
-    mutationFn: (data: any) => apiRequest("POST", "/api/collaboration/sessions", data),
+    mutationFn: async (data: any) => {
+      const res = await apiRequest("POST", "/api/collaboration/sessions", data);
+      return res.json() as Promise<CollaborationSession>;
+    },
     onSuccess: (session: CollaborationSession) => {
       queryClient.invalidateQueries({ queryKey: ["/api/collaboration/sessions"] });
       toast({ title: "Session Created", description: "Your collaboration session is ready." });
@@ -68,7 +71,10 @@ export default function Collaboration() {
   });
 
   const joinSessionMutation = useMutation({
-    mutationFn: (code: string) => apiRequest("POST", "/api/collaboration/join", { inviteCode: code }),
+    mutationFn: async (code: string) => {
+      const res = await apiRequest("POST", "/api/collaboration/join", { inviteCode: code });
+      return res.json() as Promise<{ session: CollaborationSession }>;
+    },
     onSuccess: (data: { session: CollaborationSession }) => {
       queryClient.invalidateQueries({ queryKey: ["/api/collaboration/participating"] });
       toast({ title: "Joined Session", description: "You've joined the collaboration session." });
@@ -228,7 +234,7 @@ export default function Collaboration() {
                         <SelectValue placeholder="Select a lesson to collaborate on" />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="">No lesson selected</SelectItem>
+                        <SelectItem value="none">No lesson selected</SelectItem>
                         {lessons?.map((lesson) => (
                           <SelectItem key={lesson.id} value={lesson.id}>
                             {lesson.title}
@@ -401,7 +407,7 @@ function CollaborationRoom({ session, user, onEnd, onLeave }: CollaborationRoomP
   } = useCollaboration({
     sessionId: session.id,
     userId: user.id,
-    userName: user.name || "Anonymous",
+    userName: user.firstName || user.email || "Anonymous",
     onParticipantJoin: (p) => {
       toast({ title: "Joined", description: `${p.name} joined the session` });
     },
@@ -471,11 +477,11 @@ function CollaborationRoom({ session, user, onEnd, onLeave }: CollaborationRoomP
               
               <div className="flex gap-2">
                 {isHost && (
-                  <Button variant="destructive" size="sm" onClick={onEnd} data-testid="button-end-session">
+                  <Button variant="destructive" onClick={onEnd} data-testid="button-end-session">
                     End Session
                   </Button>
                 )}
-                <Button variant="outline" size="sm" onClick={onLeave} data-testid="button-leave-session">
+                <Button variant="outline" onClick={onLeave} data-testid="button-leave-session">
                   Leave
                 </Button>
               </div>
@@ -567,7 +573,7 @@ function CollaborationRoom({ session, user, onEnd, onLeave }: CollaborationRoomP
                       <div className="flex-1 min-w-0">
                         <p className="font-medium truncate">{p.name}</p>
                         {p.id === session.hostUserId && (
-                          <Badge variant="outline" size="sm" className="gap-1">
+                          <Badge variant="outline" className="gap-1">
                             <Crown className="h-3 w-3" />
                             Host
                           </Badge>

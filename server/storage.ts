@@ -69,6 +69,14 @@ import {
   type InsertResourceLike,
   type SessionEditHistory,
   type InsertSessionEditHistory,
+  type Organization,
+  type InsertOrganization,
+  type OrgMembership,
+  type InsertOrgMembership,
+  type OrgInvitation,
+  type InsertOrgInvitation,
+  type SiteAdmin,
+  type InsertSiteAdmin,
   lessons,
   goals,
   educatorProfiles,
@@ -101,6 +109,10 @@ import {
   sharedResources,
   resourceLikes,
   sessionEditHistory,
+  organizations,
+  organizationMemberships,
+  organizationInvitations,
+  siteAdmins,
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, desc, and, asc } from "drizzle-orm";
@@ -270,6 +282,36 @@ export interface IStorage {
   getAssignmentRecipients(assignmentId: string): Promise<AssignmentRecipient[]>;
   createAssignmentRecipient(recipient: InsertAssignmentRecipient): Promise<AssignmentRecipient>;
   updateAssignmentRecipient(id: string, updates: Partial<AssignmentRecipient>): Promise<AssignmentRecipient | undefined>;
+  
+  // Organizations (Multi-Tenant)
+  getOrganizations(): Promise<Organization[]>;
+  getOrganization(id: string): Promise<Organization | undefined>;
+  getOrganizationBySlug(slug: string): Promise<Organization | undefined>;
+  createOrganization(org: InsertOrganization): Promise<Organization>;
+  updateOrganization(id: string, updates: Partial<Organization>): Promise<Organization | undefined>;
+  deleteOrganization(id: string): Promise<boolean>;
+  
+  // Organization Memberships
+  getOrganizationMembers(orgId: string): Promise<OrgMembership[]>;
+  getUserOrganizations(userId: string): Promise<OrgMembership[]>;
+  getOrgMembership(orgId: string, userId: string): Promise<OrgMembership | undefined>;
+  createOrgMembership(membership: InsertOrgMembership): Promise<OrgMembership>;
+  updateOrgMembership(id: string, updates: Partial<OrgMembership>): Promise<OrgMembership | undefined>;
+  deleteOrgMembership(id: string): Promise<boolean>;
+  
+  // Organization Invitations
+  getOrgInvitations(orgId: string): Promise<OrgInvitation[]>;
+  getOrgInvitationByToken(token: string): Promise<OrgInvitation | undefined>;
+  createOrgInvitation(invitation: InsertOrgInvitation): Promise<OrgInvitation>;
+  acceptOrgInvitation(token: string, userId: string): Promise<OrgMembership | undefined>;
+  deleteOrgInvitation(id: string): Promise<boolean>;
+  
+  // Site Administrators
+  getSiteAdmins(): Promise<SiteAdmin[]>;
+  getSiteAdmin(userId: string): Promise<SiteAdmin | undefined>;
+  isSiteAdmin(userId: string): Promise<boolean>;
+  createSiteAdmin(admin: InsertSiteAdmin): Promise<SiteAdmin>;
+  deleteSiteAdmin(userId: string): Promise<boolean>;
 }
 
 // Seed data for careers and resources (static content)
@@ -1604,6 +1646,147 @@ export class DatabaseStorage implements IStorage {
       }
     }
     return sessions;
+  }
+
+  // Organizations (Multi-Tenant)
+  async getOrganizations(): Promise<Organization[]> {
+    return await db.select().from(organizations).orderBy(asc(organizations.name));
+  }
+
+  async getOrganization(id: string): Promise<Organization | undefined> {
+    const [result] = await db.select().from(organizations).where(eq(organizations.id, id));
+    return result || undefined;
+  }
+
+  async getOrganizationBySlug(slug: string): Promise<Organization | undefined> {
+    const [result] = await db.select().from(organizations).where(eq(organizations.slug, slug));
+    return result || undefined;
+  }
+
+  async createOrganization(org: InsertOrganization): Promise<Organization> {
+    const [created] = await db.insert(organizations).values(org as any).returning();
+    return created;
+  }
+
+  async updateOrganization(id: string, updates: Partial<Organization>): Promise<Organization | undefined> {
+    const [updated] = await db.update(organizations)
+      .set({ ...updates, updatedAt: new Date() })
+      .where(eq(organizations.id, id))
+      .returning();
+    return updated || undefined;
+  }
+
+  async deleteOrganization(id: string): Promise<boolean> {
+    await db.delete(organizations).where(eq(organizations.id, id));
+    return true;
+  }
+
+  // Organization Memberships
+  async getOrganizationMembers(orgId: string): Promise<OrgMembership[]> {
+    return await db.select().from(organizationMemberships)
+      .where(eq(organizationMemberships.organizationId, orgId));
+  }
+
+  async getUserOrganizations(userId: string): Promise<OrgMembership[]> {
+    return await db.select().from(organizationMemberships)
+      .where(eq(organizationMemberships.userId, userId));
+  }
+
+  async getOrgMembership(orgId: string, userId: string): Promise<OrgMembership | undefined> {
+    const [result] = await db.select().from(organizationMemberships)
+      .where(and(
+        eq(organizationMemberships.organizationId, orgId),
+        eq(organizationMemberships.userId, userId)
+      ));
+    return result || undefined;
+  }
+
+  async createOrgMembership(membership: InsertOrgMembership): Promise<OrgMembership> {
+    const [created] = await db.insert(organizationMemberships).values(membership as any).returning();
+    return created;
+  }
+
+  async updateOrgMembership(id: string, updates: Partial<OrgMembership>): Promise<OrgMembership | undefined> {
+    const [updated] = await db.update(organizationMemberships)
+      .set(updates)
+      .where(eq(organizationMemberships.id, id))
+      .returning();
+    return updated || undefined;
+  }
+
+  async deleteOrgMembership(id: string): Promise<boolean> {
+    await db.delete(organizationMemberships).where(eq(organizationMemberships.id, id));
+    return true;
+  }
+
+  // Organization Invitations
+  async getOrgInvitations(orgId: string): Promise<OrgInvitation[]> {
+    return await db.select().from(organizationInvitations)
+      .where(eq(organizationInvitations.organizationId, orgId));
+  }
+
+  async getOrgInvitationByToken(token: string): Promise<OrgInvitation | undefined> {
+    const [result] = await db.select().from(organizationInvitations)
+      .where(eq(organizationInvitations.token, token));
+    return result || undefined;
+  }
+
+  async createOrgInvitation(invitation: InsertOrgInvitation): Promise<OrgInvitation> {
+    const [created] = await db.insert(organizationInvitations).values(invitation as any).returning();
+    return created;
+  }
+
+  async acceptOrgInvitation(token: string, userId: string): Promise<OrgMembership | undefined> {
+    const invitation = await this.getOrgInvitationByToken(token);
+    if (!invitation || invitation.acceptedAt || new Date() > invitation.expiresAt) {
+      return undefined;
+    }
+    
+    await db.update(organizationInvitations)
+      .set({ acceptedAt: new Date() })
+      .where(eq(organizationInvitations.id, invitation.id));
+    
+    const membership = await this.createOrgMembership({
+      organizationId: invitation.organizationId,
+      userId,
+      role: invitation.role || "member",
+      status: "active",
+      invitedBy: invitation.invitedBy,
+      invitedAt: invitation.createdAt,
+      joinedAt: new Date(),
+    });
+    
+    return membership;
+  }
+
+  async deleteOrgInvitation(id: string): Promise<boolean> {
+    await db.delete(organizationInvitations).where(eq(organizationInvitations.id, id));
+    return true;
+  }
+
+  // Site Administrators
+  async getSiteAdmins(): Promise<SiteAdmin[]> {
+    return await db.select().from(siteAdmins);
+  }
+
+  async getSiteAdmin(userId: string): Promise<SiteAdmin | undefined> {
+    const [result] = await db.select().from(siteAdmins).where(eq(siteAdmins.userId, userId));
+    return result || undefined;
+  }
+
+  async isSiteAdmin(userId: string): Promise<boolean> {
+    const admin = await this.getSiteAdmin(userId);
+    return !!admin;
+  }
+
+  async createSiteAdmin(admin: InsertSiteAdmin): Promise<SiteAdmin> {
+    const [created] = await db.insert(siteAdmins).values(admin as any).returning();
+    return created;
+  }
+
+  async deleteSiteAdmin(userId: string): Promise<boolean> {
+    await db.delete(siteAdmins).where(eq(siteAdmins.userId, userId));
+    return true;
   }
 }
 

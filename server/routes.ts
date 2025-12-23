@@ -2059,5 +2059,265 @@ export async function registerRoutes(
     }
   });
 
+  // ================================
+  // Site Administration & Multi-Tenant
+  // ================================
+
+  // Middleware to check if user is a site admin
+  const isSiteAdmin = async (req: any, res: any, next: any) => {
+    const userId = req.user?.claims?.sub;
+    if (!userId) {
+      res.status(401).json({ error: "Unauthorized" });
+      return;
+    }
+    const isAdmin = await storage.isSiteAdmin(userId);
+    if (!isAdmin) {
+      res.status(403).json({ error: "Site admin access required" });
+      return;
+    }
+    next();
+  };
+
+  // Check if current user is site admin
+  app.get("/api/admin/check", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user?.claims?.sub;
+      const isAdmin = await storage.isSiteAdmin(userId);
+      res.json({ isSiteAdmin: isAdmin });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to check admin status" });
+    }
+  });
+
+  // Get all site admins (site admin only)
+  app.get("/api/admin/site-admins", isAuthenticated, isSiteAdmin, async (req: any, res) => {
+    try {
+      const admins = await storage.getSiteAdmins();
+      res.json(admins);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch site admins" });
+    }
+  });
+
+  // Add site admin (site admin only)
+  app.post("/api/admin/site-admins", isAuthenticated, isSiteAdmin, async (req: any, res) => {
+    try {
+      const { userId, permissions } = req.body;
+      const createdBy = req.user?.claims?.sub;
+      const admin = await storage.createSiteAdmin({ userId, permissions, createdBy });
+      res.json(admin);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to create site admin" });
+    }
+  });
+
+  // Remove site admin (site admin only)
+  app.delete("/api/admin/site-admins/:userId", isAuthenticated, isSiteAdmin, async (req: any, res) => {
+    try {
+      const { userId } = req.params;
+      await storage.deleteSiteAdmin(userId);
+      res.json({ success: true });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to remove site admin" });
+    }
+  });
+
+  // Get all organizations (site admin only)
+  app.get("/api/admin/organizations", isAuthenticated, isSiteAdmin, async (req: any, res) => {
+    try {
+      const orgs = await storage.getOrganizations();
+      res.json(orgs);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch organizations" });
+    }
+  });
+
+  // Create organization (site admin only)
+  app.post("/api/admin/organizations", isAuthenticated, isSiteAdmin, async (req: any, res) => {
+    try {
+      const org = await storage.createOrganization(req.body);
+      res.json(org);
+    } catch (error) {
+      console.error("Create org error:", error);
+      res.status(500).json({ error: "Failed to create organization" });
+    }
+  });
+
+  // Update organization (site admin only)
+  app.patch("/api/admin/organizations/:id", isAuthenticated, isSiteAdmin, async (req: any, res) => {
+    try {
+      const { id } = req.params;
+      const updated = await storage.updateOrganization(id, req.body);
+      if (!updated) {
+        res.status(404).json({ error: "Organization not found" });
+        return;
+      }
+      res.json(updated);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to update organization" });
+    }
+  });
+
+  // Delete organization (site admin only)
+  app.delete("/api/admin/organizations/:id", isAuthenticated, isSiteAdmin, async (req: any, res) => {
+    try {
+      const { id } = req.params;
+      await storage.deleteOrganization(id);
+      res.json({ success: true });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to delete organization" });
+    }
+  });
+
+  // Get organization members (site admin or org admin)
+  app.get("/api/admin/organizations/:id/members", isAuthenticated, async (req: any, res) => {
+    try {
+      const { id } = req.params;
+      const userId = req.user?.claims?.sub;
+      
+      const isSiteAdminUser = await storage.isSiteAdmin(userId);
+      const membership = await storage.getOrgMembership(id, userId);
+      
+      if (!isSiteAdminUser && (!membership || membership.role === "member")) {
+        res.status(403).json({ error: "Admin access required" });
+        return;
+      }
+      
+      const members = await storage.getOrganizationMembers(id);
+      res.json(members);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch members" });
+    }
+  });
+
+  // Get current user's organizations
+  app.get("/api/organizations/mine", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user?.claims?.sub;
+      const memberships = await storage.getUserOrganizations(userId);
+      
+      const orgsWithDetails = await Promise.all(
+        memberships.map(async (m) => {
+          const org = await storage.getOrganization(m.organizationId);
+          return { ...m, organization: org };
+        })
+      );
+      
+      res.json(orgsWithDetails);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch organizations" });
+    }
+  });
+
+  // Invite user to organization
+  app.post("/api/organizations/:id/invite", isAuthenticated, async (req: any, res) => {
+    try {
+      const { id } = req.params;
+      const { email, role } = req.body;
+      const userId = req.user?.claims?.sub;
+      
+      const isSiteAdminUser = await storage.isSiteAdmin(userId);
+      const membership = await storage.getOrgMembership(id, userId);
+      
+      if (!isSiteAdminUser && (!membership || membership.role === "member")) {
+        res.status(403).json({ error: "Admin access required" });
+        return;
+      }
+      
+      const token = randomUUID().replace(/-/g, "").substring(0, 32);
+      const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+      
+      const invitation = await storage.createOrgInvitation({
+        organizationId: id,
+        email,
+        role: role || "member",
+        token,
+        invitedBy: userId,
+        expiresAt,
+      });
+      
+      res.json(invitation);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to create invitation" });
+    }
+  });
+
+  // Accept invitation
+  app.post("/api/organizations/accept-invite", isAuthenticated, async (req: any, res) => {
+    try {
+      const { token } = req.body;
+      const userId = req.user?.claims?.sub;
+      
+      const membership = await storage.acceptOrgInvitation(token, userId);
+      if (!membership) {
+        res.status(400).json({ error: "Invalid or expired invitation" });
+        return;
+      }
+      
+      res.json(membership);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to accept invitation" });
+    }
+  });
+
+  // Update member role
+  app.patch("/api/organizations/:orgId/members/:memberId", isAuthenticated, async (req: any, res) => {
+    try {
+      const { orgId, memberId } = req.params;
+      const { role, status } = req.body;
+      const userId = req.user?.claims?.sub;
+      
+      const isSiteAdminUser = await storage.isSiteAdmin(userId);
+      const membership = await storage.getOrgMembership(orgId, userId);
+      
+      if (!isSiteAdminUser && (!membership || membership.role !== "owner")) {
+        res.status(403).json({ error: "Owner access required" });
+        return;
+      }
+      
+      const updated = await storage.updateOrgMembership(memberId, { role, status });
+      res.json(updated);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to update member" });
+    }
+  });
+
+  // Remove member from organization
+  app.delete("/api/organizations/:orgId/members/:memberId", isAuthenticated, async (req: any, res) => {
+    try {
+      const { orgId, memberId } = req.params;
+      const userId = req.user?.claims?.sub;
+      
+      const isSiteAdminUser = await storage.isSiteAdmin(userId);
+      const membership = await storage.getOrgMembership(orgId, userId);
+      
+      if (!isSiteAdminUser && (!membership || membership.role === "member")) {
+        res.status(403).json({ error: "Admin access required" });
+        return;
+      }
+      
+      await storage.deleteOrgMembership(memberId);
+      res.json({ success: true });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to remove member" });
+    }
+  });
+
+  // Platform statistics for site admin dashboard
+  app.get("/api/admin/stats", isAuthenticated, isSiteAdmin, async (req: any, res) => {
+    try {
+      const orgs = await storage.getOrganizations();
+      const admins = await storage.getSiteAdmins();
+      
+      res.json({
+        totalOrganizations: orgs.length,
+        activeOrganizations: orgs.filter(o => o.status === "active").length,
+        totalSiteAdmins: admins.length,
+      });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch stats" });
+    }
+  });
+
   return httpServer;
 }

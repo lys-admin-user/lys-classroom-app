@@ -30,7 +30,9 @@ import {
 import type { Career, SavedCareer } from "@shared/schema";
 import { useAuth } from "@/hooks/use-auth";
 import { useToast } from "@/hooks/use-toast";
+import { useTier } from "@/hooks/use-tier";
 import { apiRequest, queryClient } from "@/lib/queryClient";
+import { AdBanner } from "@/components/AdBanner";
 
 const categories = [
   { value: "all", label: "All Categories", icon: Briefcase },
@@ -55,6 +57,7 @@ export default function Careers() {
   const [selectedCareer, setSelectedCareer] = useState<Career | null>(null);
   const { isAuthenticated } = useAuth();
   const { toast } = useToast();
+  const { showAds } = useTier();
 
   const { data: careers = [], isLoading } = useQuery<Career[]>({
     queryKey: ["/api/careers"],
@@ -300,6 +303,8 @@ export default function Careers() {
               </p>
             </div>
           </div>
+          
+          {showAds && <AdBanner position="inline" className="mb-6" />}
         </div>
 
         <div className="flex flex-wrap gap-4 mb-8">

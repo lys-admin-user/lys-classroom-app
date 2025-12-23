@@ -24,6 +24,8 @@ import {
   Wrench
 } from "lucide-react";
 import type { Resource } from "@shared/schema";
+import { useTier } from "@/hooks/use-tier";
+import { AdBanner } from "@/components/AdBanner";
 
 const typeConfig = {
   scholarship: { label: "Scholarship", icon: DollarSign, color: "bg-green-500/10 text-green-600" },
@@ -44,6 +46,7 @@ const categoryConfig = {
 export default function Resources() {
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedCategory, setSelectedCategory] = useState<string>("all");
+  const { showAds } = useTier();
 
   const { data: resources = [], isLoading } = useQuery<Resource[]>({
     queryKey: ["/api/resources"],
@@ -87,6 +90,8 @@ export default function Resources() {
               </p>
             </div>
           </div>
+          
+          {showAds && <AdBanner position="inline" className="mb-6" />}
         </div>
 
         <div className="flex flex-wrap gap-4 mb-8">
