@@ -141,13 +141,22 @@ export default function MilestonesPage() {
   const getMilestonesByCategory = (category: string) => 
     milestones.filter(m => m.category === category);
 
+  const getCompletedWeight = (category: string) => 
+    getMilestonesByCategory(category)
+      .filter(m => m.status === "completed")
+      .reduce((sum, m) => sum + (m.weight || 1), 0);
+
+  const getTotalWeight = (category: string) =>
+    getMilestonesByCategory(category)
+      .reduce((sum, m) => sum + (m.weight || 1), 0);
+
   const getCompletedCount = (category: string) => 
     getMilestonesByCategory(category).filter(m => m.status === "completed").length;
 
   const getCategoryProgress = (category: string) => {
-    const categoryMilestones = getMilestonesByCategory(category);
-    if (categoryMilestones.length === 0) return 0;
-    return Math.round((getCompletedCount(category) / categoryMilestones.length) * 100);
+    const totalWeight = getTotalWeight(category);
+    if (totalWeight === 0) return 0;
+    return Math.round((getCompletedWeight(category) / totalWeight) * 100);
   };
 
   const getStatusBadge = (status: string) => {
@@ -302,6 +311,9 @@ export default function MilestonesPage() {
           const completedCount = getCompletedCount(category);
           const progress = getCategoryProgress(category);
 
+          const completedWeight = getCompletedWeight(category);
+          const totalWeight = getTotalWeight(category);
+          
           return (
             <Card key={category} className={`${config.borderColor} border-2`}>
               <CardHeader className="flex flex-row items-center justify-between gap-4 pb-2">
@@ -311,7 +323,10 @@ export default function MilestonesPage() {
                   </div>
                   <CardTitle className="text-sm font-medium">{config.label}</CardTitle>
                 </div>
-                <Badge variant="outline">{completedCount}/{categoryMilestones.length}</Badge>
+                <div className="flex items-center gap-2">
+                  <Badge variant="outline">{completedCount}/{categoryMilestones.length}</Badge>
+                  <Badge variant="secondary" className="text-xs">{completedWeight}/{totalWeight} pts</Badge>
+                </div>
               </CardHeader>
               <CardContent>
                 <Progress value={progress} className="h-2 mb-2" />
