@@ -29,6 +29,7 @@ import Collaboration from "@/pages/Collaboration";
 import ResourceLibrary from "@/pages/ResourceLibrary";
 import SiteAdmin from "@/pages/SiteAdmin";
 import ParentPortal from "@/pages/ParentPortal";
+import Milestones from "@/pages/Milestones";
 import NotFound from "@/pages/not-found";
 
 const EXEMPT_PATHS = ["/onboarding", "/pricing", "/shared"];
@@ -76,6 +77,7 @@ function Router() {
       <Route path="/resource-library" component={ResourceLibrary} />
       <Route path="/admin" component={SiteAdmin} />
       <Route path="/parent-portal" component={ParentPortal} />
+      <Route path="/milestones" component={Milestones} />
       <Route component={NotFound} />
     </Switch>
   );

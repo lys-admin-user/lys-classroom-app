@@ -15,8 +15,8 @@ import { Slider } from "@/components/ui/slider";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useState } from "react";
-import { Shield, Building2, Users, Plus, Trash2, Settings, BarChart3, AlertTriangle, Loader2, Flag, Mail, Edit2, ToggleLeft, Percent } from "lucide-react";
-import type { Organization, SiteAdmin, FeatureFlag, EmailTemplate } from "@shared/schema";
+import { Shield, Building2, Users, Plus, Trash2, Settings, BarChart3, AlertTriangle, Loader2, Flag, Mail, Edit2, ToggleLeft, Percent, Globe, MapPin, ChevronRight } from "lucide-react";
+import type { Organization, SiteAdmin, FeatureFlag, EmailTemplate, Authority } from "@shared/schema";
 
 export default function SiteAdminPage() {
   const { user, isLoading: authLoading } = useAuth();
@@ -32,6 +32,17 @@ export default function SiteAdminPage() {
   const [isCreateTemplateOpen, setIsCreateTemplateOpen] = useState(false);
   const [editingTemplate, setEditingTemplate] = useState<EmailTemplate | null>(null);
   const [newTemplate, setNewTemplate] = useState({ name: "", subject: "", category: "notification", htmlContent: "", textContent: "", variables: [] as string[], isActive: true });
+  
+  const [isCreateAuthorityOpen, setIsCreateAuthorityOpen] = useState(false);
+  const [editingAuthority, setEditingAuthority] = useState<Authority | null>(null);
+  const [newAuthority, setNewAuthority] = useState({ 
+    code: "", 
+    name: "", 
+    level: "national" as const, 
+    modelType: "bottom_heavy" as const, 
+    country: "US",
+    parentId: null as string | null
+  });
 
   const { data: adminCheck, isLoading: checkLoading } = useQuery<{ isSiteAdmin: boolean }>({
     queryKey: ["/api/admin/check"],
@@ -64,6 +75,11 @@ export default function SiteAdminPage() {
 
   const { data: emailTemplates = [], isLoading: templatesLoading } = useQuery<EmailTemplate[]>({
     queryKey: ["/api/admin/email-templates"],
+    enabled: adminCheck?.isSiteAdmin,
+  });
+
+  const { data: authorities = [], isLoading: authoritiesLoading } = useQuery<Authority[]>({
+    queryKey: ["/api/authorities"],
     enabled: adminCheck?.isSiteAdmin,
   });
 
@@ -181,6 +197,55 @@ export default function SiteAdminPage() {
     },
   });
 
+  const createAuthorityMutation = useMutation({
+    mutationFn: async (data: typeof newAuthority) => {
+      return await apiRequest("POST", "/api/authorities", data);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/authorities"] });
+      setIsCreateAuthorityOpen(false);
+      setNewAuthority({ code: "", name: "", level: "national", modelType: "bottom_heavy", country: "US", parentId: null });
+      toast({ title: "Authority created" });
+    },
+    onError: () => {
+      toast({ title: "Failed to create authority", variant: "destructive" });
+    },
+  });
+
+  const updateAuthorityMutation = useMutation({
+    mutationFn: async ({ id, updates }: { id: string; updates: Partial<Authority> }) => {
+      return await apiRequest("PATCH", `/api/authorities/${id}`, updates);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/authorities"] });
+      setEditingAuthority(null);
+      toast({ title: "Authority updated" });
+    },
+    onError: () => {
+      toast({ title: "Failed to update authority", variant: "destructive" });
+    },
+  });
+
+  const getLevelLabel = (level: string) => {
+    const labels: Record<string, string> = {
+      supranational: "Supranational (UN/EU)",
+      national: "National",
+      regional_state: "Regional/State",
+      local_district: "Local/District",
+      school: "School"
+    };
+    return labels[level] || level;
+  };
+
+  const getModelLabel = (model: string) => {
+    const labels: Record<string, string> = {
+      bottom_heavy: "US Style (Local Control)",
+      top_down_unitary: "Centralized National",
+      federal_hybrid: "Federal Hybrid"
+    };
+    return labels[model] || model;
+  };
+
   if (authLoading || checkLoading) {
     return (
       <div className="flex items-center justify-center h-[60vh]">
@@ -283,6 +348,10 @@ export default function SiteAdminPage() {
           <TabsTrigger value="email-templates" data-testid="tab-email-templates">
             <Mail className="h-4 w-4 mr-2" />
             Email Templates
+          </TabsTrigger>
+          <TabsTrigger value="authorities" data-testid="tab-authorities">
+            <Globe className="h-4 w-4 mr-2" />
+            Global Authorities
           </TabsTrigger>
         </TabsList>
 
@@ -964,6 +1033,263 @@ export default function SiteAdminPage() {
                   data-testid="button-submit-edit-template"
                 >
                   {updateTemplateMutation.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+                  Save Changes
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
+        </TabsContent>
+
+        <TabsContent value="authorities" className="space-y-4">
+          <div className="flex items-center justify-between gap-4 flex-wrap">
+            <div>
+              <h2 className="font-oswald text-xl">Global Authority Tree</h2>
+              <p className="text-sm text-muted-foreground">Manage educational governance systems worldwide</p>
+            </div>
+            <Dialog open={isCreateAuthorityOpen} onOpenChange={setIsCreateAuthorityOpen}>
+              <DialogTrigger asChild>
+                <Button className="bg-lys-teal hover:bg-lys-teal/90" data-testid="button-create-authority">
+                  <Plus className="h-4 w-4 mr-2" />
+                  Add Authority
+                </Button>
+              </DialogTrigger>
+              <DialogContent>
+                <DialogHeader>
+                  <DialogTitle>Add Educational Authority</DialogTitle>
+                  <DialogDescription>
+                    Create a new educational authority in the global hierarchy.
+                  </DialogDescription>
+                </DialogHeader>
+                <div className="grid gap-4 py-4">
+                  <div className="grid gap-2">
+                    <Label htmlFor="authority-code">Authority Code</Label>
+                    <Input
+                      id="authority-code"
+                      value={newAuthority.code}
+                      onChange={(e) => setNewAuthority({ ...newAuthority, code: e.target.value.toUpperCase().replace(/[^A-Z0-9_-]/g, "") })}
+                      placeholder="US-TEA"
+                      data-testid="input-authority-code"
+                    />
+                  </div>
+                  <div className="grid gap-2">
+                    <Label htmlFor="authority-name">Name</Label>
+                    <Input
+                      id="authority-name"
+                      value={newAuthority.name}
+                      onChange={(e) => setNewAuthority({ ...newAuthority, name: e.target.value })}
+                      placeholder="Texas Education Agency"
+                      data-testid="input-authority-name"
+                    />
+                  </div>
+                  <div className="grid gap-2">
+                    <Label htmlFor="authority-country">Country Code</Label>
+                    <Input
+                      id="authority-country"
+                      value={newAuthority.country}
+                      onChange={(e) => setNewAuthority({ ...newAuthority, country: e.target.value.toUpperCase().slice(0, 2) })}
+                      placeholder="US"
+                      maxLength={2}
+                      data-testid="input-authority-country"
+                    />
+                  </div>
+                  <div className="grid gap-2">
+                    <Label htmlFor="authority-level">Hierarchy Level</Label>
+                    <Select
+                      value={newAuthority.level}
+                      onValueChange={(value: any) => setNewAuthority({ ...newAuthority, level: value })}
+                    >
+                      <SelectTrigger data-testid="select-authority-level">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="supranational">Supranational (UN/EU)</SelectItem>
+                        <SelectItem value="national">National</SelectItem>
+                        <SelectItem value="regional_state">Regional/State</SelectItem>
+                        <SelectItem value="local_district">Local/District</SelectItem>
+                        <SelectItem value="school">School</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="grid gap-2">
+                    <Label htmlFor="authority-model">Governance Model</Label>
+                    <Select
+                      value={newAuthority.modelType}
+                      onValueChange={(value: any) => setNewAuthority({ ...newAuthority, modelType: value })}
+                    >
+                      <SelectTrigger data-testid="select-authority-model">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="bottom_heavy">US Style (Strong Local Control)</SelectItem>
+                        <SelectItem value="top_down_unitary">Centralized National Curriculum</SelectItem>
+                        <SelectItem value="federal_hybrid">Federal Hybrid (EU/Canada)</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  {authorities.length > 0 && (
+                    <div className="grid gap-2">
+                      <Label htmlFor="authority-parent">Parent Authority (Optional)</Label>
+                      <Select
+                        value={newAuthority.parentId || "none"}
+                        onValueChange={(value) => setNewAuthority({ ...newAuthority, parentId: value === "none" ? null : value })}
+                      >
+                        <SelectTrigger data-testid="select-authority-parent">
+                          <SelectValue placeholder="Select parent..." />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="none">No Parent (Top Level)</SelectItem>
+                          {authorities.map((auth) => (
+                            <SelectItem key={auth.id} value={auth.id}>
+                              {auth.name} ({getLevelLabel(auth.level)})
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  )}
+                </div>
+                <DialogFooter>
+                  <Button variant="outline" onClick={() => setIsCreateAuthorityOpen(false)} data-testid="button-cancel-authority">
+                    Cancel
+                  </Button>
+                  <Button
+                    onClick={() => createAuthorityMutation.mutate(newAuthority)}
+                    disabled={!newAuthority.code || !newAuthority.name || createAuthorityMutation.isPending}
+                    data-testid="button-submit-authority"
+                  >
+                    {createAuthorityMutation.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+                    Create
+                  </Button>
+                </DialogFooter>
+              </DialogContent>
+            </Dialog>
+          </div>
+
+          {authoritiesLoading ? (
+            <div className="flex items-center justify-center py-12">
+              <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+            </div>
+          ) : authorities.length === 0 ? (
+            <Card>
+              <CardContent className="py-12 text-center">
+                <Globe className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+                <p className="text-muted-foreground">No educational authorities configured</p>
+                <p className="text-sm text-muted-foreground">Add authorities to build your global education hierarchy</p>
+              </CardContent>
+            </Card>
+          ) : (
+            <div className="grid gap-4">
+              {authorities.map((auth) => (
+                <Card key={auth.id} data-testid={`card-authority-${auth.id}`}>
+                  <CardHeader className="flex flex-row items-start justify-between gap-4">
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-md bg-lys-teal/10 flex items-center justify-center">
+                        <MapPin className="h-5 w-5 text-lys-teal" />
+                      </div>
+                      <div>
+                        <CardTitle className="text-lg">{auth.name}</CardTitle>
+                        <CardDescription className="flex items-center gap-2">
+                          <span className="font-mono">{auth.code}</span>
+                          <ChevronRight className="h-3 w-3" />
+                          <span>{auth.country}</span>
+                        </CardDescription>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <Badge variant="outline">{getLevelLabel(auth.level)}</Badge>
+                      <Badge variant="secondary">{getModelLabel(auth.modelType || "bottom_heavy")}</Badge>
+                      <Button
+                        size="icon"
+                        variant="ghost"
+                        onClick={() => setEditingAuthority(auth)}
+                        data-testid={`button-edit-authority-${auth.id}`}
+                      >
+                        <Edit2 className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  </CardHeader>
+                  {auth.parentId && (
+                    <CardContent>
+                      <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                        <span>Parent:</span>
+                        <Badge variant="outline" className="font-normal">
+                          {authorities.find(a => a.id === auth.parentId)?.name || auth.parentId}
+                        </Badge>
+                      </div>
+                    </CardContent>
+                  )}
+                </Card>
+              ))}
+            </div>
+          )}
+
+          <Dialog open={!!editingAuthority} onOpenChange={(open) => !open && setEditingAuthority(null)}>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>Edit Authority</DialogTitle>
+                <DialogDescription>Update the educational authority settings.</DialogDescription>
+              </DialogHeader>
+              {editingAuthority && (
+                <div className="grid gap-4 py-4">
+                  <div className="grid gap-2">
+                    <Label>Authority Code</Label>
+                    <Input value={editingAuthority.code || ""} disabled className="bg-muted" />
+                  </div>
+                  <div className="grid gap-2">
+                    <Label htmlFor="edit-authority-name">Name</Label>
+                    <Input
+                      id="edit-authority-name"
+                      value={editingAuthority.name}
+                      onChange={(e) => setEditingAuthority({ ...editingAuthority, name: e.target.value })}
+                      data-testid="input-edit-authority-name"
+                    />
+                  </div>
+                  <div className="grid gap-2">
+                    <Label htmlFor="edit-authority-model">Governance Model</Label>
+                    <Select
+                      value={editingAuthority.modelType || "bottom_heavy"}
+                      onValueChange={(value: any) => setEditingAuthority({ ...editingAuthority, modelType: value })}
+                    >
+                      <SelectTrigger data-testid="select-edit-authority-model">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="bottom_heavy">US Style (Strong Local Control)</SelectItem>
+                        <SelectItem value="top_down_unitary">Centralized National Curriculum</SelectItem>
+                        <SelectItem value="federal_hybrid">Federal Hybrid (EU/Canada)</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="flex items-center justify-between gap-4">
+                    <div className="space-y-0.5">
+                      <Label>Active</Label>
+                      <p className="text-sm text-muted-foreground">Enable this authority</p>
+                    </div>
+                    <Switch
+                      checked={editingAuthority.isActive ?? true}
+                      onCheckedChange={(checked) => setEditingAuthority({ ...editingAuthority, isActive: checked })}
+                      data-testid="switch-edit-authority-active"
+                    />
+                  </div>
+                </div>
+              )}
+              <DialogFooter>
+                <Button variant="outline" onClick={() => setEditingAuthority(null)} data-testid="button-cancel-edit-authority">
+                  Cancel
+                </Button>
+                <Button
+                  onClick={() => editingAuthority && updateAuthorityMutation.mutate({
+                    id: editingAuthority.id,
+                    updates: {
+                      name: editingAuthority.name,
+                      modelType: editingAuthority.modelType,
+                      isActive: editingAuthority.isActive,
+                    }
+                  })}
+                  disabled={updateAuthorityMutation.isPending}
+                  data-testid="button-submit-edit-authority"
+                >
+                  {updateAuthorityMutation.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
                   Save Changes
                 </Button>
               </DialogFooter>
