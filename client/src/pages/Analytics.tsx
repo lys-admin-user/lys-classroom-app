@@ -2,6 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { 
   FileText, 
   Target, 
@@ -12,9 +13,13 @@ import {
   BookOpen,
   Users,
   BarChart3,
-  Share2
+  Share2,
+  Building2,
+  GraduationCap,
+  Trophy
 } from "lucide-react";
-import type { Lesson, Goal } from "@shared/schema";
+import type { Lesson, Goal, User } from "@shared/schema";
+import { useAuth } from "@/hooks/use-auth";
 import { 
   BarChart, 
   Bar, 
@@ -30,7 +35,26 @@ import {
   Line
 } from "recharts";
 
+interface CampusAnalytics {
+  totalEducators: number;
+  totalStudents: number;
+  totalLessons: number;
+  totalGoals: number;
+  lessonsThisWeek: number;
+  lessonsLastWeek: number;
+  goalsCompleted: number;
+  goalsInProgress: number;
+  standardsCoverage: Record<string, number>;
+  bkdDistribution: { be: number; know: number; do: number };
+  activityByWeek: Array<{ name: string; lessons: number; goals: number }>;
+  topEducators: Array<{ id: string; name: string; lessonCount: number }>;
+  organizations: Array<{ id: string; name: string; memberCount: number }>;
+}
+
 export default function Analytics() {
+  const { user } = useAuth();
+  const isCampusAdmin = user?.role === "campus_admin";
+
   const { data: lessons = [], isLoading: lessonsLoading } = useQuery<Lesson[]>({
     queryKey: ["/api/lessons"],
   });
@@ -39,7 +63,12 @@ export default function Analytics() {
     queryKey: ["/api/goals"],
   });
 
-  const isLoading = lessonsLoading || goalsLoading;
+  const { data: campusData, isLoading: campusLoading } = useQuery<CampusAnalytics>({
+    queryKey: ["/api/campus-analytics"],
+    enabled: isCampusAdmin,
+  });
+
+  const isLoading = lessonsLoading || goalsLoading || (isCampusAdmin && campusLoading);
 
   const totalLessons = lessons.length;
   const sharedLessons = lessons.filter((l) => l.shareId).length;
@@ -150,358 +179,748 @@ export default function Analytics() {
     );
   }
 
+  // Campus Standards Chart Data
+  const campusStandardsData = campusData?.standardsCoverage 
+    ? Object.entries(campusData.standardsCoverage)
+        .map(([name, count]) => ({ name, count }))
+        .sort((a, b) => b.count - a.count)
+        .slice(0, 8)
+    : [];
+
+  // Campus BKD Pie Data
+  const campusBkdPieData = campusData ? [
+    { name: "BE (Identity)", value: campusData.bkdDistribution.be, color: "#F8D842" },
+    { name: "KNOW (Strategy)", value: campusData.bkdDistribution.know, color: "#EE4E23" },
+    { name: "DO (Action)", value: campusData.bkdDistribution.do, color: "#016371" },
+  ].filter((d) => d.value > 0) : [];
+
   return (
     <div className="min-h-screen bg-background p-6">
       <div className="max-w-7xl mx-auto space-y-6">
         <div>
           <h1 className="font-permanent-marker text-3xl text-lys-red mb-2" data-testid="text-analytics-title">
-            Your Analytics
+            {isCampusAdmin ? "Campus Analytics" : "Your Analytics"}
           </h1>
           <p className="font-roboto text-muted-foreground">
-            Track your progress and see how you're making an impact
+            {isCampusAdmin 
+              ? "Organization-wide insights and educator performance" 
+              : "Track your progress and see how you're making an impact"}
           </p>
         </div>
 
-        <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
-          <Card>
-            <CardContent className="pt-6">
-              <div className="flex items-center gap-4">
-                <div className="w-12 h-12 rounded-md bg-lys-red/10 flex items-center justify-center">
-                  <FileText className="h-6 w-6 text-lys-red" />
-                </div>
-                <div>
-                  <p className="text-sm text-muted-foreground font-roboto">Total Lessons</p>
-                  <p className="font-oswald text-2xl font-bold" data-testid="text-total-lessons">{totalLessons}</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
+        {isCampusAdmin && campusData ? (
+          <Tabs defaultValue="campus" className="w-full">
+            <TabsList className="grid w-full grid-cols-2 max-w-md">
+              <TabsTrigger value="campus" className="gap-2" data-testid="tab-campus-analytics">
+                <Building2 className="h-4 w-4" />
+                Campus Overview
+              </TabsTrigger>
+              <TabsTrigger value="personal" className="gap-2" data-testid="tab-personal-analytics">
+                <Users className="h-4 w-4" />
+                My Activity
+              </TabsTrigger>
+            </TabsList>
 
-          <Card>
-            <CardContent className="pt-6">
-              <div className="flex items-center gap-4">
-                <div className="w-12 h-12 rounded-md bg-lys-teal/10 flex items-center justify-center">
-                  <Share2 className="h-6 w-6 text-lys-teal" />
-                </div>
-                <div>
-                  <p className="text-sm text-muted-foreground font-roboto">Shared Lessons</p>
-                  <p className="font-oswald text-2xl font-bold" data-testid="text-shared-lessons">{sharedLessons}</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
+            <TabsContent value="campus" className="space-y-6 mt-6">
+              {/* Campus Summary Stats */}
+              <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                <Card>
+                  <CardContent className="pt-6">
+                    <div className="flex items-center gap-4">
+                      <div className="w-12 h-12 rounded-md bg-lys-teal/10 flex items-center justify-center">
+                        <GraduationCap className="h-6 w-6 text-lys-teal" />
+                      </div>
+                      <div>
+                        <p className="text-sm text-muted-foreground font-roboto">Total Educators</p>
+                        <p className="font-oswald text-2xl font-bold" data-testid="text-campus-educators">{campusData.totalEducators}</p>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
 
-          <Card>
-            <CardContent className="pt-6">
-              <div className="flex items-center gap-4">
-                <div className="w-12 h-12 rounded-md bg-lys-yellow/10 flex items-center justify-center">
-                  <Target className="h-6 w-6 text-lys-yellow" />
-                </div>
-                <div>
-                  <p className="text-sm text-muted-foreground font-roboto">Active Goals</p>
-                  <p className="font-oswald text-2xl font-bold" data-testid="text-active-goals">{inProgressGoals}</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
+                <Card>
+                  <CardContent className="pt-6">
+                    <div className="flex items-center gap-4">
+                      <div className="w-12 h-12 rounded-md bg-lys-yellow/10 flex items-center justify-center">
+                        <Users className="h-6 w-6 text-lys-yellow" />
+                      </div>
+                      <div>
+                        <p className="text-sm text-muted-foreground font-roboto">Total Students</p>
+                        <p className="font-oswald text-2xl font-bold" data-testid="text-campus-students">{campusData.totalStudents}</p>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
 
-          <Card>
-            <CardContent className="pt-6">
-              <div className="flex items-center gap-4">
-                <div className="w-12 h-12 rounded-md bg-green-500/10 flex items-center justify-center">
-                  <CheckCircle2 className="h-6 w-6 text-green-600" />
-                </div>
-                <div>
-                  <p className="text-sm text-muted-foreground font-roboto">Goals Completed</p>
-                  <p className="font-oswald text-2xl font-bold" data-testid="text-completed-goals">{completedGoals}</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
+                <Card>
+                  <CardContent className="pt-6">
+                    <div className="flex items-center gap-4">
+                      <div className="w-12 h-12 rounded-md bg-lys-red/10 flex items-center justify-center">
+                        <FileText className="h-6 w-6 text-lys-red" />
+                      </div>
+                      <div>
+                        <p className="text-sm text-muted-foreground font-roboto">Total Lessons</p>
+                        <p className="font-oswald text-2xl font-bold" data-testid="text-campus-lessons">{campusData.totalLessons}</p>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
 
-        <div className="grid lg:grid-cols-3 gap-4">
-          <Card className="lg:col-span-2">
-            <CardHeader>
-              <CardTitle className="font-oswald flex items-center gap-2">
-                <BarChart3 className="h-5 w-5 text-lys-teal" />
-                Standards Coverage
-              </CardTitle>
-              <CardDescription className="font-roboto">
-                Distribution of educational standards across your lessons
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              {standardsChartData.length > 0 ? (
-                <ResponsiveContainer width="100%" height={250}>
-                  <BarChart data={standardsChartData}>
-                    <XAxis dataKey="name" tick={{ fontSize: 12 }} />
-                    <YAxis tick={{ fontSize: 12 }} />
-                    <Tooltip 
-                      contentStyle={{ 
-                        backgroundColor: "hsl(var(--card))", 
-                        border: "1px solid hsl(var(--border))",
-                        borderRadius: "8px"
-                      }} 
-                    />
-                    <Bar 
-                      dataKey="count" 
-                      fill="#016371" 
-                      radius={[4, 4, 0, 0]}
-                      name="Lessons"
-                    />
-                  </BarChart>
-                </ResponsiveContainer>
-              ) : (
-                <div className="h-[250px] flex items-center justify-center text-muted-foreground">
-                  <p className="font-roboto text-center">
-                    Create lessons with standards to see coverage analytics
-                  </p>
-                </div>
+                <Card>
+                  <CardContent className="pt-6">
+                    <div className="flex items-center gap-4">
+                      <div className="w-12 h-12 rounded-md bg-green-500/10 flex items-center justify-center">
+                        <Target className="h-6 w-6 text-green-600" />
+                      </div>
+                      <div>
+                        <p className="text-sm text-muted-foreground font-roboto">Total Goals</p>
+                        <p className="font-oswald text-2xl font-bold" data-testid="text-campus-goals">{campusData.totalGoals}</p>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              </div>
+
+              {/* Weekly Comparison */}
+              <div className="grid sm:grid-cols-2 gap-4">
+                <Card>
+                  <CardContent className="pt-6">
+                    <div className="flex items-center justify-between gap-4">
+                      <div>
+                        <p className="text-sm text-muted-foreground font-roboto">Lessons This Week</p>
+                        <p className="font-oswald text-3xl font-bold text-lys-red">{campusData.lessonsThisWeek}</p>
+                      </div>
+                      <div className="text-right">
+                        <p className="text-sm text-muted-foreground font-roboto">vs Last Week</p>
+                        <p className={`font-oswald text-lg font-bold ${campusData.lessonsThisWeek >= campusData.lessonsLastWeek ? 'text-green-600' : 'text-amber-600'}`}>
+                          {campusData.lessonsThisWeek >= campusData.lessonsLastWeek ? '+' : ''}
+                          {campusData.lessonsThisWeek - campusData.lessonsLastWeek}
+                        </p>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+
+                <Card>
+                  <CardContent className="pt-6">
+                    <div className="flex items-center justify-between gap-4">
+                      <div>
+                        <p className="text-sm text-muted-foreground font-roboto">Goals Completed</p>
+                        <p className="font-oswald text-3xl font-bold text-green-600">{campusData.goalsCompleted}</p>
+                      </div>
+                      <div className="text-right">
+                        <p className="text-sm text-muted-foreground font-roboto">In Progress</p>
+                        <p className="font-oswald text-lg font-bold text-lys-teal">{campusData.goalsInProgress}</p>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              </div>
+
+              {/* Organizations */}
+              {campusData.organizations.length > 0 && (
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="font-oswald flex items-center gap-2">
+                      <Building2 className="h-5 w-5 text-lys-teal" />
+                      Your Organizations
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                      {campusData.organizations.map((org) => (
+                        <div key={org.id} className="p-4 rounded-md border bg-muted/20">
+                          <p className="font-oswald font-semibold">{org.name}</p>
+                          <p className="text-sm text-muted-foreground font-roboto">
+                            {org.memberCount} member{org.memberCount !== 1 ? 's' : ''}
+                          </p>
+                        </div>
+                      ))}
+                    </div>
+                  </CardContent>
+                </Card>
               )}
-            </CardContent>
-          </Card>
 
-          <Card>
-            <CardHeader>
-              <CardTitle className="font-oswald flex items-center gap-2">
-                <TrendingUp className="h-5 w-5 text-lys-yellow" />
-                Overall Progress
-              </CardTitle>
-              <CardDescription className="font-roboto">
-                Milestone completion across all goals
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="text-center">
-                <div className="relative inline-flex items-center justify-center w-32 h-32">
-                  <svg className="w-full h-full transform -rotate-90">
-                    <circle
-                      cx="64"
-                      cy="64"
-                      r="56"
-                      stroke="hsl(var(--muted))"
-                      strokeWidth="12"
-                      fill="none"
-                    />
-                    <circle
-                      cx="64"
-                      cy="64"
-                      r="56"
-                      stroke="#016371"
-                      strokeWidth="12"
-                      fill="none"
-                      strokeDasharray={`${overallProgress * 3.52} 352`}
-                      strokeLinecap="round"
-                    />
-                  </svg>
-                  <div className="absolute inset-0 flex items-center justify-center">
-                    <span className="font-oswald text-3xl font-bold" data-testid="text-overall-progress">
-                      {overallProgress}%
-                    </span>
-                  </div>
-                </div>
+              {/* Top Educators */}
+              {campusData.topEducators.length > 0 && (
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="font-oswald flex items-center gap-2">
+                      <Trophy className="h-5 w-5 text-lys-yellow" />
+                      Top Educators by Lesson Creation
+                    </CardTitle>
+                    <CardDescription className="font-roboto">
+                      Recognizing educators who are making the most impact
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="space-y-3">
+                      {campusData.topEducators.map((educator, index) => (
+                        <div key={educator.id} className="flex items-center gap-4 p-3 rounded-md bg-muted/20">
+                          <div className={`w-8 h-8 rounded-full flex items-center justify-center font-oswald font-bold text-sm ${
+                            index === 0 ? 'bg-lys-yellow text-black' :
+                            index === 1 ? 'bg-gray-300 text-black' :
+                            index === 2 ? 'bg-amber-600 text-white' :
+                            'bg-muted text-muted-foreground'
+                          }`}>
+                            {index + 1}
+                          </div>
+                          <div className="flex-1">
+                            <p className="font-oswald font-semibold">{educator.name}</p>
+                          </div>
+                          <Badge variant="outline" className="font-roboto">
+                            {educator.lessonCount} lesson{educator.lessonCount !== 1 ? 's' : ''}
+                          </Badge>
+                        </div>
+                      ))}
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
+
+              {/* Campus Charts */}
+              <div className="grid lg:grid-cols-2 gap-4">
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="font-oswald flex items-center gap-2">
+                      <BarChart3 className="h-5 w-5 text-lys-teal" />
+                      Standards Coverage (Campus-wide)
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    {campusStandardsData.length > 0 ? (
+                      <ResponsiveContainer width="100%" height={250}>
+                        <BarChart data={campusStandardsData}>
+                          <XAxis dataKey="name" tick={{ fontSize: 12 }} />
+                          <YAxis tick={{ fontSize: 12 }} />
+                          <Tooltip 
+                            contentStyle={{ 
+                              backgroundColor: "hsl(var(--card))", 
+                              border: "1px solid hsl(var(--border))",
+                              borderRadius: "8px"
+                            }} 
+                          />
+                          <Bar 
+                            dataKey="count" 
+                            fill="#016371" 
+                            radius={[4, 4, 0, 0]}
+                            name="Lessons"
+                          />
+                        </BarChart>
+                      </ResponsiveContainer>
+                    ) : (
+                      <div className="h-[250px] flex items-center justify-center text-muted-foreground">
+                        <p className="font-roboto text-center">No standards data yet</p>
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="font-oswald flex items-center gap-2">
+                      <Award className="h-5 w-5 text-lys-red" />
+                      Be-Know-Do Distribution
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    {campusBkdPieData.length > 0 ? (
+                      <ResponsiveContainer width="100%" height={250}>
+                        <PieChart>
+                          <Pie
+                            data={campusBkdPieData}
+                            cx="50%"
+                            cy="50%"
+                            innerRadius={50}
+                            outerRadius={80}
+                            paddingAngle={5}
+                            dataKey="value"
+                          >
+                            {campusBkdPieData.map((entry, index) => (
+                              <Cell key={`cell-${index}`} fill={entry.color} />
+                            ))}
+                          </Pie>
+                          <Tooltip 
+                            contentStyle={{ 
+                              backgroundColor: "hsl(var(--card))", 
+                              border: "1px solid hsl(var(--border))",
+                              borderRadius: "8px"
+                            }} 
+                          />
+                          <Legend />
+                        </PieChart>
+                      </ResponsiveContainer>
+                    ) : (
+                      <div className="h-[250px] flex items-center justify-center text-muted-foreground">
+                        <p className="font-roboto text-center">No lesson data yet</p>
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
               </div>
-              <div className="space-y-2 text-sm font-roboto">
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">Total Milestones</span>
-                  <span className="font-semibold">{totalMilestones}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">Completed</span>
-                  <span className="font-semibold text-green-600">{completedMilestones}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">Remaining</span>
-                  <span className="font-semibold">{totalMilestones - completedMilestones}</span>
-                </div>
+
+              {/* Campus Activity Timeline */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="font-oswald flex items-center gap-2">
+                    <Clock className="h-5 w-5 text-lys-red" />
+                    Campus Activity Timeline
+                  </CardTitle>
+                  <CardDescription className="font-roboto">
+                    Organization-wide activity over the past month
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <ResponsiveContainer width="100%" height={200}>
+                    <LineChart data={campusData.activityByWeek}>
+                      <XAxis dataKey="name" tick={{ fontSize: 12 }} />
+                      <YAxis tick={{ fontSize: 12 }} />
+                      <Tooltip 
+                        contentStyle={{ 
+                          backgroundColor: "hsl(var(--card))", 
+                          border: "1px solid hsl(var(--border))",
+                          borderRadius: "8px"
+                        }} 
+                      />
+                      <Legend />
+                      <Line 
+                        type="monotone" 
+                        dataKey="lessons" 
+                        stroke="#EE4E23" 
+                        strokeWidth={2}
+                        dot={{ fill: "#EE4E23" }}
+                        name="Lessons"
+                      />
+                      <Line 
+                        type="monotone" 
+                        dataKey="goals" 
+                        stroke="#016371" 
+                        strokeWidth={2}
+                        dot={{ fill: "#016371" }}
+                        name="Goals"
+                      />
+                    </LineChart>
+                  </ResponsiveContainer>
+                </CardContent>
+              </Card>
+            </TabsContent>
+
+            <TabsContent value="personal" className="space-y-6 mt-6">
+              <PersonalAnalytics 
+                totalLessons={totalLessons}
+                sharedLessons={sharedLessons}
+                inProgressGoals={inProgressGoals}
+                completedGoals={completedGoals}
+                overallProgress={overallProgress}
+                totalMilestones={totalMilestones}
+                completedMilestones={completedMilestones}
+                standardsChartData={standardsChartData}
+                bkdPieData={bkdPieData}
+                categoryPieData={categoryPieData}
+                activityData={activityData}
+                standardsCoverage={standardsCoverage}
+                totalGoals={totalGoals}
+                COLORS={COLORS}
+              />
+            </TabsContent>
+          </Tabs>
+        ) : (
+          <PersonalAnalytics 
+            totalLessons={totalLessons}
+            sharedLessons={sharedLessons}
+            inProgressGoals={inProgressGoals}
+            completedGoals={completedGoals}
+            overallProgress={overallProgress}
+            totalMilestones={totalMilestones}
+            completedMilestones={completedMilestones}
+            standardsChartData={standardsChartData}
+            bkdPieData={bkdPieData}
+            categoryPieData={categoryPieData}
+            activityData={activityData}
+            standardsCoverage={standardsCoverage}
+            totalGoals={totalGoals}
+            COLORS={COLORS}
+          />
+        )}
+      </div>
+    </div>
+  );
+}
+
+interface PersonalAnalyticsProps {
+  totalLessons: number;
+  sharedLessons: number;
+  inProgressGoals: number;
+  completedGoals: number;
+  overallProgress: number;
+  totalMilestones: number;
+  completedMilestones: number;
+  standardsChartData: Array<{ name: string; count: number }>;
+  bkdPieData: Array<{ name: string; value: number; color: string }>;
+  categoryPieData: Array<{ name: string; value: number }>;
+  activityData: Array<{ name: string; lessons: number; goals: number }>;
+  standardsCoverage: Record<string, number>;
+  totalGoals: number;
+  COLORS: string[];
+}
+
+function PersonalAnalytics({
+  totalLessons,
+  sharedLessons,
+  inProgressGoals,
+  completedGoals,
+  overallProgress,
+  totalMilestones,
+  completedMilestones,
+  standardsChartData,
+  bkdPieData,
+  categoryPieData,
+  activityData,
+  standardsCoverage,
+  totalGoals,
+  COLORS,
+}: PersonalAnalyticsProps) {
+  return (
+    <>
+      <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <Card>
+          <CardContent className="pt-6">
+            <div className="flex items-center gap-4">
+              <div className="w-12 h-12 rounded-md bg-lys-red/10 flex items-center justify-center">
+                <FileText className="h-6 w-6 text-lys-red" />
               </div>
-            </CardContent>
-          </Card>
-        </div>
+              <div>
+                <p className="text-sm text-muted-foreground font-roboto">Total Lessons</p>
+                <p className="font-oswald text-2xl font-bold" data-testid="text-total-lessons">{totalLessons}</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
 
         <Card>
+          <CardContent className="pt-6">
+            <div className="flex items-center gap-4">
+              <div className="w-12 h-12 rounded-md bg-lys-teal/10 flex items-center justify-center">
+                <Share2 className="h-6 w-6 text-lys-teal" />
+              </div>
+              <div>
+                <p className="text-sm text-muted-foreground font-roboto">Shared Lessons</p>
+                <p className="font-oswald text-2xl font-bold" data-testid="text-shared-lessons">{sharedLessons}</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardContent className="pt-6">
+            <div className="flex items-center gap-4">
+              <div className="w-12 h-12 rounded-md bg-lys-yellow/10 flex items-center justify-center">
+                <Target className="h-6 w-6 text-lys-yellow" />
+              </div>
+              <div>
+                <p className="text-sm text-muted-foreground font-roboto">Active Goals</p>
+                <p className="font-oswald text-2xl font-bold" data-testid="text-active-goals">{inProgressGoals}</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardContent className="pt-6">
+            <div className="flex items-center gap-4">
+              <div className="w-12 h-12 rounded-md bg-green-500/10 flex items-center justify-center">
+                <CheckCircle2 className="h-6 w-6 text-green-600" />
+              </div>
+              <div>
+                <p className="text-sm text-muted-foreground font-roboto">Goals Completed</p>
+                <p className="font-oswald text-2xl font-bold" data-testid="text-completed-goals">{completedGoals}</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      <div className="grid lg:grid-cols-3 gap-4">
+        <Card className="lg:col-span-2">
           <CardHeader>
             <CardTitle className="font-oswald flex items-center gap-2">
-              <Clock className="h-5 w-5 text-lys-red" />
-              Activity Timeline
+              <BarChart3 className="h-5 w-5 text-lys-teal" />
+              Standards Coverage
             </CardTitle>
             <CardDescription className="font-roboto">
-              Your creation activity over the past month
+              Distribution of educational standards across your lessons
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <ResponsiveContainer width="100%" height={200}>
-              <LineChart data={activityData}>
-                <XAxis dataKey="name" tick={{ fontSize: 12 }} />
-                <YAxis tick={{ fontSize: 12 }} />
-                <Tooltip 
-                  contentStyle={{ 
-                    backgroundColor: "hsl(var(--card))", 
-                    border: "1px solid hsl(var(--border))",
-                    borderRadius: "8px"
-                  }} 
-                />
-                <Legend />
-                <Line 
-                  type="monotone" 
-                  dataKey="lessons" 
-                  stroke="#EE4E23" 
-                  strokeWidth={2}
-                  dot={{ fill: "#EE4E23" }}
-                  name="Lessons"
-                />
-                <Line 
-                  type="monotone" 
-                  dataKey="goals" 
-                  stroke="#016371" 
-                  strokeWidth={2}
-                  dot={{ fill: "#016371" }}
-                  name="Goals"
-                />
-              </LineChart>
-            </ResponsiveContainer>
+            {standardsChartData.length > 0 ? (
+              <ResponsiveContainer width="100%" height={250}>
+                <BarChart data={standardsChartData}>
+                  <XAxis dataKey="name" tick={{ fontSize: 12 }} />
+                  <YAxis tick={{ fontSize: 12 }} />
+                  <Tooltip 
+                    contentStyle={{ 
+                      backgroundColor: "hsl(var(--card))", 
+                      border: "1px solid hsl(var(--border))",
+                      borderRadius: "8px"
+                    }} 
+                  />
+                  <Bar 
+                    dataKey="count" 
+                    fill="#016371" 
+                    radius={[4, 4, 0, 0]}
+                    name="Lessons"
+                  />
+                </BarChart>
+              </ResponsiveContainer>
+            ) : (
+              <div className="h-[250px] flex items-center justify-center text-muted-foreground">
+                <p className="font-roboto text-center">
+                  Create lessons with standards to see coverage analytics
+                </p>
+              </div>
+            )}
           </CardContent>
         </Card>
-
-        <div className="grid lg:grid-cols-2 gap-4">
-          <Card>
-            <CardHeader>
-              <CardTitle className="font-oswald flex items-center gap-2">
-                <Award className="h-5 w-5 text-lys-red" />
-                Be-Know-Do Distribution
-              </CardTitle>
-              <CardDescription className="font-roboto">
-                Goals organized by LYS methodology pillars
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              {bkdPieData.length > 0 ? (
-                <ResponsiveContainer width="100%" height={200}>
-                  <PieChart>
-                    <Pie
-                      data={bkdPieData}
-                      cx="50%"
-                      cy="50%"
-                      innerRadius={50}
-                      outerRadius={80}
-                      paddingAngle={5}
-                      dataKey="value"
-                    >
-                      {bkdPieData.map((entry, index) => (
-                        <Cell key={`cell-${index}`} fill={entry.color} />
-                      ))}
-                    </Pie>
-                    <Tooltip 
-                      contentStyle={{ 
-                        backgroundColor: "hsl(var(--card))", 
-                        border: "1px solid hsl(var(--border))",
-                        borderRadius: "8px"
-                      }} 
-                    />
-                    <Legend />
-                  </PieChart>
-                </ResponsiveContainer>
-              ) : (
-                <div className="h-[200px] flex items-center justify-center text-muted-foreground">
-                  <p className="font-roboto text-center">Create goals to see methodology distribution</p>
-                </div>
-              )}
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader>
-              <CardTitle className="font-oswald flex items-center gap-2">
-                <BookOpen className="h-5 w-5 text-lys-teal" />
-                Goals by Category
-              </CardTitle>
-              <CardDescription className="font-roboto">
-                Distribution of goals across life areas
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              {categoryPieData.length > 0 ? (
-                <ResponsiveContainer width="100%" height={200}>
-                  <PieChart>
-                    <Pie
-                      data={categoryPieData}
-                      cx="50%"
-                      cy="50%"
-                      innerRadius={50}
-                      outerRadius={80}
-                      paddingAngle={5}
-                      dataKey="value"
-                    >
-                      {categoryPieData.map((_, index) => (
-                        <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                      ))}
-                    </Pie>
-                    <Tooltip 
-                      contentStyle={{ 
-                        backgroundColor: "hsl(var(--card))", 
-                        border: "1px solid hsl(var(--border))",
-                        borderRadius: "8px"
-                      }} 
-                    />
-                    <Legend />
-                  </PieChart>
-                </ResponsiveContainer>
-              ) : (
-                <div className="h-[200px] flex items-center justify-center text-muted-foreground">
-                  <p className="font-roboto text-center">Create goals to see category distribution</p>
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        </div>
 
         <Card>
           <CardHeader>
             <CardTitle className="font-oswald flex items-center gap-2">
-              <Users className="h-5 w-5 text-lys-yellow" />
-              Quick Summary
+              <TrendingUp className="h-5 w-5 text-lys-yellow" />
+              Overall Progress
             </CardTitle>
+            <CardDescription className="font-roboto">
+              Milestone completion across all goals
+            </CardDescription>
           </CardHeader>
-          <CardContent>
-            <div className="grid sm:grid-cols-3 gap-4 text-center">
-              <div className="p-4 rounded-lg bg-lys-red/5">
-                <p className="font-oswald text-2xl font-bold text-lys-red">{totalLessons + totalGoals}</p>
-                <p className="text-sm text-muted-foreground font-roboto">Total Items Created</p>
+          <CardContent className="space-y-4">
+            <div className="text-center">
+              <div className="relative inline-flex items-center justify-center w-32 h-32">
+                <svg className="w-full h-full transform -rotate-90">
+                  <circle
+                    cx="64"
+                    cy="64"
+                    r="56"
+                    stroke="hsl(var(--muted))"
+                    strokeWidth="12"
+                    fill="none"
+                  />
+                  <circle
+                    cx="64"
+                    cy="64"
+                    r="56"
+                    stroke="#016371"
+                    strokeWidth="12"
+                    fill="none"
+                    strokeDasharray={`${overallProgress * 3.52} 352`}
+                    strokeLinecap="round"
+                  />
+                </svg>
+                <div className="absolute inset-0 flex items-center justify-center">
+                  <span className="font-oswald text-3xl font-bold" data-testid="text-overall-progress">
+                    {overallProgress}%
+                  </span>
+                </div>
               </div>
-              <div className="p-4 rounded-lg bg-lys-yellow/5">
-                <p className="font-oswald text-2xl font-bold text-lys-yellow">
-                  {Object.keys(standardsCoverage).length}
-                </p>
-                <p className="text-sm text-muted-foreground font-roboto">Standards Covered</p>
+            </div>
+            <div className="space-y-2 text-sm font-roboto">
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Total Milestones</span>
+                <span className="font-semibold">{totalMilestones}</span>
               </div>
-              <div className="p-4 rounded-lg bg-lys-teal/5">
-                <p className="font-oswald text-2xl font-bold text-lys-teal">
-                  {totalMilestones}
-                </p>
-                <p className="text-sm text-muted-foreground font-roboto">Total Milestones</p>
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Completed</span>
+                <span className="font-semibold text-green-600">{completedMilestones}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Remaining</span>
+                <span className="font-semibold">{totalMilestones - completedMilestones}</span>
               </div>
             </div>
           </CardContent>
         </Card>
+      </div>
 
-        <div className="p-6 rounded-lg bg-gradient-to-r from-lys-red/10 via-lys-yellow/10 to-lys-teal/10 border">
-          <div className="flex flex-wrap items-center gap-6">
-            <div className="flex-1 min-w-[200px]">
-              <h2 className="font-oswald text-xl font-semibold mb-2">Keep Building Success</h2>
-              <p className="font-roboto text-muted-foreground text-sm">
-                Every lesson you create and every goal you set brings your students one step closer 
-                to bridging the gap between high school and real-world success. You're making a difference!
+      <Card>
+        <CardHeader>
+          <CardTitle className="font-oswald flex items-center gap-2">
+            <Clock className="h-5 w-5 text-lys-red" />
+            Activity Timeline
+          </CardTitle>
+          <CardDescription className="font-roboto">
+            Your creation activity over the past month
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <ResponsiveContainer width="100%" height={200}>
+            <LineChart data={activityData}>
+              <XAxis dataKey="name" tick={{ fontSize: 12 }} />
+              <YAxis tick={{ fontSize: 12 }} />
+              <Tooltip 
+                contentStyle={{ 
+                  backgroundColor: "hsl(var(--card))", 
+                  border: "1px solid hsl(var(--border))",
+                  borderRadius: "8px"
+                }} 
+              />
+              <Legend />
+              <Line 
+                type="monotone" 
+                dataKey="lessons" 
+                stroke="#EE4E23" 
+                strokeWidth={2}
+                dot={{ fill: "#EE4E23" }}
+                name="Lessons"
+              />
+              <Line 
+                type="monotone" 
+                dataKey="goals" 
+                stroke="#016371" 
+                strokeWidth={2}
+                dot={{ fill: "#016371" }}
+                name="Goals"
+              />
+            </LineChart>
+          </ResponsiveContainer>
+        </CardContent>
+      </Card>
+
+      <div className="grid lg:grid-cols-2 gap-4">
+        <Card>
+          <CardHeader>
+            <CardTitle className="font-oswald flex items-center gap-2">
+              <Award className="h-5 w-5 text-lys-red" />
+              Be-Know-Do Distribution
+            </CardTitle>
+            <CardDescription className="font-roboto">
+              Goals organized by LYS methodology pillars
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            {bkdPieData.length > 0 ? (
+              <ResponsiveContainer width="100%" height={200}>
+                <PieChart>
+                  <Pie
+                    data={bkdPieData}
+                    cx="50%"
+                    cy="50%"
+                    innerRadius={50}
+                    outerRadius={80}
+                    paddingAngle={5}
+                    dataKey="value"
+                  >
+                    {bkdPieData.map((entry, index) => (
+                      <Cell key={`cell-${index}`} fill={entry.color} />
+                    ))}
+                  </Pie>
+                  <Tooltip 
+                    contentStyle={{ 
+                      backgroundColor: "hsl(var(--card))", 
+                      border: "1px solid hsl(var(--border))",
+                      borderRadius: "8px"
+                    }} 
+                  />
+                  <Legend />
+                </PieChart>
+              </ResponsiveContainer>
+            ) : (
+              <div className="h-[200px] flex items-center justify-center text-muted-foreground">
+                <p className="font-roboto text-center">Create goals to see methodology distribution</p>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle className="font-oswald flex items-center gap-2">
+              <BookOpen className="h-5 w-5 text-lys-teal" />
+              Goals by Category
+            </CardTitle>
+            <CardDescription className="font-roboto">
+              Distribution of goals across life areas
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            {categoryPieData.length > 0 ? (
+              <ResponsiveContainer width="100%" height={200}>
+                <PieChart>
+                  <Pie
+                    data={categoryPieData}
+                    cx="50%"
+                    cy="50%"
+                    innerRadius={50}
+                    outerRadius={80}
+                    paddingAngle={5}
+                    dataKey="value"
+                  >
+                    {categoryPieData.map((_, index) => (
+                      <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                    ))}
+                  </Pie>
+                  <Tooltip 
+                    contentStyle={{ 
+                      backgroundColor: "hsl(var(--card))", 
+                      border: "1px solid hsl(var(--border))",
+                      borderRadius: "8px"
+                    }} 
+                  />
+                  <Legend />
+                </PieChart>
+              </ResponsiveContainer>
+            ) : (
+              <div className="h-[200px] flex items-center justify-center text-muted-foreground">
+                <p className="font-roboto text-center">Create goals to see category distribution</p>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      </div>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="font-oswald flex items-center gap-2">
+            <Users className="h-5 w-5 text-lys-yellow" />
+            Quick Summary
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="grid sm:grid-cols-3 gap-4 text-center">
+            <div className="p-4 rounded-lg bg-lys-red/5">
+              <p className="font-oswald text-2xl font-bold text-lys-red">{totalLessons + totalGoals}</p>
+              <p className="text-sm text-muted-foreground font-roboto">Total Items Created</p>
+            </div>
+            <div className="p-4 rounded-lg bg-lys-yellow/5">
+              <p className="font-oswald text-2xl font-bold text-lys-yellow">
+                {Object.keys(standardsCoverage).length}
               </p>
+              <p className="text-sm text-muted-foreground font-roboto">Standards Covered</p>
             </div>
-            <div className="flex gap-2">
-              <Badge className="bg-lys-red/20 text-lys-red font-oswald px-3 py-1">BE</Badge>
-              <Badge className="bg-lys-yellow/20 text-lys-yellow font-oswald px-3 py-1">KNOW</Badge>
-              <Badge className="bg-lys-teal/20 text-lys-teal font-oswald px-3 py-1">DO</Badge>
+            <div className="p-4 rounded-lg bg-lys-teal/5">
+              <p className="font-oswald text-2xl font-bold text-lys-teal">
+                {totalMilestones}
+              </p>
+              <p className="text-sm text-muted-foreground font-roboto">Total Milestones</p>
             </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      <div className="p-6 rounded-lg bg-gradient-to-r from-lys-red/10 via-lys-yellow/10 to-lys-teal/10 border">
+        <div className="flex flex-wrap items-center gap-6">
+          <div className="flex-1 min-w-[200px]">
+            <h2 className="font-oswald text-xl font-semibold mb-2">Keep Building Success</h2>
+            <p className="font-roboto text-muted-foreground text-sm">
+              Every lesson you create and every goal you set brings your students one step closer 
+              to bridging the gap between high school and real-world success. You're making a difference!
+            </p>
+          </div>
+          <div className="flex gap-2">
+            <Badge className="bg-lys-red/20 text-lys-red font-oswald px-3 py-1">BE</Badge>
+            <Badge className="bg-lys-yellow/20 text-lys-yellow font-oswald px-3 py-1">KNOW</Badge>
+            <Badge className="bg-lys-teal/20 text-lys-teal font-oswald px-3 py-1">DO</Badge>
           </div>
         </div>
       </div>
-    </div>
+    </>
   );
 }

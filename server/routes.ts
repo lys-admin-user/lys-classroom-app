@@ -3,7 +3,7 @@ import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { generateLessonPlan } from "./openai";
 import { parseDocument } from "./documentParser";
-import { generateLessonRequestSchema, insertScopeSequenceSchema, insertSequenceUnitSchema, insertScopeChangeRequestSchema, users, insertFeatureFlagSchema, insertEmailTemplateSchema } from "@shared/schema";
+import { generateLessonRequestSchema, insertScopeSequenceSchema, insertSequenceUnitSchema, insertScopeChangeRequestSchema, users, insertFeatureFlagSchema, insertEmailTemplateSchema, type Lesson, type Goal } from "@shared/schema";
 import { z } from "zod";
 import { setupAuth, registerAuthRoutes, isAuthenticated } from "./replit_integrations/auth";
 import { randomUUID } from "crypto";
@@ -2325,6 +2325,179 @@ export async function registerRoutes(
       res.json(orgsWithDetails);
     } catch (error) {
       res.status(500).json({ error: "Failed to fetch organizations" });
+    }
+  });
+
+  // Campus Admin Analytics - aggregate data across organization
+  app.get("/api/campus-analytics", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user?.claims?.sub;
+      const user = await storage.getUser(userId);
+      
+      // Check if user is campus_admin
+      if (user?.role !== "campus_admin") {
+        res.status(403).json({ error: "Campus admin access required" });
+        return;
+      }
+      
+      // Get user's organizations
+      const memberships = await storage.getUserOrganizations(userId);
+      const orgIds = memberships.map(m => m.organizationId);
+      
+      if (orgIds.length === 0) {
+        res.json({
+          totalEducators: 0,
+          totalStudents: 0,
+          totalLessons: 0,
+          totalGoals: 0,
+          lessonsThisWeek: 0,
+          lessonsLastWeek: 0,
+          goalsCompleted: 0,
+          goalsInProgress: 0,
+          standardsCoverage: {},
+          bkdDistribution: { be: 0, know: 0, do: 0 },
+          activityByWeek: [],
+          topEducators: [],
+          organizations: [],
+        });
+        return;
+      }
+      
+      // Get organization details
+      const orgs = await Promise.all(
+        orgIds.map(async (id) => {
+          const org = await storage.getOrganization(id);
+          const members = await storage.getOrganizationMembers(id);
+          return { ...org, memberCount: members.length };
+        })
+      );
+      
+      // Get all members across organizations
+      const allMembers = await Promise.all(
+        orgIds.map(async (id) => storage.getOrganizationMembers(id))
+      );
+      const memberUserIds = allMembers.flat().map(m => m.userId);
+      
+      // Count educators and students
+      const memberDetails = await Promise.all(
+        memberUserIds.map(async (uid) => storage.getUser(uid))
+      );
+      const educators = memberDetails.filter(u => u?.role === "educator").length;
+      const students = memberDetails.filter(u => u?.role === "student").length;
+      
+      // Get all lessons from organization members
+      const allLessons = await Promise.all(
+        memberUserIds.map(async (uid: string) => storage.getLessons(uid))
+      );
+      const lessons = allLessons.flat();
+      
+      // Get all goals from organization members
+      const allGoals = await Promise.all(
+        memberUserIds.map(async (uid: string) => storage.getGoals(uid))
+      );
+      const goals = allGoals.flat();
+      
+      // Calculate weekly stats
+      const now = new Date();
+      const oneWeekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+      const twoWeeksAgo = new Date(now.getTime() - 14 * 24 * 60 * 60 * 1000);
+      
+      const lessonsThisWeek = lessons.filter((l: Lesson) => 
+        l.createdAt && new Date(l.createdAt) >= oneWeekAgo
+      ).length;
+      const lessonsLastWeek = lessons.filter((l: Lesson) => 
+        l.createdAt && new Date(l.createdAt) >= twoWeeksAgo && new Date(l.createdAt) < oneWeekAgo
+      ).length;
+      
+      // Goals stats
+      const goalsCompleted = goals.filter((g: Goal) => g.status === "completed").length;
+      const goalsInProgress = goals.filter((g: Goal) => g.status === "in_progress").length;
+      
+      // Standards coverage
+      const standardsCoverage: Record<string, number> = {};
+      lessons.forEach((l: Lesson) => {
+        const stds = (l.standards || "").split(",").map((s: string) => s.trim()).filter(Boolean);
+        stds.forEach((s: string) => {
+          const prefix = s.split(".")[0] || s.substring(0, 4);
+          standardsCoverage[prefix] = (standardsCoverage[prefix] || 0) + 1;
+        });
+      });
+      
+      // BKD distribution
+      const bkdDistribution = { be: 0, know: 0, do: 0 };
+      lessons.forEach((l: Lesson) => {
+        const focus = l.bkdFocus as "be" | "know" | "do";
+        if (focus && bkdDistribution[focus] !== undefined) {
+          bkdDistribution[focus]++;
+        }
+      });
+      
+      // Activity by week (last 4 weeks)
+      const getWeek = (date: Date) => {
+        const diff = Math.floor((now.getTime() - date.getTime()) / (7 * 24 * 60 * 60 * 1000));
+        if (diff === 0) return "This Week";
+        if (diff === 1) return "Last Week";
+        if (diff === 2) return "2 Weeks Ago";
+        return "3+ Weeks Ago";
+      };
+      
+      const activityMap: Record<string, { lessons: number; goals: number }> = {
+        "This Week": { lessons: 0, goals: 0 },
+        "Last Week": { lessons: 0, goals: 0 },
+        "2 Weeks Ago": { lessons: 0, goals: 0 },
+        "3+ Weeks Ago": { lessons: 0, goals: 0 },
+      };
+      
+      lessons.forEach((l: Lesson) => {
+        if (l.createdAt) activityMap[getWeek(new Date(l.createdAt))].lessons++;
+      });
+      goals.forEach((g: Goal) => {
+        if (g.createdAt) activityMap[getWeek(new Date(g.createdAt))].goals++;
+      });
+      
+      // Top educators by lesson count
+      const lessonsByUser: Record<string, number> = {};
+      lessons.forEach((l: Lesson) => {
+        lessonsByUser[l.userId] = (lessonsByUser[l.userId] || 0) + 1;
+      });
+      
+      const topEducators = await Promise.all(
+        Object.entries(lessonsByUser)
+          .sort((a, b) => b[1] - a[1])
+          .slice(0, 5)
+          .map(async ([uid, count]) => {
+            const user = await storage.getUser(uid);
+            return {
+              id: uid,
+              name: user ? `${user.firstName || ""} ${user.lastName || ""}`.trim() || "Unknown" : "Unknown",
+              lessonCount: count,
+            };
+          })
+      );
+      
+      res.json({
+        totalEducators: educators,
+        totalStudents: students,
+        totalLessons: lessons.length,
+        totalGoals: goals.length,
+        lessonsThisWeek,
+        lessonsLastWeek,
+        goalsCompleted,
+        goalsInProgress,
+        standardsCoverage,
+        bkdDistribution,
+        activityByWeek: [
+          { name: "3+ Weeks", ...activityMap["3+ Weeks Ago"] },
+          { name: "2 Weeks", ...activityMap["2 Weeks Ago"] },
+          { name: "Last Week", ...activityMap["Last Week"] },
+          { name: "This Week", ...activityMap["This Week"] },
+        ],
+        topEducators,
+        organizations: orgs,
+      });
+    } catch (error) {
+      console.error("Campus analytics error:", error);
+      res.status(500).json({ error: "Failed to fetch campus analytics" });
     }
   });
 
