@@ -2501,6 +2501,346 @@ export async function registerRoutes(
     }
   });
 
+  // District Analytics - aggregates data across all schools in a district
+  app.get("/api/district-analytics", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user?.claims?.sub;
+      const user = await storage.getUser(userId);
+      
+      if (user?.role !== "campus_admin") {
+        res.status(403).json({ error: "Campus admin access required" });
+        return;
+      }
+      
+      // Get user's organizations
+      const memberships = await storage.getUserOrganizations(userId);
+      
+      // Find districts (organizations with type 'district')
+      const districtIds: string[] = [];
+      const districts: Array<{ id: string; name: string; type: string }> = [];
+      
+      for (const m of memberships) {
+        const org = await storage.getOrganization(m.organizationId);
+        if (org?.type === "district") {
+          districtIds.push(org.id);
+          districts.push({ id: org.id, name: org.name, type: org.type });
+        }
+      }
+      
+      if (districtIds.length === 0) {
+        res.json({
+          isDistrictAdmin: false,
+          districts: [],
+          schools: [],
+          totalSchools: 0,
+          totalEducators: 0,
+          totalStudents: 0,
+          totalLessons: 0,
+          totalGoals: 0,
+        });
+        return;
+      }
+      
+      // Get all child schools under these districts
+      const allSchools: Array<{ id: string; name: string; districtId: string; memberCount: number; educatorCount: number; studentCount: number; lessonCount: number; goalCount: number }> = [];
+      
+      for (const districtId of districtIds) {
+        const childOrgs = await storage.getChildOrganizations(districtId);
+        for (const school of childOrgs) {
+          const members = await storage.getOrganizationMembers(school.id);
+          const memberUserIds = members.map(m => m.userId);
+          
+          // Get member details
+          const memberDetails = await Promise.all(
+            memberUserIds.map(async (uid: string) => storage.getUser(uid))
+          );
+          const educatorCount = memberDetails.filter(u => u?.role === "educator").length;
+          const studentCount = memberDetails.filter(u => u?.role === "student").length;
+          
+          // Get lessons and goals from this school's members
+          const schoolLessons = await Promise.all(
+            memberUserIds.map(async (uid: string) => storage.getLessons(uid))
+          );
+          const schoolGoals = await Promise.all(
+            memberUserIds.map(async (uid: string) => storage.getGoals(uid))
+          );
+          
+          allSchools.push({
+            id: school.id,
+            name: school.name,
+            districtId: districtId,
+            memberCount: members.length,
+            educatorCount,
+            studentCount,
+            lessonCount: schoolLessons.flat().length,
+            goalCount: schoolGoals.flat().length,
+          });
+        }
+      }
+      
+      // Aggregate totals
+      const totalEducators = allSchools.reduce((sum, s) => sum + s.educatorCount, 0);
+      const totalStudents = allSchools.reduce((sum, s) => sum + s.studentCount, 0);
+      const totalLessons = allSchools.reduce((sum, s) => sum + s.lessonCount, 0);
+      const totalGoals = allSchools.reduce((sum, s) => sum + s.goalCount, 0);
+      
+      res.json({
+        isDistrictAdmin: true,
+        districts,
+        schools: allSchools,
+        totalSchools: allSchools.length,
+        totalEducators,
+        totalStudents,
+        totalLessons,
+        totalGoals,
+      });
+    } catch (error) {
+      console.error("District analytics error:", error);
+      res.status(500).json({ error: "Failed to fetch district analytics" });
+    }
+  });
+
+  // School drill-down analytics - detailed stats for a single school
+  app.get("/api/analytics/school/:schoolId", isAuthenticated, async (req: any, res) => {
+    try {
+      const { schoolId } = req.params;
+      const userId = req.user?.claims?.sub;
+      const user = await storage.getUser(userId);
+      
+      if (user?.role !== "campus_admin") {
+        res.status(403).json({ error: "Campus admin access required" });
+        return;
+      }
+      
+      // Verify user has access to this school or its parent district
+      const school = await storage.getOrganization(schoolId);
+      if (!school) {
+        res.status(404).json({ error: "School not found" });
+        return;
+      }
+      
+      const membership = await storage.getOrgMembership(schoolId, userId);
+      let hasAccess = !!membership;
+      
+      // Check if user is admin of parent district
+      if (!hasAccess && school.parentOrganizationId) {
+        const districtMembership = await storage.getOrgMembership(school.parentOrganizationId, userId);
+        hasAccess = !!districtMembership;
+      }
+      
+      if (!hasAccess) {
+        res.status(403).json({ error: "Access denied to this school" });
+        return;
+      }
+      
+      // Get school members
+      const members = await storage.getOrganizationMembers(schoolId);
+      const memberUserIds = members.map(m => m.userId);
+      
+      // Get member details with lessons and goals
+      const teacherStats: Array<{
+        id: string;
+        name: string;
+        email: string | null;
+        role: string;
+        lessonCount: number;
+        goalCount: number;
+        lessonsThisWeek: number;
+      }> = [];
+      
+      const now = new Date();
+      const oneWeekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+      
+      let allLessons: Lesson[] = [];
+      let allGoals: Goal[] = [];
+      
+      for (const uid of memberUserIds) {
+        const memberUser = await storage.getUser(uid);
+        const lessons = await storage.getLessons(uid);
+        const goals = await storage.getGoals(uid);
+        
+        allLessons = allLessons.concat(lessons);
+        allGoals = allGoals.concat(goals);
+        
+        const lessonsThisWeek = lessons.filter((l: Lesson) => 
+          l.createdAt && new Date(l.createdAt) >= oneWeekAgo
+        ).length;
+        
+        teacherStats.push({
+          id: uid,
+          name: memberUser ? `${memberUser.firstName || ""} ${memberUser.lastName || ""}`.trim() || "Unknown" : "Unknown",
+          email: memberUser?.email || null,
+          role: memberUser?.role || "unknown",
+          lessonCount: lessons.length,
+          goalCount: goals.length,
+          lessonsThisWeek,
+        });
+      }
+      
+      // Sort teachers by lesson count
+      teacherStats.sort((a, b) => b.lessonCount - a.lessonCount);
+      
+      // Calculate BKD distribution
+      const bkdDistribution = { be: 0, know: 0, do: 0 };
+      allLessons.forEach((l: Lesson) => {
+        const focus = l.bkdFocus as "be" | "know" | "do";
+        if (focus && bkdDistribution[focus] !== undefined) {
+          bkdDistribution[focus]++;
+        }
+      });
+      
+      // Standards coverage
+      const standardsCoverage: Record<string, number> = {};
+      allLessons.forEach((l: Lesson) => {
+        const stds = (l.standards || "").split(",").map((s: string) => s.trim()).filter(Boolean);
+        stds.forEach((s: string) => {
+          const prefix = s.split(".")[0] || s.substring(0, 4);
+          standardsCoverage[prefix] = (standardsCoverage[prefix] || 0) + 1;
+        });
+      });
+      
+      res.json({
+        school: {
+          id: school.id,
+          name: school.name,
+          type: school.type,
+        },
+        totalMembers: members.length,
+        totalEducators: teacherStats.filter(t => t.role === "educator").length,
+        totalStudents: teacherStats.filter(t => t.role === "student").length,
+        totalLessons: allLessons.length,
+        totalGoals: allGoals.length,
+        goalsCompleted: allGoals.filter((g: Goal) => g.status === "completed").length,
+        goalsInProgress: allGoals.filter((g: Goal) => g.status === "in_progress").length,
+        teachers: teacherStats.filter(t => t.role === "educator"),
+        bkdDistribution,
+        standardsCoverage,
+      });
+    } catch (error) {
+      console.error("School analytics error:", error);
+      res.status(500).json({ error: "Failed to fetch school analytics" });
+    }
+  });
+
+  // Teacher drill-down analytics - detailed stats for a single teacher
+  app.get("/api/analytics/teacher/:teacherId", isAuthenticated, async (req: any, res) => {
+    try {
+      const { teacherId } = req.params;
+      const userId = req.user?.claims?.sub;
+      const user = await storage.getUser(userId);
+      
+      if (user?.role !== "campus_admin") {
+        res.status(403).json({ error: "Campus admin access required" });
+        return;
+      }
+      
+      // Get teacher info
+      const teacher = await storage.getUser(teacherId);
+      if (!teacher) {
+        res.status(404).json({ error: "Teacher not found" });
+        return;
+      }
+      
+      // Verify user has access (shares organization or is in parent district)
+      const userOrgs = await storage.getUserOrganizations(userId);
+      const teacherOrgs = await storage.getUserOrganizations(teacherId);
+      
+      let hasAccess = false;
+      for (const userOrg of userOrgs) {
+        for (const teacherOrg of teacherOrgs) {
+          if (userOrg.organizationId === teacherOrg.organizationId) {
+            hasAccess = true;
+            break;
+          }
+          // Check if user's org is parent of teacher's org
+          const tOrg = await storage.getOrganization(teacherOrg.organizationId);
+          if (tOrg?.parentOrganizationId === userOrg.organizationId) {
+            hasAccess = true;
+            break;
+          }
+        }
+        if (hasAccess) break;
+      }
+      
+      if (!hasAccess) {
+        res.status(403).json({ error: "Access denied to this teacher" });
+        return;
+      }
+      
+      // Get teacher's data
+      const lessons = await storage.getLessons(teacherId);
+      const goals = await storage.getGoals(teacherId);
+      
+      const now = new Date();
+      const oneWeekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+      const twoWeeksAgo = new Date(now.getTime() - 14 * 24 * 60 * 60 * 1000);
+      
+      const lessonsThisWeek = lessons.filter((l: Lesson) => 
+        l.createdAt && new Date(l.createdAt) >= oneWeekAgo
+      ).length;
+      const lessonsLastWeek = lessons.filter((l: Lesson) => 
+        l.createdAt && new Date(l.createdAt) >= twoWeeksAgo && new Date(l.createdAt) < oneWeekAgo
+      ).length;
+      
+      // BKD distribution for lessons
+      const lessonBkdDistribution = { be: 0, know: 0, do: 0 };
+      lessons.forEach((l: Lesson) => {
+        const focus = l.bkdFocus as "be" | "know" | "do";
+        if (focus && lessonBkdDistribution[focus] !== undefined) {
+          lessonBkdDistribution[focus]++;
+        }
+      });
+      
+      // Standards coverage
+      const standardsCoverage: Record<string, number> = {};
+      lessons.forEach((l: Lesson) => {
+        const stds = (l.standards || "").split(",").map((s: string) => s.trim()).filter(Boolean);
+        stds.forEach((s: string) => {
+          const prefix = s.split(".")[0] || s.substring(0, 4);
+          standardsCoverage[prefix] = (standardsCoverage[prefix] || 0) + 1;
+        });
+      });
+      
+      // Recent lessons
+      const recentLessons = lessons
+        .sort((a: Lesson, b: Lesson) => {
+          const dateA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+          const dateB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+          return dateB - dateA;
+        })
+        .slice(0, 10)
+        .map((l: Lesson) => ({
+          id: l.id,
+          title: l.title,
+          topic: l.topic,
+          gradeLevel: l.gradeLevel,
+          bkdFocus: l.bkdFocus,
+          createdAt: l.createdAt,
+        }));
+      
+      res.json({
+        teacher: {
+          id: teacher.id,
+          name: `${teacher.firstName || ""} ${teacher.lastName || ""}`.trim() || "Unknown",
+          email: teacher.email,
+          role: teacher.role,
+        },
+        totalLessons: lessons.length,
+        totalGoals: goals.length,
+        lessonsThisWeek,
+        lessonsLastWeek,
+        goalsCompleted: goals.filter((g: Goal) => g.status === "completed").length,
+        goalsInProgress: goals.filter((g: Goal) => g.status === "in_progress").length,
+        lessonBkdDistribution,
+        standardsCoverage,
+        recentLessons,
+      });
+    } catch (error) {
+      console.error("Teacher analytics error:", error);
+      res.status(500).json({ error: "Failed to fetch teacher analytics" });
+    }
+  });
+
   // Invite user to organization
   app.post("/api/organizations/:id/invite", isAuthenticated, async (req: any, res) => {
     try {

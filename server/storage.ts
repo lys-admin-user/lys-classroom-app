@@ -303,6 +303,7 @@ export interface IStorage {
   getOrganizations(): Promise<Organization[]>;
   getOrganization(id: string): Promise<Organization | undefined>;
   getOrganizationBySlug(slug: string): Promise<Organization | undefined>;
+  getChildOrganizations(parentId: string): Promise<Organization[]>;
   createOrganization(org: InsertOrganization): Promise<Organization>;
   updateOrganization(id: string, updates: Partial<Organization>): Promise<Organization | undefined>;
   deleteOrganization(id: string): Promise<boolean>;
@@ -1719,6 +1720,10 @@ export class DatabaseStorage implements IStorage {
   async getOrganizationBySlug(slug: string): Promise<Organization | undefined> {
     const [result] = await db.select().from(organizations).where(eq(organizations.slug, slug));
     return result || undefined;
+  }
+
+  async getChildOrganizations(parentId: string): Promise<Organization[]> {
+    return db.select().from(organizations).where(eq(organizations.parentOrganizationId, parentId));
   }
 
   async createOrganization(org: InsertOrganization): Promise<Organization> {
