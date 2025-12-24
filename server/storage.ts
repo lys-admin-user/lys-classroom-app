@@ -128,6 +128,18 @@ import {
   parentProgressNotes,
   featureFlags,
   emailTemplates,
+  authorities,
+  lyseMilestones,
+  workforceTrends,
+  alignmentMatrix,
+  type Authority,
+  type InsertAuthority,
+  type LyseMilestone,
+  type InsertLyseMilestone,
+  type WorkforceTrend,
+  type InsertWorkforceTrend,
+  type AlignmentMatrix,
+  type InsertAlignmentMatrix,
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, desc, and, asc } from "drizzle-orm";
@@ -366,6 +378,37 @@ export interface IStorage {
   createEmailTemplate(template: InsertEmailTemplate): Promise<EmailTemplate>;
   updateEmailTemplate(id: string, updates: Partial<EmailTemplate>): Promise<EmailTemplate | undefined>;
   deleteEmailTemplate(id: string): Promise<boolean>;
+  
+  // Global Authority Tree (LYS V3.0)
+  getAuthorities(level?: string): Promise<Authority[]>;
+  getAuthority(id: string): Promise<Authority | undefined>;
+  getAuthorityByCode(code: string): Promise<Authority | undefined>;
+  getChildAuthorities(parentId: string): Promise<Authority[]>;
+  createAuthority(authority: InsertAuthority): Promise<Authority>;
+  updateAuthority(id: string, updates: Partial<Authority>): Promise<Authority | undefined>;
+  deleteAuthority(id: string): Promise<boolean>;
+  
+  // LYS Milestones (Being, Knowing, Doing)
+  getLyseMilestones(userId: string): Promise<LyseMilestone[]>;
+  getLyseMilestone(id: string): Promise<LyseMilestone | undefined>;
+  getLyseMilestonesByCategory(userId: string, category: string): Promise<LyseMilestone[]>;
+  getGatekeeperMilestones(userId: string): Promise<LyseMilestone[]>;
+  createLyseMilestone(milestone: InsertLyseMilestone): Promise<LyseMilestone>;
+  updateLyseMilestone(id: string, updates: Partial<LyseMilestone>): Promise<LyseMilestone | undefined>;
+  deleteLyseMilestone(id: string, userId: string): Promise<boolean>;
+  
+  // Workforce Trends
+  getWorkforceTrends(country?: string): Promise<WorkforceTrend[]>;
+  getWorkforceTrend(id: string): Promise<WorkforceTrend | undefined>;
+  createWorkforceTrend(trend: InsertWorkforceTrend): Promise<WorkforceTrend>;
+  updateWorkforceTrend(id: string, updates: Partial<WorkforceTrend>): Promise<WorkforceTrend | undefined>;
+  
+  // Alignment Matrix
+  getAlignmentMatrices(): Promise<AlignmentMatrix[]>;
+  getAlignmentMatrix(id: string): Promise<AlignmentMatrix | undefined>;
+  getAlignmentMatrixByAuthority(authorityId: string): Promise<AlignmentMatrix | undefined>;
+  createAlignmentMatrix(matrix: InsertAlignmentMatrix): Promise<AlignmentMatrix>;
+  updateAlignmentMatrix(id: string, updates: Partial<AlignmentMatrix>): Promise<AlignmentMatrix | undefined>;
 }
 
 // Seed data for careers and resources (static content)
@@ -2036,6 +2079,168 @@ export class DatabaseStorage implements IStorage {
   async deleteEmailTemplate(id: string): Promise<boolean> {
     await db.delete(emailTemplates).where(eq(emailTemplates.id, id));
     return true;
+  }
+
+  // ==========================================================================
+  // Global Authority Tree (LYS V3.0)
+  // ==========================================================================
+
+  async getAuthorities(level?: string): Promise<Authority[]> {
+    if (level) {
+      return await db.select().from(authorities)
+        .where(eq(authorities.level, level))
+        .orderBy(asc(authorities.name));
+    }
+    return await db.select().from(authorities).orderBy(asc(authorities.name));
+  }
+
+  async getAuthority(id: string): Promise<Authority | undefined> {
+    const [authority] = await db.select().from(authorities).where(eq(authorities.id, id));
+    return authority || undefined;
+  }
+
+  async getAuthorityByCode(code: string): Promise<Authority | undefined> {
+    const [authority] = await db.select().from(authorities).where(eq(authorities.code, code));
+    return authority || undefined;
+  }
+
+  async getChildAuthorities(parentId: string): Promise<Authority[]> {
+    return await db.select().from(authorities)
+      .where(eq(authorities.parentId, parentId))
+      .orderBy(asc(authorities.name));
+  }
+
+  async createAuthority(authority: InsertAuthority): Promise<Authority> {
+    const [created] = await db.insert(authorities).values(authority as any).returning();
+    return created;
+  }
+
+  async updateAuthority(id: string, updates: Partial<Authority>): Promise<Authority | undefined> {
+    const [updated] = await db.update(authorities)
+      .set({ ...updates, updatedAt: new Date() })
+      .where(eq(authorities.id, id))
+      .returning();
+    return updated || undefined;
+  }
+
+  async deleteAuthority(id: string): Promise<boolean> {
+    await db.delete(authorities).where(eq(authorities.id, id));
+    return true;
+  }
+
+  // ==========================================================================
+  // LYS Milestones (Being, Knowing, Doing)
+  // ==========================================================================
+
+  async getLyseMilestones(userId: string): Promise<LyseMilestone[]> {
+    return await db.select().from(lyseMilestones)
+      .where(eq(lyseMilestones.userId, userId))
+      .orderBy(asc(lyseMilestones.dueDate));
+  }
+
+  async getLyseMilestone(id: string): Promise<LyseMilestone | undefined> {
+    const [milestone] = await db.select().from(lyseMilestones).where(eq(lyseMilestones.id, id));
+    return milestone || undefined;
+  }
+
+  async getLyseMilestonesByCategory(userId: string, category: string): Promise<LyseMilestone[]> {
+    return await db.select().from(lyseMilestones)
+      .where(and(
+        eq(lyseMilestones.userId, userId),
+        eq(lyseMilestones.category, category)
+      ))
+      .orderBy(asc(lyseMilestones.dueDate));
+  }
+
+  async getGatekeeperMilestones(userId: string): Promise<LyseMilestone[]> {
+    return await db.select().from(lyseMilestones)
+      .where(and(
+        eq(lyseMilestones.userId, userId),
+        eq(lyseMilestones.isGatekeeper, true)
+      ))
+      .orderBy(asc(lyseMilestones.dueDate));
+  }
+
+  async createLyseMilestone(milestone: InsertLyseMilestone): Promise<LyseMilestone> {
+    const [created] = await db.insert(lyseMilestones).values(milestone as any).returning();
+    return created;
+  }
+
+  async updateLyseMilestone(id: string, updates: Partial<LyseMilestone>): Promise<LyseMilestone | undefined> {
+    const [updated] = await db.update(lyseMilestones)
+      .set({ ...updates, updatedAt: new Date() })
+      .where(eq(lyseMilestones.id, id))
+      .returning();
+    return updated || undefined;
+  }
+
+  async deleteLyseMilestone(id: string, userId: string): Promise<boolean> {
+    await db.delete(lyseMilestones).where(
+      and(eq(lyseMilestones.id, id), eq(lyseMilestones.userId, userId))
+    );
+    return true;
+  }
+
+  // ==========================================================================
+  // Workforce Trends
+  // ==========================================================================
+
+  async getWorkforceTrends(country?: string): Promise<WorkforceTrend[]> {
+    if (country) {
+      return await db.select().from(workforceTrends)
+        .where(eq(workforceTrends.country, country))
+        .orderBy(desc(workforceTrends.lastUpdated));
+    }
+    return await db.select().from(workforceTrends).orderBy(desc(workforceTrends.lastUpdated));
+  }
+
+  async getWorkforceTrend(id: string): Promise<WorkforceTrend | undefined> {
+    const [trend] = await db.select().from(workforceTrends).where(eq(workforceTrends.id, id));
+    return trend || undefined;
+  }
+
+  async createWorkforceTrend(trend: InsertWorkforceTrend): Promise<WorkforceTrend> {
+    const [created] = await db.insert(workforceTrends).values(trend as any).returning();
+    return created;
+  }
+
+  async updateWorkforceTrend(id: string, updates: Partial<WorkforceTrend>): Promise<WorkforceTrend | undefined> {
+    const [updated] = await db.update(workforceTrends)
+      .set({ ...updates, lastUpdated: new Date() })
+      .where(eq(workforceTrends.id, id))
+      .returning();
+    return updated || undefined;
+  }
+
+  // ==========================================================================
+  // Alignment Matrix
+  // ==========================================================================
+
+  async getAlignmentMatrices(): Promise<AlignmentMatrix[]> {
+    return await db.select().from(alignmentMatrix).orderBy(asc(alignmentMatrix.createdAt));
+  }
+
+  async getAlignmentMatrix(id: string): Promise<AlignmentMatrix | undefined> {
+    const [matrix] = await db.select().from(alignmentMatrix).where(eq(alignmentMatrix.id, id));
+    return matrix || undefined;
+  }
+
+  async getAlignmentMatrixByAuthority(authorityId: string): Promise<AlignmentMatrix | undefined> {
+    const [matrix] = await db.select().from(alignmentMatrix).where(eq(alignmentMatrix.authorityId, authorityId));
+    return matrix || undefined;
+  }
+
+  async createAlignmentMatrix(matrix: InsertAlignmentMatrix): Promise<AlignmentMatrix> {
+    const [created] = await db.insert(alignmentMatrix).values(matrix as any).returning();
+    return created;
+  }
+
+  async updateAlignmentMatrix(id: string, updates: Partial<AlignmentMatrix>): Promise<AlignmentMatrix | undefined> {
+    const [updated] = await db.update(alignmentMatrix)
+      .set({ ...updates, updatedAt: new Date() })
+      .where(eq(alignmentMatrix.id, id))
+      .returning();
+    return updated || undefined;
   }
 }
 
