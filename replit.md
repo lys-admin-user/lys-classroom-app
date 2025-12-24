@@ -38,6 +38,19 @@ Preferred communication style: Simple, everyday language.
 -   **Shared Resource Library**: A community platform for educators to share resources (lesson plans, worksheets) with visibility controls, categorization, and engagement tracking.
 -   **Educational Standards System**: Lesson generator incorporates legally-compliant, hierarchical educational standards (e.g., US TEKS, CCSS) and a professional lesson plan format.
 
+### LYS V3.0 Global Architecture (December 2024)
+-   **Global Authority Tree**: Polymorphic hierarchy supporting worldwide educational governance systems with five levels (supranational, national, regional/state, local/district, school) and three model types:
+    -   `bottom_heavy`: US-style with strong local control (TEA, school districts)
+    -   `top_down_unitary`: African/Asian centralized national curriculum
+    -   `federal_hybrid`: EU/Canadian mixed federal-state jurisdiction
+-   **LYS Milestone Engine**: Separate from goals table, tracking Being/Knowing/Doing progress with:
+    -   Three categories (being, knowing, doing) mapping to Be-Know-Do framework
+    -   Gatekeeper logic for blocking milestones (hard deadlines, prerequisites)
+    -   Regional multipliers for gamification weighting
+    -   Alternative pathway support for flexible progression
+-   **Workforce Trends Integration**: Monthly sync with BLS/OECD/UNESCO data for career alignment
+-   **Alignment Matrix**: Regional gamification weights connecting authorities to workforce data
+
 ## External Dependencies
 
 ### AI Services

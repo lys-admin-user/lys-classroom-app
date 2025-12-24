@@ -3354,9 +3354,14 @@ export async function registerRoutes(
   // Get single milestone
   app.get("/api/lyse-milestones/:id", isAuthenticated, async (req: any, res) => {
     try {
+      const userId = req.user?.claims?.sub;
       const milestone = await storage.getLyseMilestone(req.params.id);
       if (!milestone) {
         res.status(404).json({ error: "Milestone not found" });
+        return;
+      }
+      if (milestone.userId !== userId) {
+        res.status(403).json({ error: "Access denied" });
         return;
       }
       res.json(milestone);
@@ -3382,11 +3387,17 @@ export async function registerRoutes(
   // Update milestone
   app.patch("/api/lyse-milestones/:id", isAuthenticated, async (req: any, res) => {
     try {
-      const milestone = await storage.updateLyseMilestone(req.params.id, req.body);
-      if (!milestone) {
+      const userId = req.user?.claims?.sub;
+      const existing = await storage.getLyseMilestone(req.params.id);
+      if (!existing) {
         res.status(404).json({ error: "Milestone not found" });
         return;
       }
+      if (existing.userId !== userId) {
+        res.status(403).json({ error: "Access denied" });
+        return;
+      }
+      const milestone = await storage.updateLyseMilestone(req.params.id, req.body);
       res.json(milestone);
     } catch (error) {
       res.status(500).json({ error: "Failed to update milestone" });
