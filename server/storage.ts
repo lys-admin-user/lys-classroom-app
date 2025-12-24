@@ -2088,7 +2088,7 @@ export class DatabaseStorage implements IStorage {
   async getAuthorities(level?: string): Promise<Authority[]> {
     if (level) {
       return await db.select().from(authorities)
-        .where(eq(authorities.level, level))
+        .where(eq(authorities.level, level as any))
         .orderBy(asc(authorities.name));
     }
     return await db.select().from(authorities).orderBy(asc(authorities.name));
@@ -2147,7 +2147,7 @@ export class DatabaseStorage implements IStorage {
     return await db.select().from(lyseMilestones)
       .where(and(
         eq(lyseMilestones.userId, userId),
-        eq(lyseMilestones.category, category)
+        eq(lyseMilestones.category, category as any)
       ))
       .orderBy(asc(lyseMilestones.dueDate));
   }

@@ -3244,6 +3244,196 @@ export async function registerRoutes(
   });
 
   // ================================
+  // Global Authority Tree (LYS V3.0)
+  // ================================
+
+  // Get all authorities (optionally filtered by level)
+  app.get("/api/authorities", async (req, res) => {
+    try {
+      const { level } = req.query;
+      const authoritiesList = await storage.getAuthorities(level as string | undefined);
+      res.json(authoritiesList);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch authorities" });
+    }
+  });
+
+  // Get single authority
+  app.get("/api/authorities/:id", async (req, res) => {
+    try {
+      const authority = await storage.getAuthority(req.params.id);
+      if (!authority) {
+        res.status(404).json({ error: "Authority not found" });
+        return;
+      }
+      res.json(authority);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch authority" });
+    }
+  });
+
+  // Get child authorities
+  app.get("/api/authorities/:id/children", async (req, res) => {
+    try {
+      const children = await storage.getChildAuthorities(req.params.id);
+      res.json(children);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch child authorities" });
+    }
+  });
+
+  // Create authority (admin only)
+  app.post("/api/authorities", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user?.claims?.sub;
+      const isSiteAdmin = await storage.isSiteAdmin(userId);
+      if (!isSiteAdmin) {
+        res.status(403).json({ error: "Site admin access required" });
+        return;
+      }
+      const authority = await storage.createAuthority(req.body);
+      res.status(201).json(authority);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to create authority" });
+    }
+  });
+
+  // Update authority (admin only)
+  app.patch("/api/authorities/:id", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user?.claims?.sub;
+      const isSiteAdmin = await storage.isSiteAdmin(userId);
+      if (!isSiteAdmin) {
+        res.status(403).json({ error: "Site admin access required" });
+        return;
+      }
+      const authority = await storage.updateAuthority(req.params.id, req.body);
+      if (!authority) {
+        res.status(404).json({ error: "Authority not found" });
+        return;
+      }
+      res.json(authority);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to update authority" });
+    }
+  });
+
+  // ================================
+  // LYS Milestones (Being, Knowing, Doing)
+  // ================================
+
+  // Get user's milestones
+  app.get("/api/lyse-milestones", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user?.claims?.sub;
+      const { category } = req.query;
+      
+      let milestones;
+      if (category) {
+        milestones = await storage.getLyseMilestonesByCategory(userId, category as string);
+      } else {
+        milestones = await storage.getLyseMilestones(userId);
+      }
+      res.json(milestones);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch milestones" });
+    }
+  });
+
+  // Get gatekeeper milestones
+  app.get("/api/lyse-milestones/gatekeepers", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user?.claims?.sub;
+      const milestones = await storage.getGatekeeperMilestones(userId);
+      res.json(milestones);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch gatekeeper milestones" });
+    }
+  });
+
+  // Get single milestone
+  app.get("/api/lyse-milestones/:id", isAuthenticated, async (req: any, res) => {
+    try {
+      const milestone = await storage.getLyseMilestone(req.params.id);
+      if (!milestone) {
+        res.status(404).json({ error: "Milestone not found" });
+        return;
+      }
+      res.json(milestone);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch milestone" });
+    }
+  });
+
+  // Create milestone
+  app.post("/api/lyse-milestones", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user?.claims?.sub;
+      const milestone = await storage.createLyseMilestone({
+        ...req.body,
+        userId,
+      });
+      res.status(201).json(milestone);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to create milestone" });
+    }
+  });
+
+  // Update milestone
+  app.patch("/api/lyse-milestones/:id", isAuthenticated, async (req: any, res) => {
+    try {
+      const milestone = await storage.updateLyseMilestone(req.params.id, req.body);
+      if (!milestone) {
+        res.status(404).json({ error: "Milestone not found" });
+        return;
+      }
+      res.json(milestone);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to update milestone" });
+    }
+  });
+
+  // Delete milestone
+  app.delete("/api/lyse-milestones/:id", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user?.claims?.sub;
+      await storage.deleteLyseMilestone(req.params.id, userId);
+      res.json({ success: true });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to delete milestone" });
+    }
+  });
+
+  // ================================
+  // Workforce Trends
+  // ================================
+
+  // Get workforce trends (optionally filtered by country)
+  app.get("/api/workforce-trends", async (req, res) => {
+    try {
+      const { country } = req.query;
+      const trends = await storage.getWorkforceTrends(country as string | undefined);
+      res.json(trends);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch workforce trends" });
+    }
+  });
+
+  // Get alignment matrix for an authority
+  app.get("/api/alignment-matrix/:authorityId", async (req, res) => {
+    try {
+      const matrix = await storage.getAlignmentMatrixByAuthority(req.params.authorityId);
+      if (!matrix) {
+        res.status(404).json({ error: "Alignment matrix not found" });
+        return;
+      }
+      res.json(matrix);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch alignment matrix" });
+    }
+  });
+
+  // ================================
   // Subscription / Tier Management (Demo Mode)
   // ================================
   // NOTE: This is a demo/development mode that simulates tier upgrades
