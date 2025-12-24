@@ -1,6 +1,8 @@
+import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { 
@@ -16,9 +18,13 @@ import {
   Share2,
   Building2,
   GraduationCap,
-  Trophy
+  Trophy,
+  ChevronLeft,
+  ChevronRight,
+  School,
+  User
 } from "lucide-react";
-import type { Lesson, Goal, User } from "@shared/schema";
+import type { Lesson, Goal } from "@shared/schema";
 import { useAuth } from "@/hooks/use-auth";
 import { 
   BarChart, 
@@ -51,9 +57,77 @@ interface CampusAnalytics {
   organizations: Array<{ id: string; name: string; memberCount: number }>;
 }
 
+interface DistrictAnalytics {
+  isDistrictAdmin: boolean;
+  districts: Array<{ id: string; name: string; type: string }>;
+  schools: Array<{ 
+    id: string; 
+    name: string; 
+    districtId: string; 
+    memberCount: number; 
+    educatorCount: number; 
+    studentCount: number; 
+    lessonCount: number; 
+    goalCount: number 
+  }>;
+  totalSchools: number;
+  totalEducators: number;
+  totalStudents: number;
+  totalLessons: number;
+  totalGoals: number;
+}
+
+interface SchoolAnalytics {
+  school: { id: string; name: string; type: string };
+  totalMembers: number;
+  totalEducators: number;
+  totalStudents: number;
+  totalLessons: number;
+  totalGoals: number;
+  goalsCompleted: number;
+  goalsInProgress: number;
+  teachers: Array<{
+    id: string;
+    name: string;
+    email: string | null;
+    role: string;
+    lessonCount: number;
+    goalCount: number;
+    lessonsThisWeek: number;
+  }>;
+  bkdDistribution: { be: number; know: number; do: number };
+  standardsCoverage: Record<string, number>;
+}
+
+interface TeacherAnalytics {
+  teacher: { id: string; name: string; email: string | null; role: string };
+  totalLessons: number;
+  totalGoals: number;
+  lessonsThisWeek: number;
+  lessonsLastWeek: number;
+  goalsCompleted: number;
+  goalsInProgress: number;
+  lessonBkdDistribution: { be: number; know: number; do: number };
+  standardsCoverage: Record<string, number>;
+  recentLessons: Array<{
+    id: string;
+    title: string;
+    topic: string;
+    gradeLevel: string;
+    bkdFocus: string;
+    createdAt: string | null;
+  }>;
+}
+
+type DrillDownView = 
+  | { type: "none" }
+  | { type: "school"; schoolId: string }
+  | { type: "teacher"; teacherId: string; schoolName?: string };
+
 export default function Analytics() {
   const { user } = useAuth();
   const isCampusAdmin = user?.role === "campus_admin";
+  const [drillDown, setDrillDown] = useState<DrillDownView>({ type: "none" });
 
   const { data: lessons = [], isLoading: lessonsLoading } = useQuery<Lesson[]>({
     queryKey: ["/api/lessons"],
@@ -68,7 +142,22 @@ export default function Analytics() {
     enabled: isCampusAdmin,
   });
 
-  const isLoading = lessonsLoading || goalsLoading || (isCampusAdmin && campusLoading);
+  const { data: districtData, isLoading: districtLoading } = useQuery<DistrictAnalytics>({
+    queryKey: ["/api/district-analytics"],
+    enabled: isCampusAdmin,
+  });
+
+  const { data: schoolData, isLoading: schoolLoading } = useQuery<SchoolAnalytics>({
+    queryKey: ["/api/analytics/school", drillDown.type === "school" ? drillDown.schoolId : null],
+    enabled: drillDown.type === "school",
+  });
+
+  const { data: teacherData, isLoading: teacherLoading } = useQuery<TeacherAnalytics>({
+    queryKey: ["/api/analytics/teacher", drillDown.type === "teacher" ? drillDown.teacherId : null],
+    enabled: drillDown.type === "teacher",
+  });
+
+  const isLoading = lessonsLoading || goalsLoading || (isCampusAdmin && (campusLoading || districtLoading));
 
   const totalLessons = lessons.length;
   const sharedLessons = lessons.filter((l) => l.shareId).length;
@@ -160,6 +249,31 @@ export default function Analytics() {
     { name: "This Week", lessons: activityByWeek["This Week"].lessons, goals: activityByWeek["This Week"].goals },
   ];
 
+  // Handle school drill-down
+  const handleSchoolClick = (schoolId: string) => {
+    setDrillDown({ type: "school", schoolId });
+  };
+
+  // Handle teacher drill-down
+  const handleTeacherClick = (teacherId: string, schoolName?: string) => {
+    setDrillDown({ type: "teacher", teacherId, schoolName });
+  };
+
+  // Handle back navigation
+  const handleBack = () => {
+    if (drillDown.type === "teacher" && drillDown.schoolName) {
+      // Go back to school view - need to find school ID
+      const school = districtData?.schools.find(s => s.name === drillDown.schoolName);
+      if (school) {
+        setDrillDown({ type: "school", schoolId: school.id });
+      } else {
+        setDrillDown({ type: "none" });
+      }
+    } else {
+      setDrillDown({ type: "none" });
+    }
+  };
+
   if (isLoading) {
     return (
       <div className="min-h-screen bg-background p-6">
@@ -179,6 +293,28 @@ export default function Analytics() {
     );
   }
 
+  // Drill-down views
+  if (drillDown.type === "school" && schoolData) {
+    return (
+      <SchoolDrillDownView 
+        data={schoolData} 
+        isLoading={schoolLoading}
+        onBack={handleBack}
+        onTeacherClick={handleTeacherClick}
+      />
+    );
+  }
+
+  if (drillDown.type === "teacher" && teacherData) {
+    return (
+      <TeacherDrillDownView 
+        data={teacherData} 
+        isLoading={teacherLoading}
+        onBack={handleBack}
+      />
+    );
+  }
+
   // Campus Standards Chart Data
   const campusStandardsData = campusData?.standardsCoverage 
     ? Object.entries(campusData.standardsCoverage)
@@ -194,315 +330,61 @@ export default function Analytics() {
     { name: "DO (Action)", value: campusData.bkdDistribution.do, color: "#016371" },
   ].filter((d) => d.value > 0) : [];
 
+  const isDistrictAdmin = districtData?.isDistrictAdmin ?? false;
+
   return (
     <div className="min-h-screen bg-background p-6">
       <div className="max-w-7xl mx-auto space-y-6">
         <div>
           <h1 className="font-permanent-marker text-3xl text-lys-red mb-2" data-testid="text-analytics-title">
-            {isCampusAdmin ? "Campus Analytics" : "Your Analytics"}
+            {isCampusAdmin ? (isDistrictAdmin ? "District Analytics" : "Campus Analytics") : "Your Analytics"}
           </h1>
           <p className="font-roboto text-muted-foreground">
             {isCampusAdmin 
-              ? "Organization-wide insights and educator performance" 
+              ? (isDistrictAdmin 
+                  ? "District-wide insights with drill-down to schools and teachers" 
+                  : "Organization-wide insights and educator performance")
               : "Track your progress and see how you're making an impact"}
           </p>
         </div>
 
-        {isCampusAdmin && campusData ? (
-          <Tabs defaultValue="campus" className="w-full">
-            <TabsList className="grid w-full grid-cols-2 max-w-md">
+        {isCampusAdmin && (campusData || districtData) ? (
+          <Tabs defaultValue={isDistrictAdmin ? "district" : "campus"} className="w-full">
+            <TabsList className={`grid w-full ${isDistrictAdmin ? 'grid-cols-3' : 'grid-cols-2'} max-w-lg`}>
+              {isDistrictAdmin && (
+                <TabsTrigger value="district" className="gap-2" data-testid="tab-district-analytics">
+                  <Building2 className="h-4 w-4" />
+                  District
+                </TabsTrigger>
+              )}
               <TabsTrigger value="campus" className="gap-2" data-testid="tab-campus-analytics">
-                <Building2 className="h-4 w-4" />
-                Campus Overview
+                <School className="h-4 w-4" />
+                Campus
               </TabsTrigger>
               <TabsTrigger value="personal" className="gap-2" data-testid="tab-personal-analytics">
-                <Users className="h-4 w-4" />
+                <User className="h-4 w-4" />
                 My Activity
               </TabsTrigger>
             </TabsList>
 
+            {isDistrictAdmin && districtData && (
+              <TabsContent value="district" className="space-y-6 mt-6">
+                <DistrictOverview 
+                  data={districtData} 
+                  onSchoolClick={handleSchoolClick}
+                />
+              </TabsContent>
+            )}
+
             <TabsContent value="campus" className="space-y-6 mt-6">
-              {/* Campus Summary Stats */}
-              <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                <Card>
-                  <CardContent className="pt-6">
-                    <div className="flex items-center gap-4">
-                      <div className="w-12 h-12 rounded-md bg-lys-teal/10 flex items-center justify-center">
-                        <GraduationCap className="h-6 w-6 text-lys-teal" />
-                      </div>
-                      <div>
-                        <p className="text-sm text-muted-foreground font-roboto">Total Educators</p>
-                        <p className="font-oswald text-2xl font-bold" data-testid="text-campus-educators">{campusData.totalEducators}</p>
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-
-                <Card>
-                  <CardContent className="pt-6">
-                    <div className="flex items-center gap-4">
-                      <div className="w-12 h-12 rounded-md bg-lys-yellow/10 flex items-center justify-center">
-                        <Users className="h-6 w-6 text-lys-yellow" />
-                      </div>
-                      <div>
-                        <p className="text-sm text-muted-foreground font-roboto">Total Students</p>
-                        <p className="font-oswald text-2xl font-bold" data-testid="text-campus-students">{campusData.totalStudents}</p>
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-
-                <Card>
-                  <CardContent className="pt-6">
-                    <div className="flex items-center gap-4">
-                      <div className="w-12 h-12 rounded-md bg-lys-red/10 flex items-center justify-center">
-                        <FileText className="h-6 w-6 text-lys-red" />
-                      </div>
-                      <div>
-                        <p className="text-sm text-muted-foreground font-roboto">Total Lessons</p>
-                        <p className="font-oswald text-2xl font-bold" data-testid="text-campus-lessons">{campusData.totalLessons}</p>
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-
-                <Card>
-                  <CardContent className="pt-6">
-                    <div className="flex items-center gap-4">
-                      <div className="w-12 h-12 rounded-md bg-green-500/10 flex items-center justify-center">
-                        <Target className="h-6 w-6 text-green-600" />
-                      </div>
-                      <div>
-                        <p className="text-sm text-muted-foreground font-roboto">Total Goals</p>
-                        <p className="font-oswald text-2xl font-bold" data-testid="text-campus-goals">{campusData.totalGoals}</p>
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-              </div>
-
-              {/* Weekly Comparison */}
-              <div className="grid sm:grid-cols-2 gap-4">
-                <Card>
-                  <CardContent className="pt-6">
-                    <div className="flex items-center justify-between gap-4">
-                      <div>
-                        <p className="text-sm text-muted-foreground font-roboto">Lessons This Week</p>
-                        <p className="font-oswald text-3xl font-bold text-lys-red">{campusData.lessonsThisWeek}</p>
-                      </div>
-                      <div className="text-right">
-                        <p className="text-sm text-muted-foreground font-roboto">vs Last Week</p>
-                        <p className={`font-oswald text-lg font-bold ${campusData.lessonsThisWeek >= campusData.lessonsLastWeek ? 'text-green-600' : 'text-amber-600'}`}>
-                          {campusData.lessonsThisWeek >= campusData.lessonsLastWeek ? '+' : ''}
-                          {campusData.lessonsThisWeek - campusData.lessonsLastWeek}
-                        </p>
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-
-                <Card>
-                  <CardContent className="pt-6">
-                    <div className="flex items-center justify-between gap-4">
-                      <div>
-                        <p className="text-sm text-muted-foreground font-roboto">Goals Completed</p>
-                        <p className="font-oswald text-3xl font-bold text-green-600">{campusData.goalsCompleted}</p>
-                      </div>
-                      <div className="text-right">
-                        <p className="text-sm text-muted-foreground font-roboto">In Progress</p>
-                        <p className="font-oswald text-lg font-bold text-lys-teal">{campusData.goalsInProgress}</p>
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-              </div>
-
-              {/* Organizations */}
-              {campusData.organizations.length > 0 && (
-                <Card>
-                  <CardHeader>
-                    <CardTitle className="font-oswald flex items-center gap-2">
-                      <Building2 className="h-5 w-5 text-lys-teal" />
-                      Your Organizations
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                      {campusData.organizations.map((org) => (
-                        <div key={org.id} className="p-4 rounded-md border bg-muted/20">
-                          <p className="font-oswald font-semibold">{org.name}</p>
-                          <p className="text-sm text-muted-foreground font-roboto">
-                            {org.memberCount} member{org.memberCount !== 1 ? 's' : ''}
-                          </p>
-                        </div>
-                      ))}
-                    </div>
-                  </CardContent>
-                </Card>
+              {campusData && (
+                <CampusOverview 
+                  data={campusData}
+                  campusStandardsData={campusStandardsData}
+                  campusBkdPieData={campusBkdPieData}
+                  onTeacherClick={handleTeacherClick}
+                />
               )}
-
-              {/* Top Educators */}
-              {campusData.topEducators.length > 0 && (
-                <Card>
-                  <CardHeader>
-                    <CardTitle className="font-oswald flex items-center gap-2">
-                      <Trophy className="h-5 w-5 text-lys-yellow" />
-                      Top Educators by Lesson Creation
-                    </CardTitle>
-                    <CardDescription className="font-roboto">
-                      Recognizing educators who are making the most impact
-                    </CardDescription>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="space-y-3">
-                      {campusData.topEducators.map((educator, index) => (
-                        <div key={educator.id} className="flex items-center gap-4 p-3 rounded-md bg-muted/20">
-                          <div className={`w-8 h-8 rounded-full flex items-center justify-center font-oswald font-bold text-sm ${
-                            index === 0 ? 'bg-lys-yellow text-black' :
-                            index === 1 ? 'bg-gray-300 text-black' :
-                            index === 2 ? 'bg-amber-600 text-white' :
-                            'bg-muted text-muted-foreground'
-                          }`}>
-                            {index + 1}
-                          </div>
-                          <div className="flex-1">
-                            <p className="font-oswald font-semibold">{educator.name}</p>
-                          </div>
-                          <Badge variant="outline" className="font-roboto">
-                            {educator.lessonCount} lesson{educator.lessonCount !== 1 ? 's' : ''}
-                          </Badge>
-                        </div>
-                      ))}
-                    </div>
-                  </CardContent>
-                </Card>
-              )}
-
-              {/* Campus Charts */}
-              <div className="grid lg:grid-cols-2 gap-4">
-                <Card>
-                  <CardHeader>
-                    <CardTitle className="font-oswald flex items-center gap-2">
-                      <BarChart3 className="h-5 w-5 text-lys-teal" />
-                      Standards Coverage (Campus-wide)
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    {campusStandardsData.length > 0 ? (
-                      <ResponsiveContainer width="100%" height={250}>
-                        <BarChart data={campusStandardsData}>
-                          <XAxis dataKey="name" tick={{ fontSize: 12 }} />
-                          <YAxis tick={{ fontSize: 12 }} />
-                          <Tooltip 
-                            contentStyle={{ 
-                              backgroundColor: "hsl(var(--card))", 
-                              border: "1px solid hsl(var(--border))",
-                              borderRadius: "8px"
-                            }} 
-                          />
-                          <Bar 
-                            dataKey="count" 
-                            fill="#016371" 
-                            radius={[4, 4, 0, 0]}
-                            name="Lessons"
-                          />
-                        </BarChart>
-                      </ResponsiveContainer>
-                    ) : (
-                      <div className="h-[250px] flex items-center justify-center text-muted-foreground">
-                        <p className="font-roboto text-center">No standards data yet</p>
-                      </div>
-                    )}
-                  </CardContent>
-                </Card>
-
-                <Card>
-                  <CardHeader>
-                    <CardTitle className="font-oswald flex items-center gap-2">
-                      <Award className="h-5 w-5 text-lys-red" />
-                      Be-Know-Do Distribution
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    {campusBkdPieData.length > 0 ? (
-                      <ResponsiveContainer width="100%" height={250}>
-                        <PieChart>
-                          <Pie
-                            data={campusBkdPieData}
-                            cx="50%"
-                            cy="50%"
-                            innerRadius={50}
-                            outerRadius={80}
-                            paddingAngle={5}
-                            dataKey="value"
-                          >
-                            {campusBkdPieData.map((entry, index) => (
-                              <Cell key={`cell-${index}`} fill={entry.color} />
-                            ))}
-                          </Pie>
-                          <Tooltip 
-                            contentStyle={{ 
-                              backgroundColor: "hsl(var(--card))", 
-                              border: "1px solid hsl(var(--border))",
-                              borderRadius: "8px"
-                            }} 
-                          />
-                          <Legend />
-                        </PieChart>
-                      </ResponsiveContainer>
-                    ) : (
-                      <div className="h-[250px] flex items-center justify-center text-muted-foreground">
-                        <p className="font-roboto text-center">No lesson data yet</p>
-                      </div>
-                    )}
-                  </CardContent>
-                </Card>
-              </div>
-
-              {/* Campus Activity Timeline */}
-              <Card>
-                <CardHeader>
-                  <CardTitle className="font-oswald flex items-center gap-2">
-                    <Clock className="h-5 w-5 text-lys-red" />
-                    Campus Activity Timeline
-                  </CardTitle>
-                  <CardDescription className="font-roboto">
-                    Organization-wide activity over the past month
-                  </CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <ResponsiveContainer width="100%" height={200}>
-                    <LineChart data={campusData.activityByWeek}>
-                      <XAxis dataKey="name" tick={{ fontSize: 12 }} />
-                      <YAxis tick={{ fontSize: 12 }} />
-                      <Tooltip 
-                        contentStyle={{ 
-                          backgroundColor: "hsl(var(--card))", 
-                          border: "1px solid hsl(var(--border))",
-                          borderRadius: "8px"
-                        }} 
-                      />
-                      <Legend />
-                      <Line 
-                        type="monotone" 
-                        dataKey="lessons" 
-                        stroke="#EE4E23" 
-                        strokeWidth={2}
-                        dot={{ fill: "#EE4E23" }}
-                        name="Lessons"
-                      />
-                      <Line 
-                        type="monotone" 
-                        dataKey="goals" 
-                        stroke="#016371" 
-                        strokeWidth={2}
-                        dot={{ fill: "#016371" }}
-                        name="Goals"
-                      />
-                    </LineChart>
-                  </ResponsiveContainer>
-                </CardContent>
-              </Card>
             </TabsContent>
 
             <TabsContent value="personal" className="space-y-6 mt-6">
@@ -544,6 +426,978 @@ export default function Analytics() {
         )}
       </div>
     </div>
+  );
+}
+
+// District Overview Component
+interface DistrictOverviewProps {
+  data: DistrictAnalytics;
+  onSchoolClick: (schoolId: string) => void;
+}
+
+function DistrictOverview({ data, onSchoolClick }: DistrictOverviewProps) {
+  return (
+    <>
+      {/* District Summary Stats */}
+      <div className="grid sm:grid-cols-2 lg:grid-cols-5 gap-4">
+        <Card>
+          <CardContent className="pt-6">
+            <div className="flex items-center gap-4">
+              <div className="w-12 h-12 rounded-md bg-lys-teal/10 flex items-center justify-center">
+                <School className="h-6 w-6 text-lys-teal" />
+              </div>
+              <div>
+                <p className="text-sm text-muted-foreground font-roboto">Total Schools</p>
+                <p className="font-oswald text-2xl font-bold" data-testid="text-district-schools">{data.totalSchools}</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardContent className="pt-6">
+            <div className="flex items-center gap-4">
+              <div className="w-12 h-12 rounded-md bg-lys-red/10 flex items-center justify-center">
+                <GraduationCap className="h-6 w-6 text-lys-red" />
+              </div>
+              <div>
+                <p className="text-sm text-muted-foreground font-roboto">Total Educators</p>
+                <p className="font-oswald text-2xl font-bold" data-testid="text-district-educators">{data.totalEducators}</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardContent className="pt-6">
+            <div className="flex items-center gap-4">
+              <div className="w-12 h-12 rounded-md bg-lys-yellow/10 flex items-center justify-center">
+                <Users className="h-6 w-6 text-lys-yellow" />
+              </div>
+              <div>
+                <p className="text-sm text-muted-foreground font-roboto">Total Students</p>
+                <p className="font-oswald text-2xl font-bold" data-testid="text-district-students">{data.totalStudents}</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardContent className="pt-6">
+            <div className="flex items-center gap-4">
+              <div className="w-12 h-12 rounded-md bg-blue-500/10 flex items-center justify-center">
+                <FileText className="h-6 w-6 text-blue-600" />
+              </div>
+              <div>
+                <p className="text-sm text-muted-foreground font-roboto">Total Lessons</p>
+                <p className="font-oswald text-2xl font-bold" data-testid="text-district-lessons">{data.totalLessons}</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardContent className="pt-6">
+            <div className="flex items-center gap-4">
+              <div className="w-12 h-12 rounded-md bg-green-500/10 flex items-center justify-center">
+                <Target className="h-6 w-6 text-green-600" />
+              </div>
+              <div>
+                <p className="text-sm text-muted-foreground font-roboto">Total Goals</p>
+                <p className="font-oswald text-2xl font-bold" data-testid="text-district-goals">{data.totalGoals}</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Districts */}
+      {data.districts.length > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="font-oswald flex items-center gap-2">
+              <Building2 className="h-5 w-5 text-lys-teal" />
+              Your Districts
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="flex flex-wrap gap-3">
+              {data.districts.map((district) => (
+                <Badge key={district.id} variant="outline" className="px-4 py-2 font-roboto">
+                  {district.name}
+                </Badge>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Schools List with Drill-Down */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="font-oswald flex items-center gap-2">
+            <School className="h-5 w-5 text-lys-red" />
+            Schools in Your District
+          </CardTitle>
+          <CardDescription className="font-roboto">
+            Click on a school to view detailed analytics
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          {data.schools.length > 0 ? (
+            <div className="space-y-3">
+              {data.schools.map((school) => (
+                <div 
+                  key={school.id} 
+                  className="flex items-center justify-between p-4 rounded-md border bg-muted/20 hover-elevate cursor-pointer"
+                  onClick={() => onSchoolClick(school.id)}
+                  data-testid={`school-card-${school.id}`}
+                >
+                  <div className="flex items-center gap-4">
+                    <div className="w-10 h-10 rounded-md bg-lys-teal/10 flex items-center justify-center">
+                      <School className="h-5 w-5 text-lys-teal" />
+                    </div>
+                    <div>
+                      <p className="font-oswald font-semibold">{school.name}</p>
+                      <p className="text-sm text-muted-foreground font-roboto">
+                        {school.educatorCount} educator{school.educatorCount !== 1 ? 's' : ''} | {school.studentCount} student{school.studentCount !== 1 ? 's' : ''}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-4">
+                    <div className="text-right">
+                      <p className="font-oswald font-bold text-lys-red">{school.lessonCount}</p>
+                      <p className="text-xs text-muted-foreground font-roboto">Lessons</p>
+                    </div>
+                    <div className="text-right">
+                      <p className="font-oswald font-bold text-lys-teal">{school.goalCount}</p>
+                      <p className="text-xs text-muted-foreground font-roboto">Goals</p>
+                    </div>
+                    <ChevronRight className="h-5 w-5 text-muted-foreground" />
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="text-center py-8 text-muted-foreground font-roboto">
+              <School className="h-12 w-12 mx-auto mb-4 opacity-50" />
+              <p>No schools found in your district</p>
+              <p className="text-sm">Schools need to be added as child organizations of your district</p>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+    </>
+  );
+}
+
+// School Drill-Down View
+interface SchoolDrillDownViewProps {
+  data: SchoolAnalytics;
+  isLoading: boolean;
+  onBack: () => void;
+  onTeacherClick: (teacherId: string, schoolName?: string) => void;
+}
+
+function SchoolDrillDownView({ data, isLoading, onBack, onTeacherClick }: SchoolDrillDownViewProps) {
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-background p-6">
+        <div className="max-w-7xl mx-auto space-y-6">
+          <Skeleton className="h-12 w-64" />
+          <div className="grid md:grid-cols-4 gap-4">
+            {[1, 2, 3, 4].map((i) => (
+              <Skeleton key={i} className="h-32" />
+            ))}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  const bkdPieData = [
+    { name: "BE (Identity)", value: data.bkdDistribution.be, color: "#F8D842" },
+    { name: "KNOW (Strategy)", value: data.bkdDistribution.know, color: "#EE4E23" },
+    { name: "DO (Action)", value: data.bkdDistribution.do, color: "#016371" },
+  ].filter((d) => d.value > 0);
+
+  const standardsChartData = Object.entries(data.standardsCoverage)
+    .map(([name, count]) => ({ name, count }))
+    .sort((a, b) => b.count - a.count)
+    .slice(0, 8);
+
+  return (
+    <div className="min-h-screen bg-background p-6">
+      <div className="max-w-7xl mx-auto space-y-6">
+        {/* Header with Back Button */}
+        <div className="flex items-center gap-4">
+          <Button variant="ghost" size="icon" onClick={onBack} data-testid="button-back">
+            <ChevronLeft className="h-5 w-5" />
+          </Button>
+          <div>
+            <h1 className="font-permanent-marker text-3xl text-lys-red" data-testid="text-school-name">
+              {data.school.name}
+            </h1>
+            <p className="font-roboto text-muted-foreground">
+              School Analytics - Click on a teacher to view their details
+            </p>
+          </div>
+        </div>
+
+        {/* School Summary Stats */}
+        <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          <Card>
+            <CardContent className="pt-6">
+              <div className="flex items-center gap-4">
+                <div className="w-12 h-12 rounded-md bg-lys-red/10 flex items-center justify-center">
+                  <GraduationCap className="h-6 w-6 text-lys-red" />
+                </div>
+                <div>
+                  <p className="text-sm text-muted-foreground font-roboto">Educators</p>
+                  <p className="font-oswald text-2xl font-bold">{data.totalEducators}</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardContent className="pt-6">
+              <div className="flex items-center gap-4">
+                <div className="w-12 h-12 rounded-md bg-lys-yellow/10 flex items-center justify-center">
+                  <Users className="h-6 w-6 text-lys-yellow" />
+                </div>
+                <div>
+                  <p className="text-sm text-muted-foreground font-roboto">Students</p>
+                  <p className="font-oswald text-2xl font-bold">{data.totalStudents}</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardContent className="pt-6">
+              <div className="flex items-center gap-4">
+                <div className="w-12 h-12 rounded-md bg-lys-teal/10 flex items-center justify-center">
+                  <FileText className="h-6 w-6 text-lys-teal" />
+                </div>
+                <div>
+                  <p className="text-sm text-muted-foreground font-roboto">Total Lessons</p>
+                  <p className="font-oswald text-2xl font-bold">{data.totalLessons}</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardContent className="pt-6">
+              <div className="flex items-center gap-4">
+                <div className="w-12 h-12 rounded-md bg-green-500/10 flex items-center justify-center">
+                  <Target className="h-6 w-6 text-green-600" />
+                </div>
+                <div>
+                  <p className="text-sm text-muted-foreground font-roboto">Goals Completed</p>
+                  <p className="font-oswald text-2xl font-bold">{data.goalsCompleted} / {data.totalGoals}</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Teachers List */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="font-oswald flex items-center gap-2">
+              <Trophy className="h-5 w-5 text-lys-yellow" />
+              Teachers at {data.school.name}
+            </CardTitle>
+            <CardDescription className="font-roboto">
+              Click on a teacher to view their detailed analytics
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            {data.teachers.length > 0 ? (
+              <div className="space-y-3">
+                {data.teachers.map((teacher, index) => (
+                  <div 
+                    key={teacher.id} 
+                    className="flex items-center justify-between p-4 rounded-md border bg-muted/20 hover-elevate cursor-pointer"
+                    onClick={() => onTeacherClick(teacher.id, data.school.name)}
+                    data-testid={`teacher-card-${teacher.id}`}
+                  >
+                    <div className="flex items-center gap-4">
+                      <div className={`w-8 h-8 rounded-full flex items-center justify-center font-oswald font-bold text-sm ${
+                        index === 0 ? 'bg-lys-yellow text-black' :
+                        index === 1 ? 'bg-gray-300 text-black' :
+                        index === 2 ? 'bg-amber-600 text-white' :
+                        'bg-muted text-muted-foreground'
+                      }`}>
+                        {index + 1}
+                      </div>
+                      <div>
+                        <p className="font-oswald font-semibold">{teacher.name}</p>
+                        <p className="text-sm text-muted-foreground font-roboto">{teacher.email || "No email"}</p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-4">
+                      <div className="text-right">
+                        <p className="font-oswald font-bold text-lys-red">{teacher.lessonCount}</p>
+                        <p className="text-xs text-muted-foreground font-roboto">Lessons</p>
+                      </div>
+                      <div className="text-right">
+                        <p className="font-oswald font-bold text-lys-teal">{teacher.goalCount}</p>
+                        <p className="text-xs text-muted-foreground font-roboto">Goals</p>
+                      </div>
+                      <Badge variant="outline" className="font-roboto">
+                        {teacher.lessonsThisWeek} this week
+                      </Badge>
+                      <ChevronRight className="h-5 w-5 text-muted-foreground" />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="text-center py-8 text-muted-foreground font-roboto">
+                <Users className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                <p>No educators found at this school</p>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Charts */}
+        <div className="grid lg:grid-cols-2 gap-4">
+          <Card>
+            <CardHeader>
+              <CardTitle className="font-oswald flex items-center gap-2">
+                <BarChart3 className="h-5 w-5 text-lys-teal" />
+                Standards Coverage
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              {standardsChartData.length > 0 ? (
+                <ResponsiveContainer width="100%" height={250}>
+                  <BarChart data={standardsChartData}>
+                    <XAxis dataKey="name" tick={{ fontSize: 12 }} />
+                    <YAxis tick={{ fontSize: 12 }} />
+                    <Tooltip 
+                      contentStyle={{ 
+                        backgroundColor: "hsl(var(--card))", 
+                        border: "1px solid hsl(var(--border))",
+                        borderRadius: "8px"
+                      }} 
+                    />
+                    <Bar 
+                      dataKey="count" 
+                      fill="#016371" 
+                      radius={[4, 4, 0, 0]}
+                      name="Lessons"
+                    />
+                  </BarChart>
+                </ResponsiveContainer>
+              ) : (
+                <div className="h-[250px] flex items-center justify-center text-muted-foreground">
+                  <p className="font-roboto text-center">No standards data yet</p>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle className="font-oswald flex items-center gap-2">
+                <Award className="h-5 w-5 text-lys-red" />
+                Be-Know-Do Distribution
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              {bkdPieData.length > 0 ? (
+                <ResponsiveContainer width="100%" height={250}>
+                  <PieChart>
+                    <Pie
+                      data={bkdPieData}
+                      cx="50%"
+                      cy="50%"
+                      innerRadius={50}
+                      outerRadius={80}
+                      paddingAngle={5}
+                      dataKey="value"
+                    >
+                      {bkdPieData.map((entry, index) => (
+                        <Cell key={`cell-${index}`} fill={entry.color} />
+                      ))}
+                    </Pie>
+                    <Tooltip 
+                      contentStyle={{ 
+                        backgroundColor: "hsl(var(--card))", 
+                        border: "1px solid hsl(var(--border))",
+                        borderRadius: "8px"
+                      }} 
+                    />
+                    <Legend />
+                  </PieChart>
+                </ResponsiveContainer>
+              ) : (
+                <div className="h-[250px] flex items-center justify-center text-muted-foreground">
+                  <p className="font-roboto text-center">No lesson data yet</p>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// Teacher Drill-Down View
+interface TeacherDrillDownViewProps {
+  data: TeacherAnalytics;
+  isLoading: boolean;
+  onBack: () => void;
+}
+
+function TeacherDrillDownView({ data, isLoading, onBack }: TeacherDrillDownViewProps) {
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-background p-6">
+        <div className="max-w-7xl mx-auto space-y-6">
+          <Skeleton className="h-12 w-64" />
+          <div className="grid md:grid-cols-4 gap-4">
+            {[1, 2, 3, 4].map((i) => (
+              <Skeleton key={i} className="h-32" />
+            ))}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  const bkdPieData = [
+    { name: "BE (Identity)", value: data.lessonBkdDistribution.be, color: "#F8D842" },
+    { name: "KNOW (Strategy)", value: data.lessonBkdDistribution.know, color: "#EE4E23" },
+    { name: "DO (Action)", value: data.lessonBkdDistribution.do, color: "#016371" },
+  ].filter((d) => d.value > 0);
+
+  const standardsChartData = Object.entries(data.standardsCoverage)
+    .map(([name, count]) => ({ name, count }))
+    .sort((a, b) => b.count - a.count)
+    .slice(0, 8);
+
+  return (
+    <div className="min-h-screen bg-background p-6">
+      <div className="max-w-7xl mx-auto space-y-6">
+        {/* Header with Back Button */}
+        <div className="flex items-center gap-4">
+          <Button variant="ghost" size="icon" onClick={onBack} data-testid="button-back">
+            <ChevronLeft className="h-5 w-5" />
+          </Button>
+          <div>
+            <h1 className="font-permanent-marker text-3xl text-lys-red" data-testid="text-teacher-name">
+              {data.teacher.name}
+            </h1>
+            <p className="font-roboto text-muted-foreground">
+              {data.teacher.email || "Teacher Analytics"}
+            </p>
+          </div>
+        </div>
+
+        {/* Teacher Summary Stats */}
+        <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          <Card>
+            <CardContent className="pt-6">
+              <div className="flex items-center gap-4">
+                <div className="w-12 h-12 rounded-md bg-lys-red/10 flex items-center justify-center">
+                  <FileText className="h-6 w-6 text-lys-red" />
+                </div>
+                <div>
+                  <p className="text-sm text-muted-foreground font-roboto">Total Lessons</p>
+                  <p className="font-oswald text-2xl font-bold">{data.totalLessons}</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardContent className="pt-6">
+              <div className="flex items-center gap-4">
+                <div className="w-12 h-12 rounded-md bg-lys-teal/10 flex items-center justify-center">
+                  <TrendingUp className="h-6 w-6 text-lys-teal" />
+                </div>
+                <div>
+                  <p className="text-sm text-muted-foreground font-roboto">This Week</p>
+                  <p className="font-oswald text-2xl font-bold">{data.lessonsThisWeek}</p>
+                  <p className={`text-xs ${data.lessonsThisWeek >= data.lessonsLastWeek ? 'text-green-600' : 'text-amber-600'}`}>
+                    {data.lessonsThisWeek >= data.lessonsLastWeek ? '+' : ''}
+                    {data.lessonsThisWeek - data.lessonsLastWeek} vs last week
+                  </p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardContent className="pt-6">
+              <div className="flex items-center gap-4">
+                <div className="w-12 h-12 rounded-md bg-lys-yellow/10 flex items-center justify-center">
+                  <Target className="h-6 w-6 text-lys-yellow" />
+                </div>
+                <div>
+                  <p className="text-sm text-muted-foreground font-roboto">Total Goals</p>
+                  <p className="font-oswald text-2xl font-bold">{data.totalGoals}</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardContent className="pt-6">
+              <div className="flex items-center gap-4">
+                <div className="w-12 h-12 rounded-md bg-green-500/10 flex items-center justify-center">
+                  <CheckCircle2 className="h-6 w-6 text-green-600" />
+                </div>
+                <div>
+                  <p className="text-sm text-muted-foreground font-roboto">Goals Completed</p>
+                  <p className="font-oswald text-2xl font-bold">{data.goalsCompleted} / {data.totalGoals}</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Recent Lessons */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="font-oswald flex items-center gap-2">
+              <Clock className="h-5 w-5 text-lys-red" />
+              Recent Lessons
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            {data.recentLessons.length > 0 ? (
+              <div className="space-y-3">
+                {data.recentLessons.map((lesson) => (
+                  <div 
+                    key={lesson.id} 
+                    className="flex items-center justify-between p-4 rounded-md border bg-muted/20"
+                  >
+                    <div>
+                      <p className="font-oswald font-semibold">{lesson.title}</p>
+                      <p className="text-sm text-muted-foreground font-roboto">
+                        {lesson.topic} | Grade {lesson.gradeLevel}
+                      </p>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <Badge 
+                        className={`font-roboto ${
+                          lesson.bkdFocus === "be" ? "bg-lys-yellow/20 text-lys-yellow" :
+                          lesson.bkdFocus === "know" ? "bg-lys-red/20 text-lys-red" :
+                          "bg-lys-teal/20 text-lys-teal"
+                        }`}
+                      >
+                        {lesson.bkdFocus.toUpperCase()}
+                      </Badge>
+                      {lesson.createdAt && (
+                        <span className="text-sm text-muted-foreground font-roboto">
+                          {new Date(lesson.createdAt).toLocaleDateString()}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="text-center py-8 text-muted-foreground font-roboto">
+                <FileText className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                <p>No lessons created yet</p>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Charts */}
+        <div className="grid lg:grid-cols-2 gap-4">
+          <Card>
+            <CardHeader>
+              <CardTitle className="font-oswald flex items-center gap-2">
+                <BarChart3 className="h-5 w-5 text-lys-teal" />
+                Standards Coverage
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              {standardsChartData.length > 0 ? (
+                <ResponsiveContainer width="100%" height={250}>
+                  <BarChart data={standardsChartData}>
+                    <XAxis dataKey="name" tick={{ fontSize: 12 }} />
+                    <YAxis tick={{ fontSize: 12 }} />
+                    <Tooltip 
+                      contentStyle={{ 
+                        backgroundColor: "hsl(var(--card))", 
+                        border: "1px solid hsl(var(--border))",
+                        borderRadius: "8px"
+                      }} 
+                    />
+                    <Bar 
+                      dataKey="count" 
+                      fill="#016371" 
+                      radius={[4, 4, 0, 0]}
+                      name="Lessons"
+                    />
+                  </BarChart>
+                </ResponsiveContainer>
+              ) : (
+                <div className="h-[250px] flex items-center justify-center text-muted-foreground">
+                  <p className="font-roboto text-center">No standards data yet</p>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle className="font-oswald flex items-center gap-2">
+                <Award className="h-5 w-5 text-lys-red" />
+                Be-Know-Do Distribution
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              {bkdPieData.length > 0 ? (
+                <ResponsiveContainer width="100%" height={250}>
+                  <PieChart>
+                    <Pie
+                      data={bkdPieData}
+                      cx="50%"
+                      cy="50%"
+                      innerRadius={50}
+                      outerRadius={80}
+                      paddingAngle={5}
+                      dataKey="value"
+                    >
+                      {bkdPieData.map((entry, index) => (
+                        <Cell key={`cell-${index}`} fill={entry.color} />
+                      ))}
+                    </Pie>
+                    <Tooltip 
+                      contentStyle={{ 
+                        backgroundColor: "hsl(var(--card))", 
+                        border: "1px solid hsl(var(--border))",
+                        borderRadius: "8px"
+                      }} 
+                    />
+                    <Legend />
+                  </PieChart>
+                </ResponsiveContainer>
+              ) : (
+                <div className="h-[250px] flex items-center justify-center text-muted-foreground">
+                  <p className="font-roboto text-center">No lesson data yet</p>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// Campus Overview Component
+interface CampusOverviewProps {
+  data: CampusAnalytics;
+  campusStandardsData: Array<{ name: string; count: number }>;
+  campusBkdPieData: Array<{ name: string; value: number; color: string }>;
+  onTeacherClick: (teacherId: string) => void;
+}
+
+function CampusOverview({ data, campusStandardsData, campusBkdPieData, onTeacherClick }: CampusOverviewProps) {
+  return (
+    <>
+      {/* Campus Summary Stats */}
+      <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <Card>
+          <CardContent className="pt-6">
+            <div className="flex items-center gap-4">
+              <div className="w-12 h-12 rounded-md bg-lys-teal/10 flex items-center justify-center">
+                <GraduationCap className="h-6 w-6 text-lys-teal" />
+              </div>
+              <div>
+                <p className="text-sm text-muted-foreground font-roboto">Total Educators</p>
+                <p className="font-oswald text-2xl font-bold" data-testid="text-campus-educators">{data.totalEducators}</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardContent className="pt-6">
+            <div className="flex items-center gap-4">
+              <div className="w-12 h-12 rounded-md bg-lys-yellow/10 flex items-center justify-center">
+                <Users className="h-6 w-6 text-lys-yellow" />
+              </div>
+              <div>
+                <p className="text-sm text-muted-foreground font-roboto">Total Students</p>
+                <p className="font-oswald text-2xl font-bold" data-testid="text-campus-students">{data.totalStudents}</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardContent className="pt-6">
+            <div className="flex items-center gap-4">
+              <div className="w-12 h-12 rounded-md bg-lys-red/10 flex items-center justify-center">
+                <FileText className="h-6 w-6 text-lys-red" />
+              </div>
+              <div>
+                <p className="text-sm text-muted-foreground font-roboto">Total Lessons</p>
+                <p className="font-oswald text-2xl font-bold" data-testid="text-campus-lessons">{data.totalLessons}</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardContent className="pt-6">
+            <div className="flex items-center gap-4">
+              <div className="w-12 h-12 rounded-md bg-green-500/10 flex items-center justify-center">
+                <Target className="h-6 w-6 text-green-600" />
+              </div>
+              <div>
+                <p className="text-sm text-muted-foreground font-roboto">Total Goals</p>
+                <p className="font-oswald text-2xl font-bold" data-testid="text-campus-goals">{data.totalGoals}</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Weekly Comparison */}
+      <div className="grid sm:grid-cols-2 gap-4">
+        <Card>
+          <CardContent className="pt-6">
+            <div className="flex items-center justify-between gap-4">
+              <div>
+                <p className="text-sm text-muted-foreground font-roboto">Lessons This Week</p>
+                <p className="font-oswald text-3xl font-bold text-lys-red">{data.lessonsThisWeek}</p>
+              </div>
+              <div className="text-right">
+                <p className="text-sm text-muted-foreground font-roboto">vs Last Week</p>
+                <p className={`font-oswald text-lg font-bold ${data.lessonsThisWeek >= data.lessonsLastWeek ? 'text-green-600' : 'text-amber-600'}`}>
+                  {data.lessonsThisWeek >= data.lessonsLastWeek ? '+' : ''}
+                  {data.lessonsThisWeek - data.lessonsLastWeek}
+                </p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardContent className="pt-6">
+            <div className="flex items-center justify-between gap-4">
+              <div>
+                <p className="text-sm text-muted-foreground font-roboto">Goals Completed</p>
+                <p className="font-oswald text-3xl font-bold text-green-600">{data.goalsCompleted}</p>
+              </div>
+              <div className="text-right">
+                <p className="text-sm text-muted-foreground font-roboto">In Progress</p>
+                <p className="font-oswald text-lg font-bold text-lys-teal">{data.goalsInProgress}</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Organizations */}
+      {data.organizations.length > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="font-oswald flex items-center gap-2">
+              <Building2 className="h-5 w-5 text-lys-teal" />
+              Your Organizations
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
+              {data.organizations.map((org) => (
+                <div key={org.id} className="p-4 rounded-md border bg-muted/20">
+                  <p className="font-oswald font-semibold">{org.name}</p>
+                  <p className="text-sm text-muted-foreground font-roboto">
+                    {org.memberCount} member{org.memberCount !== 1 ? 's' : ''}
+                  </p>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Top Educators */}
+      {data.topEducators.length > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="font-oswald flex items-center gap-2">
+              <Trophy className="h-5 w-5 text-lys-yellow" />
+              Top Educators by Lesson Creation
+            </CardTitle>
+            <CardDescription className="font-roboto">
+              Click on an educator to view their detailed analytics
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-3">
+              {data.topEducators.map((educator, index) => (
+                <div 
+                  key={educator.id} 
+                  className="flex items-center gap-4 p-3 rounded-md bg-muted/20 hover-elevate cursor-pointer"
+                  onClick={() => onTeacherClick(educator.id)}
+                  data-testid={`educator-card-${educator.id}`}
+                >
+                  <div className={`w-8 h-8 rounded-full flex items-center justify-center font-oswald font-bold text-sm ${
+                    index === 0 ? 'bg-lys-yellow text-black' :
+                    index === 1 ? 'bg-gray-300 text-black' :
+                    index === 2 ? 'bg-amber-600 text-white' :
+                    'bg-muted text-muted-foreground'
+                  }`}>
+                    {index + 1}
+                  </div>
+                  <div className="flex-1">
+                    <p className="font-oswald font-semibold">{educator.name}</p>
+                  </div>
+                  <Badge variant="outline" className="font-roboto">
+                    {educator.lessonCount} lesson{educator.lessonCount !== 1 ? 's' : ''}
+                  </Badge>
+                  <ChevronRight className="h-5 w-5 text-muted-foreground" />
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Campus Charts */}
+      <div className="grid lg:grid-cols-2 gap-4">
+        <Card>
+          <CardHeader>
+            <CardTitle className="font-oswald flex items-center gap-2">
+              <BarChart3 className="h-5 w-5 text-lys-teal" />
+              Standards Coverage (Campus-wide)
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            {campusStandardsData.length > 0 ? (
+              <ResponsiveContainer width="100%" height={250}>
+                <BarChart data={campusStandardsData}>
+                  <XAxis dataKey="name" tick={{ fontSize: 12 }} />
+                  <YAxis tick={{ fontSize: 12 }} />
+                  <Tooltip 
+                    contentStyle={{ 
+                      backgroundColor: "hsl(var(--card))", 
+                      border: "1px solid hsl(var(--border))",
+                      borderRadius: "8px"
+                    }} 
+                  />
+                  <Bar 
+                    dataKey="count" 
+                    fill="#016371" 
+                    radius={[4, 4, 0, 0]}
+                    name="Lessons"
+                  />
+                </BarChart>
+              </ResponsiveContainer>
+            ) : (
+              <div className="h-[250px] flex items-center justify-center text-muted-foreground">
+                <p className="font-roboto text-center">No standards data yet</p>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle className="font-oswald flex items-center gap-2">
+              <Award className="h-5 w-5 text-lys-red" />
+              Be-Know-Do Distribution
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            {campusBkdPieData.length > 0 ? (
+              <ResponsiveContainer width="100%" height={250}>
+                <PieChart>
+                  <Pie
+                    data={campusBkdPieData}
+                    cx="50%"
+                    cy="50%"
+                    innerRadius={50}
+                    outerRadius={80}
+                    paddingAngle={5}
+                    dataKey="value"
+                  >
+                    {campusBkdPieData.map((entry, index) => (
+                      <Cell key={`cell-${index}`} fill={entry.color} />
+                    ))}
+                  </Pie>
+                  <Tooltip 
+                    contentStyle={{ 
+                      backgroundColor: "hsl(var(--card))", 
+                      border: "1px solid hsl(var(--border))",
+                      borderRadius: "8px"
+                    }} 
+                  />
+                  <Legend />
+                </PieChart>
+              </ResponsiveContainer>
+            ) : (
+              <div className="h-[250px] flex items-center justify-center text-muted-foreground">
+                <p className="font-roboto text-center">No lesson data yet</p>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Campus Activity Timeline */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="font-oswald flex items-center gap-2">
+            <Clock className="h-5 w-5 text-lys-red" />
+            Campus Activity Timeline
+          </CardTitle>
+          <CardDescription className="font-roboto">
+            Organization-wide activity over the past month
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <ResponsiveContainer width="100%" height={200}>
+            <LineChart data={data.activityByWeek}>
+              <XAxis dataKey="name" tick={{ fontSize: 12 }} />
+              <YAxis tick={{ fontSize: 12 }} />
+              <Tooltip 
+                contentStyle={{ 
+                  backgroundColor: "hsl(var(--card))", 
+                  border: "1px solid hsl(var(--border))",
+                  borderRadius: "8px"
+                }} 
+              />
+              <Legend />
+              <Line 
+                type="monotone" 
+                dataKey="lessons" 
+                stroke="#EE4E23" 
+                strokeWidth={2}
+                dot={{ fill: "#EE4E23" }}
+                name="Lessons"
+              />
+              <Line 
+                type="monotone" 
+                dataKey="goals" 
+                stroke="#016371" 
+                strokeWidth={2}
+                dot={{ fill: "#016371" }}
+                name="Goals"
+              />
+            </LineChart>
+          </ResponsiveContainer>
+        </CardContent>
+      </Card>
+    </>
   );
 }
 

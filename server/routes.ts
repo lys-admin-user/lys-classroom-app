@@ -2505,8 +2505,12 @@ export async function registerRoutes(
   app.get("/api/district-analytics", isAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user?.claims?.sub;
-      const user = await storage.getUser(userId);
+      if (!userId) {
+        res.status(401).json({ error: "Authentication required" });
+        return;
+      }
       
+      const user = await storage.getUser(userId);
       if (user?.role !== "campus_admin") {
         res.status(403).json({ error: "Campus admin access required" });
         return;
@@ -2515,11 +2519,14 @@ export async function registerRoutes(
       // Get user's organizations
       const memberships = await storage.getUserOrganizations(userId);
       
-      // Find districts (organizations with type 'district')
+      // Find districts where user is admin or owner (not just member)
       const districtIds: string[] = [];
       const districts: Array<{ id: string; name: string; type: string }> = [];
       
       for (const m of memberships) {
+        // Only allow admin or owner access to district analytics
+        if (m.role !== "admin" && m.role !== "owner") continue;
+        
         const org = await storage.getOrganization(m.organizationId);
         if (org?.type === "district") {
           districtIds.push(org.id);
@@ -2548,22 +2555,30 @@ export async function registerRoutes(
         const childOrgs = await storage.getChildOrganizations(districtId);
         for (const school of childOrgs) {
           const members = await storage.getOrganizationMembers(school.id);
-          const memberUserIds = members.map(m => m.userId);
+          // Filter out any null/undefined userIds
+          const memberUserIds = members.map(m => m.userId).filter((uid): uid is string => !!uid);
           
           // Get member details
           const memberDetails = await Promise.all(
-            memberUserIds.map(async (uid: string) => storage.getUser(uid))
+            memberUserIds.map(async (uid) => storage.getUser(uid))
           );
           const educatorCount = memberDetails.filter(u => u?.role === "educator").length;
           const studentCount = memberDetails.filter(u => u?.role === "student").length;
           
-          // Get lessons and goals from this school's members
-          const schoolLessons = await Promise.all(
-            memberUserIds.map(async (uid: string) => storage.getLessons(uid))
-          );
-          const schoolGoals = await Promise.all(
-            memberUserIds.map(async (uid: string) => storage.getGoals(uid))
-          );
+          // Get lessons and goals from this school's members with error handling
+          let lessonCount = 0;
+          let goalCount = 0;
+          
+          for (const uid of memberUserIds) {
+            try {
+              const lessons = await storage.getLessons(uid);
+              const goals = await storage.getGoals(uid);
+              lessonCount += lessons.length;
+              goalCount += goals.length;
+            } catch (err) {
+              console.error(`Error fetching data for user ${uid}:`, err);
+            }
+          }
           
           allSchools.push({
             id: school.id,
@@ -2572,8 +2587,8 @@ export async function registerRoutes(
             memberCount: members.length,
             educatorCount,
             studentCount,
-            lessonCount: schoolLessons.flat().length,
-            goalCount: schoolGoals.flat().length,
+            lessonCount,
+            goalCount,
           });
         }
       }
@@ -2605,8 +2620,12 @@ export async function registerRoutes(
     try {
       const { schoolId } = req.params;
       const userId = req.user?.claims?.sub;
-      const user = await storage.getUser(userId);
+      if (!userId) {
+        res.status(401).json({ error: "Authentication required" });
+        return;
+      }
       
+      const user = await storage.getUser(userId);
       if (user?.role !== "campus_admin") {
         res.status(403).json({ error: "Campus admin access required" });
         return;
@@ -2619,23 +2638,25 @@ export async function registerRoutes(
         return;
       }
       
+      // Check for admin/owner access to the school
       const membership = await storage.getOrgMembership(schoolId, userId);
-      let hasAccess = !!membership;
+      let hasAccess = membership?.role === "admin" || membership?.role === "owner";
       
-      // Check if user is admin of parent district
+      // Check if user is admin/owner of parent district
       if (!hasAccess && school.parentOrganizationId) {
         const districtMembership = await storage.getOrgMembership(school.parentOrganizationId, userId);
-        hasAccess = !!districtMembership;
+        hasAccess = districtMembership?.role === "admin" || districtMembership?.role === "owner";
       }
       
       if (!hasAccess) {
-        res.status(403).json({ error: "Access denied to this school" });
+        res.status(403).json({ error: "Admin access required for this school" });
         return;
       }
       
       // Get school members
       const members = await storage.getOrganizationMembers(schoolId);
-      const memberUserIds = members.map(m => m.userId);
+      // Filter out any null/undefined userIds
+      const memberUserIds = members.map(m => m.userId).filter((uid): uid is string => !!uid);
       
       // Get member details with lessons and goals
       const teacherStats: Array<{
@@ -2655,26 +2676,30 @@ export async function registerRoutes(
       let allGoals: Goal[] = [];
       
       for (const uid of memberUserIds) {
-        const memberUser = await storage.getUser(uid);
-        const lessons = await storage.getLessons(uid);
-        const goals = await storage.getGoals(uid);
-        
-        allLessons = allLessons.concat(lessons);
-        allGoals = allGoals.concat(goals);
-        
-        const lessonsThisWeek = lessons.filter((l: Lesson) => 
-          l.createdAt && new Date(l.createdAt) >= oneWeekAgo
-        ).length;
-        
-        teacherStats.push({
-          id: uid,
-          name: memberUser ? `${memberUser.firstName || ""} ${memberUser.lastName || ""}`.trim() || "Unknown" : "Unknown",
-          email: memberUser?.email || null,
-          role: memberUser?.role || "unknown",
-          lessonCount: lessons.length,
-          goalCount: goals.length,
-          lessonsThisWeek,
-        });
+        try {
+          const memberUser = await storage.getUser(uid);
+          const lessons = await storage.getLessons(uid);
+          const goals = await storage.getGoals(uid);
+          
+          allLessons = allLessons.concat(lessons);
+          allGoals = allGoals.concat(goals);
+          
+          const lessonsThisWeek = lessons.filter((l: Lesson) => 
+            l.createdAt && new Date(l.createdAt) >= oneWeekAgo
+          ).length;
+          
+          teacherStats.push({
+            id: uid,
+            name: memberUser ? `${memberUser.firstName || ""} ${memberUser.lastName || ""}`.trim() || "Unknown" : "Unknown",
+            email: memberUser?.email || null,
+            role: memberUser?.role || "unknown",
+            lessonCount: lessons.length,
+            goalCount: goals.length,
+            lessonsThisWeek,
+          });
+        } catch (err) {
+          console.error(`Error fetching data for user ${uid}:`, err);
+        }
       }
       
       // Sort teachers by lesson count
@@ -2727,8 +2752,12 @@ export async function registerRoutes(
     try {
       const { teacherId } = req.params;
       const userId = req.user?.claims?.sub;
-      const user = await storage.getUser(userId);
+      if (!userId) {
+        res.status(401).json({ error: "Authentication required" });
+        return;
+      }
       
+      const user = await storage.getUser(userId);
       if (user?.role !== "campus_admin") {
         res.status(403).json({ error: "Campus admin access required" });
         return;
@@ -2741,18 +2770,22 @@ export async function registerRoutes(
         return;
       }
       
-      // Verify user has access (shares organization or is in parent district)
+      // Verify user has admin/owner access to teacher's organization or parent district
       const userOrgs = await storage.getUserOrganizations(userId);
       const teacherOrgs = await storage.getUserOrganizations(teacherId);
       
       let hasAccess = false;
       for (const userOrg of userOrgs) {
+        // Only admin/owner of org can view teacher analytics
+        if (userOrg.role !== "admin" && userOrg.role !== "owner") continue;
+        
         for (const teacherOrg of teacherOrgs) {
+          // Direct org membership match
           if (userOrg.organizationId === teacherOrg.organizationId) {
             hasAccess = true;
             break;
           }
-          // Check if user's org is parent of teacher's org
+          // Check if user's org is parent district of teacher's school
           const tOrg = await storage.getOrganization(teacherOrg.organizationId);
           if (tOrg?.parentOrganizationId === userOrg.organizationId) {
             hasAccess = true;
@@ -2763,7 +2796,7 @@ export async function registerRoutes(
       }
       
       if (!hasAccess) {
-        res.status(403).json({ error: "Access denied to this teacher" });
+        res.status(403).json({ error: "Admin access required to view this teacher" });
         return;
       }
       
