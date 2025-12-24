@@ -214,3 +214,149 @@ export const emailTemplates = pgTable("email_templates", {
 export const insertEmailTemplateSchema = createInsertSchema(emailTemplates).omit({ id: true, createdAt: true, updatedAt: true });
 export type InsertEmailTemplate = z.infer<typeof insertEmailTemplateSchema>;
 export type EmailTemplate = typeof emailTemplates.$inferSelect;
+
+// =============================================================================
+// GLOBAL AUTHORITY TREE (LYS V3.0 - Unified Global System)
+// =============================================================================
+
+// Authority levels in the educational hierarchy
+export type AuthorityLevel = "supranational" | "national" | "regional_state" | "local_district" | "school";
+
+// Educational model types for different countries/regions
+// bottom_heavy: US-style decentralized (Local Districts have authority)
+// top_down_unitary: Africa/Asia centralized (National Ministry controls)
+// federal_hybrid: Nigeria/Germany (Split between local and national)
+export type AuthorityModelType = "bottom_heavy" | "top_down_unitary" | "federal_hybrid";
+
+// Global Authority Tree - Polymorphic hierarchy for educational authorities
+export const authorities = pgTable("authorities", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  name: varchar("name").notNull(),
+  code: varchar("code").unique(),
+  level: varchar("level").notNull().$type<AuthorityLevel>(),
+  parentId: varchar("parent_id"),
+  modelType: varchar("model_type").default("bottom_heavy").$type<AuthorityModelType>(),
+  residencyRegion: varchar("residency_region"),
+  country: varchar("country"),
+  currencyCode: varchar("currency_code"),
+  timezone: varchar("timezone"),
+  academicCalendarStart: varchar("academic_calendar_start"),
+  pupilToTeacherRatio: integer("pupil_to_teacher_ratio"),
+  pisaScore: integer("pisa_score"),
+  educationBudgetPercent: varchar("education_budget_percent"),
+  metadata: jsonb("metadata").$type<{
+    standardsFramework?: string;
+    examBoard?: string;
+    gatekeeperExams?: string[];
+    languageOfInstruction?: string[];
+  }>(),
+  isActive: boolean("is_active").default(true),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertAuthoritySchema = createInsertSchema(authorities).omit({ id: true, createdAt: true, updatedAt: true });
+export type InsertAuthority = z.infer<typeof insertAuthoritySchema>;
+export type Authority = typeof authorities.$inferSelect;
+
+// =============================================================================
+// LYS MILESTONE ENGINE (Being, Knowing, Doing)
+// =============================================================================
+
+// Milestone categories aligned with LYS Be-Know-Do methodology
+export type MilestoneCategory = "being" | "knowing" | "doing";
+
+// Milestone status tracking
+export type MilestoneStatus = "not_started" | "in_progress" | "completed" | "deferred" | "failed";
+
+// LYS Milestones - Tasks aligned with authorities and BKD methodology
+export const lyseMilestones = pgTable("lyse_milestones", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").references(() => users.id),
+  title: varchar("title").notNull(),
+  description: text("description"),
+  category: varchar("category").notNull().$type<MilestoneCategory>(),
+  authorityId: varchar("authority_id").references(() => authorities.id),
+  standardCode: varchar("standard_code"),
+  isGatekeeper: boolean("is_gatekeeper").default(false),
+  isHardDeadline: boolean("is_hard_deadline").default(false),
+  dueDate: timestamp("due_date"),
+  completedAt: timestamp("completed_at"),
+  status: varchar("status").default("not_started").$type<MilestoneStatus>(),
+  weight: integer("weight").default(1),
+  regionalMultiplier: varchar("regional_multiplier"),
+  alternativePathId: varchar("alternative_path_id"),
+  linkedGoalId: varchar("linked_goal_id"),
+  linkedCareerId: varchar("linked_career_id"),
+  metadata: jsonb("metadata").$type<{
+    examName?: string;
+    examDate?: string;
+    passingScore?: number;
+    actualScore?: number;
+    distinction?: boolean;
+    peerLearningEnabled?: boolean;
+  }>(),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertLyseMilestoneSchema = createInsertSchema(lyseMilestones).omit({ id: true, createdAt: true, updatedAt: true });
+export type InsertLyseMilestone = z.infer<typeof insertLyseMilestoneSchema>;
+export type LyseMilestone = typeof lyseMilestones.$inferSelect;
+
+// =============================================================================
+// WORKFORCE TRENDS (Monthly Data Sync from BLS/OECD/UNESCO)
+// =============================================================================
+
+export const workforceTrends = pgTable("workforce_trends", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  authorityId: varchar("authority_id").references(() => authorities.id),
+  country: varchar("country").notNull(),
+  region: varchar("region"),
+  occupationCode: varchar("occupation_code"),
+  occupationTitle: varchar("occupation_title"),
+  medianSalary: integer("median_salary"),
+  growthRate: varchar("growth_rate"),
+  jobOpenings: integer("job_openings"),
+  educationRequired: varchar("education_required"),
+  dataSource: varchar("data_source"),
+  pisaScore: integer("pisa_score"),
+  pisaRank: integer("pisa_rank"),
+  teacherProfessionalismIndex: varchar("teacher_professionalism_index"),
+  certificationValue: varchar("certification_value"),
+  policyVolatilityAlert: boolean("policy_volatility_alert").default(false),
+  lastUpdated: timestamp("last_updated").defaultNow(),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertWorkforceTrendSchema = createInsertSchema(workforceTrends).omit({ id: true, createdAt: true });
+export type InsertWorkforceTrend = z.infer<typeof insertWorkforceTrendSchema>;
+export type WorkforceTrend = typeof workforceTrends.$inferSelect;
+
+// =============================================================================
+// LYS ALIGNMENT MATRIX (Regional Gamification Weights)
+// =============================================================================
+
+export const alignmentMatrix = pgTable("alignment_matrix", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  authorityId: varchar("authority_id").references(() => authorities.id),
+  modelType: varchar("model_type").$type<AuthorityModelType>(),
+  beingWeight: integer("being_weight").default(33),
+  knowingWeight: integer("knowing_weight").default(34),
+  doingWeight: integer("doing_weight").default(33),
+  certificationMultiplier: varchar("certification_multiplier").default("1.0"),
+  distinctionMultiplier: varchar("distinction_multiplier").default("2.5"),
+  peerLearningThreshold: integer("peer_learning_threshold"),
+  personalizedFeedbackWeight: integer("personalized_feedback_weight"),
+  continuousProgressWeight: integer("continuous_progress_weight"),
+  metadata: jsonb("metadata").$type<{
+    focusAreas?: string[];
+    guardrails?: string[];
+  }>(),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertAlignmentMatrixSchema = createInsertSchema(alignmentMatrix).omit({ id: true, createdAt: true, updatedAt: true });
+export type InsertAlignmentMatrix = z.infer<typeof insertAlignmentMatrixSchema>;
+export type AlignmentMatrix = typeof alignmentMatrix.$inferSelect;
