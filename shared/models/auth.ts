@@ -103,6 +103,7 @@ export const organizations = pgTable("organizations", {
   slug: varchar("slug").unique().notNull(),
   type: varchar("type").default("school").$type<OrganizationType>(),
   status: varchar("status").default("active").$type<OrganizationStatus>(),
+  parentOrganizationId: varchar("parent_organization_id"),
   domain: varchar("domain"),
   logoUrl: varchar("logo_url"),
   address: varchar("address"),
