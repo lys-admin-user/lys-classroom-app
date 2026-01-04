@@ -455,6 +455,117 @@ export async function registerRoutes(
     }
   });
 
+  // Profile Sitemap - Secure tier-based navigation
+  // This endpoint returns features available/locked based on user's tier
+  // Maximum security: tier is always validated server-side from database
+  app.get("/api/profile/sitemap", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user?.claims?.sub;
+      if (!userId) {
+        res.status(401).json({ error: "Unauthorized" });
+        return;
+      }
+      
+      // Get user's tier from database - NEVER trust client-side tier claims
+      const user = await storage.getUser(userId);
+      if (!user) {
+        res.status(404).json({ error: "User not found" });
+        return;
+      }
+      
+      // Import tier functions from shared schema
+      const { getFeaturesForTier, getNextTier, TIER_BENEFITS, UserTierType } = await import("@shared/schema");
+      
+      const userTier = (user.tier || "free") as typeof UserTierType[keyof typeof UserTierType];
+      const { available, locked } = getFeaturesForTier(userTier);
+      const nextTierKey = getNextTier(userTier);
+      
+      // Build response with tier info
+      const currentTierInfo = TIER_BENEFITS[userTier as keyof typeof TIER_BENEFITS];
+      const nextTierInfo = nextTierKey ? TIER_BENEFITS[nextTierKey as keyof typeof TIER_BENEFITS] : null;
+      
+      // Generate personalized upgrade recommendation based on user activity
+      let upgradeRecommendation: string | undefined;
+      if (userTier === "free") {
+        const lessonCount = await storage.getLessonGenerationCount(userId);
+        if (lessonCount >= 3) {
+          upgradeRecommendation = "You're using AI lessons frequently! Upgrade to Pro for unlimited lesson generation and advanced analytics.";
+        } else {
+          upgradeRecommendation = "Unlock unlimited AI lessons and personalized professional development with Pro.";
+        }
+      } else if (userTier === "pro") {
+        upgradeRecommendation = "Ready to collaborate? Campus tier enables real-time co-creation, classroom management, and shared resources.";
+      }
+      
+      const sitemap = {
+        currentTier: userTier,
+        tierInfo: currentTierInfo,
+        nextTier: nextTierInfo,
+        availableFeatures: available.map(f => ({
+          id: f.id,
+          name: f.name,
+          description: f.description,
+          icon: f.icon,
+          path: f.path,
+          category: f.category,
+          limitInfo: f.limitInfo,
+        })),
+        lockedFeatures: locked.map(f => ({
+          id: f.id,
+          name: f.name,
+          description: f.description,
+          icon: f.icon,
+          path: f.path,
+          category: f.category,
+          requiredTier: f.requiredTier,
+          upgradeMessage: f.upgradeMessage,
+        })),
+        upgradeRecommendation,
+      };
+      
+      res.json(sitemap);
+    } catch (error) {
+      console.error("Profile sitemap error:", error);
+      res.status(500).json({ error: "Failed to load profile sitemap" });
+    }
+  });
+
+  // Tier access validation middleware for protected routes
+  // Use this to prevent direct URL access to tier-locked features
+  app.get("/api/profile/check-feature-access/:featureId", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user?.claims?.sub;
+      const { featureId } = req.params;
+      
+      const user = await storage.getUser(userId);
+      if (!user) {
+        res.status(404).json({ error: "User not found" });
+        return;
+      }
+      
+      const { TIER_FEATURES, tierHasAccess, UserTierType } = await import("@shared/schema");
+      
+      const feature = TIER_FEATURES.find(f => f.id === featureId);
+      if (!feature) {
+        res.status(404).json({ error: "Feature not found" });
+        return;
+      }
+      
+      const userTier = (user.tier || "free") as typeof UserTierType[keyof typeof UserTierType];
+      const hasAccess = tierHasAccess(userTier, feature.requiredTier);
+      
+      res.json({
+        featureId,
+        hasAccess,
+        requiredTier: feature.requiredTier,
+        userTier,
+        upgradeMessage: hasAccess ? null : feature.upgradeMessage,
+      });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to check feature access" });
+    }
+  });
+
   // Careers - public
   app.get("/api/careers", async (req, res) => {
     try {
