@@ -122,8 +122,6 @@ export default function PortfolioBuilder() {
       setPrivacy("private");
       setTheme("professional");
       setSkills([]);
-      // Clear items cache to prevent stale data after portfolio deletion
-      queryClient.removeQueries({ queryKey: ["/api/portfolio"], exact: false });
     }
   }, [portfolio, portfolioLoading]);
 
