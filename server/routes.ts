@@ -264,6 +264,154 @@ export async function registerRoutes(
     }
   });
 
+  // Lesson Templates - for one-click lesson creation
+  app.get("/api/templates", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user?.claims?.sub;
+      const templates = await storage.getLessonTemplates(userId);
+      res.json(templates);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch templates" });
+    }
+  });
+
+  app.get("/api/templates/public", async (req, res) => {
+    try {
+      const templates = await storage.getPublicLessonTemplates();
+      res.json(templates);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch public templates" });
+    }
+  });
+
+  app.get("/api/templates/:id", async (req, res) => {
+    try {
+      const template = await storage.getLessonTemplate(req.params.id);
+      if (!template) {
+        res.status(404).json({ error: "Template not found" });
+        return;
+      }
+      res.json(template);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch template" });
+    }
+  });
+
+  app.post("/api/templates", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user?.claims?.sub;
+      const template = await storage.createLessonTemplate({
+        ...req.body,
+        userId,
+      });
+      res.json(template);
+    } catch (error) {
+      console.error("Create template error:", error);
+      res.status(500).json({ error: "Failed to create template" });
+    }
+  });
+
+  app.patch("/api/templates/:id", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user?.claims?.sub;
+      const updated = await storage.updateLessonTemplate(req.params.id, req.body, userId);
+      if (!updated) {
+        res.status(404).json({ error: "Template not found or not authorized" });
+        return;
+      }
+      res.json(updated);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to update template" });
+    }
+  });
+
+  app.delete("/api/templates/:id", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user?.claims?.sub;
+      const deleted = await storage.deleteLessonTemplate(req.params.id, userId);
+      if (!deleted) {
+        res.status(404).json({ error: "Template not found or not authorized" });
+        return;
+      }
+      res.json({ success: true });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to delete template" });
+    }
+  });
+
+  // Create lesson from template (one-click)
+  app.post("/api/templates/:id/use", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user?.claims?.sub;
+      const template = await storage.getLessonTemplate(req.params.id);
+      if (!template) {
+        res.status(404).json({ error: "Template not found" });
+        return;
+      }
+
+      // Increment use count
+      await storage.incrementTemplateUseCount(req.params.id);
+
+      // Create a new lesson from the template with optional customizations
+      const customizations = req.body || {};
+      const lesson = await storage.createLesson({
+        userId,
+        title: customizations.title || template.title,
+        topic: customizations.topic || template.title,
+        gradeLevel: customizations.gradeLevel || template.gradeLevel,
+        bkdFocus: template.bkdFocus,
+        standards: customizations.standards || "",
+        duration: template.duration,
+        objectives: template.objectives,
+        activities: template.activities,
+        materials: template.materials,
+        assessment: template.assessmentTemplate,
+        reflection: "",
+      });
+
+      res.json(lesson);
+    } catch (error) {
+      console.error("Use template error:", error);
+      res.status(500).json({ error: "Failed to create lesson from template" });
+    }
+  });
+
+  // Save existing lesson as template
+  app.post("/api/lessons/:id/save-as-template", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user?.claims?.sub;
+      const lesson = await storage.getLesson(req.params.id);
+      if (!lesson || lesson.userId !== userId) {
+        res.status(404).json({ error: "Lesson not found or not authorized" });
+        return;
+      }
+
+      const templateData = req.body || {};
+      const template = await storage.createLessonTemplate({
+        userId,
+        title: templateData.title || `${lesson.title} Template`,
+        description: templateData.description || `Template based on: ${lesson.title}`,
+        category: templateData.category || "General",
+        gradeLevel: lesson.gradeLevel,
+        subject: templateData.subject,
+        bkdFocus: lesson.bkdFocus,
+        duration: lesson.duration,
+        objectives: lesson.objectives,
+        activities: lesson.activities,
+        materials: lesson.materials,
+        assessmentTemplate: lesson.assessment,
+        lysMethodology: templateData.lysMethodology,
+        tags: templateData.tags || [],
+        visibility: templateData.visibility || "private",
+      });
+
+      res.json(template);
+    } catch (error) {
+      console.error("Save as template error:", error);
+      res.status(500).json({ error: "Failed to save lesson as template" });
+    }
+  });
+
   // Goals - works for all users, but data is session-based for non-auth
   app.get("/api/goals", async (req: any, res) => {
     try {
