@@ -1044,6 +1044,23 @@ export const portfolioThemes = [
   { id: "academic", name: "Academic", description: "Traditional academic style" },
 ] as const;
 
+// Portfolio Comments Table (for teacher/parent feedback)
+export const portfolioComments = pgTable("portfolio_comments", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  portfolioId: varchar("portfolio_id").notNull(),
+  portfolioItemId: varchar("portfolio_item_id"),
+  authorId: varchar("author_id").notNull(),
+  authorRole: text("author_role").notNull(),
+  authorName: text("author_name").notNull(),
+  content: text("content").notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertPortfolioCommentSchema = createInsertSchema(portfolioComments).omit({ id: true, createdAt: true, updatedAt: true });
+export type InsertPortfolioComment = z.infer<typeof insertPortfolioCommentSchema>;
+export type PortfolioComment = typeof portfolioComments.$inferSelect;
+
 // IEP/504/BIP Accommodation Suggestions (static reference data)
 export const accommodationSuggestions = [
   { id: "1", type: "IEP" as AccommodationType, category: "Presentation", suggestion: "Provide audio recordings of written materials", source: "IDEA Best Practices" },
