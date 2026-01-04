@@ -140,6 +140,9 @@ import {
   type InsertWorkforceTrend,
   type AlignmentMatrix,
   type InsertAlignmentMatrix,
+  type EntityShare,
+  type InsertEntityShare,
+  entityShares,
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, desc, and, asc } from "drizzle-orm";
@@ -310,6 +313,18 @@ export interface IStorage {
   getAssignmentRecipients(assignmentId: string): Promise<AssignmentRecipient[]>;
   createAssignmentRecipient(recipient: InsertAssignmentRecipient): Promise<AssignmentRecipient>;
   updateAssignmentRecipient(id: string, updates: Partial<AssignmentRecipient>): Promise<AssignmentRecipient | undefined>;
+
+  // Organization-Scoped Classroom Access
+  getClassesByOrganization(organizationId: string): Promise<Class[]>;
+  getStudentsByOrganization(organizationId: string): Promise<Student[]>;
+  getClassesByOrganizationHierarchy(organizationId: string): Promise<Class[]>;
+  getStudentsByOrganizationHierarchy(organizationId: string): Promise<Student[]>;
+
+  // Entity Sharing
+  createEntityShare(share: InsertEntityShare): Promise<EntityShare>;
+  getEntityShares(entityType: string, entityId: string): Promise<EntityShare[]>;
+  getSharedWithOrganization(targetOrganizationId: string): Promise<EntityShare[]>;
+  deleteEntityShare(id: string): Promise<boolean>;
   
   // Organizations (Multi-Tenant)
   getOrganizations(): Promise<Organization[]>;
@@ -1416,6 +1431,70 @@ export class DatabaseStorage implements IStorage {
   async removeStudentFromClass(classId: string, studentId: string): Promise<boolean> {
     await db.delete(classStudents)
       .where(and(eq(classStudents.classId, classId), eq(classStudents.studentId, studentId)));
+    return true;
+  }
+
+  // Organization-Scoped Classroom Access
+  async getClassesByOrganization(organizationId: string): Promise<Class[]> {
+    return await db.select().from(classes)
+      .where(eq(classes.organizationId, organizationId))
+      .orderBy(desc(classes.createdAt));
+  }
+
+  async getStudentsByOrganization(organizationId: string): Promise<Student[]> {
+    return await db.select().from(students)
+      .where(eq(students.organizationId, organizationId))
+      .orderBy(asc(students.lastName), asc(students.firstName));
+  }
+
+  async getClassesByOrganizationHierarchy(organizationId: string): Promise<Class[]> {
+    const childOrgs = await this.getChildOrganizations(organizationId);
+    const orgIds = [organizationId, ...childOrgs.map(o => o.id)];
+    
+    const allClasses: Class[] = [];
+    for (const orgId of orgIds) {
+      const orgClasses = await this.getClassesByOrganization(orgId);
+      allClasses.push(...orgClasses);
+    }
+    return allClasses.sort((a, b) => {
+      const aTime = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+      const bTime = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+      return bTime - aTime;
+    });
+  }
+
+  async getStudentsByOrganizationHierarchy(organizationId: string): Promise<Student[]> {
+    const childOrgs = await this.getChildOrganizations(organizationId);
+    const orgIds = [organizationId, ...childOrgs.map(o => o.id)];
+    
+    const allStudents: Student[] = [];
+    for (const orgId of orgIds) {
+      const orgStudents = await this.getStudentsByOrganization(orgId);
+      allStudents.push(...orgStudents);
+    }
+    return allStudents.sort((a, b) => a.lastName.localeCompare(b.lastName));
+  }
+
+  // Entity Sharing
+  async createEntityShare(share: InsertEntityShare): Promise<EntityShare> {
+    const [result] = await db.insert(entityShares).values(share).returning();
+    return result;
+  }
+
+  async getEntityShares(entityType: string, entityId: string): Promise<EntityShare[]> {
+    return await db.select().from(entityShares)
+      .where(and(eq(entityShares.entityType, entityType as any), eq(entityShares.entityId, entityId)))
+      .orderBy(desc(entityShares.createdAt));
+  }
+
+  async getSharedWithOrganization(targetOrganizationId: string): Promise<EntityShare[]> {
+    return await db.select().from(entityShares)
+      .where(eq(entityShares.targetOrganizationId, targetOrganizationId))
+      .orderBy(desc(entityShares.createdAt));
+  }
+
+  async deleteEntityShare(id: string): Promise<boolean> {
+    await db.delete(entityShares).where(eq(entityShares.id, id));
     return true;
   }
 

@@ -2328,6 +2328,121 @@ export async function registerRoutes(
     }
   });
 
+  // Organization-scoped classroom data
+  app.get("/api/orgs/:orgId/classes", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user?.claims?.sub;
+      const { orgId } = req.params;
+      const includeHierarchy = req.query.hierarchy === "true";
+      
+      const membership = await storage.getOrgMembership(orgId, userId);
+      const isSiteAdminUser = await storage.isSiteAdmin(userId);
+      
+      if (!membership && !isSiteAdminUser) {
+        res.status(403).json({ error: "Access denied" });
+        return;
+      }
+      
+      const classes = includeHierarchy 
+        ? await storage.getClassesByOrganizationHierarchy(orgId)
+        : await storage.getClassesByOrganization(orgId);
+      
+      res.json(classes);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch organization classes" });
+    }
+  });
+
+  app.get("/api/orgs/:orgId/students", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user?.claims?.sub;
+      const { orgId } = req.params;
+      const includeHierarchy = req.query.hierarchy === "true";
+      
+      const membership = await storage.getOrgMembership(orgId, userId);
+      const isSiteAdminUser = await storage.isSiteAdmin(userId);
+      
+      if (!membership && !isSiteAdminUser) {
+        res.status(403).json({ error: "Access denied" });
+        return;
+      }
+      
+      const studentList = includeHierarchy 
+        ? await storage.getStudentsByOrganizationHierarchy(orgId)
+        : await storage.getStudentsByOrganization(orgId);
+      
+      res.json(studentList);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch organization students" });
+    }
+  });
+
+  // Entity sharing between organizations
+  app.post("/api/orgs/:orgId/share", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user?.claims?.sub;
+      const { orgId } = req.params;
+      const { entityType, entityId, targetOrganizationId, permission } = req.body;
+      
+      const membership = await storage.getOrgMembership(orgId, userId);
+      if (!membership || membership.role === "member") {
+        res.status(403).json({ error: "Admin access required to share" });
+        return;
+      }
+      
+      const share = await storage.createEntityShare({
+        entityType,
+        entityId,
+        sourceOrganizationId: orgId,
+        targetOrganizationId,
+        permission: permission || "view",
+        sharedBy: userId,
+      });
+      
+      res.json(share);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to share entity" });
+    }
+  });
+
+  app.get("/api/orgs/:orgId/shared-with-us", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user?.claims?.sub;
+      const { orgId } = req.params;
+      
+      const membership = await storage.getOrgMembership(orgId, userId);
+      const isSiteAdminUser = await storage.isSiteAdmin(userId);
+      
+      if (!membership && !isSiteAdminUser) {
+        res.status(403).json({ error: "Access denied" });
+        return;
+      }
+      
+      const shares = await storage.getSharedWithOrganization(orgId);
+      res.json(shares);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch shared entities" });
+    }
+  });
+
+  app.delete("/api/shares/:shareId", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user?.claims?.sub;
+      const { shareId } = req.params;
+      
+      const isSiteAdminUser = await storage.isSiteAdmin(userId);
+      if (!isSiteAdminUser) {
+        res.status(403).json({ error: "Admin access required" });
+        return;
+      }
+      
+      await storage.deleteEntityShare(shareId);
+      res.json({ success: true });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to delete share" });
+    }
+  });
+
   // Campus Admin Analytics - aggregate data across organization
   app.get("/api/campus-analytics", isAuthenticated, async (req: any, res) => {
     try {

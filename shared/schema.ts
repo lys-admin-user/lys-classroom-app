@@ -662,6 +662,7 @@ export type AccommodationType = typeof accommodationTypes[number];
 export const classes = pgTable("classes", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   userId: varchar("user_id").notNull(),
+  organizationId: varchar("organization_id"),
   name: text("name").notNull(),
   subject: text("subject"),
   gradeLevel: text("grade_level"),
@@ -680,6 +681,7 @@ export type Class = typeof classes.$inferSelect;
 export const students = pgTable("students", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   userId: varchar("user_id").notNull(),
+  organizationId: varchar("organization_id"),
   firstName: text("first_name").notNull(),
   lastName: text("last_name").notNull(),
   studentId: text("student_id"),
@@ -709,6 +711,26 @@ export const classStudents = pgTable("class_students", {
 export const insertClassStudentSchema = createInsertSchema(classStudents).omit({ id: true, enrolledAt: true });
 export type InsertClassStudent = z.infer<typeof insertClassStudentSchema>;
 export type ClassStudent = typeof classStudents.$inferSelect;
+
+// Entity Shares - for sharing classroom data across organizations
+export type EntitySharePermission = "view" | "edit" | "copy";
+export type ShareableEntityType = "class" | "student" | "assignment" | "lesson" | "scope_sequence";
+
+export const entityShares = pgTable("entity_shares", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  entityType: text("entity_type").notNull().$type<ShareableEntityType>(),
+  entityId: varchar("entity_id").notNull(),
+  sourceOrganizationId: varchar("source_organization_id").notNull(),
+  targetOrganizationId: varchar("target_organization_id").notNull(),
+  permission: text("permission").notNull().default("view").$type<EntitySharePermission>(),
+  sharedBy: varchar("shared_by").notNull(),
+  expiresAt: timestamp("expires_at"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertEntityShareSchema = createInsertSchema(entityShares).omit({ id: true, createdAt: true });
+export type InsertEntityShare = z.infer<typeof insertEntityShareSchema>;
+export type EntityShare = typeof entityShares.$inferSelect;
 
 // Student Groups (for group assignments)
 export const studentGroups = pgTable("student_groups", {
