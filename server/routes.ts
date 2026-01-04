@@ -3,7 +3,26 @@ import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { generateLessonPlan } from "./openai";
 import { parseDocument } from "./documentParser";
-import { generateLessonRequestSchema, insertScopeSequenceSchema, insertSequenceUnitSchema, insertScopeChangeRequestSchema, users, insertFeatureFlagSchema, insertEmailTemplateSchema, type Lesson, type Goal } from "@shared/schema";
+import { 
+  generateLessonRequestSchema, 
+  insertScopeSequenceSchema, 
+  insertSequenceUnitSchema, 
+  insertScopeChangeRequestSchema, 
+  users, 
+  insertFeatureFlagSchema, 
+  insertEmailTemplateSchema, 
+  type Lesson, 
+  type Goal,
+  type User,
+  lessons,
+  goals,
+  educatorProfiles,
+  userPreferences,
+  educatorAffiliates,
+  referralEvents,
+  standardsJurisdictions,
+  authorities as authoritiesTable,
+} from "@shared/schema";
 import { z } from "zod";
 import { setupAuth, registerAuthRoutes, isAuthenticated } from "./replit_integrations/auth";
 import { randomUUID } from "crypto";
@@ -11,7 +30,7 @@ import multer from "multer";
 import { syncJurisdictionsFromCSP, syncStandardSetFromCSP, getSyncStatus, fetchCSPJurisdictions, syncAllStandardsFromCSP, getImportProgress } from "./services/cspService";
 import { extractStandardsFromText, processPdfImport, checkSourceForChanges } from "./services/llmExtractionService";
 import { db } from "./db";
-import { eq } from "drizzle-orm";
+import { eq, desc } from "drizzle-orm";
 
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 10 * 1024 * 1024 } });
 
@@ -3222,6 +3241,431 @@ export async function registerRoutes(
     }
   });
 
+  // ============ Enhanced System Admin Dashboard Routes ============
+
+  // Get comprehensive platform analytics
+  app.get("/api/admin/analytics", isAuthenticated, isSiteAdmin, async (req: any, res) => {
+    try {
+      const allUsers = await db.select().from(users);
+      const allLessons = await db.select().from(lessons);
+      const allAffiliates = await db.select().from(educatorAffiliates);
+      const allOrgs = await storage.getOrganizations();
+      const allGoals = await db.select().from(goals);
+      
+      const now = new Date();
+      const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+      const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+      
+      const recentUsers = allUsers.filter(u => u.createdAt && new Date(u.createdAt) > thirtyDaysAgo);
+      const weeklyUsers = allUsers.filter(u => u.createdAt && new Date(u.createdAt) > sevenDaysAgo);
+      
+      const tierBreakdown = {
+        free: allUsers.filter(u => u.tier === "free").length,
+        pro: allUsers.filter(u => u.tier === "pro").length,
+        campus: allUsers.filter(u => u.tier === "campus").length,
+        enterprise: allUsers.filter(u => u.tier === "enterprise").length,
+      };
+      
+      const roleBreakdown = {
+        student: allUsers.filter(u => u.role === "student").length,
+        educator: allUsers.filter(u => u.role === "educator").length,
+        campus_admin: allUsers.filter(u => u.role === "campus_admin").length,
+      };
+      
+      const affiliateStats = {
+        total: allAffiliates.length,
+        active: allAffiliates.filter(a => a.isActive).length,
+        totalPoints: allAffiliates.reduce((sum, a) => sum + (a.totalPoints || 0), 0),
+        totalReferrals: allAffiliates.reduce((sum, a) => sum + (a.totalReferrals || 0), 0),
+        totalViews: allAffiliates.reduce((sum, a) => sum + (a.totalViews || 0), 0),
+        totalShares: allAffiliates.reduce((sum, a) => sum + (a.totalShares || 0), 0),
+      };
+      
+      res.json({
+        users: {
+          total: allUsers.length,
+          newThisMonth: recentUsers.length,
+          newThisWeek: weeklyUsers.length,
+          byTier: tierBreakdown,
+          byRole: roleBreakdown,
+        },
+        content: {
+          totalLessons: allLessons.length,
+          totalGoals: allGoals.length,
+        },
+        organizations: {
+          total: allOrgs.length,
+          active: allOrgs.filter(o => o.status === "active").length,
+          byType: {
+            school: allOrgs.filter(o => o.type === "school").length,
+            district: allOrgs.filter(o => o.type === "district").length,
+            university: allOrgs.filter(o => o.type === "university").length,
+          },
+        },
+        affiliates: affiliateStats,
+      });
+    } catch (error) {
+      console.error("Analytics error:", error);
+      res.status(500).json({ error: "Failed to fetch analytics" });
+    }
+  });
+
+  // Get all users (site admin only) with pagination and search
+  app.get("/api/admin/users", isAuthenticated, isSiteAdmin, async (req: any, res) => {
+    try {
+      const { search, role, tier, limit = "50", offset = "0" } = req.query;
+      let query = db.select().from(users);
+      
+      const allUsers = await query;
+      
+      let filteredUsers = allUsers;
+      if (search) {
+        const searchLower = (search as string).toLowerCase();
+        filteredUsers = filteredUsers.filter(u => 
+          u.email?.toLowerCase().includes(searchLower) ||
+          u.firstName?.toLowerCase().includes(searchLower) ||
+          u.lastName?.toLowerCase().includes(searchLower)
+        );
+      }
+      if (role) {
+        filteredUsers = filteredUsers.filter(u => u.role === role);
+      }
+      if (tier) {
+        filteredUsers = filteredUsers.filter(u => u.tier === tier);
+      }
+      
+      const total = filteredUsers.length;
+      const paginatedUsers = filteredUsers.slice(parseInt(offset as string), parseInt(offset as string) + parseInt(limit as string));
+      
+      res.json({
+        users: paginatedUsers,
+        total,
+        limit: parseInt(limit as string),
+        offset: parseInt(offset as string),
+      });
+    } catch (error) {
+      console.error("Users fetch error:", error);
+      res.status(500).json({ error: "Failed to fetch users" });
+    }
+  });
+
+  // Get single user details (site admin only)
+  app.get("/api/admin/users/:id", isAuthenticated, isSiteAdmin, async (req: any, res) => {
+    try {
+      const { id } = req.params;
+      const [user] = await db.select().from(users).where(eq(users.id, id));
+      
+      if (!user) {
+        res.status(404).json({ error: "User not found" });
+        return;
+      }
+      
+      const [profile] = await db.select().from(educatorProfiles).where(eq(educatorProfiles.userId, id));
+      const [prefs] = await db.select().from(userPreferences).where(eq(userPreferences.userId, id));
+      const userLessons = await db.select().from(lessons).where(eq(lessons.userId, id));
+      const userGoals = await db.select().from(goals).where(eq(goals.userId, id));
+      
+      res.json({
+        user,
+        profile,
+        preferences: prefs,
+        stats: {
+          lessonsCreated: userLessons.length,
+          goalsCreated: userGoals.length,
+        },
+      });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch user details" });
+    }
+  });
+
+  // Update user (site admin only)
+  app.patch("/api/admin/users/:id", isAuthenticated, isSiteAdmin, async (req: any, res) => {
+    try {
+      const { id } = req.params;
+      const { tier, role, email, firstName, lastName } = req.body;
+      
+      const updates: Partial<User> = {};
+      if (tier) updates.tier = tier;
+      if (role) updates.role = role;
+      if (email) updates.email = email;
+      if (firstName) updates.firstName = firstName;
+      if (lastName) updates.lastName = lastName;
+      updates.updatedAt = new Date();
+      
+      const [updated] = await db.update(users).set(updates).where(eq(users.id, id)).returning();
+      res.json(updated);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to update user" });
+    }
+  });
+
+  // Delete user (site admin only)
+  app.delete("/api/admin/users/:id", isAuthenticated, isSiteAdmin, async (req: any, res) => {
+    try {
+      const { id } = req.params;
+      const adminId = req.user?.claims?.sub;
+      
+      if (id === adminId) {
+        res.status(400).json({ error: "Cannot delete your own account" });
+        return;
+      }
+      
+      await db.delete(lessons).where(eq(lessons.userId, id));
+      await db.delete(goals).where(eq(goals.userId, id));
+      await db.delete(educatorProfiles).where(eq(educatorProfiles.userId, id));
+      await db.delete(userPreferences).where(eq(userPreferences.userId, id));
+      await db.delete(users).where(eq(users.id, id));
+      
+      res.json({ success: true });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to delete user" });
+    }
+  });
+
+  // Impersonate user (site admin only) - creates a session token
+  app.post("/api/admin/users/:id/impersonate", isAuthenticated, isSiteAdmin, async (req: any, res) => {
+    try {
+      const { id } = req.params;
+      const adminId = req.user?.claims?.sub;
+      
+      const [targetUser] = await db.select().from(users).where(eq(users.id, id));
+      if (!targetUser) {
+        res.status(404).json({ error: "User not found" });
+        return;
+      }
+      
+      req.session.impersonating = {
+        userId: id,
+        originalAdminId: adminId,
+        startedAt: new Date().toISOString(),
+      };
+      
+      res.json({ 
+        success: true, 
+        message: `Now impersonating ${targetUser.firstName} ${targetUser.lastName}`,
+        user: targetUser,
+      });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to impersonate user" });
+    }
+  });
+
+  // Stop impersonation
+  app.post("/api/admin/stop-impersonation", isAuthenticated, async (req: any, res) => {
+    try {
+      if (req.session.impersonating) {
+        delete req.session.impersonating;
+        res.json({ success: true, message: "Stopped impersonation" });
+      } else {
+        res.status(400).json({ error: "Not currently impersonating" });
+      }
+    } catch (error) {
+      res.status(500).json({ error: "Failed to stop impersonation" });
+    }
+  });
+
+  // Get all affiliates (site admin only)
+  app.get("/api/admin/affiliates", isAuthenticated, isSiteAdmin, async (req: any, res) => {
+    try {
+      const affiliates = await db.select().from(educatorAffiliates);
+      
+      const enrichedAffiliates = await Promise.all(affiliates.map(async (affiliate) => {
+        const [user] = await db.select().from(users).where(eq(users.id, affiliate.userId));
+        return {
+          ...affiliate,
+          user: user ? {
+            id: user.id,
+            email: user.email,
+            firstName: user.firstName,
+            lastName: user.lastName,
+          } : null,
+        };
+      }));
+      
+      res.json(enrichedAffiliates);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch affiliates" });
+    }
+  });
+
+  // Update affiliate (site admin only)
+  app.patch("/api/admin/affiliates/:id", isAuthenticated, isSiteAdmin, async (req: any, res) => {
+    try {
+      const { id } = req.params;
+      const updates = req.body;
+      
+      const [updated] = await db.update(educatorAffiliates)
+        .set({ ...updates, updatedAt: new Date() })
+        .where(eq(educatorAffiliates.id, id))
+        .returning();
+      
+      res.json(updated);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to update affiliate" });
+    }
+  });
+
+  // Get all referral events (site admin only)
+  app.get("/api/admin/referral-events", isAuthenticated, isSiteAdmin, async (req: any, res) => {
+    try {
+      const events = await db.select().from(referralEvents).orderBy(desc(referralEvents.createdAt)).limit(100);
+      res.json(events);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch referral events" });
+    }
+  });
+
+  // Get all lessons (site admin only)
+  app.get("/api/admin/lessons", isAuthenticated, isSiteAdmin, async (req: any, res) => {
+    try {
+      const { search, limit = "50", offset = "0" } = req.query;
+      
+      let allLessons = await db.select().from(lessons).orderBy(desc(lessons.createdAt));
+      
+      if (search) {
+        const searchLower = (search as string).toLowerCase();
+        allLessons = allLessons.filter(l => 
+          l.title?.toLowerCase().includes(searchLower) ||
+          l.topic?.toLowerCase().includes(searchLower)
+        );
+      }
+      
+      const total = allLessons.length;
+      const paginatedLessons = allLessons.slice(parseInt(offset as string), parseInt(offset as string) + parseInt(limit as string));
+      
+      const enrichedLessons = await Promise.all(paginatedLessons.map(async (lesson) => {
+        const [user] = await db.select().from(users).where(eq(users.id, lesson.userId));
+        return {
+          ...lesson,
+          author: user ? `${user.firstName} ${user.lastName}` : "Unknown",
+          authorEmail: user?.email,
+        };
+      }));
+      
+      res.json({ lessons: enrichedLessons, total });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch lessons" });
+    }
+  });
+
+  // Delete lesson (site admin only)
+  app.delete("/api/admin/lessons/:id", isAuthenticated, isSiteAdmin, async (req: any, res) => {
+    try {
+      const { id } = req.params;
+      await db.delete(lessons).where(eq(lessons.id, id));
+      res.json({ success: true });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to delete lesson" });
+    }
+  });
+
+  // Get billing/subscription overview (site admin only)
+  app.get("/api/admin/billing", isAuthenticated, isSiteAdmin, async (req: any, res) => {
+    try {
+      const allUsers = await db.select().from(users);
+      
+      const subscriptionStats = {
+        activeSubscriptions: allUsers.filter(u => u.subscriptionStatus === "active").length,
+        cancelledSubscriptions: allUsers.filter(u => u.subscriptionStatus === "cancelled").length,
+        totalProUsers: allUsers.filter(u => u.tier === "pro").length,
+        totalCampusUsers: allUsers.filter(u => u.tier === "campus").length,
+        totalEnterpriseUsers: allUsers.filter(u => u.tier === "enterprise").length,
+        usersWithStripe: allUsers.filter(u => u.stripeCustomerId).length,
+      };
+      
+      const recentUpgrades = allUsers
+        .filter(u => u.tier !== "free" && u.updatedAt)
+        .sort((a, b) => new Date(b.updatedAt!).getTime() - new Date(a.updatedAt!).getTime())
+        .slice(0, 10)
+        .map(u => ({
+          id: u.id,
+          email: u.email,
+          name: `${u.firstName} ${u.lastName}`,
+          tier: u.tier,
+          updatedAt: u.updatedAt,
+        }));
+      
+      res.json({
+        stats: subscriptionStats,
+        recentUpgrades,
+      });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch billing data" });
+    }
+  });
+
+  // Get platform sitemap structure (site admin only)
+  app.get("/api/admin/sitemap", isAuthenticated, isSiteAdmin, async (req: any, res) => {
+    try {
+      const orgs = await storage.getOrganizations();
+      const authorities = await db.select().from(authoritiesTable);
+      const jurisdictions = await db.select().from(standardsJurisdictions);
+      
+      const sitemap = {
+        platform: {
+          name: "LYS Platform",
+          sections: [
+            {
+              name: "Users & Accounts",
+              path: "/admin?tab=users",
+              description: "Manage all platform users",
+            },
+            {
+              name: "Organizations",
+              path: "/admin?tab=organizations",
+              description: "Schools, districts, and universities",
+              count: orgs.length,
+            },
+            {
+              name: "Affiliates & Referrals",
+              path: "/admin?tab=affiliates",
+              description: "Educator influence program",
+            },
+            {
+              name: "Content Management",
+              path: "/admin?tab=content",
+              description: "Lessons and learning materials",
+            },
+            {
+              name: "Educational Standards",
+              path: "/standards-admin",
+              description: "Curriculum standards management",
+              count: jurisdictions.length,
+            },
+            {
+              name: "Billing & Subscriptions",
+              path: "/admin?tab=billing",
+              description: "Payment and tier management",
+            },
+            {
+              name: "Feature Flags",
+              path: "/admin?tab=flags",
+              description: "Platform feature toggles",
+            },
+            {
+              name: "Global Authorities",
+              path: "/admin?tab=authorities",
+              description: "Educational governance hierarchy",
+              count: authorities.length,
+            },
+          ],
+        },
+        organizations: orgs.map(org => ({
+          id: org.id,
+          name: org.name,
+          type: org.type,
+          status: org.status,
+          tier: org.tier,
+        })),
+      };
+      
+      res.json(sitemap);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch sitemap" });
+    }
+  });
+
   // ============ Parent Portal Routes ============
   
   // Get linked students (for parents) or linked parents (for students)
@@ -3904,13 +4348,21 @@ export async function registerRoutes(
       const userId = req.user?.claims?.sub;
       
       // Get user's goals and skills
-      const goals = await storage.getEducatorCareerGoals(userId);
-      const skills = await storage.getEducatorSkills(userId);
+      const userGoals = await storage.getEducatorCareerGoals(userId);
+      const userSkills = await storage.getEducatorSkills(userId);
       const profile = await storage.getEducatorProfile(userId);
+      
+      // Transform skills to expected format
+      const skillsForAI = userSkills.map(s => ({
+        skillName: s.skillName,
+        category: s.category,
+        currentLevel: s.proficiencyLevel,
+        targetLevel: Math.min(s.proficiencyLevel + 1, 5),
+      }));
       
       // Generate recommendations using AI
       const { generatePDRecommendations } = await import("./openai");
-      const recommendations = await generatePDRecommendations(goals, skills, profile);
+      const recommendations = await generatePDRecommendations(userGoals, skillsForAI, profile);
       
       // Clear old recommendations and save new ones
       await storage.clearUserPDRecommendations(userId);
