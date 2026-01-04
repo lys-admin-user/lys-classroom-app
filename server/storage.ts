@@ -172,6 +172,12 @@ import {
   type LessonTemplate,
   type InsertLessonTemplate,
   lessonTemplates,
+  type StudentPortfolio,
+  type InsertStudentPortfolio,
+  studentPortfolios,
+  type PortfolioItem,
+  type InsertPortfolioItem,
+  portfolioItems,
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, desc, and, asc, gte, sql } from "drizzle-orm";
@@ -514,6 +520,22 @@ export interface IStorage {
   // Student Journey Activities
   getStudentJourneyActivities(journeyProgressId: string, limit?: number): Promise<StudentJourneyActivity[]>;
   createStudentJourneyActivity(activity: InsertStudentJourneyActivity): Promise<StudentJourneyActivity>;
+  
+  // Student Digital Portfolio
+  getStudentPortfolio(userId: string): Promise<StudentPortfolio | undefined>;
+  getStudentPortfolioBySlug(slug: string): Promise<StudentPortfolio | undefined>;
+  createStudentPortfolio(portfolio: InsertStudentPortfolio): Promise<StudentPortfolio>;
+  updateStudentPortfolio(id: string, updates: Partial<StudentPortfolio>, userId: string): Promise<StudentPortfolio | undefined>;
+  deleteStudentPortfolio(id: string, userId: string): Promise<boolean>;
+  incrementPortfolioViews(id: string): Promise<void>;
+  
+  // Portfolio Items
+  getPortfolioItems(portfolioId: string): Promise<PortfolioItem[]>;
+  getPortfolioItem(id: string): Promise<PortfolioItem | undefined>;
+  createPortfolioItem(item: InsertPortfolioItem): Promise<PortfolioItem>;
+  updatePortfolioItem(id: string, updates: Partial<PortfolioItem>): Promise<PortfolioItem | undefined>;
+  deletePortfolioItem(id: string): Promise<boolean>;
+  reorderPortfolioItems(portfolioId: string, itemIds: string[]): Promise<void>;
 }
 
 // Seed data for careers and resources (static content)
@@ -2758,6 +2780,104 @@ export class DatabaseStorage implements IStorage {
   async createStudentJourneyActivity(activity: InsertStudentJourneyActivity): Promise<StudentJourneyActivity> {
     const [created] = await db.insert(studentJourneyActivities).values(activity as any).returning();
     return created;
+  }
+
+  // ================================
+  // Student Digital Portfolio
+  // ================================
+
+  async getStudentPortfolio(userId: string): Promise<StudentPortfolio | undefined> {
+    const [portfolio] = await db.select().from(studentPortfolios)
+      .where(eq(studentPortfolios.userId, userId));
+    return portfolio || undefined;
+  }
+
+  async getStudentPortfolioBySlug(slug: string): Promise<StudentPortfolio | undefined> {
+    const [portfolio] = await db.select().from(studentPortfolios)
+      .where(eq(studentPortfolios.shareableSlug, slug));
+    return portfolio || undefined;
+  }
+
+  async createStudentPortfolio(portfolio: InsertStudentPortfolio): Promise<StudentPortfolio> {
+    const slug = portfolio.shareableSlug || `portfolio-${randomUUID().slice(0, 8)}`;
+    const [created] = await db.insert(studentPortfolios).values({
+      ...portfolio,
+      shareableSlug: slug,
+    } as any).returning();
+    return created;
+  }
+
+  async updateStudentPortfolio(id: string, updates: Partial<StudentPortfolio>, userId: string): Promise<StudentPortfolio | undefined> {
+    const [existing] = await db.select().from(studentPortfolios)
+      .where(and(eq(studentPortfolios.id, id), eq(studentPortfolios.userId, userId)));
+    if (!existing) return undefined;
+    
+    const [updated] = await db.update(studentPortfolios)
+      .set({ ...updates, updatedAt: new Date() })
+      .where(eq(studentPortfolios.id, id))
+      .returning();
+    return updated;
+  }
+
+  async deleteStudentPortfolio(id: string, userId: string): Promise<boolean> {
+    const [existing] = await db.select().from(studentPortfolios)
+      .where(and(eq(studentPortfolios.id, id), eq(studentPortfolios.userId, userId)));
+    if (!existing) return false;
+    
+    await db.delete(portfolioItems).where(eq(portfolioItems.portfolioId, id));
+    await db.delete(studentPortfolios).where(eq(studentPortfolios.id, id));
+    return true;
+  }
+
+  async incrementPortfolioViews(id: string): Promise<void> {
+    await db.update(studentPortfolios)
+      .set({ viewCount: sql`COALESCE(${studentPortfolios.viewCount}, 0) + 1` })
+      .where(eq(studentPortfolios.id, id));
+  }
+
+  // Portfolio Items
+  async getPortfolioItems(portfolioId: string): Promise<PortfolioItem[]> {
+    return await db.select().from(portfolioItems)
+      .where(eq(portfolioItems.portfolioId, portfolioId))
+      .orderBy(asc(portfolioItems.displayOrder), desc(portfolioItems.createdAt));
+  }
+
+  async getPortfolioItem(id: string): Promise<PortfolioItem | undefined> {
+    const [item] = await db.select().from(portfolioItems)
+      .where(eq(portfolioItems.id, id));
+    return item || undefined;
+  }
+
+  async createPortfolioItem(item: InsertPortfolioItem): Promise<PortfolioItem> {
+    const items = await this.getPortfolioItems(item.portfolioId);
+    const maxOrder = items.length > 0 ? Math.max(...items.map(i => i.displayOrder)) : -1;
+    
+    const [created] = await db.insert(portfolioItems).values({
+      ...item,
+      displayOrder: item.displayOrder ?? maxOrder + 1,
+    } as any).returning();
+    return created;
+  }
+
+  async updatePortfolioItem(id: string, updates: Partial<PortfolioItem>): Promise<PortfolioItem | undefined> {
+    const [updated] = await db.update(portfolioItems)
+      .set(updates)
+      .where(eq(portfolioItems.id, id))
+      .returning();
+    return updated || undefined;
+  }
+
+  async deletePortfolioItem(id: string): Promise<boolean> {
+    const result = await db.delete(portfolioItems).where(eq(portfolioItems.id, id));
+    return true;
+  }
+
+  async reorderPortfolioItems(portfolioId: string, itemIds: string[]): Promise<void> {
+    for (let i = 0; i < itemIds.length; i++) {
+      await db.update(portfolioItems)
+        .set({ displayOrder: i })
+        .where(and(eq(portfolioItems.id, itemIds[i]), eq(portfolioItems.portfolioId, portfolioId)));
+    }
   }
 }
 

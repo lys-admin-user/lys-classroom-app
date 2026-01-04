@@ -958,6 +958,92 @@ export const insertAssignmentRecipientSchema = createInsertSchema(assignmentReci
 export type InsertAssignmentRecipient = z.infer<typeof insertAssignmentRecipientSchema>;
 export type AssignmentRecipient = typeof assignmentRecipients.$inferSelect;
 
+// ================================
+// Student Digital Portfolio System
+// ================================
+
+// Student Portfolios Table
+export const studentPortfolios = pgTable("student_portfolios", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull(),
+  title: text("title").notNull(),
+  bio: text("bio"),
+  profileImageUrl: text("profile_image_url"),
+  shareableSlug: varchar("shareable_slug").unique(),
+  privacy: text("privacy").notNull().default("private"),
+  theme: text("theme").notNull().default("professional"),
+  contactEmail: text("contact_email"),
+  linkedinUrl: text("linkedin_url"),
+  handshakeUrl: text("handshake_url"),
+  customLinks: jsonb("custom_links").$type<{ label: string; url: string }[]>(),
+  skills: jsonb("skills").$type<string[]>(),
+  education: jsonb("education").$type<{
+    institution: string;
+    degree?: string;
+    field?: string;
+    startYear?: number;
+    endYear?: number;
+    current?: boolean;
+  }[]>(),
+  viewCount: integer("view_count").default(0),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertStudentPortfolioSchema = createInsertSchema(studentPortfolios).omit({ id: true, createdAt: true, updatedAt: true, viewCount: true });
+export type InsertStudentPortfolio = z.infer<typeof insertStudentPortfolioSchema>;
+export type StudentPortfolio = typeof studentPortfolios.$inferSelect;
+
+// Portfolio Items Table
+export const portfolioItems = pgTable("portfolio_items", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  portfolioId: varchar("portfolio_id").notNull(),
+  itemType: text("item_type").notNull(),
+  itemId: varchar("item_id"),
+  customTitle: text("custom_title").notNull(),
+  customDescription: text("custom_description"),
+  thumbnailUrl: text("thumbnail_url"),
+  attachmentUrl: text("attachment_url"),
+  displayOrder: integer("display_order").notNull().default(0),
+  highlighted: boolean("highlighted").default(false),
+  bkdFocus: text("bkd_focus"),
+  skills: jsonb("skills").$type<string[]>(),
+  completedAt: timestamp("completed_at"),
+  score: text("score"),
+  metadata: jsonb("metadata").$type<{
+    originalTitle?: string;
+    course?: string;
+    educator?: string;
+    feedback?: string;
+    certificateId?: string;
+  }>(),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertPortfolioItemSchema = createInsertSchema(portfolioItems).omit({ id: true, createdAt: true });
+export type InsertPortfolioItem = z.infer<typeof insertPortfolioItemSchema>;
+export type PortfolioItem = typeof portfolioItems.$inferSelect;
+
+// Portfolio item types
+export const portfolioItemTypes = [
+  "assignment",
+  "project",
+  "reflection",
+  "certificate",
+  "achievement",
+  "custom"
+] as const;
+
+export type PortfolioItemType = typeof portfolioItemTypes[number];
+
+// Portfolio themes
+export const portfolioThemes = [
+  { id: "professional", name: "Professional", description: "Clean and formal design" },
+  { id: "creative", name: "Creative", description: "Colorful and expressive design" },
+  { id: "minimal", name: "Minimal", description: "Simple and elegant design" },
+  { id: "academic", name: "Academic", description: "Traditional academic style" },
+] as const;
+
 // IEP/504/BIP Accommodation Suggestions (static reference data)
 export const accommodationSuggestions = [
   { id: "1", type: "IEP" as AccommodationType, category: "Presentation", suggestion: "Provide audio recordings of written materials", source: "IDEA Best Practices" },

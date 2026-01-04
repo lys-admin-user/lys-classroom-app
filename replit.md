@@ -37,6 +37,16 @@ Preferred communication style: Simple, everyday language.
 -   **Real-Time Collaboration**: Enables co-creation of lesson plans with invite codes, role differentiation, live chat, and edit history.
 -   **Shared Resource Library**: A community platform for educators to share resources (lesson plans, worksheets) with visibility controls, categorization, and engagement tracking.
 -   **Educational Standards System**: Lesson generator incorporates legally-compliant, hierarchical educational standards (e.g., US TEKS, CCSS) and a professional lesson plan format.
+-   **Student Digital Portfolio**: Students can create and manage a professional portfolio to showcase completed assignments, projects, and achievements. Features include:
+    -   Portfolio profile with bio, skills, education, and contact info
+    -   Add/remove/reorder portfolio items (assignments, projects, certificates, achievements, reflections)
+    -   Multiple theme options (professional, creative, minimal, academic)
+    -   Privacy controls (private, unlisted, public)
+    -   Shareable links for colleges, employers, and scholarship committees
+    -   Social sharing integration (LinkedIn, Handshake recommendations)
+    -   PDF download for applications
+    -   View count analytics
+-   **One-Click Template Library**: Educators can save lesson plans as reusable templates and browse community-shared templates for quick lesson creation.
 
 ### LYS V3.0 Global Architecture (December 2024)
 -   **Global Authority Tree**: Polymorphic hierarchy supporting worldwide educational governance systems with five levels (supranational, national, regional/state, local/district, school) and three model types:

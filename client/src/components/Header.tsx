@@ -1,7 +1,7 @@
 import { Link, useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
 import { ThemeToggle } from "./ThemeToggle";
-import { Menu, X, Sparkles, LogIn, LogOut, BookOpen, User, BarChart3, Award, Database, Users, Library } from "lucide-react";
+import { Menu, X, Sparkles, LogIn, LogOut, BookOpen, User, BarChart3, Award, Database, Users, Library, Briefcase } from "lucide-react";
 import { useState } from "react";
 import { useAuth } from "@/hooks/use-auth";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -101,6 +101,16 @@ export function Header() {
                     Templates
                   </Button>
                 </Link>
+                <Link href="/portfolio">
+                  <Button
+                    variant={location === "/portfolio" ? "secondary" : "ghost"}
+                    size="sm"
+                    className="font-roboto"
+                    data-testid="nav-portfolio"
+                  >
+                    Portfolio
+                  </Button>
+                </Link>
                 <Link href="/analytics">
                   <Button
                     variant={location === "/analytics" ? "secondary" : "ghost"}
@@ -150,6 +160,12 @@ export function Header() {
                     <DropdownMenuItem className="cursor-pointer" data-testid="menu-templates">
                       <Library className="mr-2 h-4 w-4" />
                       Templates
+                    </DropdownMenuItem>
+                  </Link>
+                  <Link href="/portfolio">
+                    <DropdownMenuItem className="cursor-pointer" data-testid="menu-portfolio">
+                      <Briefcase className="mr-2 h-4 w-4" />
+                      Portfolio
                     </DropdownMenuItem>
                   </Link>
                   <Link href="/analytics">
@@ -258,6 +274,17 @@ export function Header() {
                     >
                       <Library className="mr-2 h-4 w-4" />
                       Templates
+                    </Button>
+                  </Link>
+                  <Link href="/portfolio">
+                    <Button
+                      variant={location === "/portfolio" ? "secondary" : "ghost"}
+                      className="w-full justify-start font-roboto"
+                      onClick={() => setMobileMenuOpen(false)}
+                      data-testid="mobile-nav-portfolio"
+                    >
+                      <Briefcase className="mr-2 h-4 w-4" />
+                      Portfolio
                     </Button>
                   </Link>
                   <Link href="/analytics">

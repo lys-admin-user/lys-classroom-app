@@ -5031,5 +5031,307 @@ export async function registerRoutes(
     }
   });
 
+  // ================================
+  // Student Digital Portfolio System
+  // ================================
+
+  // Get current user's portfolio
+  app.get("/api/portfolio", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user?.claims?.sub;
+      const portfolio = await storage.getStudentPortfolio(userId);
+      res.json(portfolio || null);
+    } catch (error) {
+      console.error("Failed to fetch portfolio:", error);
+      res.status(500).json({ error: "Failed to fetch portfolio" });
+    }
+  });
+
+  // Get public portfolio by shareable slug (no auth required)
+  app.get("/api/portfolio/public/:slug", async (req: any, res) => {
+    try {
+      const { slug } = req.params;
+      const portfolio = await storage.getStudentPortfolioBySlug(slug);
+      
+      if (!portfolio) {
+        res.status(404).json({ error: "Portfolio not found" });
+        return;
+      }
+      
+      if (portfolio.privacy === "private") {
+        res.status(403).json({ error: "This portfolio is private" });
+        return;
+      }
+      
+      // Increment view count
+      await storage.incrementPortfolioViews(portfolio.id);
+      
+      // Get portfolio items
+      const items = await storage.getPortfolioItems(portfolio.id);
+      
+      res.json({ portfolio, items });
+    } catch (error) {
+      console.error("Failed to fetch public portfolio:", error);
+      res.status(500).json({ error: "Failed to fetch portfolio" });
+    }
+  });
+
+  // Create portfolio
+  app.post("/api/portfolio", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user?.claims?.sub;
+      
+      // Check if user already has a portfolio
+      const existing = await storage.getStudentPortfolio(userId);
+      if (existing) {
+        res.status(400).json({ error: "You already have a portfolio. Please update it instead." });
+        return;
+      }
+      
+      const portfolio = await storage.createStudentPortfolio({
+        userId,
+        title: req.body.title || "My Portfolio",
+        bio: req.body.bio,
+        profileImageUrl: req.body.profileImageUrl,
+        privacy: req.body.privacy || "private",
+        theme: req.body.theme || "professional",
+        contactEmail: req.body.contactEmail,
+        linkedinUrl: req.body.linkedinUrl,
+        handshakeUrl: req.body.handshakeUrl,
+        customLinks: req.body.customLinks || [],
+        skills: req.body.skills || [],
+        education: req.body.education || [],
+      });
+      
+      res.status(201).json(portfolio);
+    } catch (error) {
+      console.error("Failed to create portfolio:", error);
+      res.status(500).json({ error: "Failed to create portfolio" });
+    }
+  });
+
+  // Update portfolio
+  app.patch("/api/portfolio/:id", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user?.claims?.sub;
+      const { id } = req.params;
+      
+      const updated = await storage.updateStudentPortfolio(id, req.body, userId);
+      if (!updated) {
+        res.status(404).json({ error: "Portfolio not found or not authorized" });
+        return;
+      }
+      
+      res.json(updated);
+    } catch (error) {
+      console.error("Failed to update portfolio:", error);
+      res.status(500).json({ error: "Failed to update portfolio" });
+    }
+  });
+
+  // Delete portfolio
+  app.delete("/api/portfolio/:id", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user?.claims?.sub;
+      const { id } = req.params;
+      
+      const deleted = await storage.deleteStudentPortfolio(id, userId);
+      if (!deleted) {
+        res.status(404).json({ error: "Portfolio not found or not authorized" });
+        return;
+      }
+      
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Failed to delete portfolio:", error);
+      res.status(500).json({ error: "Failed to delete portfolio" });
+    }
+  });
+
+  // Get portfolio items
+  app.get("/api/portfolio/:id/items", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user?.claims?.sub;
+      const { id } = req.params;
+      
+      // Verify ownership
+      const portfolio = await storage.getStudentPortfolio(userId);
+      if (!portfolio || portfolio.id !== id) {
+        res.status(403).json({ error: "Not authorized" });
+        return;
+      }
+      
+      const items = await storage.getPortfolioItems(id);
+      res.json(items);
+    } catch (error) {
+      console.error("Failed to fetch portfolio items:", error);
+      res.status(500).json({ error: "Failed to fetch portfolio items" });
+    }
+  });
+
+  // Add item to portfolio
+  app.post("/api/portfolio/:id/items", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user?.claims?.sub;
+      const { id: portfolioId } = req.params;
+      
+      // Verify ownership
+      const portfolio = await storage.getStudentPortfolio(userId);
+      if (!portfolio || portfolio.id !== portfolioId) {
+        res.status(403).json({ error: "Not authorized" });
+        return;
+      }
+      
+      const item = await storage.createPortfolioItem({
+        portfolioId,
+        itemType: req.body.itemType || "custom",
+        itemId: req.body.itemId || null,
+        customTitle: req.body.customTitle,
+        customDescription: req.body.customDescription,
+        thumbnailUrl: req.body.thumbnailUrl,
+        attachmentUrl: req.body.attachmentUrl,
+        highlighted: req.body.highlighted || false,
+        bkdFocus: req.body.bkdFocus,
+        skills: req.body.skills || [],
+        completedAt: req.body.completedAt ? new Date(req.body.completedAt) : null,
+        score: req.body.score,
+        metadata: req.body.metadata || {},
+      });
+      
+      res.status(201).json(item);
+    } catch (error) {
+      console.error("Failed to add portfolio item:", error);
+      res.status(500).json({ error: "Failed to add portfolio item" });
+    }
+  });
+
+  // Update portfolio item
+  app.patch("/api/portfolio/items/:id", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user?.claims?.sub;
+      const { id } = req.params;
+      
+      // Get the item to verify ownership
+      const item = await storage.getPortfolioItem(id);
+      if (!item) {
+        res.status(404).json({ error: "Item not found" });
+        return;
+      }
+      
+      // Verify portfolio ownership
+      const portfolio = await storage.getStudentPortfolio(userId);
+      if (!portfolio || portfolio.id !== item.portfolioId) {
+        res.status(403).json({ error: "Not authorized" });
+        return;
+      }
+      
+      const updated = await storage.updatePortfolioItem(id, req.body);
+      res.json(updated);
+    } catch (error) {
+      console.error("Failed to update portfolio item:", error);
+      res.status(500).json({ error: "Failed to update portfolio item" });
+    }
+  });
+
+  // Delete portfolio item
+  app.delete("/api/portfolio/items/:id", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user?.claims?.sub;
+      const { id } = req.params;
+      
+      // Get the item to verify ownership
+      const item = await storage.getPortfolioItem(id);
+      if (!item) {
+        res.status(404).json({ error: "Item not found" });
+        return;
+      }
+      
+      // Verify portfolio ownership
+      const portfolio = await storage.getStudentPortfolio(userId);
+      if (!portfolio || portfolio.id !== item.portfolioId) {
+        res.status(403).json({ error: "Not authorized" });
+        return;
+      }
+      
+      await storage.deletePortfolioItem(id);
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Failed to delete portfolio item:", error);
+      res.status(500).json({ error: "Failed to delete portfolio item" });
+    }
+  });
+
+  // Reorder portfolio items
+  app.post("/api/portfolio/:id/reorder", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user?.claims?.sub;
+      const { id: portfolioId } = req.params;
+      const { itemIds } = req.body;
+      
+      // Verify ownership
+      const portfolio = await storage.getStudentPortfolio(userId);
+      if (!portfolio || portfolio.id !== portfolioId) {
+        res.status(403).json({ error: "Not authorized" });
+        return;
+      }
+      
+      await storage.reorderPortfolioItems(portfolioId, itemIds);
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Failed to reorder portfolio items:", error);
+      res.status(500).json({ error: "Failed to reorder portfolio items" });
+    }
+  });
+
+  // Add completed assignment to portfolio (quick add)
+  app.post("/api/portfolio/add-assignment/:assignmentId", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user?.claims?.sub;
+      const { assignmentId } = req.params;
+      
+      // Get or create portfolio
+      let portfolio = await storage.getStudentPortfolio(userId);
+      if (!portfolio) {
+        portfolio = await storage.createStudentPortfolio({
+          userId,
+          title: "My Portfolio",
+          privacy: "private",
+          theme: "professional",
+        });
+      }
+      
+      // Get assignment details
+      const assignment = await storage.getAssignment(assignmentId);
+      if (!assignment) {
+        res.status(404).json({ error: "Assignment not found" });
+        return;
+      }
+      
+      // Create portfolio item from assignment
+      const item = await storage.createPortfolioItem({
+        portfolioId: portfolio.id,
+        itemType: "assignment",
+        itemId: assignmentId,
+        customTitle: req.body.customTitle || assignment.title,
+        customDescription: req.body.customDescription || assignment.description || null,
+        bkdFocus: req.body.bkdFocus,
+        skills: req.body.skills || [],
+        completedAt: new Date(),
+        score: req.body.score,
+        metadata: {
+          originalTitle: assignment.title,
+          course: req.body.course,
+          educator: req.body.educator,
+          feedback: req.body.feedback,
+        },
+      });
+      
+      res.status(201).json({ portfolio, item });
+    } catch (error) {
+      console.error("Failed to add assignment to portfolio:", error);
+      res.status(500).json({ error: "Failed to add assignment to portfolio" });
+    }
+  });
+
   return httpServer;
 }

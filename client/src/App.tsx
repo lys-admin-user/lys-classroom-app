@@ -36,9 +36,11 @@ import ProfessionalDevelopment from "@/pages/ProfessionalDevelopment";
 import StudentJourney from "@/pages/StudentJourney";
 import StudentDashboard from "@/pages/StudentDashboard";
 import TemplateLibrary from "@/pages/TemplateLibrary";
+import PortfolioBuilder from "@/pages/PortfolioBuilder";
+import PortfolioView from "@/pages/PortfolioView";
 import NotFound from "@/pages/not-found";
 
-const EXEMPT_PATHS = ["/onboarding", "/pricing", "/shared"];
+const EXEMPT_PATHS = ["/onboarding", "/pricing", "/shared", "/p/"];
 
 function OnboardingGuard({ children }: { children: React.ReactNode }) {
   const { user, isAuthenticated, isLoading } = useAuth();
@@ -90,6 +92,8 @@ function Router() {
       <Route path="/student-dashboard/:studentId" component={StudentDashboard} />
       <Route path="/professional-development" component={ProfessionalDevelopment} />
       <Route path="/templates" component={TemplateLibrary} />
+      <Route path="/portfolio" component={PortfolioBuilder} />
+      <Route path="/p/:slug" component={PortfolioView} />
       <Route component={NotFound} />
     </Switch>
   );
