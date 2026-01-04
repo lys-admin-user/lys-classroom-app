@@ -178,6 +178,9 @@ import {
   type PortfolioItem,
   type InsertPortfolioItem,
   portfolioItems,
+  type PortfolioComment,
+  type InsertPortfolioComment,
+  portfolioComments,
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, desc, and, asc, gte, sql } from "drizzle-orm";
@@ -536,6 +539,13 @@ export interface IStorage {
   updatePortfolioItem(id: string, updates: Partial<PortfolioItem>): Promise<PortfolioItem | undefined>;
   deletePortfolioItem(id: string): Promise<boolean>;
   reorderPortfolioItems(portfolioId: string, itemIds: string[]): Promise<void>;
+  
+  // Portfolio Comments
+  getPortfolioComments(portfolioId: string): Promise<PortfolioComment[]>;
+  getPortfolioItemComments(portfolioItemId: string): Promise<PortfolioComment[]>;
+  createPortfolioComment(comment: InsertPortfolioComment): Promise<PortfolioComment>;
+  updatePortfolioComment(id: string, authorId: string, updates: Partial<PortfolioComment>): Promise<PortfolioComment | undefined>;
+  deletePortfolioComment(id: string, authorId: string): Promise<boolean>;
 }
 
 // Seed data for careers and resources (static content)
@@ -2878,6 +2888,37 @@ export class DatabaseStorage implements IStorage {
         .set({ displayOrder: i })
         .where(and(eq(portfolioItems.id, itemIds[i]), eq(portfolioItems.portfolioId, portfolioId)));
     }
+  }
+
+  // Portfolio Comments
+  async getPortfolioComments(portfolioId: string): Promise<PortfolioComment[]> {
+    return await db.select().from(portfolioComments)
+      .where(eq(portfolioComments.portfolioId, portfolioId))
+      .orderBy(desc(portfolioComments.createdAt));
+  }
+
+  async getPortfolioItemComments(portfolioItemId: string): Promise<PortfolioComment[]> {
+    return await db.select().from(portfolioComments)
+      .where(eq(portfolioComments.portfolioItemId, portfolioItemId))
+      .orderBy(desc(portfolioComments.createdAt));
+  }
+
+  async createPortfolioComment(comment: InsertPortfolioComment): Promise<PortfolioComment> {
+    const [created] = await db.insert(portfolioComments).values(comment as any).returning();
+    return created;
+  }
+
+  async updatePortfolioComment(id: string, authorId: string, updates: Partial<PortfolioComment>): Promise<PortfolioComment | undefined> {
+    const [updated] = await db.update(portfolioComments)
+      .set({ ...updates, updatedAt: new Date() })
+      .where(and(eq(portfolioComments.id, id), eq(portfolioComments.authorId, authorId)))
+      .returning();
+    return updated || undefined;
+  }
+
+  async deletePortfolioComment(id: string, authorId: string): Promise<boolean> {
+    await db.delete(portfolioComments).where(and(eq(portfolioComments.id, id), eq(portfolioComments.authorId, authorId)));
+    return true;
   }
 }
 
