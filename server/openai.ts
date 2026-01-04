@@ -269,3 +269,165 @@ function generateMockLessonPlan(request: GenerateLessonRequest): GeneratedLesson
     reflection: `What did you learn about yourself today? How will you apply the ${request.bkdFocus.toUpperCase()} mindset this week?`,
   };
 }
+
+// Professional Development Recommendation Types
+interface PDRecommendationResult {
+  recommendations: {
+    title: string;
+    description: string;
+    reason: string;
+    skillGaps: string[];
+    resourceType: string;
+    provider?: string;
+    estimatedDuration?: string;
+    priority: number;
+  }[];
+  summary: string;
+  focusAreas: string[];
+}
+
+export async function generatePDRecommendations(
+  goals: { goalType: string; targetRole?: string | null; description?: string | null; timeline?: string | null }[],
+  skills: { skillName: string; category: string; currentLevel: number; targetLevel: number }[],
+  profile?: { yearsExperience?: number | null; subjectAreas?: string[] | null; certifications?: string[] | null } | null
+): Promise<PDRecommendationResult> {
+  if (!openai) {
+    return generateMockPDRecommendations(goals, skills, profile);
+  }
+
+  const skillGaps = skills.filter(s => s.currentLevel < s.targetLevel);
+  
+  const systemPrompt = `You are an expert career advisor for educators, specializing in professional development planning. 
+Analyze the educator's career goals, current skills, and skill gaps to generate personalized professional development recommendations.
+
+Consider:
+- The educator's stated career goals and target roles
+- Specific skill gaps (difference between current and target skill levels)
+- Years of experience and existing certifications
+- Practical, actionable resources that can help them grow
+- A mix of formal courses, workshops, peer learning, and self-directed activities
+
+Prioritize recommendations based on:
+1. Skills most critical for their career goals
+2. Largest gaps between current and target levels
+3. Resources that offer the best return on investment of time`;
+
+  const userPrompt = `Educator Profile:
+- Years of Experience: ${profile?.yearsExperience || "Not specified"}
+- Subject Areas: ${profile?.subjectAreas?.join(", ") || "Not specified"}
+- Certifications: ${profile?.certifications?.join(", ") || "None listed"}
+
+Career Goals:
+${goals.length > 0 ? goals.map(g => `- ${g.goalType}${g.targetRole ? ` (Target: ${g.targetRole})` : ""}${g.description ? `: ${g.description}` : ""}${g.timeline ? ` [Timeline: ${g.timeline}]` : ""}`).join("\n") : "No specific goals set"}
+
+Skills Assessment:
+${skillGaps.length > 0 ? skillGaps.map(s => `- ${s.skillName} (${s.category}): Current ${s.currentLevel}/5, Target ${s.targetLevel}/5, Gap: ${s.targetLevel - s.currentLevel}`).join("\n") : "No skill gaps identified"}
+
+Generate 5-8 specific professional development recommendations tailored to this educator's needs.`;
+
+  try {
+    const response = await openai.chat.completions.create({
+      model: "gpt-4o",
+      messages: [
+        { role: "system", content: systemPrompt },
+        { role: "user", content: userPrompt },
+      ],
+      response_format: { type: "json_object" },
+      temperature: 0.7,
+    });
+
+    const content = response.choices[0].message.content;
+    if (!content) throw new Error("No content from OpenAI");
+
+    const result = JSON.parse(content);
+    return {
+      recommendations: result.recommendations || [],
+      summary: result.summary || "Professional development recommendations based on your goals and skills.",
+      focusAreas: result.focusAreas || [],
+    };
+  } catch (error) {
+    console.error("OpenAI PD recommendation error:", error);
+    return generateMockPDRecommendations(goals, skills, profile);
+  }
+}
+
+function generateMockPDRecommendations(
+  goals: { goalType: string; targetRole?: string | null; description?: string | null }[],
+  skills: { skillName: string; category: string; currentLevel: number; targetLevel: number }[],
+  profile?: { yearsExperience?: number | null; subjectAreas?: string[] | null } | null
+): PDRecommendationResult {
+  const skillGaps = skills.filter(s => s.currentLevel < s.targetLevel);
+  const primaryGoal = goals[0]?.goalType || "career_advancement";
+  
+  const baseRecommendations = [
+    {
+      title: "Advanced Classroom Management Strategies",
+      description: "Master evidence-based techniques for creating positive learning environments and managing diverse classroom dynamics.",
+      reason: "Essential foundation for any leadership role in education.",
+      skillGaps: ["classroom_management", "leadership"],
+      resourceType: "course",
+      provider: "ASCD",
+      estimatedDuration: "6 weeks",
+      priority: 1,
+    },
+    {
+      title: "Instructional Coaching Certification",
+      description: "Develop skills to mentor and support fellow educators in improving their practice.",
+      reason: primaryGoal === "leadership" ? "Directly aligned with your leadership goals." : "Builds leadership capacity for future advancement.",
+      skillGaps: ["coaching", "feedback", "professional_development"],
+      resourceType: "certification",
+      provider: "Learning Forward",
+      estimatedDuration: "3 months",
+      priority: 2,
+    },
+    {
+      title: "Data-Driven Instruction Workshop",
+      description: "Learn to analyze student data effectively and use insights to differentiate instruction.",
+      reason: "Critical skill for demonstrating impact and leading data teams.",
+      skillGaps: ["data_analysis", "differentiation"],
+      resourceType: "workshop",
+      provider: "Local Education Agency",
+      estimatedDuration: "2 days",
+      priority: 3,
+    },
+    {
+      title: "Peer Observation Exchange",
+      description: "Join a structured peer observation program to learn from colleagues and share best practices.",
+      reason: "Low-cost, high-impact way to improve teaching while building professional relationships.",
+      skillGaps: ["collaboration", "reflection"],
+      resourceType: "peer_learning",
+      estimatedDuration: "Ongoing",
+      priority: 4,
+    },
+    {
+      title: "Educational Technology Integration",
+      description: "Explore tools and strategies for enhancing student engagement through technology.",
+      reason: "Technology literacy is increasingly essential for modern educators.",
+      skillGaps: ["technology", "student_engagement"],
+      resourceType: "self_study",
+      provider: "ISTE",
+      estimatedDuration: "4 weeks",
+      priority: 5,
+    },
+  ];
+
+  // Add skill-gap-specific recommendations
+  if (skillGaps.length > 0) {
+    const topGap = skillGaps.sort((a, b) => (b.targetLevel - b.currentLevel) - (a.targetLevel - a.currentLevel))[0];
+    baseRecommendations.unshift({
+      title: `${topGap.skillName.replace(/_/g, " ").replace(/\b\w/g, l => l.toUpperCase())} Intensive`,
+      description: `Focused professional development to close your gap in ${topGap.skillName.replace(/_/g, " ")}.`,
+      reason: `You have a ${topGap.targetLevel - topGap.currentLevel} level gap in this skill.`,
+      skillGaps: [topGap.skillName],
+      resourceType: "course",
+      estimatedDuration: "4 weeks",
+      priority: 1,
+    });
+  }
+
+  return {
+    recommendations: baseRecommendations.slice(0, 6),
+    summary: `Based on your ${goals.length > 0 ? goals[0].goalType.replace(/_/g, " ") : "professional"} goals and ${skillGaps.length} identified skill gaps, we've curated these development opportunities.`,
+    focusAreas: skillGaps.slice(0, 3).map(s => s.skillName.replace(/_/g, " ")),
+  };
+}
