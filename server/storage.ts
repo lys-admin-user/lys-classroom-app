@@ -160,6 +160,15 @@ import {
   pdResources,
   pdRecommendations,
   educatorPDProgress,
+  type StudentJourneyProgress,
+  type InsertStudentJourneyProgress,
+  type StudentJourneyMilestone,
+  type InsertStudentJourneyMilestone,
+  type StudentJourneyActivity,
+  type InsertStudentJourneyActivity,
+  studentJourneyProgress,
+  studentJourneyMilestones,
+  studentJourneyActivities,
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, desc, and, asc, gte, sql } from "drizzle-orm";
@@ -474,6 +483,24 @@ export interface IStorage {
   getEducatorPDProgressItem(id: string): Promise<EducatorPDProgress | undefined>;
   createEducatorPDProgress(progress: InsertEducatorPDProgress): Promise<EducatorPDProgress>;
   updateEducatorPDProgress(id: string, userId: string, updates: Partial<EducatorPDProgress>): Promise<EducatorPDProgress | undefined>;
+  
+  // Student Journey Progress (Be-Know-Do Tracking)
+  getStudentJourneyProgress(studentId: string): Promise<StudentJourneyProgress | undefined>;
+  getStudentJourneyProgressByEducator(educatorUserId: string): Promise<StudentJourneyProgress[]>;
+  createStudentJourneyProgress(progress: InsertStudentJourneyProgress): Promise<StudentJourneyProgress>;
+  updateStudentJourneyProgress(id: string, updates: Partial<StudentJourneyProgress>): Promise<StudentJourneyProgress | undefined>;
+  deleteStudentJourneyProgress(id: string): Promise<boolean>;
+  
+  // Student Journey Milestones
+  getStudentJourneyMilestones(journeyProgressId: string): Promise<StudentJourneyMilestone[]>;
+  getStudentJourneyMilestone(id: string): Promise<StudentJourneyMilestone | undefined>;
+  createStudentJourneyMilestone(milestone: InsertStudentJourneyMilestone): Promise<StudentJourneyMilestone>;
+  updateStudentJourneyMilestone(id: string, updates: Partial<StudentJourneyMilestone>): Promise<StudentJourneyMilestone | undefined>;
+  deleteStudentJourneyMilestone(id: string): Promise<boolean>;
+  
+  // Student Journey Activities
+  getStudentJourneyActivities(journeyProgressId: string, limit?: number): Promise<StudentJourneyActivity[]>;
+  createStudentJourneyActivity(activity: InsertStudentJourneyActivity): Promise<StudentJourneyActivity>;
 }
 
 // Seed data for careers and resources (static content)
@@ -2576,6 +2603,84 @@ export class DatabaseStorage implements IStorage {
       .where(and(eq(educatorPDProgress.id, id), eq(educatorPDProgress.userId, userId)))
       .returning();
     return updated || undefined;
+  }
+
+  // ================================
+  // Student Journey Progress (Be-Know-Do Tracking)
+  // ================================
+
+  async getStudentJourneyProgress(studentId: string): Promise<StudentJourneyProgress | undefined> {
+    const [progress] = await db.select().from(studentJourneyProgress)
+      .where(eq(studentJourneyProgress.studentId, studentId));
+    return progress || undefined;
+  }
+
+  async getStudentJourneyProgressByEducator(educatorUserId: string): Promise<StudentJourneyProgress[]> {
+    return await db.select().from(studentJourneyProgress)
+      .where(eq(studentJourneyProgress.educatorUserId, educatorUserId))
+      .orderBy(desc(studentJourneyProgress.lastActivityDate));
+  }
+
+  async createStudentJourneyProgress(progress: InsertStudentJourneyProgress): Promise<StudentJourneyProgress> {
+    const [created] = await db.insert(studentJourneyProgress).values(progress as any).returning();
+    return created;
+  }
+
+  async updateStudentJourneyProgress(id: string, updates: Partial<StudentJourneyProgress>): Promise<StudentJourneyProgress | undefined> {
+    const [updated] = await db.update(studentJourneyProgress)
+      .set({ ...updates, updatedAt: new Date() })
+      .where(eq(studentJourneyProgress.id, id))
+      .returning();
+    return updated || undefined;
+  }
+
+  async deleteStudentJourneyProgress(id: string): Promise<boolean> {
+    const result = await db.delete(studentJourneyProgress).where(eq(studentJourneyProgress.id, id));
+    return (result.rowCount ?? 0) > 0;
+  }
+
+  // Student Journey Milestones
+  async getStudentJourneyMilestones(journeyProgressId: string): Promise<StudentJourneyMilestone[]> {
+    return await db.select().from(studentJourneyMilestones)
+      .where(eq(studentJourneyMilestones.journeyProgressId, journeyProgressId))
+      .orderBy(desc(studentJourneyMilestones.createdAt));
+  }
+
+  async getStudentJourneyMilestone(id: string): Promise<StudentJourneyMilestone | undefined> {
+    const [milestone] = await db.select().from(studentJourneyMilestones)
+      .where(eq(studentJourneyMilestones.id, id));
+    return milestone || undefined;
+  }
+
+  async createStudentJourneyMilestone(milestone: InsertStudentJourneyMilestone): Promise<StudentJourneyMilestone> {
+    const [created] = await db.insert(studentJourneyMilestones).values(milestone as any).returning();
+    return created;
+  }
+
+  async updateStudentJourneyMilestone(id: string, updates: Partial<StudentJourneyMilestone>): Promise<StudentJourneyMilestone | undefined> {
+    const [updated] = await db.update(studentJourneyMilestones)
+      .set(updates)
+      .where(eq(studentJourneyMilestones.id, id))
+      .returning();
+    return updated || undefined;
+  }
+
+  async deleteStudentJourneyMilestone(id: string): Promise<boolean> {
+    const result = await db.delete(studentJourneyMilestones).where(eq(studentJourneyMilestones.id, id));
+    return (result.rowCount ?? 0) > 0;
+  }
+
+  // Student Journey Activities
+  async getStudentJourneyActivities(journeyProgressId: string, limit: number = 50): Promise<StudentJourneyActivity[]> {
+    return await db.select().from(studentJourneyActivities)
+      .where(eq(studentJourneyActivities.journeyProgressId, journeyProgressId))
+      .orderBy(desc(studentJourneyActivities.createdAt))
+      .limit(limit);
+  }
+
+  async createStudentJourneyActivity(activity: InsertStudentJourneyActivity): Promise<StudentJourneyActivity> {
+    const [created] = await db.insert(studentJourneyActivities).values(activity as any).returning();
+    return created;
   }
 }
 
