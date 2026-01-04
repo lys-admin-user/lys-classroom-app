@@ -35,6 +35,7 @@ import Classroom from "@/pages/Classroom";
 import ProfessionalDevelopment from "@/pages/ProfessionalDevelopment";
 import StudentJourney from "@/pages/StudentJourney";
 import StudentDashboard from "@/pages/StudentDashboard";
+import TemplateLibrary from "@/pages/TemplateLibrary";
 import NotFound from "@/pages/not-found";
 
 const EXEMPT_PATHS = ["/onboarding", "/pricing", "/shared"];
@@ -88,6 +89,7 @@ function Router() {
       <Route path="/student-journey/:studentId" component={StudentJourney} />
       <Route path="/student-dashboard/:studentId" component={StudentDashboard} />
       <Route path="/professional-development" component={ProfessionalDevelopment} />
+      <Route path="/templates" component={TemplateLibrary} />
       <Route component={NotFound} />
     </Switch>
   );
