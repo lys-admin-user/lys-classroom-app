@@ -1,5 +1,5 @@
 import { BKDCard } from "@/components/BKDCard";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
@@ -13,11 +13,114 @@ import {
   TrendingUp,
   ArrowRight,
   Clock,
-  Star
+  Star,
+  Trophy
 } from "lucide-react";
 import { Link } from "wouter";
+import { useQuery } from "@tanstack/react-query";
+import { useAuth } from "@/hooks/use-auth";
+import type { StudentJourneyProgress, StudentJourneyMilestone, StudentJourneyActivity } from "@shared/schema";
+
+interface JourneyData {
+  progress: StudentJourneyProgress;
+  milestones: StudentJourneyMilestone[];
+  activities: StudentJourneyActivity[];
+}
+
+function JourneyProgressCard() {
+  const { data: journeyData, isLoading } = useQuery<JourneyData>({
+    queryKey: ["/api/my-journey"],
+  });
+
+  if (isLoading || !journeyData) {
+    return null;
+  }
+
+  const { progress, milestones } = journeyData;
+  const activeMilestones = milestones.filter(m => m.status === "in_progress").slice(0, 2);
+
+  return (
+    <Card className="border-2 border-lys-yellow/30 bg-gradient-to-br from-lys-yellow/5 to-background">
+      <CardHeader className="pb-2">
+        <div className="flex items-center justify-between gap-4 flex-wrap">
+          <div>
+            <CardTitle className="font-oswald flex items-center gap-2">
+              <Trophy className="w-5 h-5 text-lys-yellow" />
+              Your Be-Know-Do Journey
+            </CardTitle>
+            <CardDescription className="font-roboto">Track your progress across all areas</CardDescription>
+          </div>
+          <Button asChild size="sm" variant="outline" data-testid="button-view-journey">
+            <Link href="/my-journey">
+              View Full Journey <ArrowRight className="w-4 h-4 ml-1" />
+            </Link>
+          </Button>
+        </div>
+      </CardHeader>
+      <CardContent>
+        <div className="grid grid-cols-3 gap-4 mb-4">
+          <div className="text-center p-3 rounded-lg bg-lys-yellow/10">
+            <Heart className="w-5 h-5 mx-auto text-lys-yellow mb-1" />
+            <div className="text-2xl font-bold text-lys-yellow">{progress.beScore || 0}%</div>
+            <div className="text-xs text-muted-foreground font-roboto">Being</div>
+          </div>
+          <div className="text-center p-3 rounded-lg bg-lys-teal/10">
+            <Compass className="w-5 h-5 mx-auto text-lys-teal mb-1" />
+            <div className="text-2xl font-bold text-lys-teal">{progress.knowScore || 0}%</div>
+            <div className="text-xs text-muted-foreground font-roboto">Knowing</div>
+          </div>
+          <div className="text-center p-3 rounded-lg bg-lys-red/10">
+            <Target className="w-5 h-5 mx-auto text-lys-red mb-1" />
+            <div className="text-2xl font-bold text-lys-red">{progress.doScore || 0}%</div>
+            <div className="text-xs text-muted-foreground font-roboto">Doing</div>
+          </div>
+        </div>
+        
+        <div className="mb-4">
+          <div className="flex items-center justify-between text-sm mb-1">
+            <span className="font-roboto text-muted-foreground">Overall Progress</span>
+            <span className="font-bold">{progress.overallScore || 0}%</span>
+          </div>
+          <Progress value={progress.overallScore || 0} className="h-2" />
+        </div>
+        
+        {activeMilestones.length > 0 && (
+          <div className="space-y-2">
+            <p className="text-sm font-medium">Active Milestones</p>
+            {activeMilestones.map(milestone => (
+              <div key={milestone.id} className="flex items-center gap-2 text-sm p-2 rounded bg-muted/30">
+                <Clock className="w-4 h-4 text-amber-500" />
+                <span className="flex-1 truncate">{milestone.title}</span>
+                <Badge variant="outline" className="text-xs">
+                  {milestone.currentValue}/{milestone.targetValue}
+                </Badge>
+              </div>
+            ))}
+          </div>
+        )}
+        
+        {progress.totalAssessmentsCompleted === 0 && (
+          <div className="mt-4 p-3 rounded-lg bg-lys-yellow/10 border border-lys-yellow/20">
+            <p className="text-sm font-medium mb-2">Get Started</p>
+            <p className="text-xs text-muted-foreground mb-3">
+              Take the self-discovery assessment to see your Be-Know-Do profile!
+            </p>
+            <Button asChild size="sm" className="bg-lys-yellow text-black hover:bg-lys-yellow/90" data-testid="button-start-assessment">
+              <Link href="/self-discovery">
+                <Sparkles className="w-4 h-4 mr-1" />
+                Start Assessment
+              </Link>
+            </Button>
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
 
 export default function Dashboard() {
+  const { isAuthenticated, user } = useAuth();
+  const isStudent = user?.role === "student";
   return (
     <div className="min-h-screen bg-background">
       <section className="relative overflow-hidden bg-gradient-to-br from-lys-yellow/20 via-background to-lys-teal/10">
@@ -98,6 +201,14 @@ export default function Dashboard() {
           </div>
         </div>
       </section>
+
+      {isAuthenticated && (
+        <section className="py-8 lg:py-12 bg-muted/20">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6">
+            <JourneyProgressCard />
+          </div>
+        </section>
+      )}
 
       <section className="py-12 lg:py-16">
         <div className="max-w-7xl mx-auto px-4 sm:px-6">

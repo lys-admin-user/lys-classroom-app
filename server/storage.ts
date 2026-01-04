@@ -508,6 +508,7 @@ export interface IStorage {
   
   // Student Journey Progress (Be-Know-Do Tracking)
   getStudentJourneyProgress(studentId: string): Promise<StudentJourneyProgress | undefined>;
+  getStudentJourneyProgressByUserId(userId: string): Promise<StudentJourneyProgress | undefined>;
   getStudentJourneyProgressByEducator(educatorUserId: string): Promise<StudentJourneyProgress[]>;
   createStudentJourneyProgress(progress: InsertStudentJourneyProgress): Promise<StudentJourneyProgress>;
   updateStudentJourneyProgress(id: string, updates: Partial<StudentJourneyProgress>): Promise<StudentJourneyProgress | undefined>;
@@ -2721,6 +2722,12 @@ export class DatabaseStorage implements IStorage {
   async getStudentJourneyProgress(studentId: string): Promise<StudentJourneyProgress | undefined> {
     const [progress] = await db.select().from(studentJourneyProgress)
       .where(eq(studentJourneyProgress.studentId, studentId));
+    return progress || undefined;
+  }
+
+  async getStudentJourneyProgressByUserId(userId: string): Promise<StudentJourneyProgress | undefined> {
+    const [progress] = await db.select().from(studentJourneyProgress)
+      .where(eq(studentJourneyProgress.studentId, userId));
     return progress || undefined;
   }
 

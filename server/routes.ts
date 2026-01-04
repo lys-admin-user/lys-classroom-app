@@ -1060,10 +1060,70 @@ export async function registerRoutes(
   app.post("/api/self-discovery/results", isAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user?.claims?.sub;
+      const { beScore, knowScore, doScore, totalScore, strengths, growthAreas, answers } = req.body;
+      
       const result = await storage.saveSelfDiscoveryResult({
-        ...req.body,
         userId,
+        beScore,
+        knowScore,
+        doScore,
+        totalScore,
+        strengths,
+        growthAreas,
+        answers,
       });
+      
+      // Also update the student's Be-Know-Do journey progress
+      let journey = await storage.getStudentJourneyProgressByUserId(userId);
+      if (!journey) {
+        // Auto-create journey if it doesn't exist
+        journey = await storage.createStudentJourneyProgress({
+          studentId: userId,
+          educatorUserId: userId,
+          organizationId: null,
+          beScore: 0,
+          knowScore: 0,
+          doScore: 0,
+          overallScore: 0,
+          totalAssessmentsCompleted: 0,
+          totalMilestonesAchieved: 0,
+          currentFocus: "be",
+          savedCareerIds: [],
+          latestAssessmentResults: null,
+        });
+      }
+      
+      // Update journey with assessment results
+      const overallScore = Math.round((beScore + knowScore + doScore) / 3);
+      await storage.updateStudentJourneyProgress(journey.id, {
+        beScore,
+        knowScore,
+        doScore,
+        overallScore,
+        totalAssessmentsCompleted: (journey.totalAssessmentsCompleted || 0) + 1,
+        latestAssessmentResults: {
+          completedAt: new Date().toISOString(),
+          beAnswers: answers,
+          knowAnswers: answers,
+          doAnswers: answers,
+          strengths: strengths || [],
+          growthAreas: growthAreas || [],
+        },
+        lastActivityDate: new Date(),
+      });
+      
+      // Log the assessment activity
+      await storage.createStudentJourneyActivity({
+        journeyProgressId: journey.id,
+        studentId: userId,
+        activityType: "assessment",
+        title: "Self-Discovery Assessment Completed",
+        description: `Be: ${beScore}%, Know: ${knowScore}%, Do: ${doScore}%`,
+        category: "be",
+        pointsEarned: overallScore,
+        metadata: { beScore, knowScore, doScore, strengths, growthAreas },
+      });
+      
       res.json(result);
     } catch (error) {
       console.error("Save self-discovery result error:", error);
@@ -4755,6 +4815,179 @@ export async function registerRoutes(
   // Student Journey Progress (Be-Know-Do Tracking)
   // ================================
 
+  // Get or create current user's journey (for students viewing their own progress)
+  app.get("/api/my-journey", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user?.claims?.sub;
+      
+      // Try to get existing journey where user is the student
+      let progress = await storage.getStudentJourneyProgressByUserId(userId);
+      
+      // Auto-create journey if it doesn't exist (self-service for students)
+      if (!progress) {
+        progress = await storage.createStudentJourneyProgress({
+          studentId: userId,
+          educatorUserId: userId, // Student is their own "educator" for self-tracking
+          organizationId: null,
+          beScore: 0,
+          knowScore: 0,
+          doScore: 0,
+          overallScore: 0,
+          totalAssessmentsCompleted: 0,
+          totalMilestonesAchieved: 0,
+          currentFocus: "be",
+          savedCareerIds: [],
+          latestAssessmentResults: null,
+        });
+      }
+      
+      // Get milestones and recent activities
+      const milestones = await storage.getStudentJourneyMilestones(progress.id);
+      const activities = await storage.getStudentJourneyActivities(progress.id, 20);
+      
+      res.json({
+        progress,
+        milestones,
+        activities,
+      });
+    } catch (error) {
+      console.error("Failed to fetch my journey:", error);
+      res.status(500).json({ error: "Failed to fetch journey" });
+    }
+  });
+
+  // Update current user's journey
+  app.patch("/api/my-journey", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user?.claims?.sub;
+      const body = req.body;
+      
+      // Get user's journey
+      const progress = await storage.getStudentJourneyProgressByUserId(userId);
+      if (!progress) {
+        res.status(404).json({ error: "Journey not found" });
+        return;
+      }
+      
+      // Whitelist allowed fields - prevent overwriting protected fields
+      const allowedFields = ["currentFocus", "savedCareerIds"];
+      const updates: any = { lastActivityDate: new Date() };
+      for (const field of allowedFields) {
+        if (body[field] !== undefined) {
+          updates[field] = body[field];
+        }
+      }
+      
+      const updated = await storage.updateStudentJourneyProgress(progress.id, updates);
+      res.json(updated);
+    } catch (error) {
+      console.error("Failed to update my journey:", error);
+      res.status(500).json({ error: "Failed to update journey" });
+    }
+  });
+
+  // Add milestone to current user's journey
+  app.post("/api/my-journey/milestones", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user?.claims?.sub;
+      const { title, description, category } = req.body;
+      
+      // Get or create journey
+      let progress = await storage.getStudentJourneyProgressByUserId(userId);
+      if (!progress) {
+        progress = await storage.createStudentJourneyProgress({
+          studentId: userId,
+          educatorUserId: userId,
+          organizationId: null,
+          beScore: 0,
+          knowScore: 0,
+          doScore: 0,
+          overallScore: 0,
+          totalAssessmentsCompleted: 0,
+          totalMilestonesAchieved: 0,
+          currentFocus: "be",
+          savedCareerIds: [],
+          latestAssessmentResults: null,
+        });
+      }
+      
+      const milestone = await storage.createStudentJourneyMilestone({
+        studentId: userId,
+        journeyProgressId: progress.id,
+        title,
+        description: description || null,
+        category: category || "do",
+        status: "not_started",
+        targetValue: 100,
+        currentValue: 0,
+        pointsEarned: 0,
+        evidence: [],
+      });
+      
+      res.status(201).json(milestone);
+    } catch (error) {
+      console.error("Failed to add milestone:", error);
+      res.status(500).json({ error: "Failed to add milestone" });
+    }
+  });
+
+  // Record assessment result for current user's journey
+  app.post("/api/my-journey/assessment", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user?.claims?.sub;
+      const { beScore, knowScore, doScore, assessmentResult } = req.body;
+      
+      // Get or create journey
+      let progress = await storage.getStudentJourneyProgressByUserId(userId);
+      if (!progress) {
+        progress = await storage.createStudentJourneyProgress({
+          studentId: userId,
+          educatorUserId: userId,
+          organizationId: null,
+          beScore: 0,
+          knowScore: 0,
+          doScore: 0,
+          overallScore: 0,
+          totalAssessmentsCompleted: 0,
+          totalMilestonesAchieved: 0,
+          currentFocus: "be",
+          savedCareerIds: [],
+          latestAssessmentResults: null,
+        });
+      }
+      
+      // Update journey with new scores
+      const overallScore = Math.round((beScore + knowScore + doScore) / 3);
+      
+      const updated = await storage.updateStudentJourneyProgress(progress.id, {
+        beScore,
+        knowScore,
+        doScore,
+        overallScore,
+        latestAssessmentResults: assessmentResult || null,
+        totalAssessmentsCompleted: (progress.totalAssessmentsCompleted || 0) + 1,
+        lastActivityDate: new Date(),
+      });
+      
+      // Log the assessment activity
+      await storage.createStudentJourneyActivity({
+        journeyProgressId: progress.id,
+        studentId: userId,
+        activityType: "assessment",
+        title: "Self-Discovery Assessment Completed",
+        description: `Be: ${beScore}, Know: ${knowScore}, Do: ${doScore}`,
+        category: "be",
+        pointsEarned: overallScore,
+        metadata: assessmentResult,
+      });
+      
+      res.json(updated);
+    } catch (error) {
+      console.error("Failed to record assessment:", error);
+      res.status(500).json({ error: "Failed to record assessment" });
+    }
+  });
+
   // Get student journey progress for a specific student
   app.get("/api/student-journey/:studentId", isAuthenticated, async (req: any, res) => {
     try {
@@ -4959,11 +5192,34 @@ export async function registerRoutes(
     }
   });
 
-  // Update milestone status
-  app.patch("/api/student-journey/milestone/:id", isAuthenticated, async (req: any, res) => {
+  // Update milestone status (with ownership check)
+  app.patch("/api/student-journey/milestones/:id", isAuthenticated, async (req: any, res) => {
     try {
+      const userId = req.user?.claims?.sub;
       const { id } = req.params;
-      const updates = req.body;
+      const body = req.body;
+      
+      // Get the milestone first to check ownership
+      const existingMilestone = await storage.getStudentJourneyMilestone(id);
+      if (!existingMilestone) {
+        res.status(404).json({ error: "Milestone not found" });
+        return;
+      }
+      
+      // Verify ownership - the milestone's studentId must match the authenticated user
+      if (existingMilestone.studentId !== userId) {
+        res.status(403).json({ error: "Access denied - you can only update your own milestones" });
+        return;
+      }
+      
+      // Whitelist allowed update fields
+      const allowedFields = ["status", "currentValue", "description", "pointsEarned", "startedAt", "completedAt"];
+      const updates: any = {};
+      for (const field of allowedFields) {
+        if (body[field] !== undefined) {
+          updates[field] = body[field];
+        }
+      }
       
       // If completing milestone, set completedAt
       if (updates.status === "completed" && !updates.completedAt) {

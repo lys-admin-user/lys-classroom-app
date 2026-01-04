@@ -15,6 +15,7 @@ import {
 
 const navLinks = [
   { href: "/", label: "Dashboard" },
+  { href: "/my-journey", label: "My Journey" },
   { href: "/lesson-generator", label: "AI Lessons" },
   { href: "/self-discovery", label: "Self Discovery" },
   { href: "/careers", label: "KNOW Paths" },
