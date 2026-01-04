@@ -143,9 +143,11 @@ import {
   type EntityShare,
   type InsertEntityShare,
   entityShares,
+  lessonGenerations,
+  type InsertLessonGeneration,
 } from "@shared/schema";
 import { db } from "./db";
-import { eq, desc, and, asc } from "drizzle-orm";
+import { eq, desc, and, asc, gte, sql } from "drizzle-orm";
 import { randomUUID } from "crypto";
 
 export interface IStorage {
@@ -156,6 +158,9 @@ export interface IStorage {
   createLesson(lesson: InsertLesson): Promise<Lesson>;
   deleteLesson(id: string, userId: string): Promise<boolean>;
   toggleLessonShare(id: string, userId: string): Promise<{ shareId: string | null } | undefined>;
+  countMonthlyGenerations(userId: string): Promise<number>;
+  logLessonGeneration(userId: string, topic?: string): Promise<void>;
+  tryReserveLessonGeneration(userId: string, limit: number, topic?: string): Promise<{ success: boolean; currentCount: number }>;
   
   // Goals
   getGoals(userId?: string): Promise<Goal[]>;
@@ -670,6 +675,57 @@ export class DatabaseStorage implements IStorage {
     const newShareId = lesson.shareId ? null : randomUUID().substring(0, 12);
     await db.update(lessons).set({ shareId: newShareId }).where(eq(lessons.id, id));
     return { shareId: newShareId };
+  }
+
+  async countMonthlyGenerations(userId: string): Promise<number> {
+    const startOfMonth = new Date();
+    startOfMonth.setDate(1);
+    startOfMonth.setHours(0, 0, 0, 0);
+    
+    const result = await db.select({ count: sql<number>`count(*)` })
+      .from(lessonGenerations)
+      .where(and(
+        eq(lessonGenerations.userId, userId),
+        gte(lessonGenerations.createdAt, startOfMonth)
+      ));
+    return Number(result[0]?.count || 0);
+  }
+
+  async logLessonGeneration(userId: string, topic?: string): Promise<void> {
+    await db.insert(lessonGenerations).values({ userId, topic });
+  }
+
+  async tryReserveLessonGeneration(userId: string, limit: number, topic?: string): Promise<{ success: boolean; currentCount: number }> {
+    // Atomic check-and-insert using a single SQL statement
+    // This inserts a row only if the current count is below the limit
+    const startOfMonth = new Date();
+    startOfMonth.setDate(1);
+    startOfMonth.setHours(0, 0, 0, 0);
+
+    const result = await db.execute(sql`
+      WITH current_count AS (
+        SELECT COUNT(*) as cnt FROM lesson_generations 
+        WHERE user_id = ${userId} AND created_at >= ${startOfMonth}
+      ),
+      inserted AS (
+        INSERT INTO lesson_generations (id, user_id, topic, created_at)
+        SELECT gen_random_uuid(), ${userId}, ${topic}, NOW()
+        WHERE (SELECT cnt FROM current_count) < ${limit}
+        RETURNING 1
+      )
+      SELECT 
+        (SELECT cnt FROM current_count)::int as current_count,
+        (SELECT COUNT(*) FROM inserted)::int as inserted_count
+    `);
+    
+    const row = result.rows[0] as any;
+    const currentCount = Number(row?.current_count || 0);
+    const insertedCount = Number(row?.inserted_count || 0);
+    
+    return {
+      success: insertedCount > 0,
+      currentCount: currentCount
+    };
   }
 
   // Goals - stored in database

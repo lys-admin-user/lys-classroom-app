@@ -114,10 +114,52 @@ export async function registerRoutes(
   await setupAuth(app);
   registerAuthRoutes(app);
 
-  // Lesson Plans - Generate (works for all, but saving requires auth)
-  app.post("/api/lessons/generate", async (req, res) => {
+  // Get lesson generation usage for free tier
+  app.get("/api/lessons/usage", isAuthenticated, async (req: any, res) => {
     try {
+      const userId = req.user?.claims?.sub;
+      const tier = await storage.getUserTier(userId);
+      const monthlyCount = await storage.countMonthlyGenerations(userId);
+      const limit = tier === "free" ? 3 : null;
+      const remaining = limit !== null ? Math.max(0, limit - monthlyCount) : null;
+      
+      res.json({
+        tier,
+        monthlyCount,
+        limit,
+        remaining,
+        unlimited: tier !== "free"
+      });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to get usage info" });
+    }
+  });
+
+  // Lesson Plans - Generate (requires auth, free users limited to 3/month)
+  app.post("/api/lessons/generate", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user?.claims?.sub;
       const validated = generateLessonRequestSchema.parse(req.body);
+      
+      const tier = await storage.getUserTier(userId);
+      if (tier === "free") {
+        // Atomic check-and-reserve to prevent race conditions
+        const { success, currentCount } = await storage.tryReserveLessonGeneration(userId, 3, validated.topic);
+        if (!success) {
+          res.status(403).json({ 
+            error: "Monthly limit reached", 
+            message: "Free accounts can generate up to 3 lessons per month. Upgrade to Pro for unlimited lessons.",
+            monthlyCount: currentCount,
+            limit: 3,
+            requiredTier: "pro"
+          });
+          return;
+        }
+      } else {
+        // Pro/Campus users - just log without limit check
+        await storage.logLessonGeneration(userId, validated.topic);
+      }
+      
       const generatedPlan = await generateLessonPlan(validated);
       res.json(generatedPlan);
     } catch (error) {

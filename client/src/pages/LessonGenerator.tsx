@@ -70,6 +70,11 @@ export default function LessonGenerator() {
     enabled: isAuthenticated,
   });
 
+  const { data: usageData, refetch: refetchUsage } = useQuery<{ tier: string; monthlyCount: number; limit: number | null; remaining: number | null; unlimited: boolean }>({
+    queryKey: ["/api/lessons/usage"],
+    enabled: isAuthenticated,
+  });
+
   const educatorProfile = profileData?.profile;
   const hasProfile = !!educatorProfile && !!educatorProfile.country && !!educatorProfile.state;
 
@@ -206,6 +211,7 @@ export default function LessonGenerator() {
     onSuccess: (data) => {
       setGeneratedLesson(data);
       setIsSaved(false);
+      refetchUsage();
       // Initialize resources from generated lesson if any
       if (data.resources && data.resources.length > 0) {
         setAddedResources(data.resources.map(r => ({
@@ -224,12 +230,21 @@ export default function LessonGenerator() {
         description: "Great job! You just saved yourself 30+ minutes.",
       });
     },
-    onError: (error: Error) => {
-      toast({
-        title: "Oops! Let's try that again",
-        description: error.message || "There was an error generating your lesson.",
-        variant: "destructive",
-      });
+    onError: async (error: any) => {
+      const errorData = error?.response ? await error.response.json().catch(() => ({})) : {};
+      if (errorData.requiredTier) {
+        toast({
+          title: "Monthly Limit Reached",
+          description: "Free accounts can generate up to 3 lessons per month. Upgrade to Pro for unlimited lessons.",
+          variant: "destructive",
+        });
+      } else {
+        toast({
+          title: "Oops! Let's try that again",
+          description: error.message || "There was an error generating your lesson.",
+          variant: "destructive",
+        });
+      }
     },
   });
 
@@ -278,6 +293,15 @@ export default function LessonGenerator() {
   });
 
   const handleGenerate = () => {
+    if (!isAuthenticated) {
+      toast({
+        title: "Sign In Required",
+        description: "Please sign in to generate lessons.",
+        variant: "destructive",
+      });
+      setLocation("/api/login");
+      return;
+    }
     if (!topic || !gradeLevel) {
       toast({
         title: "Missing Information",
@@ -649,9 +673,29 @@ ${addedResources.length > 0 ? addedResources.map(r => `- ${r.title}: ${r.url}`).
                   </div>
                 </div>
 
+                {isAuthenticated && usageData && !usageData.unlimited && (
+                  <div className="flex items-center justify-between p-3 bg-muted rounded-md">
+                    <div className="flex items-center gap-2">
+                      <Sparkles className="h-4 w-4 text-lys-yellow" />
+                      <span className="text-sm font-roboto">
+                        {usageData.remaining === 0 
+                          ? "Monthly limit reached" 
+                          : `${usageData.remaining} of ${usageData.limit} lessons remaining this month`}
+                      </span>
+                    </div>
+                    {usageData.remaining === 0 && (
+                      <Link href="/pricing">
+                        <Button size="sm" variant="default" data-testid="button-upgrade-limit">
+                          Upgrade
+                        </Button>
+                      </Link>
+                    )}
+                  </div>
+                )}
+
                 <Button
                   onClick={handleGenerate}
-                  disabled={generateMutation.isPending}
+                  disabled={generateMutation.isPending || (usageData && usageData.remaining === 0)}
                   className="w-full bg-lys-red hover:bg-lys-red/90 text-white font-oswald text-lg h-12 gap-2"
                   data-testid="button-generate-lesson"
                 >

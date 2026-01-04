@@ -29,6 +29,18 @@ export const insertLessonSchema = createInsertSchema(lessons).omit({ id: true, c
 export type InsertLesson = z.infer<typeof insertLessonSchema>;
 export type Lesson = typeof lessons.$inferSelect;
 
+// Lesson Generation Tracking (for free tier limits)
+export const lessonGenerations = pgTable("lesson_generations", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull(),
+  topic: text("topic"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertLessonGenerationSchema = createInsertSchema(lessonGenerations).omit({ id: true, createdAt: true });
+export type InsertLessonGeneration = z.infer<typeof insertLessonGenerationSchema>;
+export type LessonGeneration = typeof lessonGenerations.$inferSelect;
+
 // Goals Table (for action plans)
 export const goals = pgTable("goals", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
