@@ -724,6 +724,129 @@ export const insertClassStudentSchema = createInsertSchema(classStudents).omit({
 export type InsertClassStudent = z.infer<typeof insertClassStudentSchema>;
 export type ClassStudent = typeof classStudents.$inferSelect;
 
+// ================================
+// Student Journey Progress (Be-Know-Do Tracking)
+// ================================
+
+// BKD Category types for journey tracking
+export const bkdCategories = ["be", "know", "do"] as const;
+export type BkdCategory = typeof bkdCategories[number];
+
+// Journey milestone status
+export const journeyMilestoneStatuses = ["not_started", "in_progress", "completed", "mastered"] as const;
+export type JourneyMilestoneStatus = typeof journeyMilestoneStatuses[number];
+
+// Student Journey Progress Table - tracks overall BKD journey
+export const studentJourneyProgress = pgTable("student_journey_progress", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  studentId: varchar("student_id").notNull(),
+  educatorUserId: varchar("educator_user_id").notNull(),
+  organizationId: varchar("organization_id"),
+  
+  // Overall scores (0-100)
+  beScore: integer("be_score").notNull().default(0),
+  knowScore: integer("know_score").notNull().default(0),
+  doScore: integer("do_score").notNull().default(0),
+  overallScore: integer("overall_score").notNull().default(0),
+  
+  // Journey metadata
+  journeyStartDate: timestamp("journey_start_date").defaultNow(),
+  lastActivityDate: timestamp("last_activity_date").defaultNow(),
+  totalAssessmentsCompleted: integer("total_assessments_completed").notNull().default(0),
+  totalMilestonesAchieved: integer("total_milestones_achieved").notNull().default(0),
+  
+  // Current focus area
+  currentFocus: text("current_focus").$type<BkdCategory>().default("be"),
+  
+  // Saved career interests from exploration
+  savedCareerIds: jsonb("saved_career_ids").$type<string[]>().default([]),
+  
+  // Self-discovery assessment results
+  latestAssessmentResults: jsonb("latest_assessment_results").$type<{
+    completedAt: string;
+    beAnswers: Record<string, number>;
+    knowAnswers: Record<string, number>;
+    doAnswers: Record<string, number>;
+    strengths: string[];
+    growthAreas: string[];
+  }>(),
+  
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertStudentJourneyProgressSchema = createInsertSchema(studentJourneyProgress).omit({ id: true, createdAt: true, updatedAt: true });
+export type InsertStudentJourneyProgress = z.infer<typeof insertStudentJourneyProgressSchema>;
+export type StudentJourneyProgress = typeof studentJourneyProgress.$inferSelect;
+
+// Student Journey Milestones - individual achievements in the journey
+export const studentJourneyMilestones = pgTable("student_journey_milestones", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  studentId: varchar("student_id").notNull(),
+  journeyProgressId: varchar("journey_progress_id").notNull(),
+  
+  // Milestone details
+  title: text("title").notNull(),
+  description: text("description"),
+  category: text("category").notNull().$type<BkdCategory>(),
+  status: text("status").notNull().default("not_started").$type<JourneyMilestoneStatus>(),
+  
+  // Progress tracking
+  targetValue: integer("target_value").default(100),
+  currentValue: integer("current_value").notNull().default(0),
+  
+  // Points and rewards
+  pointsEarned: integer("points_earned").notNull().default(0),
+  badgeId: varchar("badge_id"),
+  
+  // Dates
+  startedAt: timestamp("started_at"),
+  completedAt: timestamp("completed_at"),
+  
+  // Evidence/notes
+  evidence: jsonb("evidence").$type<{
+    type: "assignment" | "assessment" | "reflection" | "project" | "observation";
+    title: string;
+    date: string;
+    notes?: string;
+  }[]>().default([]),
+  
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertStudentJourneyMilestoneSchema = createInsertSchema(studentJourneyMilestones).omit({ id: true, createdAt: true });
+export type InsertStudentJourneyMilestone = z.infer<typeof insertStudentJourneyMilestoneSchema>;
+export type StudentJourneyMilestone = typeof studentJourneyMilestones.$inferSelect;
+
+// Student Journey Activity Log - tracks all activities in the journey
+export const studentJourneyActivities = pgTable("student_journey_activities", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  studentId: varchar("student_id").notNull(),
+  journeyProgressId: varchar("journey_progress_id").notNull(),
+  
+  // Activity details
+  activityType: text("activity_type").notNull().$type<"assessment" | "lesson" | "career_exploration" | "goal_progress" | "reflection" | "milestone_achieved">(),
+  title: text("title").notNull(),
+  description: text("description"),
+  
+  // BKD impact
+  category: text("category").$type<BkdCategory>(),
+  pointsEarned: integer("points_earned").notNull().default(0),
+  
+  // Related entities
+  relatedEntityType: text("related_entity_type"),
+  relatedEntityId: varchar("related_entity_id"),
+  
+  // Metadata
+  metadata: jsonb("metadata").$type<Record<string, any>>(),
+  
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertStudentJourneyActivitySchema = createInsertSchema(studentJourneyActivities).omit({ id: true, createdAt: true });
+export type InsertStudentJourneyActivity = z.infer<typeof insertStudentJourneyActivitySchema>;
+export type StudentJourneyActivity = typeof studentJourneyActivities.$inferSelect;
+
 // Entity Shares - for sharing classroom data across organizations
 export type EntitySharePermission = "view" | "edit" | "copy";
 export type ShareableEntityType = "class" | "student" | "assignment" | "lesson" | "scope_sequence";
