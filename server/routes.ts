@@ -5333,5 +5333,203 @@ export async function registerRoutes(
     }
   });
 
+  // Get portfolio comments (with role-based filtering)
+  app.get("/api/portfolio/:portfolioId/comments", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.id;
+      const { portfolioId } = req.params;
+      const userRole = req.user.role;
+      
+      // Get the portfolio to verify ownership/access
+      const portfolio = await storage.getStudentPortfolioBySlug(portfolioId);
+      const portfolioById = portfolio || await storage.getStudentPortfolio(userId);
+      
+      if (!portfolioById) {
+        res.status(404).json({ error: "Portfolio not found" });
+        return;
+      }
+      
+      const allComments = await storage.getPortfolioComments(portfolioById.id);
+      
+      // Role-based filtering
+      // Students see all comments on their portfolio
+      if (portfolioById.userId === userId) {
+        res.json(allComments);
+        return;
+      }
+      
+      // Educators see all comments
+      if (userRole === "educator" || userRole === "campus_admin") {
+        res.json(allComments);
+        return;
+      }
+      
+      // Parents see their own comments + educator comments
+      if (userRole === "parent") {
+        const filteredComments = allComments.filter(
+          c => c.authorId === userId || c.authorRole === "educator" || c.authorRole === "campus_admin"
+        );
+        res.json(filteredComments);
+        return;
+      }
+      
+      // Default: only own comments
+      const ownComments = allComments.filter(c => c.authorId === userId);
+      res.json(ownComments);
+    } catch (error) {
+      console.error("Failed to fetch portfolio comments:", error);
+      res.status(500).json({ error: "Failed to fetch comments" });
+    }
+  });
+
+  // Get comments for a specific portfolio item
+  app.get("/api/portfolio/items/:itemId/comments", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.id;
+      const { itemId } = req.params;
+      const userRole = req.user.role;
+      
+      const item = await storage.getPortfolioItem(itemId);
+      if (!item) {
+        res.status(404).json({ error: "Portfolio item not found" });
+        return;
+      }
+      
+      const allComments = await storage.getPortfolioItemComments(itemId);
+      
+      // Get portfolio to check ownership
+      const portfolio = await storage.getStudentPortfolio(userId);
+      
+      // Portfolio owner sees all
+      if (portfolio && portfolio.id === item.portfolioId) {
+        res.json(allComments);
+        return;
+      }
+      
+      // Educators see all
+      if (userRole === "educator" || userRole === "campus_admin") {
+        res.json(allComments);
+        return;
+      }
+      
+      // Parents see their own + educator comments
+      if (userRole === "parent") {
+        const filteredComments = allComments.filter(
+          c => c.authorId === userId || c.authorRole === "educator" || c.authorRole === "campus_admin"
+        );
+        res.json(filteredComments);
+        return;
+      }
+      
+      const ownComments = allComments.filter(c => c.authorId === userId);
+      res.json(ownComments);
+    } catch (error) {
+      console.error("Failed to fetch item comments:", error);
+      res.status(500).json({ error: "Failed to fetch comments" });
+    }
+  });
+
+  // Create a portfolio comment
+  app.post("/api/portfolio/:portfolioId/comments", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.id;
+      const { portfolioId } = req.params;
+      const { content, portfolioItemId } = req.body;
+      const userRole = req.user.role;
+      
+      if (!content || content.trim().length === 0) {
+        res.status(400).json({ error: "Comment content is required" });
+        return;
+      }
+      
+      // Verify portfolio exists
+      const portfolio = await storage.getStudentPortfolioBySlug(portfolioId);
+      const actualPortfolio = portfolio || (await storage.getStudentPortfolio(userId));
+      
+      if (!actualPortfolio) {
+        res.status(404).json({ error: "Portfolio not found" });
+        return;
+      }
+      
+      // Only student (owner), parents linked to student, and educators can comment
+      const isOwner = actualPortfolio.userId === userId;
+      const isEducator = userRole === "educator" || userRole === "campus_admin";
+      const isParent = userRole === "parent";
+      
+      if (!isOwner && !isEducator && !isParent) {
+        res.status(403).json({ error: "You do not have permission to comment on this portfolio" });
+        return;
+      }
+      
+      // Get author name from user
+      const user = await storage.getUser(userId);
+      const authorName = user?.firstName && user?.lastName 
+        ? `${user.firstName} ${user.lastName}`
+        : user?.email?.split("@")[0] || "Anonymous";
+      
+      const comment = await storage.createPortfolioComment({
+        portfolioId: actualPortfolio.id,
+        portfolioItemId: portfolioItemId || null,
+        authorId: userId,
+        authorRole: userRole || "student",
+        authorName,
+        content: content.trim(),
+      });
+      
+      res.status(201).json(comment);
+    } catch (error) {
+      console.error("Failed to create comment:", error);
+      res.status(500).json({ error: "Failed to create comment" });
+    }
+  });
+
+  // Update a portfolio comment (only author can update)
+  app.patch("/api/portfolio/comments/:commentId", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.id;
+      const { commentId } = req.params;
+      const { content } = req.body;
+      
+      if (!content || content.trim().length === 0) {
+        res.status(400).json({ error: "Comment content is required" });
+        return;
+      }
+      
+      const updated = await storage.updatePortfolioComment(commentId, userId, {
+        content: content.trim(),
+      });
+      
+      if (!updated) {
+        res.status(404).json({ error: "Comment not found or you are not the author" });
+        return;
+      }
+      
+      res.json(updated);
+    } catch (error) {
+      console.error("Failed to update comment:", error);
+      res.status(500).json({ error: "Failed to update comment" });
+    }
+  });
+
+  // Delete a portfolio comment (only author can delete)
+  app.delete("/api/portfolio/comments/:commentId", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.id;
+      const { commentId } = req.params;
+      
+      const deleted = await storage.deletePortfolioComment(commentId, userId);
+      
+      if (!deleted) {
+        res.status(404).json({ error: "Comment not found or you are not the author" });
+        return;
+      }
+      
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Failed to delete comment:", error);
+      res.status(500).json({ error: "Failed to delete comment" });
+    }
+  });
+
   return httpServer;
 }
