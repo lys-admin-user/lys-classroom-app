@@ -4589,5 +4589,273 @@ export async function registerRoutes(
     }
   });
 
+  // ================================
+  // Student Journey Progress (Be-Know-Do Tracking)
+  // ================================
+
+  // Get student journey progress for a specific student
+  app.get("/api/student-journey/:studentId", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user?.claims?.sub;
+      const { studentId } = req.params;
+      
+      const progress = await storage.getStudentJourneyProgress(studentId);
+      if (!progress) {
+        res.status(404).json({ error: "Student journey not found" });
+        return;
+      }
+      
+      // Verify the requesting user has access (is the educator or student)
+      if (progress.educatorUserId !== userId && progress.studentId !== studentId) {
+        res.status(403).json({ error: "Access denied" });
+        return;
+      }
+      
+      // Get milestones and recent activities
+      const milestones = await storage.getStudentJourneyMilestones(progress.id);
+      const activities = await storage.getStudentJourneyActivities(progress.id, 20);
+      
+      res.json({
+        progress,
+        milestones,
+        activities,
+      });
+    } catch (error) {
+      console.error("Failed to fetch student journey:", error);
+      res.status(500).json({ error: "Failed to fetch student journey" });
+    }
+  });
+
+  // Get all student journeys for an educator
+  app.get("/api/student-journeys", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user?.claims?.sub;
+      const journeys = await storage.getStudentJourneyProgressByEducator(userId);
+      res.json(journeys);
+    } catch (error) {
+      console.error("Failed to fetch student journeys:", error);
+      res.status(500).json({ error: "Failed to fetch student journeys" });
+    }
+  });
+
+  // Create or initialize student journey progress
+  app.post("/api/student-journey", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user?.claims?.sub;
+      const { studentId, studentName, classId, grade } = req.body;
+      
+      if (!studentId) {
+        res.status(400).json({ error: "Student ID is required" });
+        return;
+      }
+      
+      // Check if journey already exists
+      const existing = await storage.getStudentJourneyProgress(studentId);
+      if (existing) {
+        res.status(409).json({ error: "Journey already exists for this student", existing });
+        return;
+      }
+      
+      const journey = await storage.createStudentJourneyProgress({
+        studentId,
+        educatorUserId: userId,
+        organizationId: null,
+        beScore: 0,
+        knowScore: 0,
+        doScore: 0,
+        overallScore: 0,
+        totalAssessmentsCompleted: 0,
+        totalMilestonesAchieved: 0,
+        currentFocus: "be",
+        savedCareerIds: [],
+        latestAssessmentResults: null,
+      });
+      
+      // Log the activity
+      await storage.createStudentJourneyActivity({
+        journeyProgressId: journey.id,
+        studentId,
+        activityType: "assessment",
+        title: "Journey Started",
+        description: "Student began their Be-Know-Do journey",
+        category: "be",
+        pointsEarned: 0,
+      });
+      
+      res.status(201).json(journey);
+    } catch (error) {
+      console.error("Failed to create student journey:", error);
+      res.status(500).json({ error: "Failed to create student journey" });
+    }
+  });
+
+  // Update student journey progress (scores, etc.)
+  app.patch("/api/student-journey/:id", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user?.claims?.sub;
+      const { id } = req.params;
+      const updates = req.body;
+      
+      // Get journey to verify access
+      const progress = await storage.getStudentJourneyProgress(updates.studentId || "");
+      if (progress && progress.educatorUserId !== userId) {
+        res.status(403).json({ error: "Access denied" });
+        return;
+      }
+      
+      // Update last activity date
+      updates.lastActivityDate = new Date();
+      
+      const updated = await storage.updateStudentJourneyProgress(id, updates);
+      if (!updated) {
+        res.status(404).json({ error: "Journey not found" });
+        return;
+      }
+      
+      res.json(updated);
+    } catch (error) {
+      console.error("Failed to update student journey:", error);
+      res.status(500).json({ error: "Failed to update student journey" });
+    }
+  });
+
+  // Record a student journey activity (assessment, assignment, reflection, etc.)
+  app.post("/api/student-journey/:id/activity", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user?.claims?.sub;
+      const { id: journeyProgressId } = req.params;
+      const { activityType, title, description, beImpact, knowImpact, doImpact, relatedEntityType, relatedEntityId, metadata } = req.body;
+      
+      // Create the activity
+      const activity = await storage.createStudentJourneyActivity({
+        journeyProgressId,
+        studentId: req.body.studentId || "",
+        activityType,
+        title,
+        description,
+        category: req.body.category || "be",
+        pointsEarned: req.body.pointsEarned || 0,
+        relatedEntityType: relatedEntityType || null,
+        relatedEntityId: relatedEntityId || null,
+        metadata: metadata || null,
+      });
+      
+      // Update journey scores based on category
+      if (req.body.pointsEarned) {
+        // Get current progress to update scores
+        const journeys = await storage.getStudentJourneyProgressByEducator(userId);
+        const journey = journeys.find(j => j.id === journeyProgressId);
+        
+        if (journey) {
+          const category = req.body.category || "be";
+          const points = req.body.pointsEarned || 0;
+          const updates: any = {};
+          
+          if (category === "be") updates.beScore = Math.min(100, (journey.beScore || 0) + points);
+          if (category === "know") updates.knowScore = Math.min(100, (journey.knowScore || 0) + points);
+          if (category === "do") updates.doScore = Math.min(100, (journey.doScore || 0) + points);
+          
+          updates.overallScore = Math.round(((updates.beScore || journey.beScore) + (updates.knowScore || journey.knowScore) + (updates.doScore || journey.doScore)) / 3);
+          
+          await storage.updateStudentJourneyProgress(journeyProgressId, updates);
+        }
+      }
+      
+      res.status(201).json(activity);
+    } catch (error) {
+      console.error("Failed to record student activity:", error);
+      res.status(500).json({ error: "Failed to record activity" });
+    }
+  });
+
+  // Add a milestone to student journey
+  app.post("/api/student-journey/:id/milestone", isAuthenticated, async (req: any, res) => {
+    try {
+      const { id: journeyProgressId } = req.params;
+      const { category, title, description, targetDate } = req.body;
+      
+      const milestone = await storage.createStudentJourneyMilestone({
+        journeyProgressId,
+        studentId: req.body.studentId || "",
+        category: category || "do",
+        title,
+        description: description || null,
+        status: "not_started",
+        evidence: [],
+      });
+      
+      // Update milestone count
+      const milestones = await storage.getStudentJourneyMilestones(journeyProgressId);
+      await storage.updateStudentJourneyProgress(journeyProgressId, {
+        totalMilestonesAchieved: milestones.filter((m: any) => m.status === "completed").length,
+      });
+      
+      res.status(201).json(milestone);
+    } catch (error) {
+      console.error("Failed to add milestone:", error);
+      res.status(500).json({ error: "Failed to add milestone" });
+    }
+  });
+
+  // Update milestone status
+  app.patch("/api/student-journey/milestone/:id", isAuthenticated, async (req: any, res) => {
+    try {
+      const { id } = req.params;
+      const updates = req.body;
+      
+      // If completing milestone, set completedAt
+      if (updates.status === "completed" && !updates.completedAt) {
+        updates.completedAt = new Date();
+      }
+      
+      const milestone = await storage.updateStudentJourneyMilestone(id, updates);
+      if (!milestone) {
+        res.status(404).json({ error: "Milestone not found" });
+        return;
+      }
+      
+      res.json(milestone);
+    } catch (error) {
+      console.error("Failed to update milestone:", error);
+      res.status(500).json({ error: "Failed to update milestone" });
+    }
+  });
+
+  // Record self-discovery assessment result for a student
+  app.post("/api/student-journey/:id/assessment", isAuthenticated, async (req: any, res) => {
+    try {
+      const { id: journeyProgressId } = req.params;
+      const { beScore, knowScore, doScore, assessmentResult, studentId } = req.body;
+      
+      // Update journey with new scores
+      const overallScore = Math.round((beScore + knowScore + doScore) / 3);
+      
+      const updated = await storage.updateStudentJourneyProgress(journeyProgressId, {
+        beScore,
+        knowScore,
+        doScore,
+        overallScore,
+        latestAssessmentResults: assessmentResult || null,
+      });
+      
+      // Log the assessment activity
+      await storage.createStudentJourneyActivity({
+        journeyProgressId,
+        studentId: studentId || "",
+        activityType: "assessment",
+        title: "Self-Discovery Assessment Completed",
+        description: `Be: ${beScore}, Know: ${knowScore}, Do: ${doScore}`,
+        category: "be",
+        pointsEarned: overallScore,
+        metadata: assessmentResult,
+      });
+      
+      res.json(updated);
+    } catch (error) {
+      console.error("Failed to record assessment:", error);
+      res.status(500).json({ error: "Failed to record assessment" });
+    }
+  });
+
   return httpServer;
 }
