@@ -24,9 +24,13 @@ import {
   UserPlus,
   School,
   FileText,
-  AlertCircle
+  AlertCircle,
+  Building2,
+  Share2
 } from "lucide-react";
-import type { Class, Student, InsertClass, InsertStudent, AccommodationType } from "@shared/schema";
+import type { Class, Student, InsertClass, InsertStudent, AccommodationType, Organization, OrgMembership } from "@shared/schema";
+
+type OrgWithDetails = OrgMembership & { organization: Organization };
 
 const GRADE_LEVELS = [
   "Pre-K",
@@ -57,6 +61,15 @@ export default function Classroom() {
   const [editingClass, setEditingClass] = useState<Class | null>(null);
   const [editingStudent, setEditingStudent] = useState<Student | null>(null);
   const [selectedClassId, setSelectedClassId] = useState<string | null>(null);
+  const [selectedOrgId, setSelectedOrgId] = useState<string | null>(null);
+  const [viewMode, setViewMode] = useState<"personal" | "organization">("personal");
+
+  const isCampusAdmin = user?.role === "campus_admin";
+  
+  const { data: userOrgs = [] } = useQuery<OrgWithDetails[]>({
+    queryKey: ["/api/organizations/mine"],
+    enabled: !!user && isCampusAdmin,
+  });
 
   const [newClass, setNewClass] = useState<Partial<InsertClass>>({
     name: "",
@@ -82,16 +95,31 @@ export default function Classroom() {
     active: boolean;
   }>({ type: "IEP", description: "", active: true });
 
-  // Queries
-  const { data: classes = [], isLoading: classesLoading } = useQuery<Class[]>({
+  // Personal classes/students queries
+  const { data: personalClasses = [], isLoading: classesLoading } = useQuery<Class[]>({
     queryKey: ["/api/classes"],
-    enabled: !!user,
+    enabled: !!user && viewMode === "personal",
   });
 
-  const { data: students = [], isLoading: studentsLoading } = useQuery<Student[]>({
+  const { data: personalStudents = [], isLoading: studentsLoading } = useQuery<Student[]>({
     queryKey: ["/api/students"],
-    enabled: !!user,
+    enabled: !!user && viewMode === "personal",
   });
+
+  // Organization-scoped queries with hierarchy for district-level viewing
+  const { data: orgClasses = [] } = useQuery<Class[]>({
+    queryKey: ["/api/orgs", selectedOrgId, "classes", "hierarchy=true"],
+    enabled: !!selectedOrgId && viewMode === "organization",
+  });
+
+  const { data: orgStudents = [] } = useQuery<Student[]>({
+    queryKey: ["/api/orgs", selectedOrgId, "students", "hierarchy=true"],
+    enabled: !!selectedOrgId && viewMode === "organization",
+  });
+
+  // Combined data based on view mode
+  const classes = viewMode === "organization" ? orgClasses : personalClasses;
+  const students = viewMode === "organization" ? orgStudents : personalStudents;
 
   const { data: classStudents = [] } = useQuery<Student[]>({
     queryKey: ["/api/classes", selectedClassId, "students"],
@@ -270,14 +298,77 @@ export default function Classroom() {
           </div>
           <div>
             <h1 className="font-marker text-3xl sm:text-4xl text-foreground">
-              My Classroom
+              {viewMode === "organization" ? "Organization Classroom" : "My Classroom"}
             </h1>
             <p className="font-roboto text-muted-foreground">
-              Manage your classes and students
+              {viewMode === "organization" 
+                ? "View classes and students across your organization"
+                : "Manage your classes and students"}
             </p>
           </div>
         </div>
       </div>
+
+      {isCampusAdmin && userOrgs.length > 0 && (
+        <Card className="mb-6">
+          <CardHeader className="pb-3">
+            <CardTitle className="text-base flex items-center gap-2">
+              <Building2 className="h-4 w-4" />
+              View Mode
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="flex flex-wrap items-center gap-4">
+              <div className="flex items-center gap-2">
+                <Switch
+                  checked={viewMode === "organization"}
+                  onCheckedChange={(checked) => {
+                    setViewMode(checked ? "organization" : "personal");
+                    if (checked && userOrgs.length > 0 && !selectedOrgId) {
+                      setSelectedOrgId(userOrgs[0].organizationId);
+                    }
+                  }}
+                  data-testid="switch-view-mode"
+                />
+                <Label className="text-sm">
+                  {viewMode === "organization" ? "Organization View" : "Personal View"}
+                </Label>
+              </div>
+              
+              {viewMode === "organization" && (
+                <Select
+                  value={selectedOrgId || ""}
+                  onValueChange={setSelectedOrgId}
+                >
+                  <SelectTrigger className="w-64" data-testid="select-organization">
+                    <SelectValue placeholder="Select organization" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {userOrgs.map((orgMembership) => (
+                      <SelectItem 
+                        key={orgMembership.organizationId} 
+                        value={orgMembership.organizationId}
+                      >
+                        {orgMembership.organization?.name || "Unknown Organization"}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
+            </div>
+            
+            {viewMode === "organization" && selectedOrgId && (
+              <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                <Share2 className="h-4 w-4" />
+                <span>
+                  Viewing all classes and students in this organization. 
+                  Admins can share data with other organizations.
+                </span>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
 
       <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as any)} className="space-y-6">
         <TabsList>

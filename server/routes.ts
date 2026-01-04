@@ -2378,15 +2378,35 @@ export async function registerRoutes(
   });
 
   // Entity sharing between organizations
+  const entityShareBodySchema = z.object({
+    entityType: z.enum(["class", "student", "assignment", "lesson", "scope_sequence"]),
+    entityId: z.string().min(1),
+    targetOrganizationId: z.string().min(1),
+    permission: z.enum(["view", "edit", "copy"]).optional().default("view"),
+  });
+
   app.post("/api/orgs/:orgId/share", isAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user?.claims?.sub;
       const { orgId } = req.params;
-      const { entityType, entityId, targetOrganizationId, permission } = req.body;
+      
+      const parsed = entityShareBodySchema.safeParse(req.body);
+      if (!parsed.success) {
+        res.status(400).json({ error: "Invalid share data", details: parsed.error.errors });
+        return;
+      }
+      
+      const { entityType, entityId, targetOrganizationId, permission } = parsed.data;
       
       const membership = await storage.getOrgMembership(orgId, userId);
       if (!membership || membership.role === "member") {
         res.status(403).json({ error: "Admin access required to share" });
+        return;
+      }
+      
+      const targetOrg = await storage.getOrganization(targetOrganizationId);
+      if (!targetOrg) {
+        res.status(400).json({ error: "Target organization not found" });
         return;
       }
       
@@ -2395,7 +2415,7 @@ export async function registerRoutes(
         entityId,
         sourceOrganizationId: orgId,
         targetOrganizationId,
-        permission: permission || "view",
+        permission,
         sharedBy: userId,
       });
       
@@ -2430,9 +2450,20 @@ export async function registerRoutes(
       const userId = req.user?.claims?.sub;
       const { shareId } = req.params;
       
+      const share = await storage.getEntityShare(shareId);
+      if (!share) {
+        res.status(404).json({ error: "Share not found" });
+        return;
+      }
+      
       const isSiteAdminUser = await storage.isSiteAdmin(userId);
-      if (!isSiteAdminUser) {
-        res.status(403).json({ error: "Admin access required" });
+      
+      const sourceOrgMembership = await storage.getOrgMembership(share.sourceOrganizationId, userId);
+      const isSourceOrgAdmin = sourceOrgMembership && 
+        (sourceOrgMembership.role === "admin" || sourceOrgMembership.role === "owner");
+      
+      if (!isSiteAdminUser && !isSourceOrgAdmin) {
+        res.status(403).json({ error: "Admin access required to delete share" });
         return;
       }
       

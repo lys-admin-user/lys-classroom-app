@@ -322,6 +322,7 @@ export interface IStorage {
 
   // Entity Sharing
   createEntityShare(share: InsertEntityShare): Promise<EntityShare>;
+  getEntityShare(id: string): Promise<EntityShare | undefined>;
   getEntityShares(entityType: string, entityId: string): Promise<EntityShare[]>;
   getSharedWithOrganization(targetOrganizationId: string): Promise<EntityShare[]>;
   deleteEntityShare(id: string): Promise<boolean>;
@@ -1479,6 +1480,11 @@ export class DatabaseStorage implements IStorage {
   async createEntityShare(share: InsertEntityShare): Promise<EntityShare> {
     const [result] = await db.insert(entityShares).values(share).returning();
     return result;
+  }
+
+  async getEntityShare(id: string): Promise<EntityShare | undefined> {
+    const [result] = await db.select().from(entityShares).where(eq(entityShares.id, id));
+    return result || undefined;
   }
 
   async getEntityShares(entityType: string, entityId: string): Promise<EntityShare[]> {
