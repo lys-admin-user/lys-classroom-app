@@ -28,6 +28,7 @@ import Assignments from "@/pages/Assignments";
 import Collaboration from "@/pages/Collaboration";
 import ResourceLibrary from "@/pages/ResourceLibrary";
 import SiteAdmin from "@/pages/SiteAdmin";
+import SystemAdmin from "@/pages/SystemAdmin";
 import ParentPortal from "@/pages/ParentPortal";
 import Milestones from "@/pages/Milestones";
 import Classroom from "@/pages/Classroom";
@@ -78,6 +79,7 @@ function Router() {
       <Route path="/collaboration/:id" component={Collaboration} />
       <Route path="/resource-library" component={ResourceLibrary} />
       <Route path="/admin" component={SiteAdmin} />
+      <Route path="/system-admin" component={SystemAdmin} />
       <Route path="/parent-portal" component={ParentPortal} />
       <Route path="/milestones" component={Milestones} />
       <Route path="/classroom" component={Classroom} />
