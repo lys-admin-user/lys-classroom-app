@@ -476,7 +476,8 @@ export async function registerRoutes(
       // Import tier functions from shared schema
       const { getFeaturesForTier, getNextTier, TIER_BENEFITS, UserTierType } = await import("@shared/schema");
       
-      const userTier = (user.tier || "free") as typeof UserTierType[keyof typeof UserTierType];
+      type TierType = typeof UserTierType[keyof typeof UserTierType];
+      const userTier = (user.tier || "free") as TierType;
       const { available, locked } = getFeaturesForTier(userTier);
       const nextTierKey = getNextTier(userTier);
       
@@ -487,7 +488,7 @@ export async function registerRoutes(
       // Generate personalized upgrade recommendation based on user activity
       let upgradeRecommendation: string | undefined;
       if (userTier === "free") {
-        const lessonCount = await storage.getLessonGenerationCount(userId);
+        const lessonCount = await storage.countMonthlyGenerations(userId);
         if (lessonCount >= 3) {
           upgradeRecommendation = "You're using AI lessons frequently! Upgrade to Pro for unlimited lesson generation and advanced analytics.";
         } else {
@@ -551,7 +552,8 @@ export async function registerRoutes(
         return;
       }
       
-      const userTier = (user.tier || "free") as typeof UserTierType[keyof typeof UserTierType];
+      type TierType = typeof UserTierType[keyof typeof UserTierType];
+      const userTier = (user.tier || "free") as TierType;
       const hasAccess = tierHasAccess(userTier, feature.requiredTier);
       
       res.json({

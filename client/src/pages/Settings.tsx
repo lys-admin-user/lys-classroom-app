@@ -7,6 +7,7 @@ import { Separator } from "@/components/ui/separator";
 import { Settings as SettingsIcon, User, Crown, Loader2 } from "lucide-react";
 import { useLocation } from "wouter";
 import EducatorProfileForm from "@/components/EducatorProfileForm";
+import ProfileTierSitemap from "@/components/ProfileTierSitemap";
 import type { EducatorProfile } from "@shared/schema";
 
 export default function Settings() {
@@ -113,6 +114,10 @@ export default function Settings() {
               </div>
             </CardContent>
           </Card>
+
+          <Separator />
+
+          <ProfileTierSitemap />
 
           <Separator />
 
