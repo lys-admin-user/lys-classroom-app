@@ -27,9 +27,18 @@ import {
   AlertCircle,
   GraduationCap,
   Sparkles,
-  Map
+  Map,
+  FolderOpen,
+  MessageSquare,
+  Send,
+  Trash2,
+  Edit3
 } from "lucide-react";
-import type { StudentJourneyProgress, StudentJourneyMilestone, Assignment, AssignmentRecipient, Student } from "@shared/schema";
+import type { StudentJourneyProgress, StudentJourneyMilestone, Assignment, AssignmentRecipient, Student, StudentPortfolio, PortfolioItem, PortfolioComment } from "@shared/schema";
+import { useMutation } from "@tanstack/react-query";
+import { apiRequest, queryClient } from "@/lib/queryClient";
+import { Textarea } from "@/components/ui/textarea";
+import { useAuth } from "@/hooks/use-auth";
 
 interface JourneyData {
   progress: StudentJourneyProgress;
@@ -178,13 +187,21 @@ const studentFeatures = [
   { id: "journey", name: "My Journey", icon: TrendingUp, path: "#journey", description: "Track your Be-Know-Do progress" },
   { id: "assignments", name: "Assignments", icon: ClipboardList, path: "#assignments", description: "View and complete your assignments" },
   { id: "milestones", name: "Milestones", icon: Trophy, path: "#milestones", description: "Celebrate your achievements" },
+  { id: "portfolio", name: "Portfolio", icon: FolderOpen, path: "#portfolio", description: "Showcase your best work" },
   { id: "careers", name: "Career Explorer", icon: Briefcase, path: "/careers", description: "Discover career pathways" },
   { id: "discovery", name: "Self-Discovery", icon: Sparkles, path: "/self-discovery", description: "Learn about yourself" },
 ];
 
+interface PortfolioData {
+  portfolio: StudentPortfolio;
+  items: PortfolioItem[];
+}
+
 export default function StudentDashboard() {
   const { studentId } = useParams<{ studentId: string }>();
   const [activeTab, setActiveTab] = useState("overview");
+  const [newComment, setNewComment] = useState("");
+  const { user: currentUser } = useAuth();
 
   const { data: student, isLoading: studentLoading } = useQuery<Student>({
     queryKey: ["/api/students", studentId],
@@ -199,6 +216,39 @@ export default function StudentDashboard() {
   const { data: assignmentsData, isLoading: assignmentsLoading } = useQuery<StudentAssignment[]>({
     queryKey: ["/api/student-assignments", studentId],
     enabled: !!studentId,
+  });
+
+  const { data: portfolio } = useQuery<StudentPortfolio | null>({
+    queryKey: ["/api/portfolio"],
+  });
+
+  const { data: portfolioItems } = useQuery<PortfolioItem[]>({
+    queryKey: ["/api/portfolio", portfolio?.id, "items"],
+    enabled: !!portfolio?.id,
+  });
+
+  const { data: portfolioComments } = useQuery<PortfolioComment[]>({
+    queryKey: ["/api/portfolio", portfolio?.id, "comments"],
+    enabled: !!portfolio?.id,
+  });
+
+  const createCommentMutation = useMutation({
+    mutationFn: async (content: string) => {
+      return apiRequest("POST", `/api/portfolio/${portfolio?.id}/comments`, { content });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/portfolio", portfolio?.id, "comments"] });
+      setNewComment("");
+    },
+  });
+
+  const deleteCommentMutation = useMutation({
+    mutationFn: async (commentId: string) => {
+      return apiRequest("DELETE", `/api/portfolio/comments/${commentId}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/portfolio", portfolio?.id, "comments"] });
+    },
   });
 
   const isLoading = studentLoading || journeyLoading || assignmentsLoading;
@@ -316,6 +366,10 @@ export default function StudentDashboard() {
                   )}
                 </TabsTrigger>
                 <TabsTrigger value="milestones" data-testid="tab-milestones">Milestones</TabsTrigger>
+                <TabsTrigger value="portfolio" data-testid="tab-portfolio">
+                  <FolderOpen className="w-4 h-4 mr-1" />
+                  Portfolio
+                </TabsTrigger>
               </TabsList>
 
               <TabsContent value="overview" className="space-y-6">
@@ -524,6 +578,202 @@ export default function StudentDashboard() {
                     )}
                   </CardContent>
                 </Card>
+              </TabsContent>
+
+              <TabsContent value="portfolio" className="space-y-6">
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2 font-oswald">
+                      <FolderOpen className="w-5 h-5 text-lys-teal" />
+                      My Portfolio
+                    </CardTitle>
+                    <CardDescription className="font-roboto">
+                      Showcase your best work to colleges, employers, and scholarship committees
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    {!portfolio ? (
+                      <div className="py-8 text-center">
+                        <FolderOpen className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
+                        <p className="text-muted-foreground mb-4">
+                          You haven't created a portfolio yet. Start showcasing your best work!
+                        </p>
+                        <Button asChild>
+                          <Link href="/portfolio/builder">
+                            <FolderOpen className="w-4 h-4 mr-2" />
+                            Create Portfolio
+                          </Link>
+                        </Button>
+                      </div>
+                    ) : (
+                      <div className="space-y-4">
+                        <div className="flex items-center justify-between gap-2 flex-wrap">
+                          <div>
+                            <h3 className="font-medium">{portfolio.title}</h3>
+                            <p className="text-sm text-muted-foreground">{portfolio.bio || "No bio added"}</p>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <Badge variant="outline">{portfolio.privacy}</Badge>
+                            <Badge variant="secondary">{portfolio.viewCount || 0} views</Badge>
+                            <Button variant="outline" size="sm" asChild>
+                              <Link href="/portfolio/builder">
+                                <Edit3 className="w-4 h-4 mr-1" />
+                                Edit
+                              </Link>
+                            </Button>
+                          </div>
+                        </div>
+                        <Separator />
+                        
+                        {portfolioItems && portfolioItems.length > 0 ? (
+                          <div className="grid gap-3">
+                            {portfolioItems.map((item) => {
+                              const bkdConfig = {
+                                be: { color: "text-lys-yellow", bg: "bg-lys-yellow/10" },
+                                know: { color: "text-lys-teal", bg: "bg-lys-teal/10" },
+                                do: { color: "text-lys-red", bg: "bg-lys-red/10" },
+                              };
+                              const bkd = bkdConfig[item.bkdFocus as keyof typeof bkdConfig] || bkdConfig.do;
+                              
+                              return (
+                                <div 
+                                  key={item.id} 
+                                  className="p-4 rounded-md bg-muted/30"
+                                  data-testid={`portfolio-item-${item.id}`}
+                                >
+                                  <div className="flex items-start gap-3">
+                                    <div className={`p-2 rounded-md ${bkd.bg}`}>
+                                      <FileText className={`w-5 h-5 ${bkd.color}`} />
+                                    </div>
+                                    <div className="flex-1 min-w-0">
+                                      <div className="flex items-center gap-2 flex-wrap">
+                                        <h4 className="font-medium">{item.customTitle}</h4>
+                                        <Badge variant="outline" className="capitalize">{item.itemType}</Badge>
+                                        {item.bkdFocus && (
+                                          <Badge className={bkd.bg + " " + bkd.color + " border-0"}>
+                                            {item.bkdFocus.toUpperCase()}
+                                          </Badge>
+                                        )}
+                                      </div>
+                                      {item.customDescription && (
+                                        <p className="text-sm text-muted-foreground mt-1">{item.customDescription}</p>
+                                      )}
+                                      {item.skills && item.skills.length > 0 && (
+                                        <div className="flex gap-1 mt-2 flex-wrap">
+                                          {item.skills.map((skill, i) => (
+                                            <Badge key={i} variant="secondary" className="text-xs">{skill}</Badge>
+                                          ))}
+                                        </div>
+                                      )}
+                                    </div>
+                                  </div>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        ) : (
+                          <div className="py-4 text-center text-muted-foreground">
+                            <p>No items in your portfolio yet. Add your best work!</p>
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+
+                {portfolio && (
+                  <Card>
+                    <CardHeader>
+                      <CardTitle className="flex items-center gap-2 font-oswald">
+                        <MessageSquare className="w-5 h-5" />
+                        Feedback & Comments
+                      </CardTitle>
+                      <CardDescription className="font-roboto">
+                        Comments from teachers, parents, and yourself
+                      </CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="space-y-4">
+                        <div className="flex gap-2">
+                          <Textarea
+                            placeholder="Add a comment or note about your portfolio..."
+                            value={newComment}
+                            onChange={(e) => setNewComment(e.target.value)}
+                            className="min-h-[80px]"
+                            data-testid="input-portfolio-comment"
+                          />
+                        </div>
+                        <div className="flex justify-end">
+                          <Button 
+                            onClick={() => createCommentMutation.mutate(newComment)}
+                            disabled={!newComment.trim() || createCommentMutation.isPending}
+                            data-testid="button-submit-comment"
+                          >
+                            {createCommentMutation.isPending ? (
+                              <Loader2 className="w-4 h-4 animate-spin mr-2" />
+                            ) : (
+                              <Send className="w-4 h-4 mr-2" />
+                            )}
+                            Post Comment
+                          </Button>
+                        </div>
+                        
+                        <Separator />
+                        
+                        {portfolioComments && portfolioComments.length > 0 ? (
+                          <div className="space-y-3">
+                            {portfolioComments.map((comment) => {
+                              const roleColors: Record<string, string> = {
+                                student: "bg-blue-500/10 text-blue-600",
+                                educator: "bg-emerald-500/10 text-emerald-600",
+                                campus_admin: "bg-purple-500/10 text-purple-600",
+                                parent: "bg-amber-500/10 text-amber-600",
+                              };
+                              const roleColor = roleColors[comment.authorRole] || roleColors.student;
+                              
+                              return (
+                                <div 
+                                  key={comment.id} 
+                                  className="p-3 rounded-md bg-muted/30"
+                                  data-testid={`comment-${comment.id}`}
+                                >
+                                  <div className="flex items-start justify-between gap-2">
+                                    <div className="flex items-center gap-2">
+                                      <span className="font-medium text-sm">{comment.authorName}</span>
+                                      <Badge className={roleColor + " border-0 text-xs capitalize"}>
+                                        {comment.authorRole.replace("_", " ")}
+                                      </Badge>
+                                      <span className="text-xs text-muted-foreground">
+                                        {comment.createdAt ? new Date(comment.createdAt).toLocaleDateString() : ""}
+                                      </span>
+                                    </div>
+                                    {currentUser && comment.authorId === currentUser.id && (
+                                      <Button
+                                        variant="ghost"
+                                        size="icon"
+                                        className="h-6 w-6"
+                                        onClick={() => deleteCommentMutation.mutate(comment.id)}
+                                        data-testid={`button-delete-comment-${comment.id}`}
+                                      >
+                                        <Trash2 className="w-3 h-3" />
+                                      </Button>
+                                    )}
+                                  </div>
+                                  <p className="text-sm mt-2">{comment.content}</p>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        ) : (
+                          <div className="py-4 text-center text-muted-foreground">
+                            <MessageSquare className="w-8 h-8 mx-auto mb-2 opacity-50" />
+                            <p className="text-sm">No comments yet. Be the first to add one!</p>
+                          </div>
+                        )}
+                      </div>
+                    </CardContent>
+                  </Card>
+                )}
               </TabsContent>
             </Tabs>
           </div>
