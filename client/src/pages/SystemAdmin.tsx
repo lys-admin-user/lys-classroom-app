@@ -421,7 +421,7 @@ export default function SystemAdminPage() {
                   </CardContent>
                 </Card>
 
-                <Card>
+                <Card className="flex flex-col">
                   <CardHeader>
                     <CardTitle className="text-lg flex items-center gap-2">
                       <Map className="h-5 w-5 text-lys-teal" />
@@ -429,9 +429,9 @@ export default function SystemAdminPage() {
                     </CardTitle>
                     <CardDescription>Quick navigation to all admin sections</CardDescription>
                   </CardHeader>
-                  <CardContent>
-                    <ScrollArea className="h-[280px]">
-                      <div className="space-y-2">
+                  <CardContent className="flex-1 relative">
+                    <ScrollArea className="h-[320px] pr-4" type="always">
+                      <div className="space-y-2 pb-2">
                         {sitemap?.platform.sections.map((section, i) => (
                           <button
                             key={i}
@@ -443,7 +443,7 @@ export default function SystemAdminPage() {
                                 setLocation(section.path);
                               }
                             }}
-                            className="w-full flex items-center justify-between p-3 rounded-md bg-muted/50 hover-elevate text-left"
+                            className="w-full flex items-center justify-between p-3 rounded-md bg-muted/50 hover-elevate text-left transition-colors"
                             data-testid={`sitemap-link-${section.name.toLowerCase().replace(/\s+/g, "-")}`}
                           >
                             <div className="flex-1 min-w-0">
@@ -460,6 +460,7 @@ export default function SystemAdminPage() {
                         ))}
                       </div>
                     </ScrollArea>
+                    <div className="absolute bottom-0 left-0 right-4 h-6 bg-gradient-to-t from-card to-transparent pointer-events-none" />
                   </CardContent>
                 </Card>
               </div>
