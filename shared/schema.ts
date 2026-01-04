@@ -1052,3 +1052,134 @@ export const emailTemplates = pgTable("email_templates", {
 export const insertEmailTemplateSchema = createInsertSchema(emailTemplates).omit({ id: true, createdAt: true, updatedAt: true });
 export type InsertEmailTemplate = z.infer<typeof insertEmailTemplateSchema>;
 export type EmailTemplate = typeof emailTemplates.$inferSelect;
+
+// ================================
+// Professional Development System
+// ================================
+
+// Educator Career Goals - tracks career aspirations for educators
+export const educatorCareerGoals = pgTable("educator_career_goals", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull(),
+  title: text("title").notNull(),
+  description: text("description"),
+  goalType: text("goal_type").notNull(), // "leadership", "specialization", "certification", "skill_development", "role_change"
+  targetRole: text("target_role"), // e.g., "Department Head", "Curriculum Specialist", "Principal"
+  timeframe: text("timeframe").notNull(), // "6_months", "1_year", "2_years", "5_years"
+  priority: integer("priority").default(1), // 1-5, higher is more important
+  status: text("status").notNull().default("active"), // "active", "achieved", "paused", "abandoned"
+  progress: integer("progress").default(0), // 0-100
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertEducatorCareerGoalSchema = createInsertSchema(educatorCareerGoals).omit({ id: true, createdAt: true, updatedAt: true });
+export type InsertEducatorCareerGoal = z.infer<typeof insertEducatorCareerGoalSchema>;
+export type EducatorCareerGoal = typeof educatorCareerGoals.$inferSelect;
+
+// Educator Skills - tracks current skills and proficiency levels
+export const educatorSkills = pgTable("educator_skills", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull(),
+  skillName: text("skill_name").notNull(),
+  category: text("category").notNull(), // "pedagogy", "technology", "leadership", "subject_matter", "assessment", "communication", "sel"
+  proficiencyLevel: integer("proficiency_level").notNull().default(1), // 1-5: beginner, developing, proficient, advanced, expert
+  isVerified: boolean("is_verified").default(false), // verified through assessment or certification
+  lastAssessedAt: timestamp("last_assessed_at"),
+  notes: text("notes"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertEducatorSkillSchema = createInsertSchema(educatorSkills).omit({ id: true, createdAt: true, updatedAt: true });
+export type InsertEducatorSkill = z.infer<typeof insertEducatorSkillSchema>;
+export type EducatorSkill = typeof educatorSkills.$inferSelect;
+
+// PD Resources - catalog of professional development opportunities
+export const pdResources = pgTable("pd_resources", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  title: text("title").notNull(),
+  description: text("description").notNull(),
+  provider: text("provider"), // "LYS", "Coursera", "EdX", "State", "District", etc.
+  resourceType: text("resource_type").notNull(), // "course", "workshop", "certification", "webinar", "book", "mentorship", "conference"
+  url: text("url"),
+  duration: text("duration"), // "2 hours", "4 weeks", "self-paced"
+  cost: text("cost"), // "free", "$50", "subscription"
+  skillsAddressed: jsonb("skills_addressed").$type<string[]>().default([]),
+  goalTypesAddressed: jsonb("goal_types_addressed").$type<string[]>().default([]),
+  gradeRelevance: jsonb("grade_relevance").$type<string[]>().default([]), // K-2, 3-5, 6-8, 9-12, Higher Ed
+  subjectRelevance: jsonb("subject_relevance").$type<string[]>().default([]),
+  rating: integer("rating"), // 1-5 average rating
+  completionCount: integer("completion_count").default(0),
+  isActive: boolean("is_active").default(true),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertPDResourceSchema = createInsertSchema(pdResources).omit({ id: true, createdAt: true, updatedAt: true });
+export type InsertPDResource = z.infer<typeof insertPDResourceSchema>;
+export type PDResource = typeof pdResources.$inferSelect;
+
+// PD Recommendations - AI-generated personalized recommendations
+export const pdRecommendations = pgTable("pd_recommendations", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull(),
+  resourceId: varchar("resource_id"),
+  title: text("title").notNull(),
+  description: text("description").notNull(),
+  reason: text("reason").notNull(), // why this was recommended
+  skillGaps: jsonb("skill_gaps").$type<string[]>().default([]), // which skills this addresses
+  relatedGoalIds: jsonb("related_goal_ids").$type<string[]>().default([]),
+  priority: integer("priority").default(1), // 1-5, higher is more relevant
+  status: text("status").notNull().default("new"), // "new", "viewed", "saved", "started", "completed", "dismissed"
+  resourceType: text("resource_type"), // "course", "workshop", etc.
+  provider: text("provider"),
+  url: text("url"),
+  estimatedDuration: text("estimated_duration"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertPDRecommendationSchema = createInsertSchema(pdRecommendations).omit({ id: true, createdAt: true, updatedAt: true });
+export type InsertPDRecommendation = z.infer<typeof insertPDRecommendationSchema>;
+export type PDRecommendation = typeof pdRecommendations.$inferSelect;
+
+// Educator PD Progress - tracks completion of PD activities
+export const educatorPDProgress = pgTable("educator_pd_progress", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull(),
+  resourceId: varchar("resource_id"),
+  recommendationId: varchar("recommendation_id"),
+  title: text("title").notNull(),
+  status: text("status").notNull().default("in_progress"), // "in_progress", "completed", "abandoned"
+  progress: integer("progress").default(0), // 0-100
+  hoursSpent: integer("hours_spent").default(0),
+  completedAt: timestamp("completed_at"),
+  certificateUrl: text("certificate_url"),
+  notes: text("notes"),
+  rating: integer("rating"), // user's rating 1-5
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertEducatorPDProgressSchema = createInsertSchema(educatorPDProgress).omit({ id: true, createdAt: true, updatedAt: true });
+export type InsertEducatorPDProgress = z.infer<typeof insertEducatorPDProgressSchema>;
+export type EducatorPDProgress = typeof educatorPDProgress.$inferSelect;
+
+// PD Recommendation Response Schema (for AI-generated recommendations)
+export const pdRecommendationResponseSchema = z.object({
+  recommendations: z.array(z.object({
+    title: z.string(),
+    description: z.string(),
+    reason: z.string(),
+    skillGaps: z.array(z.string()),
+    resourceType: z.string(),
+    provider: z.string().optional(),
+    estimatedDuration: z.string().optional(),
+    priority: z.number().min(1).max(5),
+  })),
+  summary: z.string(),
+  focusAreas: z.array(z.string()),
+});
+
+export type PDRecommendationResponse = z.infer<typeof pdRecommendationResponseSchema>;
