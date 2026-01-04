@@ -1478,7 +1478,7 @@ export class DatabaseStorage implements IStorage {
 
   // Entity Sharing
   async createEntityShare(share: InsertEntityShare): Promise<EntityShare> {
-    const [result] = await db.insert(entityShares).values(share).returning();
+    const [result] = await db.insert(entityShares).values(share as any).returning();
     return result;
   }
 

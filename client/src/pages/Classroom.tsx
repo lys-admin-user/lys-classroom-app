@@ -26,7 +26,9 @@ import {
   FileText,
   AlertCircle,
   Building2,
-  Share2
+  Share2,
+  Eye,
+  X
 } from "lucide-react";
 import type { Class, Student, InsertClass, InsertStudent, AccommodationType, Organization, OrgMembership } from "@shared/schema";
 
@@ -63,12 +65,42 @@ export default function Classroom() {
   const [selectedClassId, setSelectedClassId] = useState<string | null>(null);
   const [selectedOrgId, setSelectedOrgId] = useState<string | null>(null);
   const [viewMode, setViewMode] = useState<"personal" | "organization">("personal");
+  const [sharingClass, setSharingClass] = useState<Class | null>(null);
+  const [shareTargetOrgId, setShareTargetOrgId] = useState<string>("");
+  const [sharePermission, setSharePermission] = useState<"view" | "edit" | "copy">("view");
+  const [managingSharesClass, setManagingSharesClass] = useState<Class | null>(null);
 
   const isCampusAdmin = user?.role === "campus_admin";
   
   const { data: userOrgs = [] } = useQuery<OrgWithDetails[]>({
     queryKey: ["/api/organizations/mine"],
     enabled: !!user && isCampusAdmin,
+  });
+
+  const { data: allOrgs = [] } = useQuery<Organization[]>({
+    queryKey: ["/api/organizations"],
+    enabled: !!user && isCampusAdmin,
+  });
+
+  type EntityShare = {
+    id: string;
+    entityType: string;
+    entityId: string;
+    sourceOrganizationId: string;
+    targetOrganizationId: string;
+    permission: string;
+    sharedBy: string;
+    createdAt: string;
+  };
+
+  const { data: sharedWithUs = [] } = useQuery<EntityShare[]>({
+    queryKey: ["/api/orgs", selectedOrgId, "shared-with-us"],
+    enabled: !!selectedOrgId && viewMode === "organization",
+  });
+
+  const { data: classShares = [] } = useQuery<EntityShare[]>({
+    queryKey: ["/api/shares/entity", "class", managingSharesClass?.id],
+    enabled: !!managingSharesClass,
   });
 
   const [newClass, setNewClass] = useState<Partial<InsertClass>>({
@@ -248,6 +280,41 @@ export default function Classroom() {
     },
     onError: () => {
       toast({ title: "Failed to remove student from class", variant: "destructive" });
+    },
+  });
+
+  const shareClassMutation = useMutation({
+    mutationFn: async ({ orgId, classId, targetOrgId, permission }: { 
+      orgId: string; classId: string; targetOrgId: string; permission: string 
+    }) => {
+      return await apiRequest("POST", `/api/orgs/${orgId}/share`, {
+        entityType: "class",
+        entityId: classId,
+        targetOrganizationId: targetOrgId,
+        permission,
+      });
+    },
+    onSuccess: () => {
+      setSharingClass(null);
+      setShareTargetOrgId("");
+      setSharePermission("view");
+      toast({ title: "Class shared successfully" });
+    },
+    onError: () => {
+      toast({ title: "Failed to share class", variant: "destructive" });
+    },
+  });
+
+  const revokeShareMutation = useMutation({
+    mutationFn: async (shareId: string) => {
+      return await apiRequest("DELETE", `/api/shares/${shareId}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/shares/entity", "class", managingSharesClass?.id] });
+      toast({ title: "Share revoked" });
+    },
+    onError: () => {
+      toast({ title: "Failed to revoke share", variant: "destructive" });
     },
   });
 
@@ -510,6 +577,26 @@ export default function Classroom() {
                       </div>
                     </div>
                     <div className="flex items-center gap-1">
+                      {isCampusAdmin && userOrgs.length > 0 && (
+                        <>
+                          <Button
+                            size="icon"
+                            variant="ghost"
+                            onClick={() => setSharingClass(cls)}
+                            data-testid={`button-share-class-${cls.id}`}
+                          >
+                            <Share2 className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            size="icon"
+                            variant="ghost"
+                            onClick={() => setManagingSharesClass(cls)}
+                            data-testid={`button-manage-shares-${cls.id}`}
+                          >
+                            <Eye className="h-4 w-4" />
+                          </Button>
+                        </>
+                      )}
                       <Button
                         size="icon"
                         variant="ghost"
@@ -545,6 +632,14 @@ export default function Classroom() {
                       <Badge variant={cls.isActive ? "default" : "secondary"}>
                         {cls.isActive ? "Active" : "Inactive"}
                       </Badge>
+                      {viewMode === "organization" && sharedWithUs.some(
+                        s => s.entityType === "class" && s.entityId === cls.id
+                      ) && (
+                        <Badge variant="outline" className="text-lys-teal border-lys-teal">
+                          <Share2 className="h-3 w-3 mr-1" />
+                          Shared
+                        </Badge>
+                      )}
                     </div>
                   </CardContent>
                 </Card>
@@ -930,6 +1025,138 @@ export default function Classroom() {
             >
               {updateStudentMutation.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
               Save Changes
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Manage Shares Dialog */}
+      <Dialog open={!!managingSharesClass} onOpenChange={(open) => !open && setManagingSharesClass(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Manage Shares</DialogTitle>
+            <DialogDescription>
+              View and manage shares for "{managingSharesClass?.name}".
+            </DialogDescription>
+          </DialogHeader>
+          <div className="py-4">
+            {classShares.length === 0 ? (
+              <div className="text-center text-muted-foreground py-8">
+                <Share2 className="h-8 w-8 mx-auto mb-2 opacity-50" />
+                <p>No shares for this class yet</p>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {classShares.map((share) => {
+                  const targetOrg = allOrgs.find(o => o.id === share.targetOrganizationId);
+                  return (
+                    <div 
+                      key={share.id} 
+                      className="flex items-center justify-between gap-4 p-3 rounded-md bg-muted/50"
+                    >
+                      <div className="flex-1">
+                        <p className="font-medium">{targetOrg?.name || "Unknown Organization"}</p>
+                        <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                          <Badge variant="outline">{share.permission}</Badge>
+                        </div>
+                      </div>
+                      <Button
+                        size="icon"
+                        variant="ghost"
+                        onClick={() => revokeShareMutation.mutate(share.id)}
+                        disabled={revokeShareMutation.isPending}
+                        data-testid={`button-revoke-share-${share.id}`}
+                      >
+                        <X className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setManagingSharesClass(null)}>Close</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Share Class Dialog */}
+      <Dialog open={!!sharingClass} onOpenChange={(open) => !open && setSharingClass(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Share Class</DialogTitle>
+            <DialogDescription>
+              Share "{sharingClass?.name}" with another organization.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-4 py-4">
+            <div className="grid gap-2">
+              <Label htmlFor="share-target-org">Target Organization</Label>
+              <Select
+                value={shareTargetOrgId}
+                onValueChange={setShareTargetOrgId}
+              >
+                <SelectTrigger data-testid="select-share-target-org">
+                  <SelectValue placeholder="Select organization to share with" />
+                </SelectTrigger>
+                <SelectContent>
+                  {allOrgs
+                    .filter(org => {
+                      const sourceOrgId = sharingClass?.organizationId || selectedOrgId;
+                      return org.id !== sourceOrgId;
+                    })
+                    .map((org) => (
+                      <SelectItem key={org.id} value={org.id}>
+                        {org.name}
+                      </SelectItem>
+                    ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="grid gap-2">
+              <Label htmlFor="share-permission">Permission Level</Label>
+              <Select
+                value={sharePermission}
+                onValueChange={(v) => setSharePermission(v as "view" | "edit" | "copy")}
+              >
+                <SelectTrigger data-testid="select-share-permission">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="view">View Only</SelectItem>
+                  <SelectItem value="edit">Edit</SelectItem>
+                  <SelectItem value="copy">Copy</SelectItem>
+                </SelectContent>
+              </Select>
+              <p className="text-sm text-muted-foreground">
+                {sharePermission === "view" && "Target organization can view this class but not modify it."}
+                {sharePermission === "edit" && "Target organization can view and modify this class."}
+                {sharePermission === "copy" && "Target organization can create their own copy of this class."}
+              </p>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setSharingClass(null)}>Cancel</Button>
+            <Button
+              onClick={() => {
+                if (sharingClass && shareTargetOrgId) {
+                  const sourceOrgId = sharingClass.organizationId || selectedOrgId || userOrgs[0]?.organizationId;
+                  if (sourceOrgId) {
+                    shareClassMutation.mutate({
+                      orgId: sourceOrgId,
+                      classId: sharingClass.id,
+                      targetOrgId: shareTargetOrgId,
+                      permission: sharePermission,
+                    });
+                  }
+                }
+              }}
+              disabled={!shareTargetOrgId || shareClassMutation.isPending}
+              data-testid="button-submit-share"
+            >
+              {shareClassMutation.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+              Share Class
             </Button>
           </DialogFooter>
         </DialogContent>

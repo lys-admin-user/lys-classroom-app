@@ -2445,6 +2445,27 @@ export async function registerRoutes(
     }
   });
 
+  app.get("/api/shares/entity/:entityType/:entityId", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user?.claims?.sub;
+      const { entityType, entityId } = req.params;
+      
+      const shares = await storage.getEntityShares(entityType, entityId);
+      
+      const userOrgs = await storage.getUserOrganizations(userId);
+      const userOrgIds = userOrgs.map(m => m.organizationId);
+      
+      const filteredShares = shares.filter(share => 
+        userOrgIds.includes(share.sourceOrganizationId) ||
+        userOrgIds.includes(share.targetOrganizationId)
+      );
+      
+      res.json(filteredShares);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch entity shares" });
+    }
+  });
+
   app.delete("/api/shares/:shareId", isAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user?.claims?.sub;
