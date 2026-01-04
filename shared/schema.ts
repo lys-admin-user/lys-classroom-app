@@ -29,6 +29,33 @@ export const insertLessonSchema = createInsertSchema(lessons).omit({ id: true, c
 export type InsertLesson = z.infer<typeof insertLessonSchema>;
 export type Lesson = typeof lessons.$inferSelect;
 
+// Lesson Plan Templates (for one-click lesson creation)
+export const lessonTemplates = pgTable("lesson_templates", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull(),
+  title: text("title").notNull(),
+  description: text("description"),
+  category: text("category").notNull(),
+  gradeLevel: text("grade_level").notNull(),
+  subject: text("subject"),
+  bkdFocus: text("bkd_focus").notNull(),
+  duration: text("duration").notNull(),
+  objectives: jsonb("objectives").notNull().$type<string[]>(),
+  activities: jsonb("activities").notNull().$type<{ title: string; description: string; duration: string; type: string }[]>(),
+  materials: jsonb("materials").notNull().$type<string[]>(),
+  assessmentTemplate: text("assessment_template").notNull(),
+  lysMethodology: jsonb("lys_methodology").$type<{ be: { focus: string; description: string }; know: { focus: string; description: string }; do: { focus: string; description: string } }>(),
+  tags: jsonb("tags").$type<string[]>(),
+  visibility: text("visibility").notNull().default("private"),
+  useCount: integer("use_count").default(0),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertLessonTemplateSchema = createInsertSchema(lessonTemplates).omit({ id: true, createdAt: true, updatedAt: true, useCount: true });
+export type InsertLessonTemplate = z.infer<typeof insertLessonTemplateSchema>;
+export type LessonTemplate = typeof lessonTemplates.$inferSelect;
+
 // Lesson Generation Tracking (for free tier limits)
 export const lessonGenerations = pgTable("lesson_generations", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),

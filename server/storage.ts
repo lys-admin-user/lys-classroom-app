@@ -169,6 +169,9 @@ import {
   studentJourneyProgress,
   studentJourneyMilestones,
   studentJourneyActivities,
+  type LessonTemplate,
+  type InsertLessonTemplate,
+  lessonTemplates,
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, desc, and, asc, gte, sql } from "drizzle-orm";
@@ -185,6 +188,15 @@ export interface IStorage {
   countMonthlyGenerations(userId: string): Promise<number>;
   logLessonGeneration(userId: string, topic?: string): Promise<void>;
   tryReserveLessonGeneration(userId: string, limit: number, topic?: string): Promise<{ success: boolean; currentCount: number }>;
+  
+  // Lesson Templates
+  getLessonTemplates(userId: string): Promise<LessonTemplate[]>;
+  getPublicLessonTemplates(): Promise<LessonTemplate[]>;
+  getLessonTemplate(id: string): Promise<LessonTemplate | undefined>;
+  createLessonTemplate(template: InsertLessonTemplate): Promise<LessonTemplate>;
+  updateLessonTemplate(id: string, updates: Partial<LessonTemplate>, userId: string): Promise<LessonTemplate | undefined>;
+  deleteLessonTemplate(id: string, userId: string): Promise<boolean>;
+  incrementTemplateUseCount(id: string): Promise<void>;
   
   // Goals
   getGoals(userId?: string): Promise<Goal[]>;
@@ -798,6 +810,53 @@ export class DatabaseStorage implements IStorage {
       success: insertedCount > 0,
       currentCount: currentCount
     };
+  }
+
+  // Lesson Templates - stored in database
+  async getLessonTemplates(userId: string): Promise<LessonTemplate[]> {
+    return await db.select().from(lessonTemplates)
+      .where(eq(lessonTemplates.userId, userId))
+      .orderBy(desc(lessonTemplates.createdAt));
+  }
+
+  async getPublicLessonTemplates(): Promise<LessonTemplate[]> {
+    return await db.select().from(lessonTemplates)
+      .where(eq(lessonTemplates.visibility, "public"))
+      .orderBy(desc(lessonTemplates.useCount));
+  }
+
+  async getLessonTemplate(id: string): Promise<LessonTemplate | undefined> {
+    const [template] = await db.select().from(lessonTemplates).where(eq(lessonTemplates.id, id));
+    return template || undefined;
+  }
+
+  async createLessonTemplate(template: InsertLessonTemplate): Promise<LessonTemplate> {
+    const [created] = await db.insert(lessonTemplates).values(template as any).returning();
+    return created;
+  }
+
+  async updateLessonTemplate(id: string, updates: Partial<LessonTemplate>, userId: string): Promise<LessonTemplate | undefined> {
+    const template = await this.getLessonTemplate(id);
+    if (!template || template.userId !== userId) return undefined;
+    
+    const [updated] = await db.update(lessonTemplates)
+      .set({ ...updates, updatedAt: new Date() })
+      .where(eq(lessonTemplates.id, id))
+      .returning();
+    return updated || undefined;
+  }
+
+  async deleteLessonTemplate(id: string, userId: string): Promise<boolean> {
+    const result = await db.delete(lessonTemplates)
+      .where(and(eq(lessonTemplates.id, id), eq(lessonTemplates.userId, userId)))
+      .returning();
+    return result.length > 0;
+  }
+
+  async incrementTemplateUseCount(id: string): Promise<void> {
+    await db.update(lessonTemplates)
+      .set({ useCount: sql`${lessonTemplates.useCount} + 1` })
+      .where(eq(lessonTemplates.id, id));
   }
 
   // Goals - stored in database
