@@ -340,6 +340,7 @@ export interface IStorage {
   deleteAssignment(id: string, userId: string): Promise<boolean>;
 
   getAssignmentRecipients(assignmentId: string): Promise<AssignmentRecipient[]>;
+  getAssignmentsForStudent(studentId: string): Promise<{ assignment: Assignment; recipient: AssignmentRecipient }[]>;
   createAssignmentRecipient(recipient: InsertAssignmentRecipient): Promise<AssignmentRecipient>;
   updateAssignmentRecipient(id: string, updates: Partial<AssignmentRecipient>): Promise<AssignmentRecipient | undefined>;
 
@@ -1707,6 +1708,23 @@ export class DatabaseStorage implements IStorage {
   async getAssignmentRecipients(assignmentId: string): Promise<AssignmentRecipient[]> {
     return await db.select().from(assignmentRecipients)
       .where(eq(assignmentRecipients.assignmentId, assignmentId));
+  }
+
+  async getAssignmentsForStudent(studentId: string): Promise<{ assignment: Assignment; recipient: AssignmentRecipient }[]> {
+    const recipients = await db.select().from(assignmentRecipients)
+      .where(and(
+        eq(assignmentRecipients.recipientType, "student"),
+        eq(assignmentRecipients.recipientId, studentId)
+      ));
+    
+    const result: { assignment: Assignment; recipient: AssignmentRecipient }[] = [];
+    for (const recipient of recipients) {
+      const assignment = await this.getAssignment(recipient.assignmentId);
+      if (assignment) {
+        result.push({ assignment, recipient });
+      }
+    }
+    return result;
   }
 
   async createAssignmentRecipient(recipient: InsertAssignmentRecipient): Promise<AssignmentRecipient> {

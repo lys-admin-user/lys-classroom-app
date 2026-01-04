@@ -835,12 +835,12 @@ export default function Classroom() {
                       </div>
                     </div>
                     <div className="flex items-center gap-1">
-                      <Link href={`/student-journey/${student.id}`}>
+                      <Link href={`/student-dashboard/${student.id}`}>
                         <Button
                           size="icon"
                           variant="ghost"
-                          title="View Journey"
-                          data-testid={`button-journey-student-${student.id}`}
+                          title="Student Dashboard"
+                          data-testid={`button-dashboard-student-${student.id}`}
                         >
                           <TrendingUp className="h-4 w-4" />
                         </Button>

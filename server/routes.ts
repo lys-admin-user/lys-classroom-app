@@ -1299,6 +1299,20 @@ export async function registerRoutes(
     }
   });
 
+  app.get("/api/students/:id", isAuthenticated, async (req: any, res) => {
+    try {
+      const { id } = req.params;
+      const student = await storage.getStudent(id);
+      if (!student) {
+        res.status(404).json({ error: "Student not found" });
+        return;
+      }
+      res.json(student);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch student" });
+    }
+  });
+
   app.patch("/api/students/:id", isAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user?.claims?.sub;
@@ -4854,6 +4868,18 @@ export async function registerRoutes(
     } catch (error) {
       console.error("Failed to record assessment:", error);
       res.status(500).json({ error: "Failed to record assessment" });
+    }
+  });
+
+  // Get assignments for a specific student (for student dashboard)
+  app.get("/api/student-assignments/:studentId", isAuthenticated, async (req: any, res) => {
+    try {
+      const { studentId } = req.params;
+      const assignments = await storage.getAssignmentsForStudent(studentId);
+      res.json(assignments);
+    } catch (error) {
+      console.error("Failed to fetch student assignments:", error);
+      res.status(500).json({ error: "Failed to fetch student assignments" });
     }
   });
 
