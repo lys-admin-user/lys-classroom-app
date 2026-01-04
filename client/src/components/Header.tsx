@@ -83,22 +83,12 @@ export function Header() {
                 </Link>
                 <Link href="/my-lessons">
                   <Button
-                    variant={location === "/my-lessons" ? "secondary" : "ghost"}
+                    variant={location === "/my-lessons" || location === "/templates" ? "secondary" : "ghost"}
                     size="sm"
                     className="font-roboto"
                     data-testid="nav-my-lessons"
                   >
                     My Lessons
-                  </Button>
-                </Link>
-                <Link href="/templates">
-                  <Button
-                    variant={location === "/templates" ? "secondary" : "ghost"}
-                    size="sm"
-                    className="font-roboto"
-                    data-testid="nav-templates"
-                  >
-                    Templates
                   </Button>
                 </Link>
                 <Link href="/portfolio">
@@ -154,12 +144,6 @@ export function Header() {
                     <DropdownMenuItem className="cursor-pointer" data-testid="menu-my-lessons">
                       <BookOpen className="mr-2 h-4 w-4" />
                       My Lessons
-                    </DropdownMenuItem>
-                  </Link>
-                  <Link href="/templates">
-                    <DropdownMenuItem className="cursor-pointer" data-testid="menu-templates">
-                      <Library className="mr-2 h-4 w-4" />
-                      Templates
                     </DropdownMenuItem>
                   </Link>
                   <Link href="/portfolio">
@@ -263,17 +247,6 @@ export function Header() {
                     >
                       <BookOpen className="mr-2 h-4 w-4" />
                       My Lessons
-                    </Button>
-                  </Link>
-                  <Link href="/templates">
-                    <Button
-                      variant={location === "/templates" ? "secondary" : "ghost"}
-                      className="w-full justify-start font-roboto"
-                      onClick={() => setMobileMenuOpen(false)}
-                      data-testid="mobile-nav-templates"
-                    >
-                      <Library className="mr-2 h-4 w-4" />
-                      Templates
                     </Button>
                   </Link>
                   <Link href="/portfolio">

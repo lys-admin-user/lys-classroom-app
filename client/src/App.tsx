@@ -35,7 +35,6 @@ import Classroom from "@/pages/Classroom";
 import ProfessionalDevelopment from "@/pages/ProfessionalDevelopment";
 import StudentJourney from "@/pages/StudentJourney";
 import StudentDashboard from "@/pages/StudentDashboard";
-import TemplateLibrary from "@/pages/TemplateLibrary";
 import PortfolioBuilder from "@/pages/PortfolioBuilder";
 import PortfolioView from "@/pages/PortfolioView";
 import NotFound from "@/pages/not-found";
@@ -91,7 +90,6 @@ function Router() {
       <Route path="/student-journey/:studentId" component={StudentJourney} />
       <Route path="/student-dashboard/:studentId" component={StudentDashboard} />
       <Route path="/professional-development" component={ProfessionalDevelopment} />
-      <Route path="/templates" component={TemplateLibrary} />
       <Route path="/portfolio" component={PortfolioBuilder} />
       <Route path="/p/:slug" component={PortfolioView} />
       <Route component={NotFound} />

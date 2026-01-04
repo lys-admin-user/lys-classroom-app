@@ -5,11 +5,14 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { BookOpen, Trash2, Clock, Target, GraduationCap, Heart, Compass, Lightbulb, AlertCircle, Share2, Link2, BarChart3, Library, Loader2 } from "lucide-react";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { BookOpen, Trash2, Clock, Target, GraduationCap, Heart, Compass, Lightbulb, AlertCircle, Share2, Link2, BarChart3, Library, Loader2, Search, Filter, LayoutGrid, List, Globe, Lock, Sparkles, Zap } from "lucide-react";
 import { useAuth } from "@/hooks/use-auth";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
-import type { Lesson } from "@shared/schema";
+import type { Lesson, LessonTemplate } from "@shared/schema";
+import { Link } from "wouter";
+import { TemplateCard, CreateTemplateDialog, UseTemplateDialog, templateCategories, templateGradeLevels } from "./TemplateLibrary";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -43,6 +46,7 @@ const bkdConfig = {
 export default function MyLessons() {
   const { toast } = useToast();
   const { user, isLoading: authLoading, isAuthenticated } = useAuth();
+  const [activeMainTab, setActiveMainTab] = useState("lessons");
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [shareLesson, setShareLesson] = useState<{ id: string; title: string } | null>(null);
   const [templateLesson, setTemplateLesson] = useState<Lesson | null>(null);
@@ -50,8 +54,28 @@ export default function MyLessons() {
   const [templateDescription, setTemplateDescription] = useState("");
   const [templateVisibility, setTemplateVisibility] = useState<"private" | "public">("private");
 
+  // Template Library state
+  const [templateTab, setTemplateTab] = useState("my-templates");
+  const [templateSearchQuery, setTemplateSearchQuery] = useState("");
+  const [selectedCategory, setSelectedCategory] = useState("All");
+  const [selectedGrade, setSelectedGrade] = useState("All Grades");
+  const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
+  const [selectedTemplate, setSelectedTemplate] = useState<LessonTemplate | null>(null);
+  const [useDialogOpen, setUseDialogOpen] = useState(false);
+  const [usingTemplateId, setUsingTemplateId] = useState<string | null>(null);
+
   const { data: lessons = [], isLoading } = useQuery<Lesson[]>({
     queryKey: ["/api/lessons"],
+    enabled: isAuthenticated,
+  });
+
+  const { data: myTemplates = [], isLoading: myTemplatesLoading } = useQuery<LessonTemplate[]>({
+    queryKey: ["/api/templates"],
+    enabled: isAuthenticated,
+  });
+
+  const { data: publicTemplates = [], isLoading: publicTemplatesLoading } = useQuery<LessonTemplate[]>({
+    queryKey: ["/api/templates/public"],
     enabled: isAuthenticated,
   });
 
@@ -86,6 +110,7 @@ export default function MyLessons() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/templates"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/templates/public"] });
       toast({
         title: "Template Created!",
         description: "Your lesson has been saved as a reusable template.",
@@ -103,6 +128,59 @@ export default function MyLessons() {
     },
   });
 
+  const useTemplateMutation = useMutation({
+    mutationFn: async ({ templateId, customizations }: { templateId: string; customizations: any }) => {
+      setUsingTemplateId(templateId);
+      return await apiRequest("POST", `/api/templates/${templateId}/use`, customizations);
+    },
+    onSuccess: () => {
+      toast({ title: "Lesson created!", description: "Your new lesson is ready in your saved lessons." });
+      queryClient.invalidateQueries({ queryKey: ["/api/lessons"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/templates"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/templates/public"] });
+      setUseDialogOpen(false);
+      setSelectedTemplate(null);
+      setUsingTemplateId(null);
+      setActiveMainTab("lessons");
+    },
+    onError: () => {
+      toast({ title: "Error", description: "Failed to create lesson from template", variant: "destructive" });
+      setUsingTemplateId(null);
+    }
+  });
+
+  const deleteTemplateMutation = useMutation({
+    mutationFn: async (templateId: string) => {
+      return await apiRequest("DELETE", `/api/templates/${templateId}`);
+    },
+    onSuccess: () => {
+      toast({ title: "Template deleted" });
+      queryClient.invalidateQueries({ queryKey: ["/api/templates"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/templates/public"] });
+    },
+    onError: () => {
+      toast({ title: "Error", description: "Failed to delete template", variant: "destructive" });
+    }
+  });
+
+  const handleUseTemplate = (template: LessonTemplate) => {
+    setSelectedTemplate(template);
+    setUseDialogOpen(true);
+  };
+
+  const filterTemplates = (templates: LessonTemplate[]) => {
+    return templates.filter(t => {
+      const matchesSearch = !templateSearchQuery || 
+        t.title.toLowerCase().includes(templateSearchQuery.toLowerCase()) ||
+        (t.description && t.description.toLowerCase().includes(templateSearchQuery.toLowerCase()));
+      const matchesCategory = selectedCategory === "All" || t.category === selectedCategory;
+      const matchesGrade = selectedGrade === "All Grades" || t.gradeLevel === selectedGrade;
+      return matchesSearch && matchesCategory && matchesGrade;
+    });
+  };
+
+  const filteredMyTemplates = filterTemplates(myTemplates);
+  const filteredPublicTemplates = filterTemplates(publicTemplates);
 
   const standardsCoverage = useMemo(() => {
     if (!lessons || lessons.length === 0) return null;
@@ -195,16 +273,29 @@ export default function MyLessons() {
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 py-8">
-      <div className="mb-8">
+      <div className="mb-6">
         <h1 className="font-marker text-3xl md:text-4xl text-foreground mb-2" data-testid="text-page-title">
-          My Lesson Library
+          My Lessons
         </h1>
         <p className="font-roboto text-muted-foreground">
-          All your saved lesson plans in one place. Ready to inspire your students!
+          Manage your lessons and templates in one place
         </p>
       </div>
 
-      {standardsCoverage && (
+      <Tabs value={activeMainTab} onValueChange={setActiveMainTab} className="space-y-6">
+        <TabsList className="grid w-full max-w-md grid-cols-2">
+          <TabsTrigger value="lessons" data-testid="tab-my-lessons">
+            <BookOpen className="w-4 h-4 mr-2" />
+            Saved Lessons ({lessons.length})
+          </TabsTrigger>
+          <TabsTrigger value="templates" data-testid="tab-templates">
+            <Library className="w-4 h-4 mr-2" />
+            Templates ({myTemplates.length})
+          </TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="lessons" className="space-y-6">
+          {standardsCoverage && (
         <Card className="mb-6" data-testid="card-standards-coverage">
           <CardHeader className="pb-2">
             <CardTitle className="font-oswald text-lg flex items-center gap-2">
@@ -375,8 +466,168 @@ export default function MyLessons() {
               </Card>
             );
           })}
-        </div>
-      )}
+          </div>
+        )}
+        </TabsContent>
+
+        <TabsContent value="templates" className="space-y-6">
+          <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4 mb-4">
+            <CreateTemplateDialog onCreated={() => {
+              queryClient.invalidateQueries({ queryKey: ["/api/templates"] });
+              queryClient.invalidateQueries({ queryKey: ["/api/templates/public"] });
+            }} />
+          </div>
+
+          <Card>
+            <CardContent className="p-4">
+              <div className="flex flex-wrap items-center gap-4">
+                <div className="relative flex-1 min-w-[200px]">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                  <Input
+                    placeholder="Search templates..."
+                    value={templateSearchQuery}
+                    onChange={(e) => setTemplateSearchQuery(e.target.value)}
+                    className="pl-9"
+                    data-testid="input-search-templates"
+                  />
+                </div>
+                <Select value={selectedCategory} onValueChange={setSelectedCategory}>
+                  <SelectTrigger className="w-[180px]" data-testid="select-filter-category">
+                    <Filter className="w-4 h-4 mr-2" />
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {templateCategories.map(c => (
+                      <SelectItem key={c} value={c}>{c}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <Select value={selectedGrade} onValueChange={setSelectedGrade}>
+                  <SelectTrigger className="w-[180px]" data-testid="select-filter-grade">
+                    <GraduationCap className="w-4 h-4 mr-2" />
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {templateGradeLevels.map(g => (
+                      <SelectItem key={g} value={g}>{g}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <div className="flex items-center border rounded-md">
+                  <Button
+                    size="icon"
+                    variant={viewMode === "grid" ? "secondary" : "ghost"}
+                    onClick={() => setViewMode("grid")}
+                    data-testid="button-view-grid"
+                  >
+                    <LayoutGrid className="w-4 h-4" />
+                  </Button>
+                  <Button
+                    size="icon"
+                    variant={viewMode === "list" ? "secondary" : "ghost"}
+                    onClick={() => setViewMode("list")}
+                    data-testid="button-view-list"
+                  >
+                    <List className="w-4 h-4" />
+                  </Button>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Tabs value={templateTab} onValueChange={setTemplateTab}>
+            <TabsList className="grid w-full max-w-md grid-cols-2">
+              <TabsTrigger value="my-templates" data-testid="tab-my-templates">
+                <Lock className="w-4 h-4 mr-2" />
+                My Templates ({myTemplates.length})
+              </TabsTrigger>
+              <TabsTrigger value="community" data-testid="tab-community">
+                <Globe className="w-4 h-4 mr-2" />
+                Community ({publicTemplates.length})
+              </TabsTrigger>
+            </TabsList>
+
+            <TabsContent value="my-templates" className="mt-6">
+              {myTemplatesLoading ? (
+                <div className="flex items-center justify-center py-12">
+                  <Loader2 className="w-8 h-8 animate-spin text-primary" />
+                </div>
+              ) : filteredMyTemplates.length === 0 ? (
+                <Card>
+                  <CardContent className="flex flex-col items-center justify-center py-12 text-center">
+                    <Library className="w-12 h-12 text-muted-foreground mb-4" />
+                    <h3 className="text-lg font-medium mb-2">No templates yet</h3>
+                    <p className="text-muted-foreground mb-4 max-w-md">
+                      Create your first template or save an existing lesson as a template from the lesson view.
+                    </p>
+                    <div className="flex gap-2">
+                      <CreateTemplateDialog onCreated={() => {
+                        queryClient.invalidateQueries({ queryKey: ["/api/templates"] });
+                        queryClient.invalidateQueries({ queryKey: ["/api/templates/public"] });
+                      }} />
+                      <Link href="/lesson-generator">
+                        <Button variant="outline">
+                          <Sparkles className="w-4 h-4 mr-2" />
+                          Generate Lesson
+                        </Button>
+                      </Link>
+                    </div>
+                  </CardContent>
+                </Card>
+              ) : (
+                <div className={viewMode === "grid" 
+                  ? "grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4" 
+                  : "flex flex-col gap-3"
+                }>
+                  {filteredMyTemplates.map(template => (
+                    <TemplateCard
+                      key={template.id}
+                      template={template}
+                      onUse={() => handleUseTemplate(template)}
+                      onDelete={() => deleteTemplateMutation.mutate(template.id)}
+                      isOwner={true}
+                      isLoading={usingTemplateId === template.id}
+                    />
+                  ))}
+                </div>
+              )}
+            </TabsContent>
+
+            <TabsContent value="community" className="mt-6">
+              {publicTemplatesLoading ? (
+                <div className="flex items-center justify-center py-12">
+                  <Loader2 className="w-8 h-8 animate-spin text-primary" />
+                </div>
+              ) : filteredPublicTemplates.length === 0 ? (
+                <Card>
+                  <CardContent className="flex flex-col items-center justify-center py-12 text-center">
+                    <Globe className="w-12 h-12 text-muted-foreground mb-4" />
+                    <h3 className="text-lg font-medium mb-2">No community templates yet</h3>
+                    <p className="text-muted-foreground mb-4 max-w-md">
+                      Be the first to share a template with the community! Make your templates public to appear here.
+                    </p>
+                  </CardContent>
+                </Card>
+              ) : (
+                <div className={viewMode === "grid" 
+                  ? "grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4" 
+                  : "flex flex-col gap-3"
+                }>
+                  {filteredPublicTemplates.map(template => (
+                    <TemplateCard
+                      key={template.id}
+                      template={template}
+                      onUse={() => handleUseTemplate(template)}
+                      isOwner={template.userId === user?.id}
+                      isLoading={usingTemplateId === template.id}
+                    />
+                  ))}
+                </div>
+              )}
+            </TabsContent>
+          </Tabs>
+        </TabsContent>
+      </Tabs>
 
       <AlertDialog open={!!deleteId} onOpenChange={() => setDeleteId(null)}>
         <AlertDialogContent>
@@ -488,6 +739,17 @@ export default function MyLessons() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <UseTemplateDialog
+        template={selectedTemplate}
+        open={useDialogOpen}
+        onOpenChange={setUseDialogOpen}
+        onUse={(customizations) => {
+          if (selectedTemplate) {
+            useTemplateMutation.mutate({ templateId: selectedTemplate.id, customizations });
+          }
+        }}
+      />
     </div>
   );
 }

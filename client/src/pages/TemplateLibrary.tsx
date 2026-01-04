@@ -40,7 +40,7 @@ import { useAuth } from "@/hooks/use-auth";
 import { Link, useLocation } from "wouter";
 import type { LessonTemplate } from "@shared/schema";
 
-const categories = [
+export const templateCategories = [
   "All",
   "General",
   "STEM",
@@ -51,7 +51,7 @@ const categories = [
   "Life Skills"
 ];
 
-const gradeLevels = [
+export const templateGradeLevels = [
   "All Grades",
   "Elementary (K-2)",
   "Elementary (3-5)",
@@ -66,7 +66,7 @@ const bkdLabels = {
   do: { label: "DO", color: "bg-lys-red text-white", icon: Target, description: "Action & Application" }
 };
 
-function TemplateCard({ 
+export function TemplateCard({ 
   template, 
   onUse, 
   onDelete, 
@@ -189,7 +189,7 @@ function TemplateCard({
   );
 }
 
-function CreateTemplateDialog({ onCreated }: { onCreated: () => void }) {
+export function CreateTemplateDialog({ onCreated }: { onCreated: () => void }) {
   const { toast } = useToast();
   const [open, setOpen] = useState(false);
   const [title, setTitle] = useState("");
@@ -276,7 +276,7 @@ function CreateTemplateDialog({ onCreated }: { onCreated: () => void }) {
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  {categories.filter(c => c !== "All").map(c => (
+                  {templateCategories.filter(c => c !== "All").map(c => (
                     <SelectItem key={c} value={c}>{c}</SelectItem>
                   ))}
                 </SelectContent>
@@ -289,7 +289,7 @@ function CreateTemplateDialog({ onCreated }: { onCreated: () => void }) {
                   <SelectValue placeholder="Select grade" />
                 </SelectTrigger>
                 <SelectContent>
-                  {gradeLevels.filter(g => g !== "All Grades").map(g => (
+                  {templateGradeLevels.filter(g => g !== "All Grades").map(g => (
                     <SelectItem key={g} value={g}>{g}</SelectItem>
                   ))}
                 </SelectContent>
@@ -360,7 +360,7 @@ function CreateTemplateDialog({ onCreated }: { onCreated: () => void }) {
   );
 }
 
-function UseTemplateDialog({ 
+export function UseTemplateDialog({ 
   template, 
   open, 
   onOpenChange,
@@ -552,7 +552,7 @@ export default function TemplateLibrary() {
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    {categories.map(c => (
+                    {templateCategories.map(c => (
                       <SelectItem key={c} value={c}>{c}</SelectItem>
                     ))}
                   </SelectContent>
@@ -563,7 +563,7 @@ export default function TemplateLibrary() {
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    {gradeLevels.map(g => (
+                    {templateGradeLevels.map(g => (
                       <SelectItem key={g} value={g}>{g}</SelectItem>
                     ))}
                   </SelectContent>
