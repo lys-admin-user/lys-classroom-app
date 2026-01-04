@@ -8,7 +8,7 @@ import { z } from "zod";
 import { setupAuth, registerAuthRoutes, isAuthenticated } from "./replit_integrations/auth";
 import { randomUUID } from "crypto";
 import multer from "multer";
-import { syncJurisdictionsFromCSP, syncStandardSetFromCSP, getSyncStatus, fetchCSPJurisdictions } from "./services/cspService";
+import { syncJurisdictionsFromCSP, syncStandardSetFromCSP, getSyncStatus, fetchCSPJurisdictions, syncAllStandardsFromCSP, getImportProgress } from "./services/cspService";
 import { extractStandardsFromText, processPdfImport, checkSourceForChanges } from "./services/llmExtractionService";
 import { db } from "./db";
 import { eq } from "drizzle-orm";
@@ -1879,6 +1879,35 @@ export async function registerRoutes(
     } catch (error) {
       console.error("Get sync logs error:", error);
       res.status(500).json({ error: "Failed to get sync logs" });
+    }
+  });
+
+  // Full import of all standards from all jurisdictions
+  app.post("/api/admin/standards/sync/full-import", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user?.claims?.sub;
+      // Start import in background and return immediately
+      syncAllStandardsFromCSP(userId).catch(err => {
+        console.error("Full import failed:", err);
+      });
+      res.json({ 
+        message: "Full import started. Use GET /api/admin/standards/import-progress to track progress.",
+        status: "started" 
+      });
+    } catch (error) {
+      console.error("Start full import error:", error);
+      res.status(500).json({ error: "Failed to start full import" });
+    }
+  });
+
+  // Get import progress
+  app.get("/api/admin/standards/import-progress", isAuthenticated, async (req: any, res) => {
+    try {
+      const progress = getImportProgress();
+      res.json(progress);
+    } catch (error) {
+      console.error("Get import progress error:", error);
+      res.status(500).json({ error: "Failed to get import progress" });
     }
   });
 

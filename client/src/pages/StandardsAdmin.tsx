@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -12,7 +12,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Checkbox } from "@/components/ui/checkbox";
 import { Textarea } from "@/components/ui/textarea";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
-import { RefreshCw, Database, FileText, CheckCircle, XCircle, Clock, ChevronRight, AlertCircle, ClipboardCheck, Sparkles } from "lucide-react";
+import { RefreshCw, Database, FileText, CheckCircle, XCircle, Clock, ChevronRight, AlertCircle, ClipboardCheck, Sparkles, Download } from "lucide-react";
+import { Progress } from "@/components/ui/progress";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import type { StandardsJurisdiction, StandardSet, EducationalStandard, SyncLog, StandardsStaging } from "@shared/schema";
@@ -37,6 +38,21 @@ interface SyncStatus {
     updatedRecords: number | null;
     errorCount: number | null;
   }>;
+}
+
+interface ImportProgress {
+  status: "idle" | "syncing_jurisdictions" | "syncing_standard_sets" | "syncing_standards" | "completed" | "failed";
+  currentJurisdiction?: string;
+  currentStandardSet?: string;
+  jurisdictionsTotal: number;
+  jurisdictionsProcessed: number;
+  standardSetsTotal: number;
+  standardSetsProcessed: number;
+  standardsTotal: number;
+  standardsProcessed: number;
+  errors: string[];
+  startedAt?: string;
+  completedAt?: string;
 }
 
 function formatDate(dateStr: string | null): string {
@@ -105,6 +121,56 @@ export default function StandardsAdmin() {
   });
 
   const [selectedStaging, setSelectedStaging] = useState<string[]>([]);
+  const [isImporting, setIsImporting] = useState(false);
+
+  const { data: importProgress, refetch: refetchProgress } = useQuery<ImportProgress>({
+    queryKey: ["/api/admin/standards/import-progress"],
+    refetchInterval: isImporting ? 2000 : false,
+  });
+
+  useEffect(() => {
+    if (importProgress) {
+      if (importProgress.status === "completed" || importProgress.status === "failed") {
+        setIsImporting(false);
+        queryClient.invalidateQueries({ queryKey: ["/api/admin/standards/status"] });
+        queryClient.invalidateQueries({ queryKey: ["/api/admin/standards/jurisdictions"] });
+        queryClient.invalidateQueries({ queryKey: ["/api/admin/standards/sync-logs"] });
+        if (importProgress.status === "completed") {
+          toast({
+            title: "Full Import Complete",
+            description: `Imported ${importProgress.jurisdictionsProcessed} jurisdictions, ${importProgress.standardSetsProcessed} standard sets, and ${importProgress.standardsProcessed} standards`,
+          });
+        } else if (importProgress.status === "failed") {
+          toast({
+            title: "Import Failed",
+            description: importProgress.errors[0] || "Unknown error occurred",
+            variant: "destructive",
+          });
+        }
+      } else if (importProgress.status !== "idle" && !isImporting) {
+        setIsImporting(true);
+      }
+    }
+  }, [importProgress, isImporting, toast]);
+
+  const fullImportMutation = useMutation({
+    mutationFn: () => apiRequest("POST", "/api/admin/standards/sync/full-import"),
+    onSuccess: () => {
+      setIsImporting(true);
+      refetchProgress();
+      toast({
+        title: "Full Import Started",
+        description: "Importing all standards from all jurisdictions. This may take several minutes.",
+      });
+    },
+    onError: () => {
+      toast({
+        title: "Import Failed",
+        description: "Failed to start full import",
+        variant: "destructive",
+      });
+    },
+  });
 
   const extractForm = useForm<z.infer<typeof extractFormSchema>>({
     resolver: zodResolver(extractFormSchema),
@@ -182,14 +248,25 @@ export default function StandardsAdmin() {
           <h1 className="text-3xl font-marker text-foreground">Standards Management</h1>
           <p className="text-muted-foreground">Sync and manage educational standards from external sources</p>
         </div>
-        <Button
-          onClick={() => syncJurisdictionsMutation.mutate()}
-          disabled={syncJurisdictionsMutation.isPending}
-          data-testid="button-sync-jurisdictions"
-        >
-          <RefreshCw className={`h-4 w-4 mr-2 ${syncJurisdictionsMutation.isPending ? "animate-spin" : ""}`} />
-          {syncJurisdictionsMutation.isPending ? "Syncing..." : "Sync Jurisdictions"}
-        </Button>
+        <div className="flex gap-2 flex-wrap">
+          <Button
+            onClick={() => syncJurisdictionsMutation.mutate()}
+            disabled={syncJurisdictionsMutation.isPending || isImporting}
+            variant="outline"
+            data-testid="button-sync-jurisdictions"
+          >
+            <RefreshCw className={`h-4 w-4 mr-2 ${syncJurisdictionsMutation.isPending ? "animate-spin" : ""}`} />
+            {syncJurisdictionsMutation.isPending ? "Syncing..." : "Sync Jurisdictions"}
+          </Button>
+          <Button
+            onClick={() => fullImportMutation.mutate()}
+            disabled={fullImportMutation.isPending || isImporting}
+            data-testid="button-full-import"
+          >
+            <Download className={`h-4 w-4 mr-2 ${isImporting ? "animate-pulse" : ""}`} />
+            {isImporting ? "Importing..." : "Import All Standards"}
+          </Button>
+        </div>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
@@ -220,6 +297,59 @@ export default function StandardsAdmin() {
           </CardContent>
         </Card>
       </div>
+
+      {isImporting && importProgress && importProgress.status !== "idle" && (
+        <Card className="mb-8">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <RefreshCw className="h-5 w-5 animate-spin" />
+              Import in Progress
+            </CardTitle>
+            <CardDescription>
+              {importProgress.currentJurisdiction && (
+                <span>Processing: {importProgress.currentJurisdiction}</span>
+              )}
+              {importProgress.currentStandardSet && (
+                <span> / {importProgress.currentStandardSet}</span>
+              )}
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="space-y-2">
+              <div className="flex items-center justify-between text-sm">
+                <span>Jurisdictions</span>
+                <span>{importProgress.jurisdictionsProcessed} / {importProgress.jurisdictionsTotal}</span>
+              </div>
+              <Progress 
+                value={importProgress.jurisdictionsTotal > 0 
+                  ? (importProgress.jurisdictionsProcessed / importProgress.jurisdictionsTotal) * 100 
+                  : 0
+                } 
+              />
+            </div>
+            <div className="space-y-2">
+              <div className="flex items-center justify-between text-sm">
+                <span>Standard Sets</span>
+                <span>{importProgress.standardSetsProcessed} / {importProgress.standardSetsTotal || "?"}</span>
+              </div>
+              <Progress 
+                value={importProgress.standardSetsTotal > 0 
+                  ? (importProgress.standardSetsProcessed / importProgress.standardSetsTotal) * 100 
+                  : 0
+                } 
+              />
+            </div>
+            <div className="text-sm text-muted-foreground">
+              Standards imported: {importProgress.standardsProcessed}
+            </div>
+            {importProgress.errors.length > 0 && (
+              <div className="text-sm text-destructive">
+                Errors: {importProgress.errors.length}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
 
       <Tabs defaultValue="browse" className="space-y-4">
         <TabsList>

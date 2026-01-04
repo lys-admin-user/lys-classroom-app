@@ -109,6 +109,25 @@ export async function fetchCSPStandardSet(standardSetId: string): Promise<CSPSta
   }
 }
 
+export async function fetchCSPStandardSetsForJurisdiction(jurisdictionExternalId: string): Promise<{ id: string; title: string; subject: string }[]> {
+  try {
+    const response = await fetch(`${CSP_API_BASE}/jurisdictions/${jurisdictionExternalId}`);
+    if (!response.ok) {
+      throw new Error(`CSP API error: ${response.status}`);
+    }
+    const data = await response.json();
+    const standardSets = data.data?.standardSets || [];
+    return standardSets.map((s: any) => ({
+      id: s.id,
+      title: s.title,
+      subject: s.subject || "General",
+    }));
+  } catch (error) {
+    console.error(`Failed to fetch CSP standard sets for jurisdiction ${jurisdictionExternalId}:`, error);
+    throw error;
+  }
+}
+
 export async function syncJurisdictionsFromCSP(triggeredBy?: string): Promise<{
   newCount: number;
   updatedCount: number;
@@ -408,4 +427,174 @@ export async function getSyncStatus(): Promise<{
       errorCount: l.errorCount,
     })),
   };
+}
+
+export interface FullImportProgress {
+  status: "idle" | "syncing_jurisdictions" | "syncing_standard_sets" | "syncing_standards" | "completed" | "failed";
+  currentJurisdiction?: string;
+  currentStandardSet?: string;
+  jurisdictionsTotal: number;
+  jurisdictionsProcessed: number;
+  standardSetsTotal: number;
+  standardSetsProcessed: number;
+  standardsTotal: number;
+  standardsProcessed: number;
+  errors: string[];
+  startedAt?: Date;
+  completedAt?: Date;
+}
+
+let currentImportProgress: FullImportProgress = {
+  status: "idle",
+  jurisdictionsTotal: 0,
+  jurisdictionsProcessed: 0,
+  standardSetsTotal: 0,
+  standardSetsProcessed: 0,
+  standardsTotal: 0,
+  standardsProcessed: 0,
+  errors: [],
+};
+
+export function getImportProgress(): FullImportProgress {
+  return { ...currentImportProgress };
+}
+
+export async function syncAllStandardsFromCSP(triggeredBy?: string): Promise<{
+  syncLogId: string;
+  jurisdictionsProcessed: number;
+  standardSetsProcessed: number;
+  standardsProcessed: number;
+  errors: string[];
+}> {
+  currentImportProgress = {
+    status: "syncing_jurisdictions",
+    jurisdictionsTotal: 0,
+    jurisdictionsProcessed: 0,
+    standardSetsTotal: 0,
+    standardSetsProcessed: 0,
+    standardsTotal: 0,
+    standardsProcessed: 0,
+    errors: [],
+    startedAt: new Date(),
+  };
+
+  const syncLog = await storage.createSyncLog({
+    source: "csp",
+    status: "started",
+    triggeredBy: triggeredBy || "full_import",
+    totalRecords: 0,
+    processedRecords: 0,
+    newRecords: 0,
+    updatedRecords: 0,
+    errorCount: 0,
+    errorMessages: [],
+  });
+
+  try {
+    const cspJurisdictions = await fetchCSPJurisdictions();
+    currentImportProgress.jurisdictionsTotal = cspJurisdictions.length;
+    
+    await storage.updateSyncLog(syncLog.id, {
+      status: "in_progress",
+      totalRecords: cspJurisdictions.length,
+    });
+
+    let totalNewRecords = 0;
+    let totalUpdatedRecords = 0;
+    let totalStandardSets = 0;
+    let totalStandards = 0;
+
+    for (const cspJurisdiction of cspJurisdictions) {
+      currentImportProgress.currentJurisdiction = cspJurisdiction.title;
+      currentImportProgress.status = "syncing_jurisdictions";
+
+      try {
+        const abbreviation = mapStateAbbreviation(cspJurisdiction.title);
+        let jurisdiction = await storage.getJurisdictionByAbbr("United States", abbreviation);
+        
+        if (!jurisdiction) {
+          jurisdiction = await storage.createJurisdiction({
+            externalId: cspJurisdiction.id,
+            country: "United States",
+            name: cspJurisdiction.title,
+            abbreviation,
+            standardsName: getStandardsName(cspJurisdiction.title),
+            source: "csp",
+            sourceUrl: `${CSP_API_BASE}/jurisdictions/${cspJurisdiction.id}`,
+            lastSyncedAt: new Date(),
+          });
+          totalNewRecords++;
+        } else {
+          await storage.updateJurisdiction(jurisdiction.id, {
+            externalId: cspJurisdiction.id,
+            lastSyncedAt: new Date(),
+          });
+          totalUpdatedRecords++;
+        }
+
+        currentImportProgress.status = "syncing_standard_sets";
+        const standardSets = await fetchCSPStandardSetsForJurisdiction(cspJurisdiction.id);
+        currentImportProgress.standardSetsTotal += standardSets.length;
+
+        for (const setInfo of standardSets) {
+          currentImportProgress.currentStandardSet = setInfo.title;
+          
+          try {
+            currentImportProgress.status = "syncing_standards";
+            const result = await syncStandardSetFromCSP(setInfo.id, jurisdiction.id, triggeredBy);
+            totalStandardSets++;
+            totalStandards += result.newStandards + result.updatedStandards;
+            currentImportProgress.standardSetsProcessed++;
+            currentImportProgress.standardsTotal += result.newStandards + result.updatedStandards;
+            currentImportProgress.standardsProcessed += result.newStandards + result.updatedStandards;
+          } catch (err) {
+            const errorMsg = `Failed to sync standard set ${setInfo.title}: ${err}`;
+            currentImportProgress.errors.push(errorMsg);
+            console.error(errorMsg);
+          }
+
+          await new Promise(resolve => setTimeout(resolve, 100));
+        }
+
+        currentImportProgress.jurisdictionsProcessed++;
+      } catch (err) {
+        const errorMsg = `Failed to process jurisdiction ${cspJurisdiction.title}: ${err}`;
+        currentImportProgress.errors.push(errorMsg);
+        console.error(errorMsg);
+      }
+    }
+
+    currentImportProgress.status = "completed";
+    currentImportProgress.completedAt = new Date();
+
+    await storage.updateSyncLog(syncLog.id, {
+      status: "completed",
+      processedRecords: cspJurisdictions.length,
+      newRecords: totalNewRecords,
+      updatedRecords: totalUpdatedRecords,
+      errorCount: currentImportProgress.errors.length,
+      errorMessages: currentImportProgress.errors,
+      completedAt: new Date(),
+    });
+
+    return {
+      syncLogId: syncLog.id,
+      jurisdictionsProcessed: currentImportProgress.jurisdictionsProcessed,
+      standardSetsProcessed: totalStandardSets,
+      standardsProcessed: totalStandards,
+      errors: currentImportProgress.errors,
+    };
+  } catch (error) {
+    currentImportProgress.status = "failed";
+    currentImportProgress.errors.push(`Full sync failed: ${error}`);
+    currentImportProgress.completedAt = new Date();
+
+    await storage.updateSyncLog(syncLog.id, {
+      status: "failed",
+      errorCount: 1,
+      errorMessages: [`Full sync failed: ${error}`],
+      completedAt: new Date(),
+    });
+    throw error;
+  }
 }
