@@ -4,7 +4,6 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { 
   LayoutDashboard, Compass, Briefcase, Target, BookOpen, Sparkles, FileText, Brain,
@@ -141,8 +140,8 @@ export default function ProfileTierSitemap() {
             <Star className="h-4 w-4 text-lys-yellow" />
             Available Features
           </h3>
-          <ScrollArea className="h-auto max-h-[300px]">
-            <div className="space-y-4 pr-4">
+          <div className="max-h-[280px] overflow-y-auto scrollbar-always-visible pr-1">
+            <div className="space-y-4 pr-3">
               {Object.entries(availableGroups).map(([category, features]) => (
                 <div key={category} className={`p-3 rounded-md ${categoryColors[category]}`}>
                   <h4 className="font-oswald text-sm text-muted-foreground mb-2">
@@ -182,7 +181,7 @@ export default function ProfileTierSitemap() {
                 </div>
               ))}
             </div>
-          </ScrollArea>
+          </div>
         </div>
 
         {sitemap.lockedFeatures.length > 0 && (
@@ -193,8 +192,8 @@ export default function ProfileTierSitemap() {
                 <Lock className="h-4 w-4" />
                 Unlock More Features
               </h3>
-              <ScrollArea className="h-auto max-h-[250px]">
-                <div className="space-y-4 pr-4">
+              <div className="max-h-[220px] overflow-y-auto scrollbar-always-visible pr-1">
+                <div className="space-y-4 pr-3">
                   {Object.entries(lockedGroups).map(([category, features]) => (
                     <div key={category} className="p-3 rounded-md bg-muted/30 border border-dashed border-muted-foreground/20">
                       <h4 className="font-oswald text-sm text-muted-foreground mb-2">
@@ -235,7 +234,7 @@ export default function ProfileTierSitemap() {
                     </div>
                   ))}
                 </div>
-              </ScrollArea>
+              </div>
             </div>
           </>
         )}
