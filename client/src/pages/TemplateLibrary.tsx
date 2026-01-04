@@ -102,14 +102,18 @@ function TemplateCard({
       </CardHeader>
       <CardContent className="space-y-4">
         <div className="flex flex-wrap gap-2">
-          <Badge variant="outline" className="gap-1">
-            <GraduationCap className="w-3 h-3" />
-            {template.gradeLevel}
-          </Badge>
-          <Badge variant="outline" className="gap-1">
-            <Clock className="w-3 h-3" />
-            {template.duration}
-          </Badge>
+          {template.gradeLevel && (
+            <Badge variant="outline" className="gap-1">
+              <GraduationCap className="w-3 h-3" />
+              {template.gradeLevel}
+            </Badge>
+          )}
+          {template.duration && (
+            <Badge variant="outline" className="gap-1">
+              <Clock className="w-3 h-3" />
+              {template.duration}
+            </Badge>
+          )}
           {template.subject && (
             <Badge variant="outline" className="gap-1">
               <BookOpen className="w-3 h-3" />
@@ -336,12 +340,12 @@ function CreateTemplateDialog({ onCreated }: { onCreated: () => void }) {
         </div>
         <DialogFooter>
           <DialogClose asChild>
-            <Button variant="outline">Cancel</Button>
+            <Button variant="outline" data-testid="button-cancel-create-template">Cancel</Button>
           </DialogClose>
           <Button 
             onClick={() => createMutation.mutate()}
             disabled={!title || !gradeLevel || createMutation.isPending}
-            data-testid="button-submit-template"
+            data-testid="button-submit-create-template"
           >
             {createMutation.isPending ? (
               <Loader2 className="w-4 h-4 animate-spin mr-2" />
@@ -420,7 +424,7 @@ function UseTemplateDialog({
         </div>
         <DialogFooter>
           <DialogClose asChild>
-            <Button variant="outline">Cancel</Button>
+            <Button variant="outline" data-testid="button-cancel-use-template">Cancel</Button>
           </DialogClose>
           <Button 
             onClick={() => onUse({ title: title || undefined, topic: topic || undefined })}

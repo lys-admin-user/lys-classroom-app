@@ -1,7 +1,7 @@
 import { Link, useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
 import { ThemeToggle } from "./ThemeToggle";
-import { Menu, X, Sparkles, LogIn, LogOut, BookOpen, User, BarChart3, Award, Database, Users } from "lucide-react";
+import { Menu, X, Sparkles, LogIn, LogOut, BookOpen, User, BarChart3, Award, Database, Users, Library } from "lucide-react";
 import { useState } from "react";
 import { useAuth } from "@/hooks/use-auth";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -91,6 +91,16 @@ export function Header() {
                     My Lessons
                   </Button>
                 </Link>
+                <Link href="/templates">
+                  <Button
+                    variant={location === "/templates" ? "secondary" : "ghost"}
+                    size="sm"
+                    className="font-roboto"
+                    data-testid="nav-templates"
+                  >
+                    Templates
+                  </Button>
+                </Link>
                 <Link href="/analytics">
                   <Button
                     variant={location === "/analytics" ? "secondary" : "ghost"}
@@ -134,6 +144,12 @@ export function Header() {
                     <DropdownMenuItem className="cursor-pointer" data-testid="menu-my-lessons">
                       <BookOpen className="mr-2 h-4 w-4" />
                       My Lessons
+                    </DropdownMenuItem>
+                  </Link>
+                  <Link href="/templates">
+                    <DropdownMenuItem className="cursor-pointer" data-testid="menu-templates">
+                      <Library className="mr-2 h-4 w-4" />
+                      Templates
                     </DropdownMenuItem>
                   </Link>
                   <Link href="/analytics">
@@ -231,6 +247,17 @@ export function Header() {
                     >
                       <BookOpen className="mr-2 h-4 w-4" />
                       My Lessons
+                    </Button>
+                  </Link>
+                  <Link href="/templates">
+                    <Button
+                      variant={location === "/templates" ? "secondary" : "ghost"}
+                      className="w-full justify-start font-roboto"
+                      onClick={() => setMobileMenuOpen(false)}
+                      data-testid="mobile-nav-templates"
+                    >
+                      <Library className="mr-2 h-4 w-4" />
+                      Templates
                     </Button>
                   </Link>
                   <Link href="/analytics">

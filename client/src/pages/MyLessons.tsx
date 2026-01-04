@@ -408,7 +408,14 @@ export default function MyLessons() {
         />
       )}
 
-      <Dialog open={!!templateLesson} onOpenChange={(open) => !open && setTemplateLesson(null)}>
+      <Dialog open={!!templateLesson} onOpenChange={(open) => {
+        if (!open) {
+          setTemplateLesson(null);
+          setTemplateTitle("");
+          setTemplateDescription("");
+          setTemplateVisibility("private");
+        }
+      }}>
         <DialogContent>
           <DialogHeader>
             <DialogTitle className="font-oswald text-xl flex items-center gap-2">
@@ -421,29 +428,29 @@ export default function MyLessons() {
           </DialogHeader>
           <div className="space-y-4 py-4">
             <div className="space-y-2">
-              <Label htmlFor="template-title">Template Title</Label>
+              <Label htmlFor="save-template-title">Template Title</Label>
               <Input
-                id="template-title"
+                id="save-template-title"
                 value={templateTitle}
                 onChange={(e) => setTemplateTitle(e.target.value)}
                 placeholder="Enter template title"
-                data-testid="input-template-title"
+                data-testid="input-save-template-title"
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="template-description">Description (optional)</Label>
+              <Label htmlFor="save-template-description">Description (optional)</Label>
               <Input
-                id="template-description"
+                id="save-template-description"
                 value={templateDescription}
                 onChange={(e) => setTemplateDescription(e.target.value)}
                 placeholder="Describe what this template is for"
-                data-testid="input-template-description"
+                data-testid="input-save-template-description"
               />
             </div>
             <div className="space-y-2">
               <Label>Visibility</Label>
               <Select value={templateVisibility} onValueChange={(v) => setTemplateVisibility(v as "private" | "public")}>
-                <SelectTrigger data-testid="select-template-visibility">
+                <SelectTrigger data-testid="select-save-template-visibility">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -455,7 +462,7 @@ export default function MyLessons() {
           </div>
           <DialogFooter>
             <DialogClose asChild>
-              <Button variant="outline">Cancel</Button>
+              <Button variant="outline" data-testid="button-cancel-save-template">Cancel</Button>
             </DialogClose>
             <Button
               onClick={() => {
