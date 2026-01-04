@@ -3766,5 +3766,263 @@ export async function registerRoutes(
     }
   });
 
+  // ================================
+  // Professional Development System
+  // ================================
+
+  // Get educator career goals
+  app.get("/api/pd/career-goals", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user?.claims?.sub;
+      const goals = await storage.getEducatorCareerGoals(userId);
+      res.json(goals);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch career goals" });
+    }
+  });
+
+  // Create career goal
+  app.post("/api/pd/career-goals", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user?.claims?.sub;
+      const goal = await storage.createEducatorCareerGoal({
+        ...req.body,
+        userId,
+      });
+      res.status(201).json(goal);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to create career goal" });
+    }
+  });
+
+  // Update career goal
+  app.patch("/api/pd/career-goals/:id", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user?.claims?.sub;
+      const goal = await storage.updateEducatorCareerGoal(req.params.id, userId, req.body);
+      if (!goal) {
+        res.status(404).json({ error: "Goal not found" });
+        return;
+      }
+      res.json(goal);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to update career goal" });
+    }
+  });
+
+  // Delete career goal
+  app.delete("/api/pd/career-goals/:id", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user?.claims?.sub;
+      await storage.deleteEducatorCareerGoal(req.params.id, userId);
+      res.json({ success: true });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to delete career goal" });
+    }
+  });
+
+  // Get educator skills
+  app.get("/api/pd/skills", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user?.claims?.sub;
+      const skills = await storage.getEducatorSkills(userId);
+      res.json(skills);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch skills" });
+    }
+  });
+
+  // Create skill
+  app.post("/api/pd/skills", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user?.claims?.sub;
+      const skill = await storage.createEducatorSkill({
+        ...req.body,
+        userId,
+      });
+      res.status(201).json(skill);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to create skill" });
+    }
+  });
+
+  // Update skill
+  app.patch("/api/pd/skills/:id", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user?.claims?.sub;
+      const skill = await storage.updateEducatorSkill(req.params.id, userId, req.body);
+      if (!skill) {
+        res.status(404).json({ error: "Skill not found" });
+        return;
+      }
+      res.json(skill);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to update skill" });
+    }
+  });
+
+  // Delete skill
+  app.delete("/api/pd/skills/:id", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user?.claims?.sub;
+      await storage.deleteEducatorSkill(req.params.id, userId);
+      res.json({ success: true });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to delete skill" });
+    }
+  });
+
+  // Get PD resources
+  app.get("/api/pd/resources", async (req, res) => {
+    try {
+      const { resourceType } = req.query;
+      const resources = await storage.getPDResources({
+        resourceType: resourceType as string | undefined,
+        isActive: true,
+      });
+      res.json(resources);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch PD resources" });
+    }
+  });
+
+  // Get PD recommendations
+  app.get("/api/pd/recommendations", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user?.claims?.sub;
+      const { status } = req.query;
+      const recs = await storage.getPDRecommendations(userId, status as string | undefined);
+      res.json(recs);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch recommendations" });
+    }
+  });
+
+  // Generate AI recommendations
+  app.post("/api/pd/recommendations/generate", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user?.claims?.sub;
+      
+      // Get user's goals and skills
+      const goals = await storage.getEducatorCareerGoals(userId);
+      const skills = await storage.getEducatorSkills(userId);
+      const profile = await storage.getEducatorProfile(userId);
+      
+      // Generate recommendations using AI
+      const { generatePDRecommendations } = await import("./openai");
+      const recommendations = await generatePDRecommendations(goals, skills, profile);
+      
+      // Clear old recommendations and save new ones
+      await storage.clearUserPDRecommendations(userId);
+      
+      const savedRecs = [];
+      for (const rec of recommendations.recommendations) {
+        const saved = await storage.createPDRecommendation({
+          userId,
+          title: rec.title,
+          description: rec.description,
+          reason: rec.reason,
+          skillGaps: rec.skillGaps,
+          resourceType: rec.resourceType,
+          provider: rec.provider || null,
+          estimatedDuration: rec.estimatedDuration || null,
+          priority: rec.priority,
+          status: "new",
+        });
+        savedRecs.push(saved);
+      }
+      
+      res.json({
+        recommendations: savedRecs,
+        summary: recommendations.summary,
+        focusAreas: recommendations.focusAreas,
+      });
+    } catch (error) {
+      console.error("Failed to generate PD recommendations:", error);
+      res.status(500).json({ error: "Failed to generate recommendations" });
+    }
+  });
+
+  // Update recommendation status
+  app.patch("/api/pd/recommendations/:id", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user?.claims?.sub;
+      const { status } = req.body;
+      const rec = await storage.updatePDRecommendationStatus(req.params.id, userId, status);
+      if (!rec) {
+        res.status(404).json({ error: "Recommendation not found" });
+        return;
+      }
+      res.json(rec);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to update recommendation" });
+    }
+  });
+
+  // Get PD progress
+  app.get("/api/pd/progress", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user?.claims?.sub;
+      const progress = await storage.getEducatorPDProgress(userId);
+      res.json(progress);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch PD progress" });
+    }
+  });
+
+  // Start PD activity (from recommendation)
+  app.post("/api/pd/progress", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user?.claims?.sub;
+      const { recommendationId, resourceId, title } = req.body;
+      
+      const progress = await storage.createEducatorPDProgress({
+        userId,
+        recommendationId,
+        resourceId,
+        title,
+        status: "in_progress",
+        progress: 0,
+      });
+      
+      // Update recommendation status if provided
+      if (recommendationId) {
+        await storage.updatePDRecommendationStatus(recommendationId, userId, "started");
+      }
+      
+      res.status(201).json(progress);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to start PD activity" });
+    }
+  });
+
+  // Update PD progress
+  app.patch("/api/pd/progress/:id", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user?.claims?.sub;
+      const updates = req.body;
+      
+      // If marking as completed, set completedAt
+      if (updates.status === "completed" && !updates.completedAt) {
+        updates.completedAt = new Date();
+      }
+      
+      const progress = await storage.updateEducatorPDProgress(req.params.id, userId, updates);
+      if (!progress) {
+        res.status(404).json({ error: "Progress not found" });
+        return;
+      }
+      
+      // Update related recommendation if completed
+      if (progress.status === "completed" && progress.recommendationId) {
+        await storage.updatePDRecommendationStatus(progress.recommendationId, userId, "completed");
+      }
+      
+      res.json(progress);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to update PD progress" });
+    }
+  });
+
   return httpServer;
 }
