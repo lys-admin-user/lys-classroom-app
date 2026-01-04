@@ -11,7 +11,7 @@ import { Separator } from "@/components/ui/separator";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Sparkles, Clock, Target, BookOpen, Users, Loader2, Copy, Download, Heart, Compass, Save, Check, GraduationCap, FileText, Globe, MapPin, Lightbulb, Play, UserCheck, Settings, Printer, LayoutList, AlertCircle, ExternalLink, Plus, X, Search, Library } from "lucide-react";
+import { Sparkles, Clock, Target, BookOpen, Users, Loader2, Copy, Download, Heart, Compass, Save, Check, GraduationCap, FileText, Globe, MapPin, Lightbulb, Play, UserCheck, Settings, Printer, LayoutList, AlertCircle, ExternalLink, Plus, X, Search, Library, ClipboardList, PenLine, MessageSquare, Brain, ChevronRight, Award } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useAuth } from "@/hooks/use-auth";
@@ -54,8 +54,14 @@ export default function LessonGenerator() {
   
   const [generatedLesson, setGeneratedLesson] = useState<LessonPlan | null>(null);
   const [isSaved, setIsSaved] = useState(false);
+  const [savedLessonId, setSavedLessonId] = useState<string | null>(null);
   const [profileApplied, setProfileApplied] = useState(false);
   const [scopeSkipped, setScopeSkipped] = useState(false);
+  
+  // Assignment generation state
+  const [showAssignmentOption, setShowAssignmentOption] = useState(false);
+  const [assignmentType, setAssignmentType] = useState<"quiz" | "worksheet" | "project" | "discussion" | "reflection">("quiz");
+  const [generatedAssignment, setGeneratedAssignment] = useState<any>(null);
   
   // Educational Resources state
   const [addedResources, setAddedResources] = useState<EducationalResource[]>([]);
@@ -275,18 +281,54 @@ export default function LessonGenerator() {
       });
       return await response.json();
     },
-    onSuccess: () => {
+    onSuccess: (data: any) => {
       setIsSaved(true);
+      setSavedLessonId(data.id);
       queryClient.invalidateQueries({ queryKey: ["/api/lessons"] });
       toast({
         title: "Lesson Saved!",
         description: "Your lesson has been added to your library.",
       });
+      // Show assignment generation option with a slight delay for smooth animation
+      setTimeout(() => setShowAssignmentOption(true), 500);
     },
     onError: (error: Error) => {
       toast({
         title: "Failed to Save",
         description: error.message || "Please try again.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  // Assignment generation mutation
+  const assignmentMutation = useMutation({
+    mutationFn: async () => {
+      if (!savedLessonId) throw new Error("No saved lesson");
+      const response = await apiRequest("POST", "/api/assignments/generate", {
+        lessonId: savedLessonId,
+        assignmentType,
+        questionCount: assignmentType === "quiz" ? 10 : 5,
+        difficulty: "medium",
+        includeBeKnowDo: true,
+      });
+      return await response.json();
+    },
+    onSuccess: (data: any) => {
+      setGeneratedAssignment(data);
+      queryClient.invalidateQueries({ queryKey: ["/api/assignments"] });
+      toast({
+        title: "Assignment Created!",
+        description: `Your ${assignmentType} is ready to use.`,
+      });
+    },
+    onError: (error: any) => {
+      const isUpgradeNeeded = error?.message?.includes("upgrade") || error?.message?.includes("tier");
+      toast({
+        title: isUpgradeNeeded ? "Upgrade Required" : "Generation Failed",
+        description: isUpgradeNeeded 
+          ? "Assignment generation requires a paid plan. Upgrade to Pro or Campus to unlock."
+          : "Please try again.",
         variant: "destructive",
       });
     },
@@ -1193,6 +1235,158 @@ ${addedResources.length > 0 ? addedResources.map(r => `- ${r.title}: ${r.url}`).
                           </div>
                         )}
                       </div>
+
+                      {/* Subtle Assignment Generation Option - appears after saving */}
+                      {showAssignmentOption && isSaved && (
+                        <div 
+                          className="mt-6 animate-in slide-in-from-bottom-4 fade-in duration-500"
+                          data-testid="assignment-generation-panel"
+                        >
+                          <Separator className="mb-6" />
+                          
+                          {!generatedAssignment ? (
+                            <div className="relative overflow-hidden rounded-lg border border-dashed border-muted-foreground/20 bg-gradient-to-br from-muted/30 via-background to-muted/20 p-6">
+                              {/* Decorative sparkle */}
+                              <div className="absolute -right-4 -top-4 h-24 w-24 rounded-full bg-lys-yellow/10 blur-2xl" />
+                              
+                              <div className="relative">
+                                <div className="flex items-center gap-3 mb-4">
+                                  <div className="flex h-10 w-10 items-center justify-center rounded-full bg-lys-yellow/10">
+                                    <ClipboardList className="h-5 w-5 text-lys-yellow" />
+                                  </div>
+                                  <div>
+                                    <h4 className="font-oswald text-base font-semibold">Create an Assignment</h4>
+                                    <p className="text-sm text-muted-foreground font-roboto">Turn this lesson into a ready-to-use assignment</p>
+                                  </div>
+                                </div>
+
+                                <div className="flex flex-wrap gap-2 mb-4">
+                                  {[
+                                    { value: "quiz", label: "Quiz", icon: Brain, description: "Multiple choice & short answer" },
+                                    { value: "worksheet", label: "Worksheet", icon: PenLine, description: "Practice problems & exercises" },
+                                    { value: "project", label: "Project", icon: Award, description: "Hands-on learning activity" },
+                                    { value: "discussion", label: "Discussion", icon: MessageSquare, description: "Collaborative questions" },
+                                    { value: "reflection", label: "Reflection", icon: Heart, description: "Personal growth journaling" },
+                                  ].map((type) => (
+                                    <button
+                                      key={type.value}
+                                      onClick={() => setAssignmentType(type.value as any)}
+                                      className={`group flex items-center gap-2 rounded-md border px-3 py-2 text-sm font-roboto transition-all hover-elevate ${
+                                        assignmentType === type.value 
+                                          ? "border-lys-teal bg-lys-teal/10 text-lys-teal" 
+                                          : "border-muted-foreground/20 text-muted-foreground"
+                                      }`}
+                                      data-testid={`assignment-type-${type.value}`}
+                                    >
+                                      <type.icon className="h-4 w-4" />
+                                      {type.label}
+                                    </button>
+                                  ))}
+                                </div>
+
+                                <Button 
+                                  onClick={() => assignmentMutation.mutate()}
+                                  disabled={assignmentMutation.isPending}
+                                  className="gap-2 bg-gradient-to-r from-lys-teal to-lys-teal/90 hover:from-lys-teal/90 hover:to-lys-teal text-white font-roboto"
+                                  data-testid="button-generate-assignment"
+                                >
+                                  {assignmentMutation.isPending ? (
+                                    <>
+                                      <Loader2 className="h-4 w-4 animate-spin" />
+                                      Creating {assignmentType}...
+                                    </>
+                                  ) : (
+                                    <>
+                                      <Sparkles className="h-4 w-4" />
+                                      Generate {assignmentType.charAt(0).toUpperCase() + assignmentType.slice(1)}
+                                      <ChevronRight className="h-4 w-4" />
+                                    </>
+                                  )}
+                                </Button>
+                              </div>
+                            </div>
+                          ) : (
+                            <div className="rounded-lg border bg-card p-6 animate-in fade-in duration-300">
+                              <div className="flex items-center justify-between gap-4 mb-4 flex-wrap">
+                                <div className="flex items-center gap-3">
+                                  <div className="flex h-10 w-10 items-center justify-center rounded-full bg-green-500/10">
+                                    <Check className="h-5 w-5 text-green-500" />
+                                  </div>
+                                  <div>
+                                    <h4 className="font-oswald text-base font-semibold">{generatedAssignment.title}</h4>
+                                    <p className="text-sm text-muted-foreground font-roboto">Your {assignmentType} is ready</p>
+                                  </div>
+                                </div>
+                                <div className="flex items-center gap-2">
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => {
+                                      navigator.clipboard.writeText(JSON.stringify(generatedAssignment, null, 2));
+                                      toast({ title: "Copied!", description: "Assignment copied to clipboard" });
+                                    }}
+                                    className="gap-1"
+                                    data-testid="button-copy-assignment"
+                                  >
+                                    <Copy className="h-4 w-4" />
+                                    Copy
+                                  </Button>
+                                  <Button
+                                    size="sm"
+                                    onClick={() => setLocation("/assignments")}
+                                    className="gap-1"
+                                    data-testid="button-view-assignments"
+                                  >
+                                    View All Assignments
+                                    <ChevronRight className="h-4 w-4" />
+                                  </Button>
+                                </div>
+                              </div>
+
+                              {generatedAssignment.questions && (
+                                <div className="space-y-3 max-h-[300px] overflow-y-auto scrollbar-always-visible pr-2">
+                                  {generatedAssignment.questions.slice(0, 5).map((q: any, i: number) => (
+                                    <div key={i} className="p-3 rounded-md bg-muted/30 border border-muted/50">
+                                      <p className="font-roboto text-sm font-medium mb-1">
+                                        {i + 1}. {q.question}
+                                      </p>
+                                      {q.options && (
+                                        <div className="ml-4 space-y-1">
+                                          {q.options.map((opt: string, j: number) => (
+                                            <p key={j} className="text-sm text-muted-foreground font-roboto">
+                                              {String.fromCharCode(65 + j)}. {opt}
+                                            </p>
+                                          ))}
+                                        </div>
+                                      )}
+                                    </div>
+                                  ))}
+                                  {generatedAssignment.questions.length > 5 && (
+                                    <p className="text-sm text-muted-foreground text-center py-2 font-roboto">
+                                      + {generatedAssignment.questions.length - 5} more questions
+                                    </p>
+                                  )}
+                                </div>
+                              )}
+
+                              <div className="mt-4 pt-4 border-t">
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => {
+                                    setGeneratedAssignment(null);
+                                    setShowAssignmentOption(true);
+                                  }}
+                                  className="text-muted-foreground"
+                                  data-testid="button-create-another"
+                                >
+                                  Create another assignment
+                                </Button>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      )}
                     </div>
                   </ScrollArea>
                 ) : (
