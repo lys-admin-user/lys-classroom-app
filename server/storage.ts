@@ -145,6 +145,21 @@ import {
   entityShares,
   lessonGenerations,
   type InsertLessonGeneration,
+  type EducatorCareerGoal,
+  type InsertEducatorCareerGoal,
+  type EducatorSkill,
+  type InsertEducatorSkill,
+  type PDResource,
+  type InsertPDResource,
+  type PDRecommendation,
+  type InsertPDRecommendation,
+  type EducatorPDProgress,
+  type InsertEducatorPDProgress,
+  educatorCareerGoals,
+  educatorSkills,
+  pdResources,
+  pdRecommendations,
+  educatorPDProgress,
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, desc, and, asc, gte, sql } from "drizzle-orm";
@@ -430,6 +445,35 @@ export interface IStorage {
   getAlignmentMatrixByAuthority(authorityId: string): Promise<AlignmentMatrix | undefined>;
   createAlignmentMatrix(matrix: InsertAlignmentMatrix): Promise<AlignmentMatrix>;
   updateAlignmentMatrix(id: string, updates: Partial<AlignmentMatrix>): Promise<AlignmentMatrix | undefined>;
+  
+  // Professional Development System
+  getEducatorCareerGoals(userId: string): Promise<EducatorCareerGoal[]>;
+  getEducatorCareerGoal(id: string): Promise<EducatorCareerGoal | undefined>;
+  createEducatorCareerGoal(goal: InsertEducatorCareerGoal): Promise<EducatorCareerGoal>;
+  updateEducatorCareerGoal(id: string, userId: string, updates: Partial<EducatorCareerGoal>): Promise<EducatorCareerGoal | undefined>;
+  deleteEducatorCareerGoal(id: string, userId: string): Promise<boolean>;
+  
+  getEducatorSkills(userId: string): Promise<EducatorSkill[]>;
+  getEducatorSkill(id: string): Promise<EducatorSkill | undefined>;
+  createEducatorSkill(skill: InsertEducatorSkill): Promise<EducatorSkill>;
+  updateEducatorSkill(id: string, userId: string, updates: Partial<EducatorSkill>): Promise<EducatorSkill | undefined>;
+  deleteEducatorSkill(id: string, userId: string): Promise<boolean>;
+  
+  getPDResources(filters?: { resourceType?: string; skillsAddressed?: string[]; isActive?: boolean }): Promise<PDResource[]>;
+  getPDResource(id: string): Promise<PDResource | undefined>;
+  createPDResource(resource: InsertPDResource): Promise<PDResource>;
+  updatePDResource(id: string, updates: Partial<PDResource>): Promise<PDResource | undefined>;
+  
+  getPDRecommendations(userId: string, status?: string): Promise<PDRecommendation[]>;
+  getPDRecommendation(id: string): Promise<PDRecommendation | undefined>;
+  createPDRecommendation(rec: InsertPDRecommendation): Promise<PDRecommendation>;
+  updatePDRecommendationStatus(id: string, userId: string, status: string): Promise<PDRecommendation | undefined>;
+  clearUserPDRecommendations(userId: string): Promise<void>;
+  
+  getEducatorPDProgress(userId: string): Promise<EducatorPDProgress[]>;
+  getEducatorPDProgressItem(id: string): Promise<EducatorPDProgress | undefined>;
+  createEducatorPDProgress(progress: InsertEducatorPDProgress): Promise<EducatorPDProgress>;
+  updateEducatorPDProgress(id: string, userId: string, updates: Partial<EducatorPDProgress>): Promise<EducatorPDProgress | undefined>;
 }
 
 // Seed data for careers and resources (static content)
@@ -2380,6 +2424,156 @@ export class DatabaseStorage implements IStorage {
     const [updated] = await db.update(alignmentMatrix)
       .set({ ...updates, updatedAt: new Date() })
       .where(eq(alignmentMatrix.id, id))
+      .returning();
+    return updated || undefined;
+  }
+
+  // ==========================================================================
+  // Professional Development System
+  // ==========================================================================
+
+  async getEducatorCareerGoals(userId: string): Promise<EducatorCareerGoal[]> {
+    return await db.select().from(educatorCareerGoals)
+      .where(eq(educatorCareerGoals.userId, userId))
+      .orderBy(desc(educatorCareerGoals.priority), desc(educatorCareerGoals.createdAt));
+  }
+
+  async getEducatorCareerGoal(id: string): Promise<EducatorCareerGoal | undefined> {
+    const [goal] = await db.select().from(educatorCareerGoals).where(eq(educatorCareerGoals.id, id));
+    return goal || undefined;
+  }
+
+  async createEducatorCareerGoal(goal: InsertEducatorCareerGoal): Promise<EducatorCareerGoal> {
+    const [created] = await db.insert(educatorCareerGoals).values(goal as any).returning();
+    return created;
+  }
+
+  async updateEducatorCareerGoal(id: string, userId: string, updates: Partial<EducatorCareerGoal>): Promise<EducatorCareerGoal | undefined> {
+    const [updated] = await db.update(educatorCareerGoals)
+      .set({ ...updates, updatedAt: new Date() })
+      .where(and(eq(educatorCareerGoals.id, id), eq(educatorCareerGoals.userId, userId)))
+      .returning();
+    return updated || undefined;
+  }
+
+  async deleteEducatorCareerGoal(id: string, userId: string): Promise<boolean> {
+    const result = await db.delete(educatorCareerGoals)
+      .where(and(eq(educatorCareerGoals.id, id), eq(educatorCareerGoals.userId, userId)));
+    return true;
+  }
+
+  async getEducatorSkills(userId: string): Promise<EducatorSkill[]> {
+    return await db.select().from(educatorSkills)
+      .where(eq(educatorSkills.userId, userId))
+      .orderBy(asc(educatorSkills.category), asc(educatorSkills.skillName));
+  }
+
+  async getEducatorSkill(id: string): Promise<EducatorSkill | undefined> {
+    const [skill] = await db.select().from(educatorSkills).where(eq(educatorSkills.id, id));
+    return skill || undefined;
+  }
+
+  async createEducatorSkill(skill: InsertEducatorSkill): Promise<EducatorSkill> {
+    const [created] = await db.insert(educatorSkills).values(skill as any).returning();
+    return created;
+  }
+
+  async updateEducatorSkill(id: string, userId: string, updates: Partial<EducatorSkill>): Promise<EducatorSkill | undefined> {
+    const [updated] = await db.update(educatorSkills)
+      .set({ ...updates, updatedAt: new Date() })
+      .where(and(eq(educatorSkills.id, id), eq(educatorSkills.userId, userId)))
+      .returning();
+    return updated || undefined;
+  }
+
+  async deleteEducatorSkill(id: string, userId: string): Promise<boolean> {
+    await db.delete(educatorSkills)
+      .where(and(eq(educatorSkills.id, id), eq(educatorSkills.userId, userId)));
+    return true;
+  }
+
+  async getPDResources(filters?: { resourceType?: string; skillsAddressed?: string[]; isActive?: boolean }): Promise<PDResource[]> {
+    let query = db.select().from(pdResources);
+    if (filters?.isActive !== undefined) {
+      query = query.where(eq(pdResources.isActive, filters.isActive)) as any;
+    }
+    if (filters?.resourceType) {
+      query = query.where(eq(pdResources.resourceType, filters.resourceType)) as any;
+    }
+    return await query.orderBy(desc(pdResources.rating), desc(pdResources.completionCount));
+  }
+
+  async getPDResource(id: string): Promise<PDResource | undefined> {
+    const [resource] = await db.select().from(pdResources).where(eq(pdResources.id, id));
+    return resource || undefined;
+  }
+
+  async createPDResource(resource: InsertPDResource): Promise<PDResource> {
+    const [created] = await db.insert(pdResources).values(resource as any).returning();
+    return created;
+  }
+
+  async updatePDResource(id: string, updates: Partial<PDResource>): Promise<PDResource | undefined> {
+    const [updated] = await db.update(pdResources)
+      .set({ ...updates, updatedAt: new Date() })
+      .where(eq(pdResources.id, id))
+      .returning();
+    return updated || undefined;
+  }
+
+  async getPDRecommendations(userId: string, status?: string): Promise<PDRecommendation[]> {
+    if (status) {
+      return await db.select().from(pdRecommendations)
+        .where(and(eq(pdRecommendations.userId, userId), eq(pdRecommendations.status, status)))
+        .orderBy(desc(pdRecommendations.priority), desc(pdRecommendations.createdAt));
+    }
+    return await db.select().from(pdRecommendations)
+      .where(eq(pdRecommendations.userId, userId))
+      .orderBy(desc(pdRecommendations.priority), desc(pdRecommendations.createdAt));
+  }
+
+  async getPDRecommendation(id: string): Promise<PDRecommendation | undefined> {
+    const [rec] = await db.select().from(pdRecommendations).where(eq(pdRecommendations.id, id));
+    return rec || undefined;
+  }
+
+  async createPDRecommendation(rec: InsertPDRecommendation): Promise<PDRecommendation> {
+    const [created] = await db.insert(pdRecommendations).values(rec as any).returning();
+    return created;
+  }
+
+  async updatePDRecommendationStatus(id: string, userId: string, status: string): Promise<PDRecommendation | undefined> {
+    const [updated] = await db.update(pdRecommendations)
+      .set({ status, updatedAt: new Date() })
+      .where(and(eq(pdRecommendations.id, id), eq(pdRecommendations.userId, userId)))
+      .returning();
+    return updated || undefined;
+  }
+
+  async clearUserPDRecommendations(userId: string): Promise<void> {
+    await db.delete(pdRecommendations).where(eq(pdRecommendations.userId, userId));
+  }
+
+  async getEducatorPDProgress(userId: string): Promise<EducatorPDProgress[]> {
+    return await db.select().from(educatorPDProgress)
+      .where(eq(educatorPDProgress.userId, userId))
+      .orderBy(desc(educatorPDProgress.updatedAt));
+  }
+
+  async getEducatorPDProgressItem(id: string): Promise<EducatorPDProgress | undefined> {
+    const [progress] = await db.select().from(educatorPDProgress).where(eq(educatorPDProgress.id, id));
+    return progress || undefined;
+  }
+
+  async createEducatorPDProgress(progress: InsertEducatorPDProgress): Promise<EducatorPDProgress> {
+    const [created] = await db.insert(educatorPDProgress).values(progress as any).returning();
+    return created;
+  }
+
+  async updateEducatorPDProgress(id: string, userId: string, updates: Partial<EducatorPDProgress>): Promise<EducatorPDProgress | undefined> {
+    const [updated] = await db.update(educatorPDProgress)
+      .set({ ...updates, updatedAt: new Date() })
+      .where(and(eq(educatorPDProgress.id, id), eq(educatorPDProgress.userId, userId)))
       .returning();
     return updated || undefined;
   }
