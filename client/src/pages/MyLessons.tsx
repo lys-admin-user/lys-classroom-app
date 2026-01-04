@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { BookOpen, Trash2, Clock, Target, GraduationCap, Heart, Compass, Lightbulb, AlertCircle, Share2, Link2, BarChart3 } from "lucide-react";
+import { BookOpen, Trash2, Clock, Target, GraduationCap, Heart, Compass, Lightbulb, AlertCircle, Share2, Link2, BarChart3, Library, Loader2 } from "lucide-react";
 import { useAuth } from "@/hooks/use-auth";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
@@ -21,6 +21,18 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { ShareDialog } from "@/components/ShareDialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+  DialogClose,
+} from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 const bkdConfig = {
   be: { label: "BE", icon: Heart, color: "bg-lys-red/10 text-lys-red border-lys-red/20" },
@@ -33,6 +45,10 @@ export default function MyLessons() {
   const { user, isLoading: authLoading, isAuthenticated } = useAuth();
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [shareLesson, setShareLesson] = useState<{ id: string; title: string } | null>(null);
+  const [templateLesson, setTemplateLesson] = useState<Lesson | null>(null);
+  const [templateTitle, setTemplateTitle] = useState("");
+  const [templateDescription, setTemplateDescription] = useState("");
+  const [templateVisibility, setTemplateVisibility] = useState<"private" | "public">("private");
 
   const { data: lessons = [], isLoading } = useQuery<Lesson[]>({
     queryKey: ["/api/lessons"],
@@ -55,6 +71,33 @@ export default function MyLessons() {
       toast({
         title: "Error",
         description: "Failed to delete the lesson. Please try again.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const saveTemplateMutation = useMutation({
+    mutationFn: async ({ lessonId, title, description, visibility }: { lessonId: string; title: string; description: string; visibility: string }) => {
+      return await apiRequest("POST", `/api/lessons/${lessonId}/save-as-template`, {
+        title,
+        description,
+        visibility
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/templates"] });
+      toast({
+        title: "Template Created!",
+        description: "Your lesson has been saved as a reusable template.",
+      });
+      setTemplateLesson(null);
+      setTemplateTitle("");
+      setTemplateDescription("");
+    },
+    onError: () => {
+      toast({
+        title: "Error",
+        description: "Failed to save as template. Please try again.",
         variant: "destructive",
       });
     },
@@ -308,6 +351,20 @@ export default function MyLessons() {
                   <Button
                     variant="ghost"
                     size="icon"
+                    className="text-muted-foreground"
+                    onClick={() => {
+                      setTemplateLesson(lesson);
+                      setTemplateTitle(lesson.title);
+                      setTemplateDescription("");
+                    }}
+                    data-testid={`button-template-${lesson.id}`}
+                    title="Save as Template"
+                  >
+                    <Library className="h-4 w-4" />
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="icon"
                     className="text-muted-foreground hover:text-destructive"
                     onClick={() => setDeleteId(lesson.id)}
                     data-testid={`button-delete-${lesson.id}`}
@@ -350,6 +407,80 @@ export default function MyLessons() {
           lessonTitle={shareLesson.title}
         />
       )}
+
+      <Dialog open={!!templateLesson} onOpenChange={(open) => !open && setTemplateLesson(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="font-oswald text-xl flex items-center gap-2">
+              <Library className="h-5 w-5 text-lys-teal" />
+              Save as Template
+            </DialogTitle>
+            <DialogDescription>
+              Create a reusable template from this lesson. Templates help you quickly create new lessons with the same structure.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="template-title">Template Title</Label>
+              <Input
+                id="template-title"
+                value={templateTitle}
+                onChange={(e) => setTemplateTitle(e.target.value)}
+                placeholder="Enter template title"
+                data-testid="input-template-title"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="template-description">Description (optional)</Label>
+              <Input
+                id="template-description"
+                value={templateDescription}
+                onChange={(e) => setTemplateDescription(e.target.value)}
+                placeholder="Describe what this template is for"
+                data-testid="input-template-description"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Visibility</Label>
+              <Select value={templateVisibility} onValueChange={(v) => setTemplateVisibility(v as "private" | "public")}>
+                <SelectTrigger data-testid="select-template-visibility">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="private">Private - Only you can see</SelectItem>
+                  <SelectItem value="public">Public - Share with community</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          <DialogFooter>
+            <DialogClose asChild>
+              <Button variant="outline">Cancel</Button>
+            </DialogClose>
+            <Button
+              onClick={() => {
+                if (templateLesson) {
+                  saveTemplateMutation.mutate({
+                    lessonId: templateLesson.id,
+                    title: templateTitle,
+                    description: templateDescription,
+                    visibility: templateVisibility
+                  });
+                }
+              }}
+              disabled={!templateTitle || saveTemplateMutation.isPending}
+              data-testid="button-confirm-save-template"
+            >
+              {saveTemplateMutation.isPending ? (
+                <Loader2 className="h-4 w-4 animate-spin mr-2" />
+              ) : (
+                <Library className="h-4 w-4 mr-2" />
+              )}
+              Save Template
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
