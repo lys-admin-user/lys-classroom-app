@@ -1183,3 +1183,155 @@ export const pdRecommendationResponseSchema = z.object({
 });
 
 export type PDRecommendationResponse = z.infer<typeof pdRecommendationResponseSchema>;
+
+// ============================================
+// TIER-BASED FEATURE ACCESS SYSTEM
+// ============================================
+
+export const UserTier = {
+  FREE: "free",
+  PRO: "pro",
+  CAMPUS: "campus",
+  ENTERPRISE: "enterprise",
+} as const;
+
+export type UserTierType = typeof UserTier[keyof typeof UserTier];
+
+// Feature definition with tier requirements
+export interface TierFeature {
+  id: string;
+  name: string;
+  description: string;
+  icon: string;
+  path: string;
+  category: "core" | "ai" | "collaboration" | "analytics" | "admin" | "premium";
+  requiredTier: UserTierType;
+  upgradeMessage?: string;
+  limitInfo?: string; // e.g., "5/month on Free, Unlimited on Pro"
+}
+
+// Comprehensive feature definitions with tier requirements
+export const TIER_FEATURES: TierFeature[] = [
+  // Core Features (Free tier)
+  { id: "dashboard", name: "Dashboard", description: "View your progress and recent activity", icon: "LayoutDashboard", path: "/", category: "core", requiredTier: "free" },
+  { id: "self_discovery", name: "Self-Discovery", description: "Take assessments to understand your strengths", icon: "Compass", path: "/self-discovery", category: "core", requiredTier: "free" },
+  { id: "careers", name: "Career Explorer", description: "Browse and save career pathways", icon: "Briefcase", path: "/careers", category: "core", requiredTier: "free" },
+  { id: "action_plans", name: "Action Plans", description: "Create and track your goals", icon: "Target", path: "/action-plans", category: "core", requiredTier: "free", limitInfo: "3 active goals on Free" },
+  { id: "resources", name: "Resources", description: "Access educational materials", icon: "BookOpen", path: "/resources", category: "core", requiredTier: "free" },
+  
+  // AI Features (Pro tier)
+  { id: "lesson_generator", name: "AI Lesson Generator", description: "Create professional lesson plans with AI", icon: "Sparkles", path: "/lesson-generator", category: "ai", requiredTier: "free", limitInfo: "5/month on Free, Unlimited on Pro" },
+  { id: "my_lessons", name: "My Lessons", description: "View and manage saved lessons", icon: "FileText", path: "/my-lessons", category: "ai", requiredTier: "free" },
+  { id: "ai_recommendations", name: "AI PD Recommendations", description: "Get personalized professional development suggestions", icon: "Brain", path: "/professional-development", category: "ai", requiredTier: "pro", upgradeMessage: "Unlock AI-powered recommendations with Pro" },
+  { id: "advanced_analytics", name: "Advanced Analytics", description: "Deep insights into your teaching impact", icon: "BarChart3", path: "/analytics", category: "analytics", requiredTier: "pro", upgradeMessage: "Get detailed analytics with Pro" },
+  
+  // Collaboration Features (Campus tier)
+  { id: "collaboration", name: "Real-Time Collaboration", description: "Co-create lessons with colleagues", icon: "Users", path: "/collaboration", category: "collaboration", requiredTier: "campus", upgradeMessage: "Collaborate in real-time with Campus" },
+  { id: "resource_library", name: "Shared Resource Library", description: "Share and discover resources with your community", icon: "Library", path: "/resource-library", category: "collaboration", requiredTier: "campus", upgradeMessage: "Access shared resources with Campus" },
+  { id: "classroom", name: "Classroom Management", description: "Organize students and track progress", icon: "School", path: "/classroom", category: "collaboration", requiredTier: "campus", upgradeMessage: "Manage classrooms with Campus" },
+  { id: "assignments", name: "Assignments", description: "Create and distribute assignments", icon: "ClipboardList", path: "/assignments", category: "collaboration", requiredTier: "campus", upgradeMessage: "Create assignments with Campus" },
+  { id: "scope_sequence", name: "Scope & Sequence Builder", description: "Plan your curriculum across units", icon: "Calendar", path: "/scope-sequence", category: "collaboration", requiredTier: "campus", upgradeMessage: "Build curriculum with Campus" },
+  
+  // Admin Features (Campus tier)
+  { id: "educator_influence", name: "Educator Influence", description: "Track your referrals and earn rewards", icon: "Award", path: "/educator-influence", category: "premium", requiredTier: "free" },
+  { id: "milestones", name: "LYS Milestones", description: "Track Be-Know-Do milestone progress", icon: "Flag", path: "/milestones", category: "core", requiredTier: "free" },
+  { id: "parent_portal", name: "Parent Portal", description: "Share progress with parents", icon: "Heart", path: "/parent-portal", category: "collaboration", requiredTier: "campus", upgradeMessage: "Share with parents via Campus" },
+  
+  // Enterprise Features
+  { id: "standards_admin", name: "Standards Management", description: "Manage educational standards", icon: "Database", path: "/admin/standards", category: "admin", requiredTier: "enterprise", upgradeMessage: "Enterprise-level standards management" },
+  { id: "site_admin", name: "Site Administration", description: "Full platform administration", icon: "Shield", path: "/admin", category: "admin", requiredTier: "enterprise", upgradeMessage: "Enterprise administration access" },
+  { id: "system_admin", name: "System Administration", description: "Complete platform oversight", icon: "Settings", path: "/system-admin", category: "admin", requiredTier: "enterprise", upgradeMessage: "Enterprise system administration" },
+];
+
+// Tier benefits for upgrade messaging
+export const TIER_BENEFITS = {
+  free: {
+    name: "Free",
+    price: "$0",
+    features: ["Self-Discovery Assessment", "Career Explorer", "5 AI Lessons/month", "3 Active Goals", "Basic Resources"],
+  },
+  pro: {
+    name: "Pro",
+    price: "$9.99/month",
+    features: ["Everything in Free", "Unlimited AI Lessons", "AI PD Recommendations", "Advanced Analytics", "Priority Support"],
+  },
+  campus: {
+    name: "Campus",
+    price: "$29.99/month",
+    features: ["Everything in Pro", "Real-Time Collaboration", "Classroom Management", "Assignments & Curriculum", "Shared Resource Library", "Parent Portal"],
+  },
+  enterprise: {
+    name: "Enterprise",
+    price: "Contact Sales",
+    features: ["Everything in Campus", "Custom Integrations", "Standards Management", "Site Administration", "Dedicated Support", "Custom Branding"],
+  },
+};
+
+// Helper function to check if a tier has access to a feature
+export function tierHasAccess(userTier: UserTierType, requiredTier: UserTierType): boolean {
+  const tierOrder: UserTierType[] = ["free", "pro", "campus", "enterprise"];
+  return tierOrder.indexOf(userTier) >= tierOrder.indexOf(requiredTier);
+}
+
+// Get features for a specific tier (available and locked)
+export function getFeaturesForTier(userTier: UserTierType): { available: TierFeature[]; locked: TierFeature[] } {
+  const available: TierFeature[] = [];
+  const locked: TierFeature[] = [];
+  
+  for (const feature of TIER_FEATURES) {
+    if (tierHasAccess(userTier, feature.requiredTier)) {
+      available.push(feature);
+    } else {
+      locked.push(feature);
+    }
+  }
+  
+  return { available, locked };
+}
+
+// Get the next tier for upgrade
+export function getNextTier(currentTier: UserTierType): UserTierType | null {
+  const tierOrder: UserTierType[] = ["free", "pro", "campus", "enterprise"];
+  const currentIndex = tierOrder.indexOf(currentTier);
+  if (currentIndex < tierOrder.length - 1) {
+    return tierOrder[currentIndex + 1];
+  }
+  return null;
+}
+
+// Profile Sitemap Schema for API responses
+export const profileSitemapSchema = z.object({
+  currentTier: z.enum(["free", "pro", "campus", "enterprise"]),
+  tierInfo: z.object({
+    name: z.string(),
+    price: z.string(),
+    features: z.array(z.string()),
+  }),
+  nextTier: z.object({
+    name: z.string(),
+    price: z.string(),
+    features: z.array(z.string()),
+  }).nullable(),
+  availableFeatures: z.array(z.object({
+    id: z.string(),
+    name: z.string(),
+    description: z.string(),
+    icon: z.string(),
+    path: z.string(),
+    category: z.string(),
+    limitInfo: z.string().optional(),
+  })),
+  lockedFeatures: z.array(z.object({
+    id: z.string(),
+    name: z.string(),
+    description: z.string(),
+    icon: z.string(),
+    path: z.string(),
+    category: z.string(),
+    requiredTier: z.string(),
+    upgradeMessage: z.string().optional(),
+  })),
+  upgradeRecommendation: z.string().optional(),
+});
+
+export type ProfileSitemap = z.infer<typeof profileSitemapSchema>;
