@@ -123,7 +123,7 @@ export default function Settings() {
 
           <EducatorProfileForm 
             existingProfile={profile}
-            isOnboarding={!profile?.onboardingCompleted}
+            isOnboarding={!profile}
           />
         </div>
       </div>
