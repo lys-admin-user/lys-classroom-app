@@ -28,8 +28,10 @@ import {
   Building2,
   Share2,
   Eye,
-  X
+  X,
+  TrendingUp
 } from "lucide-react";
+import { Link } from "wouter";
 import type { Class, Student, InsertClass, InsertStudent, AccommodationType, Organization, OrgMembership } from "@shared/schema";
 
 type OrgWithDetails = OrgMembership & { organization: Organization };
@@ -833,6 +835,16 @@ export default function Classroom() {
                       </div>
                     </div>
                     <div className="flex items-center gap-1">
+                      <Link href={`/student-journey/${student.id}`}>
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          title="View Journey"
+                          data-testid={`button-journey-student-${student.id}`}
+                        >
+                          <TrendingUp className="h-4 w-4" />
+                        </Button>
+                      </Link>
                       <Button
                         size="icon"
                         variant="ghost"

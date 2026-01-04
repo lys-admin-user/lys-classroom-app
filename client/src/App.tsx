@@ -33,6 +33,7 @@ import ParentPortal from "@/pages/ParentPortal";
 import Milestones from "@/pages/Milestones";
 import Classroom from "@/pages/Classroom";
 import ProfessionalDevelopment from "@/pages/ProfessionalDevelopment";
+import StudentJourney from "@/pages/StudentJourney";
 import NotFound from "@/pages/not-found";
 
 const EXEMPT_PATHS = ["/onboarding", "/pricing", "/shared"];
@@ -83,6 +84,7 @@ function Router() {
       <Route path="/parent-portal" component={ParentPortal} />
       <Route path="/milestones" component={Milestones} />
       <Route path="/classroom" component={Classroom} />
+      <Route path="/student-journey/:studentId" component={StudentJourney} />
       <Route path="/professional-development" component={ProfessionalDevelopment} />
       <Route component={NotFound} />
     </Switch>
