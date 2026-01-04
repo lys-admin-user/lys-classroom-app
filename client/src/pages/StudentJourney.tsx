@@ -211,18 +211,28 @@ export default function StudentJourney() {
     enabled: !!studentId,
   });
 
+  const createJourneyMutation = useMutation({
+    mutationFn: async () => {
+      const res = await apiRequest("POST", "/api/student-journey", { studentId });
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/student-journey", studentId] });
+      toast({ title: "Journey started", description: "Student journey has been created successfully." });
+    },
+    onError: () => {
+      toast({ title: "Failed to create journey", variant: "destructive" });
+    },
+  });
+
   const addMilestoneMutation = useMutation({
     mutationFn: async (milestone: typeof newMilestone) => {
-      const res = await fetch(`/api/student-journey/${journeyData?.progress.id}/milestone`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          ...milestone,
-          studentId,
-        }),
-        credentials: "include",
-      });
-      if (!res.ok) throw new Error("Failed to add milestone");
+      if (!journeyData?.progress.id) throw new Error("No journey progress");
+      const res = await apiRequest(
+        "POST",
+        `/api/student-journey/${journeyData.progress.id}/milestone`,
+        { ...milestone, studentId }
+      );
       return res.json();
     },
     onSuccess: () => {
@@ -250,14 +260,25 @@ export default function StudentJourney() {
         <Card>
           <CardContent className="py-12 text-center">
             <Trophy className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
-            <h2 className="text-xl font-semibold mb-2">Journey Not Found</h2>
+            <h2 className="text-xl font-semibold mb-2">Journey Not Started</h2>
             <p className="text-muted-foreground mb-4">
-              This student's journey hasn't been started yet.
+              This student's Be-Know-Do journey hasn't been started yet. Create a journey to begin tracking their progress.
             </p>
-            <Button onClick={() => setLocation("/classroom")} data-testid="button-back-classroom">
-              <ArrowLeft className="w-4 h-4 mr-2" />
-              Back to Classroom
-            </Button>
+            <div className="flex items-center justify-center gap-3 flex-wrap">
+              <Button 
+                onClick={() => createJourneyMutation.mutate()}
+                disabled={createJourneyMutation.isPending}
+                data-testid="button-create-journey"
+              >
+                {createJourneyMutation.isPending && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+                <Sparkles className="w-4 h-4 mr-2" />
+                Start Journey
+              </Button>
+              <Button variant="outline" onClick={() => setLocation("/classroom")} data-testid="button-back-classroom">
+                <ArrowLeft className="w-4 h-4 mr-2" />
+                Back to Classroom
+              </Button>
+            </div>
           </CardContent>
         </Card>
       </div>
