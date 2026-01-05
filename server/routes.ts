@@ -5140,6 +5140,59 @@ export async function registerRoutes(
     }
   });
 
+  // Add activity to current user's journey (for reflections, etc.)
+  app.post("/api/my-journey/activities", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user?.claims?.sub;
+      const { activityType, title, description, category, pointsEarned } = req.body;
+      
+      if (!activityType || !title) {
+        res.status(400).json({ error: "Activity type and title are required" });
+        return;
+      }
+      
+      // Get or create journey
+      let progress = await storage.getStudentJourneyProgressByUserId(userId);
+      if (!progress) {
+        progress = await storage.createStudentJourneyProgress({
+          studentId: userId,
+          educatorUserId: userId,
+          organizationId: null,
+          beScore: 0,
+          knowScore: 0,
+          doScore: 0,
+          overallScore: 0,
+          totalAssessmentsCompleted: 0,
+          totalMilestonesAchieved: 0,
+          currentFocus: "be",
+          savedCareerIds: [],
+          latestAssessmentResults: null,
+        });
+      }
+      
+      const activity = await storage.createStudentJourneyActivity({
+        journeyProgressId: progress.id,
+        studentId: userId,
+        activityType,
+        title,
+        description: description || null,
+        category: category || "be",
+        pointsEarned: pointsEarned || 0,
+        metadata: null,
+      });
+      
+      // Update last activity date
+      await storage.updateStudentJourneyProgress(progress.id, {
+        lastActivityDate: new Date(),
+      });
+      
+      res.status(201).json(activity);
+    } catch (error) {
+      console.error("Failed to add activity:", error);
+      res.status(500).json({ error: "Failed to add activity" });
+    }
+  });
+
   // Get student journey progress for a specific student
   app.get("/api/student-journey/:studentId", isAuthenticated, async (req: any, res) => {
     try {
