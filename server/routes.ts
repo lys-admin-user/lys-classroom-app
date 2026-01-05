@@ -2277,29 +2277,38 @@ export async function registerRoutes(
     }
   });
 
-  // Valid US state abbreviations for filtering out test providers/districts
-  const US_STATE_ABBREVIATIONS = new Set([
-    'AL', 'AK', 'AZ', 'AR', 'CA', 'CO', 'CT', 'DE', 'FL', 'GA',
-    'HI', 'ID', 'IL', 'IN', 'IA', 'KS', 'KY', 'LA', 'ME', 'MD',
-    'MA', 'MI', 'MN', 'MS', 'MO', 'MT', 'NE', 'NV', 'NH', 'NJ',
-    'NM', 'NY', 'NC', 'ND', 'OH', 'OK', 'OR', 'PA', 'RI', 'SC',
-    'SD', 'TN', 'TX', 'UT', 'VT', 'VA', 'WA', 'WV', 'WI', 'WY', 'DC'
-  ]);
+  // Map of actual US state names to their abbreviations for filtering
+  const US_STATES: Record<string, string> = {
+    'Alabama': 'AL', 'Alaska': 'AK', 'Arizona': 'AZ', 'Arkansas': 'AR', 
+    'California': 'CA', 'Colorado': 'CO', 'Connecticut': 'CT', 'Delaware': 'DE', 
+    'Florida': 'FL', 'Georgia': 'GA', 'Hawaii': 'HI', 'Idaho': 'ID', 
+    'Illinois': 'IL', 'Indiana': 'IN', 'Iowa': 'IA', 'Kansas': 'KS', 
+    'Kentucky': 'KY', 'Louisiana': 'LA', 'Maine': 'ME', 'Maryland': 'MD',
+    'Massachusetts': 'MA', 'Michigan': 'MI', 'Minnesota': 'MN', 'Mississippi': 'MS',
+    'Missouri': 'MO', 'Montana': 'MT', 'Nebraska': 'NE', 'Nevada': 'NV',
+    'New Hampshire': 'NH', 'New Jersey': 'NJ', 'New Mexico': 'NM', 'New York': 'NY',
+    'North Carolina': 'NC', 'North Dakota': 'ND', 'Ohio': 'OH', 'Oklahoma': 'OK',
+    'Oregon': 'OR', 'Pennsylvania': 'PA', 'Rhode Island': 'RI', 'South Carolina': 'SC',
+    'South Dakota': 'SD', 'Tennessee': 'TN', 'Texas': 'TX', 'Utah': 'UT',
+    'Vermont': 'VT', 'Virginia': 'VA', 'Washington': 'WA', 'West Virginia': 'WV',
+    'Wisconsin': 'WI', 'Wyoming': 'WY', 'District of Columbia': 'DC'
+  };
 
   app.get("/api/standards/states/:country", async (req, res) => {
     try {
       const { country } = req.params;
       const jurisdictions = await storage.getJurisdictions(country);
       
-      // Filter to only show actual states/regions (not districts, test providers, etc.)
+      // Filter to only show actual states/regions by NAME (not districts, test providers, etc.)
       let filtered = jurisdictions;
       if (country === 'United States') {
-        filtered = jurisdictions.filter(j => US_STATE_ABBREVIATIONS.has(j.abbreviation));
+        // Filter by state NAME to avoid conflicts with organizations using state abbreviations
+        filtered = jurisdictions.filter(j => US_STATES[j.name] !== undefined);
       }
       
       res.json(filtered.map(j => ({
         state: j.name,
-        abbreviation: j.abbreviation,
+        abbreviation: US_STATES[j.name] || j.abbreviation, // Use correct abbreviation
         standardsName: j.standardsName,
       })));
     } catch (error) {
@@ -2308,10 +2317,27 @@ export async function registerRoutes(
     }
   });
 
+  // Helper to find state name from abbreviation
+  const getStateNameFromAbbr = (abbr: string): string | undefined => {
+    return Object.entries(US_STATES).find(([name, ab]) => ab === abbr)?.[0];
+  };
+
   app.get("/api/standards/subjects/:country/:stateAbbr", async (req, res) => {
     try {
       const { country, stateAbbr } = req.params;
-      const jurisdiction = await storage.getJurisdictionByAbbr(country, stateAbbr);
+      
+      // For US, look up by state name instead of abbreviation (database has wrong abbreviations)
+      let jurisdiction;
+      if (country === 'United States') {
+        const stateName = getStateNameFromAbbr(stateAbbr);
+        if (stateName) {
+          const jurisdictions = await storage.getJurisdictions(country);
+          jurisdiction = jurisdictions.find(j => j.name === stateName);
+        }
+      } else {
+        jurisdiction = await storage.getJurisdictionByAbbr(country, stateAbbr);
+      }
+      
       if (!jurisdiction) {
         res.json([]);
         return;
@@ -2328,7 +2354,19 @@ export async function registerRoutes(
   app.get("/api/standards/codes/:country/:stateAbbr/:subject", async (req, res) => {
     try {
       const { country, stateAbbr, subject } = req.params;
-      const jurisdiction = await storage.getJurisdictionByAbbr(country, stateAbbr);
+      
+      // For US, look up by state name instead of abbreviation (database has wrong abbreviations)
+      let jurisdiction;
+      if (country === 'United States') {
+        const stateName = getStateNameFromAbbr(stateAbbr);
+        if (stateName) {
+          const jurisdictions = await storage.getJurisdictions(country);
+          jurisdiction = jurisdictions.find(j => j.name === stateName);
+        }
+      } else {
+        jurisdiction = await storage.getJurisdictionByAbbr(country, stateAbbr);
+      }
+      
       if (!jurisdiction) {
         res.json([]);
         return;
