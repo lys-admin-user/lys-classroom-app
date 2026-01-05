@@ -530,9 +530,24 @@ export async function registerRoutes(
       const userId = req.user?.claims?.sub;
       const profile = await storage.getEducatorProfile(userId);
       const tier = await storage.getUserTier(userId);
-      res.json({ profile: profile || null, tier });
+      const sponsoredAccess = await storage.getUserSponsoredAccess(userId);
+      res.json({ profile: profile || null, tier, sponsoredAccess: sponsoredAccess || null });
     } catch (error) {
       res.status(500).json({ error: "Failed to fetch educator profile" });
+    }
+  });
+
+  app.get("/api/ads/sponsorship", async (req, res) => {
+    try {
+      const placement = req.query.placement as string;
+      if (!placement) {
+        res.status(400).json({ error: "Placement parameter required" });
+        return;
+      }
+      const sponsorship = await storage.getActiveSponsorship(placement);
+      res.json(sponsorship || null);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch sponsorship" });
     }
   });
 

@@ -36,9 +36,11 @@ export const users = pgTable("users", {
   firstName: varchar("first_name"),
   lastName: varchar("last_name"),
   profileImageUrl: varchar("profile_image_url"),
+  birthdate: timestamp("birthdate"),
   tier: varchar("tier").default("free").$type<UserTier>(),
   role: varchar("role").default("student").$type<UserRole>(),
   onboardingCompleted: boolean("onboarding_completed").default(false),
+  sponsoredAccessId: varchar("sponsored_access_id"),
   stripeCustomerId: varchar("stripe_customer_id"),
   stripeSubscriptionId: varchar("stripe_subscription_id"),
   subscriptionStatus: varchar("subscription_status"),
@@ -360,3 +362,93 @@ export const alignmentMatrix = pgTable("alignment_matrix", {
 export const insertAlignmentMatrixSchema = createInsertSchema(alignmentMatrix).omit({ id: true, createdAt: true, updatedAt: true });
 export type InsertAlignmentMatrix = z.infer<typeof insertAlignmentMatrixSchema>;
 export type AlignmentMatrix = typeof alignmentMatrix.$inferSelect;
+
+// =============================================================================
+// SPONSORED ACCESS (Regional NGO/Ministry Bulk Access Programs)
+// =============================================================================
+// For regions where ad revenue < $0.35 CPM, NGOs/Ministries can pay bulk "connectivity fees"
+// to provide ad-free access to students in their jurisdiction
+
+export type SponsorType = "ngo" | "ministry" | "foundation" | "corporate" | "other";
+export type SponsoredAccessStatus = "active" | "expired" | "suspended" | "pending";
+
+export const sponsoredAccess = pgTable("sponsored_access", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  sponsorName: varchar("sponsor_name").notNull(),
+  sponsorType: varchar("sponsor_type").$type<SponsorType>().notNull(),
+  authorityId: varchar("authority_id").references(() => authorities.id),
+  country: varchar("country").notNull(),
+  region: varchar("region"),
+  status: varchar("status").default("active").$type<SponsoredAccessStatus>(),
+  maxStudents: integer("max_students"),
+  currentStudents: integer("current_students").default(0),
+  monthlyFeeUsd: varchar("monthly_fee_usd"),
+  adFreeAccess: boolean("ad_free_access").default(true),
+  focusModeEnabled: boolean("focus_mode_enabled").default(true),
+  startDate: timestamp("start_date").defaultNow(),
+  endDate: timestamp("end_date"),
+  contactEmail: varchar("contact_email"),
+  contactName: varchar("contact_name"),
+  notes: text("notes"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertSponsoredAccessSchema = createInsertSchema(sponsoredAccess).omit({ id: true, createdAt: true, updatedAt: true, currentStudents: true });
+export type InsertSponsoredAccess = z.infer<typeof insertSponsoredAccessSchema>;
+export type SponsoredAccess = typeof sponsoredAccess.$inferSelect;
+
+// =============================================================================
+// AD CONFIGURATION (Regional Ad Revenue Settings)
+// =============================================================================
+// Tracks expected CPM by region to determine when to use Sponsored Access model
+
+export const adRegionalConfig = pgTable("ad_regional_config", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  country: varchar("country").notNull(),
+  region: varchar("region"),
+  expectedCpmUsd: varchar("expected_cpm_usd").notNull(),
+  cogsPerUserUsd: varchar("cogs_per_user_usd").default("0.45"),
+  requiresSponsoredAccess: boolean("requires_sponsored_access").default(false),
+  authorityId: varchar("authority_id").references(() => authorities.id),
+  notes: text("notes"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertAdRegionalConfigSchema = createInsertSchema(adRegionalConfig).omit({ id: true, createdAt: true, updatedAt: true });
+export type InsertAdRegionalConfig = z.infer<typeof insertAdRegionalConfigSchema>;
+export type AdRegionalConfig = typeof adRegionalConfig.$inferSelect;
+
+// =============================================================================
+// CONTEXTUAL SPONSORSHIPS (Age-Appropriate Sponsorship Ads)
+// =============================================================================
+// High-value contextual sponsorships for minors (under 13) - COPPA compliant
+// Example: "This Roadmap is brought to you by [University Name]"
+
+export type SponsorshipPlacement = "roadmap" | "career_explorer" | "lesson_header" | "dashboard" | "portfolio";
+
+export const contextualSponsorships = pgTable("contextual_sponsorships", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  sponsorName: varchar("sponsor_name").notNull(),
+  sponsorLogoUrl: varchar("sponsor_logo_url"),
+  sponsorUrl: varchar("sponsor_url"),
+  placement: varchar("placement").$type<SponsorshipPlacement>().notNull(),
+  messageTemplate: text("message_template").notNull(),
+  targetCountries: jsonb("target_countries").$type<string[]>(),
+  targetRegions: jsonb("target_regions").$type<string[]>(),
+  targetGradeLevels: jsonb("target_grade_levels").$type<string[]>(),
+  minorsSafe: boolean("minors_safe").default(true),
+  cpmUsd: varchar("cpm_usd"),
+  impressionCount: integer("impression_count").default(0),
+  clickCount: integer("click_count").default(0),
+  isActive: boolean("is_active").default(true),
+  startDate: timestamp("start_date"),
+  endDate: timestamp("end_date"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertContextualSponsorshipSchema = createInsertSchema(contextualSponsorships).omit({ id: true, createdAt: true, updatedAt: true, impressionCount: true, clickCount: true });
+export type InsertContextualSponsorship = z.infer<typeof insertContextualSponsorshipSchema>;
+export type ContextualSponsorship = typeof contextualSponsorships.$inferSelect;

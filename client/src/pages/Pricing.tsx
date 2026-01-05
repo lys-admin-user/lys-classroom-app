@@ -3,7 +3,7 @@ import { useMutation, useQuery } from "@tanstack/react-query";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Check, X, Sparkles, Building2, GraduationCap, AlertCircle } from "lucide-react";
+import { Check, X, Sparkles, Building2, GraduationCap, AlertCircle, Eye } from "lucide-react";
 import { useAuth } from "@/hooks/use-auth";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
@@ -28,6 +28,7 @@ const tiers = [
       { name: "Action Plans (3 max)", included: true },
       { name: "Resource Library", included: true },
       { name: "AI Lesson Generator (5/month)", included: true },
+      { name: "Ad-Supported Experience", included: true, note: "Contextual sponsorships" },
       { name: "Scope & Sequence Builder", included: false },
       { name: "Standards Database Access", included: false },
       { name: "Analytics Dashboard", included: false },
@@ -40,11 +41,13 @@ const tiers = [
   {
     id: "pro",
     name: "Pro",
+    subtitle: "Focus Mode",
     price: "$19",
     period: "/month",
-    description: "For educators who want unlimited lesson planning and curriculum tools",
-    icon: Sparkles,
+    description: "Distraction-free learning with unlimited tools for educators",
+    icon: Eye,
     features: [
+      { name: "Focus Mode (No Ads)", included: true, highlight: true },
       { name: "Self-Discovery Assessments", included: true },
       { name: "Career Exploration", included: true },
       { name: "Unlimited Action Plans", included: true },
@@ -56,17 +59,19 @@ const tiers = [
       { name: "Educator Influence Program", included: true },
       { name: "Priority Support", included: false },
     ],
-    cta: "Upgrade to Pro",
+    cta: "Upgrade to Focus Mode",
     popular: true,
   },
   {
     id: "campus",
     name: "Campus",
+    subtitle: "Focus Mode + Team",
     price: "$99",
     period: "/month",
     description: "For schools and districts with multiple educators and admin tools",
     icon: Building2,
     features: [
+      { name: "Focus Mode (No Ads)", included: true, highlight: true },
       { name: "Everything in Pro", included: true },
       { name: "Unlimited Educators", included: true },
       { name: "Campus Admin Dashboard", included: true },
@@ -202,6 +207,12 @@ export default function Pricing() {
                     <tier.icon className="h-6 w-6 text-foreground" />
                   </div>
                   <CardTitle className="font-oswald text-2xl">{tier.name}</CardTitle>
+                  {(tier as any).subtitle && (
+                    <Badge variant="outline" className="mx-auto mt-1 text-lys-teal border-lys-teal/30">
+                      <Eye className="w-3 h-3 mr-1" />
+                      {(tier as any).subtitle}
+                    </Badge>
+                  )}
                   <div className="mt-2">
                     <span className="text-4xl font-bold text-foreground">{tier.price}</span>
                     <span className="text-muted-foreground">{tier.period}</span>
@@ -210,15 +221,18 @@ export default function Pricing() {
                 </CardHeader>
                 <CardContent className="pt-4">
                   <ul className="space-y-3">
-                    {tier.features.map((feature) => (
+                    {tier.features.map((feature: any) => (
                       <li key={feature.name} className="flex items-start gap-3">
                         {feature.included ? (
-                          <Check className="h-5 w-5 text-green-500 shrink-0 mt-0.5" />
+                          <Check className={`h-5 w-5 shrink-0 mt-0.5 ${feature.highlight ? "text-lys-teal" : "text-green-500"}`} />
                         ) : (
                           <X className="h-5 w-5 text-muted-foreground shrink-0 mt-0.5" />
                         )}
-                        <span className={feature.included ? "text-foreground" : "text-muted-foreground"}>
+                        <span className={`${feature.included ? "text-foreground" : "text-muted-foreground"} ${feature.highlight ? "font-medium text-lys-teal" : ""}`}>
                           {feature.name}
+                          {feature.note && (
+                            <span className="text-xs text-muted-foreground ml-1">({feature.note})</span>
+                          )}
                         </span>
                       </li>
                     ))}

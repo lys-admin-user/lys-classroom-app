@@ -181,6 +181,10 @@ import {
   type PortfolioComment,
   type InsertPortfolioComment,
   portfolioComments,
+  type SponsoredAccess,
+  sponsoredAccess,
+  type ContextualSponsorship,
+  contextualSponsorships,
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, desc, and, asc, gte, sql } from "drizzle-orm";
@@ -226,6 +230,10 @@ export interface IStorage {
   updateUserTier(userId: string, tier: string): Promise<User | undefined>;
   updateUserRole(userId: string, role: UserRole): Promise<User | undefined>;
   completeOnboarding(userId: string): Promise<User | undefined>;
+  
+  // Sponsored Access
+  getUserSponsoredAccess(userId: string): Promise<SponsoredAccess | undefined>;
+  getActiveSponsorship(placement: string): Promise<ContextualSponsorship | undefined>;
   
   // User Preferences
   getUserPreferences(userId: string): Promise<UserPreferences | undefined>;
@@ -1010,6 +1018,33 @@ export class DatabaseStorage implements IStorage {
       .where(eq(users.id, userId))
       .returning();
     return updated || undefined;
+  }
+
+  // Sponsored Access
+  async getUserSponsoredAccess(userId: string): Promise<SponsoredAccess | undefined> {
+    const [user] = await db.select().from(users).where(eq(users.id, userId));
+    if (!user?.sponsoredAccessId) return undefined;
+    
+    const [access] = await db.select()
+      .from(sponsoredAccess)
+      .where(and(
+        eq(sponsoredAccess.id, user.sponsoredAccessId),
+        eq(sponsoredAccess.status, "active")
+      ));
+    return access || undefined;
+  }
+
+  async getActiveSponsorship(placement: string): Promise<ContextualSponsorship | undefined> {
+    const now = new Date();
+    const [sponsor] = await db.select()
+      .from(contextualSponsorships)
+      .where(and(
+        eq(contextualSponsorships.placement, placement as any),
+        eq(contextualSponsorships.isActive, true),
+        eq(contextualSponsorships.minorsSafe, true)
+      ))
+      .limit(1);
+    return sponsor || undefined;
   }
 
   // User Preferences
