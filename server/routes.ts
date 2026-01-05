@@ -2277,11 +2277,27 @@ export async function registerRoutes(
     }
   });
 
+  // Valid US state abbreviations for filtering out test providers/districts
+  const US_STATE_ABBREVIATIONS = new Set([
+    'AL', 'AK', 'AZ', 'AR', 'CA', 'CO', 'CT', 'DE', 'FL', 'GA',
+    'HI', 'ID', 'IL', 'IN', 'IA', 'KS', 'KY', 'LA', 'ME', 'MD',
+    'MA', 'MI', 'MN', 'MS', 'MO', 'MT', 'NE', 'NV', 'NH', 'NJ',
+    'NM', 'NY', 'NC', 'ND', 'OH', 'OK', 'OR', 'PA', 'RI', 'SC',
+    'SD', 'TN', 'TX', 'UT', 'VT', 'VA', 'WA', 'WV', 'WI', 'WY', 'DC'
+  ]);
+
   app.get("/api/standards/states/:country", async (req, res) => {
     try {
       const { country } = req.params;
       const jurisdictions = await storage.getJurisdictions(country);
-      res.json(jurisdictions.map(j => ({
+      
+      // Filter to only show actual states/regions (not districts, test providers, etc.)
+      let filtered = jurisdictions;
+      if (country === 'United States') {
+        filtered = jurisdictions.filter(j => US_STATE_ABBREVIATIONS.has(j.abbreviation));
+      }
+      
+      res.json(filtered.map(j => ({
         state: j.name,
         abbreviation: j.abbreviation,
         standardsName: j.standardsName,

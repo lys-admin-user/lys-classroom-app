@@ -619,34 +619,71 @@ ${addedResources.length > 0 ? addedResources.map(r => `- ${r.title}: ${r.url}`).
                     </Select>
                   </div>
 
+                  {/* Selection breadcrumb path */}
+                  {(selectedCountry || selectedState || selectedSubject) && (
+                    <div className="flex items-center gap-1 text-xs font-roboto text-muted-foreground bg-muted/50 rounded-md px-3 py-2" data-testid="breadcrumb-selection">
+                      {selectedCountry && (
+                        <>
+                          <Globe className="h-3 w-3" />
+                          <span>{selectedCountry}</span>
+                        </>
+                      )}
+                      {selectedState && (
+                        <>
+                          <ChevronRight className="h-3 w-3" />
+                          <MapPin className="h-3 w-3" />
+                          <span>{states.find(s => s.abbreviation === selectedState)?.state || selectedState}</span>
+                        </>
+                      )}
+                      {selectedSubject && (
+                        <>
+                          <ChevronRight className="h-3 w-3" />
+                          <FileText className="h-3 w-3" />
+                          <span>{selectedSubject}</span>
+                        </>
+                      )}
+                    </div>
+                  )}
+
                   {standardCodes.length > 0 && (
                     <div className="space-y-2">
                       <Label className="font-roboto text-sm text-muted-foreground">
                         {standardsName} Standard Codes (select all that apply)
                       </Label>
-                      <ScrollArea className="h-32 rounded-md border p-3">
-                        <div className="space-y-2">
+                      <ScrollArea className="h-48 rounded-md border bg-muted/30">
+                        <div className="p-3 space-y-1">
                           {standardCodes.map((code) => (
-                            <div key={code.code} className="flex items-start gap-2">
+                            <div 
+                              key={code.code} 
+                              className="flex items-start gap-3 p-2 rounded-md hover-elevate cursor-pointer"
+                            >
                               <Checkbox
                                 id={code.code}
                                 checked={selectedStandardCodes.some(c => c.code === code.code)}
                                 onCheckedChange={() => toggleStandardCode(code)}
+                                className="mt-0.5"
                                 data-testid={`checkbox-standard-${code.code}`}
                               />
-                              <label htmlFor={code.code} className="font-roboto text-sm cursor-pointer leading-tight">
+                              <label htmlFor={code.code} className="font-roboto text-sm cursor-pointer leading-relaxed flex-1">
                                 <span className="font-semibold text-lys-teal">{code.code}</span>
-                                <span className="text-muted-foreground ml-1">- {code.description}</span>
+                                <span className="text-muted-foreground ml-2">{code.description}</span>
                               </label>
                             </div>
                           ))}
                         </div>
                       </ScrollArea>
                       {selectedStandardCodes.length > 0 && (
-                        <div className="flex flex-wrap gap-1 mt-2">
+                        <div className="flex flex-wrap gap-1.5 mt-2">
                           {selectedStandardCodes.map((code) => (
-                            <Badge key={code.code} variant="secondary" className="font-roboto text-xs">
+                            <Badge 
+                              key={code.code} 
+                              variant="secondary" 
+                              className="font-roboto text-xs cursor-pointer"
+                              onClick={() => toggleStandardCode(code)}
+                              data-testid={`badge-selected-${code.code}`}
+                            >
                               {code.code}
+                              <X className="h-3 w-3 ml-1" />
                             </Badge>
                           ))}
                         </div>
