@@ -18,7 +18,7 @@ import {
   Shield, Building2, Users, Trash2, BarChart3, AlertTriangle, Loader2, 
   TrendingUp, CreditCard, Share2, BookOpen, Target, UserCheck, 
   Eye, Edit2, Search, ChevronRight, Map, GraduationCap, DollarSign,
-  Activity, Globe, FileText, Award, Zap, ExternalLink, UserCog
+  Activity, Globe, FileText, Award, Zap, ExternalLink, UserCog, Library, Plus
 } from "lucide-react";
 import type { Organization, User as UserType, Lesson } from "@shared/schema";
 
@@ -101,6 +101,8 @@ export default function SystemAdminPage() {
   const [selectedUser, setSelectedUser] = useState<UserType | null>(null);
   const [editUserOpen, setEditUserOpen] = useState(false);
   const [editUserData, setEditUserData] = useState<Partial<UserType>>({});
+  const [addJurisdictionOpen, setAddJurisdictionOpen] = useState(false);
+  const [newJurisdiction, setNewJurisdiction] = useState({ country: 'United States', name: '', abbreviation: '', standardsName: '' });
 
   const { data: adminCheck, isLoading: checkLoading } = useQuery<{ isSiteAdmin: boolean }>({
     queryKey: ["/api/admin/check"],
@@ -141,6 +143,31 @@ export default function SystemAdminPage() {
   const { data: organizations = [] } = useQuery<Organization[]>({
     queryKey: ["/api/admin/organizations"],
     enabled: adminCheck?.isSiteAdmin,
+  });
+
+  const { data: jurisdictions = [], isLoading: jurisdictionsLoading } = useQuery<{
+    state: string;
+    abbreviation: string;
+    standardsName: string;
+    source: 'csp' | 'fallback' | 'manual';
+  }[]>({
+    queryKey: ["/api/standards/states/United States"],
+    enabled: adminCheck?.isSiteAdmin && activeTab === "standards",
+  });
+
+  const addJurisdictionMutation = useMutation({
+    mutationFn: async (data: { country: string; name: string; abbreviation: string; standardsName: string }) => {
+      return await apiRequest("POST", "/api/admin/jurisdictions", data);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/standards/states/United States"] });
+      setAddJurisdictionOpen(false);
+      setNewJurisdiction({ country: 'United States', name: '', abbreviation: '', standardsName: '' });
+      toast({ title: "Jurisdiction added successfully" });
+    },
+    onError: () => {
+      toast({ title: "Failed to add jurisdiction", variant: "destructive" });
+    },
   });
 
   const updateUserMutation = useMutation({
@@ -299,6 +326,10 @@ export default function SystemAdminPage() {
           <TabsTrigger value="billing" className="gap-2" data-testid="tab-billing">
             <CreditCard className="h-4 w-4" />
             <span className="hidden sm:inline">Billing</span>
+          </TabsTrigger>
+          <TabsTrigger value="standards" className="gap-2" data-testid="tab-standards">
+            <Library className="h-4 w-4" />
+            <span className="hidden sm:inline">Standards</span>
           </TabsTrigger>
         </TabsList>
 
@@ -916,6 +947,180 @@ export default function SystemAdminPage() {
               ) : (
                 <p className="text-center text-muted-foreground py-4">No recent upgrades</p>
               )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="standards" className="space-y-4">
+          <div className="flex items-center justify-between gap-4 flex-wrap">
+            <h2 className="font-oswald text-xl">Educational Standards & Jurisdictions</h2>
+            <Dialog open={addJurisdictionOpen} onOpenChange={setAddJurisdictionOpen}>
+              <DialogTrigger asChild>
+                <Button data-testid="button-add-jurisdiction">
+                  <Plus className="h-4 w-4 mr-2" />
+                  Add Jurisdiction
+                </Button>
+              </DialogTrigger>
+              <DialogContent>
+                <DialogHeader>
+                  <DialogTitle>Add New Jurisdiction</DialogTitle>
+                  <DialogDescription>
+                    Add a new state or jurisdiction for educational standards. This will be available in the lesson generator.
+                  </DialogDescription>
+                </DialogHeader>
+                <div className="space-y-4 py-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="j-country">Country</Label>
+                    <Select 
+                      value={newJurisdiction.country} 
+                      onValueChange={(v) => setNewJurisdiction({ ...newJurisdiction, country: v })}
+                    >
+                      <SelectTrigger id="j-country" data-testid="select-jurisdiction-country">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="United States">United States</SelectItem>
+                        <SelectItem value="Canada">Canada</SelectItem>
+                        <SelectItem value="United Kingdom">United Kingdom</SelectItem>
+                        <SelectItem value="Australia">Australia</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="j-name">State/Region Name</Label>
+                    <Input 
+                      id="j-name"
+                      value={newJurisdiction.name}
+                      onChange={(e) => setNewJurisdiction({ ...newJurisdiction, name: e.target.value })}
+                      placeholder="e.g. California"
+                      data-testid="input-jurisdiction-name"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="j-abbr">Abbreviation</Label>
+                    <Input 
+                      id="j-abbr"
+                      value={newJurisdiction.abbreviation}
+                      onChange={(e) => setNewJurisdiction({ ...newJurisdiction, abbreviation: e.target.value.toUpperCase() })}
+                      placeholder="e.g. CA"
+                      maxLength={3}
+                      data-testid="input-jurisdiction-abbreviation"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="j-standards">Standards Name</Label>
+                    <Input 
+                      id="j-standards"
+                      value={newJurisdiction.standardsName}
+                      onChange={(e) => setNewJurisdiction({ ...newJurisdiction, standardsName: e.target.value })}
+                      placeholder="e.g. California Standards, CCSS"
+                      data-testid="input-jurisdiction-standards-name"
+                    />
+                  </div>
+                </div>
+                <DialogFooter>
+                  <Button variant="outline" onClick={() => setAddJurisdictionOpen(false)}>
+                    Cancel
+                  </Button>
+                  <Button 
+                    onClick={() => addJurisdictionMutation.mutate(newJurisdiction)}
+                    disabled={!newJurisdiction.name || !newJurisdiction.abbreviation || addJurisdictionMutation.isPending}
+                    data-testid="button-confirm-add-jurisdiction"
+                  >
+                    {addJurisdictionMutation.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+                    Add Jurisdiction
+                  </Button>
+                </DialogFooter>
+              </DialogContent>
+            </Dialog>
+          </div>
+
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-lg flex items-center gap-2">
+                <Globe className="h-5 w-5 text-lys-teal" />
+                US States & Jurisdictions
+              </CardTitle>
+              <CardDescription>
+                States with educational standards available for lesson generation. 
+                "CSP" indicates data from Common Standards Project, "Fallback" uses built-in standards.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              {jurisdictionsLoading ? (
+                <div className="flex items-center justify-center py-8">
+                  <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+                </div>
+              ) : (
+                <ScrollArea className="h-[400px]">
+                  <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+                    {jurisdictions.map((j) => (
+                      <div 
+                        key={j.abbreviation} 
+                        className="flex items-center justify-between p-3 rounded-md bg-muted/50 hover-elevate"
+                        data-testid={`jurisdiction-${j.abbreviation}`}
+                      >
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2">
+                            <span className="font-medium">{j.state}</span>
+                            <Badge variant="outline" className="text-xs">{j.abbreviation}</Badge>
+                          </div>
+                          <p className="text-xs text-muted-foreground truncate">{j.standardsName}</p>
+                        </div>
+                        <Badge 
+                          variant={j.source === 'csp' ? 'default' : j.source === 'manual' ? 'outline' : 'secondary'} 
+                          className="ml-2 text-xs"
+                        >
+                          {j.source === 'csp' ? 'CSP' : j.source === 'manual' ? 'Manual' : 'Fallback'}
+                        </Badge>
+                      </div>
+                    ))}
+                  </div>
+                </ScrollArea>
+              )}
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-lg">Missing States</CardTitle>
+              <CardDescription>
+                These US states are not yet in the system. Click "Add Jurisdiction" above to manually add them.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              {(() => {
+                const allStates = ['AL', 'AK', 'AZ', 'AR', 'CA', 'CO', 'CT', 'DE', 'FL', 'GA', 'HI', 'ID', 'IL', 'IN', 'IA', 'KS', 'KY', 'LA', 'ME', 'MD', 'MA', 'MI', 'MN', 'MS', 'MO', 'MT', 'NE', 'NV', 'NH', 'NJ', 'NM', 'NY', 'NC', 'ND', 'OH', 'OK', 'OR', 'PA', 'RI', 'SC', 'SD', 'TN', 'TX', 'UT', 'VT', 'VA', 'WA', 'WV', 'WI', 'WY', 'DC'];
+                const stateNames: Record<string, string> = {
+                  'AL': 'Alabama', 'AK': 'Alaska', 'AZ': 'Arizona', 'AR': 'Arkansas', 'CA': 'California',
+                  'CO': 'Colorado', 'CT': 'Connecticut', 'DE': 'Delaware', 'FL': 'Florida', 'GA': 'Georgia',
+                  'HI': 'Hawaii', 'ID': 'Idaho', 'IL': 'Illinois', 'IN': 'Indiana', 'IA': 'Iowa',
+                  'KS': 'Kansas', 'KY': 'Kentucky', 'LA': 'Louisiana', 'ME': 'Maine', 'MD': 'Maryland',
+                  'MA': 'Massachusetts', 'MI': 'Michigan', 'MN': 'Minnesota', 'MS': 'Mississippi', 'MO': 'Missouri',
+                  'MT': 'Montana', 'NE': 'Nebraska', 'NV': 'Nevada', 'NH': 'New Hampshire', 'NJ': 'New Jersey',
+                  'NM': 'New Mexico', 'NY': 'New York', 'NC': 'North Carolina', 'ND': 'North Dakota', 'OH': 'Ohio',
+                  'OK': 'Oklahoma', 'OR': 'Oregon', 'PA': 'Pennsylvania', 'RI': 'Rhode Island', 'SC': 'South Carolina',
+                  'SD': 'South Dakota', 'TN': 'Tennessee', 'TX': 'Texas', 'UT': 'Utah', 'VT': 'Vermont',
+                  'VA': 'Virginia', 'WA': 'Washington', 'WV': 'West Virginia', 'WI': 'Wisconsin', 'WY': 'Wyoming',
+                  'DC': 'District of Columbia'
+                };
+                const presentAbbrs = new Set(jurisdictions.map(j => j.abbreviation));
+                const missing = allStates.filter(a => !presentAbbrs.has(a));
+                
+                if (missing.length === 0) {
+                  return <p className="text-center text-muted-foreground py-4">All US states are covered!</p>;
+                }
+                
+                return (
+                  <div className="flex flex-wrap gap-2">
+                    {missing.map(abbr => (
+                      <Badge key={abbr} variant="outline" className="text-xs">
+                        {stateNames[abbr]} ({abbr})
+                      </Badge>
+                    ))}
+                  </div>
+                );
+              })()}
             </CardContent>
           </Card>
         </TabsContent>

@@ -2299,17 +2299,48 @@ export async function registerRoutes(
       const { country } = req.params;
       const jurisdictions = await storage.getJurisdictions(country);
       
-      // Filter to only show actual states/regions by NAME (not districts, test providers, etc.)
-      let filtered = jurisdictions;
+      // For US, merge CSP database with fallback standards
       if (country === 'United States') {
-        // Filter by state NAME to avoid conflicts with organizations using state abbreviations
-        filtered = jurisdictions.filter(j => US_STATES[j.name] !== undefined);
+        // Filter CSP by state NAME to avoid conflicts with organizations
+        const cspStates = jurisdictions.filter(j => US_STATES[j.name] !== undefined);
+        const cspStateNames = new Set(cspStates.map(j => j.name));
+        
+        // Import fallback standards for states not in CSP
+        const { getStates } = await import("@shared/standards");
+        const fallbackStates = getStates(country);
+        
+        // Combine: CSP states + fallback states not already in CSP
+        // Note: jurisdictions with source='manual' should show as 'manual' not 'csp'
+        const result = cspStates.map(j => ({
+          state: j.name,
+          abbreviation: US_STATES[j.name] || j.abbreviation,
+          standardsName: j.standardsName,
+          source: (j.source === 'manual' ? 'manual' : 'csp') as 'csp' | 'manual' | 'fallback',
+        }));
+        
+        // Add fallback states that aren't in CSP
+        for (const fb of fallbackStates) {
+          if (!cspStateNames.has(fb.state)) {
+            result.push({
+              state: fb.state,
+              abbreviation: fb.abbreviation,
+              standardsName: fb.standardsName,
+              source: 'fallback' as const,
+            });
+          }
+        }
+        
+        // Sort alphabetically by state name
+        result.sort((a, b) => a.state.localeCompare(b.state));
+        res.json(result);
+        return;
       }
       
-      res.json(filtered.map(j => ({
+      res.json(jurisdictions.map(j => ({
         state: j.name,
-        abbreviation: US_STATES[j.name] || j.abbreviation, // Use correct abbreviation
+        abbreviation: j.abbreviation,
         standardsName: j.standardsName,
+        source: 'csp' as const,
       })));
     } catch (error) {
       console.error("Get states error:", error);
@@ -2338,13 +2369,21 @@ export async function registerRoutes(
         jurisdiction = await storage.getJurisdictionByAbbr(country, stateAbbr);
       }
       
+      // If no CSP jurisdiction found, try fallback standards
       if (!jurisdiction) {
+        const { getSubjects } = await import("@shared/standards");
+        const fallbackSubjects = getSubjects(country, stateAbbr);
+        if (fallbackSubjects.length > 0) {
+          res.json(fallbackSubjects.map(s => ({ subject: s.subject, source: 'fallback' })));
+          return;
+        }
         res.json([]);
         return;
       }
+      
       const sets = await storage.getStandardSets(jurisdiction.id);
       const subjects = Array.from(new Set(sets.map(s => s.subject)));
-      res.json(subjects.map(subject => ({ subject })));
+      res.json(subjects.map(subject => ({ subject, source: 'csp' })));
     } catch (error) {
       console.error("Get subjects error:", error);
       res.status(500).json({ error: "Failed to get subjects" });
@@ -2367,13 +2406,36 @@ export async function registerRoutes(
         jurisdiction = await storage.getJurisdictionByAbbr(country, stateAbbr);
       }
       
+      // If no CSP jurisdiction found, try fallback standards
       if (!jurisdiction) {
+        const { getStandardCodes } = await import("@shared/standards");
+        const fallbackCodes = getStandardCodes(country, stateAbbr, subject);
+        if (fallbackCodes.length > 0) {
+          res.json(fallbackCodes.map(s => ({
+            code: s.code,
+            description: s.description,
+            source: 'fallback',
+          })));
+          return;
+        }
         res.json([]);
         return;
       }
+      
       const sets = await storage.getStandardSets(jurisdiction.id);
       const subjectSet = sets.find(s => s.subject === subject);
       if (!subjectSet) {
+        // Try fallback for missing subjects in CSP
+        const { getStandardCodes } = await import("@shared/standards");
+        const fallbackCodes = getStandardCodes(country, stateAbbr, subject);
+        if (fallbackCodes.length > 0) {
+          res.json(fallbackCodes.map(s => ({
+            code: s.code,
+            description: s.description,
+            source: 'fallback',
+          })));
+          return;
+        }
         res.json([]);
         return;
       }
@@ -2381,6 +2443,7 @@ export async function registerRoutes(
       res.json(standards.map(s => ({
         code: s.humanCoding,
         description: s.statement,
+        source: 'csp',
       })));
     } catch (error) {
       console.error("Get standard codes error:", error);
@@ -2620,6 +2683,41 @@ export async function registerRoutes(
     } catch (error) {
       console.error("Create org error:", error);
       res.status(500).json({ error: "Failed to create organization" });
+    }
+  });
+
+  // Add new jurisdiction for standards (site admin only)
+  app.post("/api/admin/jurisdictions", isAuthenticated, isSiteAdmin, async (req: any, res) => {
+    try {
+      const { country, name, abbreviation, standardsName } = req.body;
+      
+      if (!country || !name || !abbreviation) {
+        res.status(400).json({ error: "Country, name, and abbreviation are required" });
+        return;
+      }
+      
+      // Check if jurisdiction already exists
+      const existing = await storage.getJurisdictions(country);
+      if (existing.some(j => j.name === name || j.abbreviation === abbreviation)) {
+        res.status(400).json({ error: "Jurisdiction with this name or abbreviation already exists" });
+        return;
+      }
+      
+      // Create new jurisdiction
+      const jurisdiction = await storage.createJurisdiction({
+        country,
+        name,
+        abbreviation,
+        standardsName: standardsName || `${name} Standards`,
+        source: 'manual',
+        externalId: null,
+        sourceUrl: null,
+      });
+      
+      res.json(jurisdiction);
+    } catch (error) {
+      console.error("Create jurisdiction error:", error);
+      res.status(500).json({ error: "Failed to create jurisdiction" });
     }
   });
 
