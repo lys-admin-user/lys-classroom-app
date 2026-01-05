@@ -18,7 +18,7 @@ import { useAuth } from "@/hooks/use-auth";
 import { useTier } from "@/hooks/use-tier";
 import { AdBanner } from "@/components/AdBanner";
 import type { LessonPlan, EducatorProfile } from "@shared/schema";
-import { educationalStandards, getStates, getSubjects, getStandardCodes, getStandardsName, type StandardCode } from "@shared/standards";
+import type { StandardCode } from "@shared/standards";
 import { educationalResourceProviders, getSearchUrl, type EducationalResourceProvider, type EducationalResource } from "@shared/educationalResources";
 import { Link, useLocation } from "wouter";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
@@ -95,11 +95,34 @@ export default function LessonGenerator() {
     }
   }, [educatorProfile, profileApplied]);
 
-  const countries = useMemo(() => educationalStandards.map(c => c.country), []);
-  const states = useMemo(() => selectedCountry ? getStates(selectedCountry) : [], [selectedCountry]);
-  const subjects = useMemo(() => selectedCountry && selectedState ? getSubjects(selectedCountry, selectedState) : [], [selectedCountry, selectedState]);
-  const standardCodes = useMemo(() => selectedCountry && selectedState && selectedSubject ? getStandardCodes(selectedCountry, selectedState, selectedSubject) : [], [selectedCountry, selectedState, selectedSubject]);
-  const standardsName = useMemo(() => selectedCountry && selectedState ? getStandardsName(selectedCountry, selectedState) : "", [selectedCountry, selectedState]);
+  // Fetch standards from API instead of hardcoded data
+  const { data: countriesData } = useQuery<string[]>({
+    queryKey: ["/api/standards/countries"],
+  });
+  const countries = countriesData || [];
+
+  const { data: statesData } = useQuery<{ state: string; abbreviation: string; standardsName: string }[]>({
+    queryKey: ["/api/standards/states", selectedCountry],
+    enabled: !!selectedCountry,
+  });
+  const states = statesData || [];
+
+  const { data: subjectsData } = useQuery<{ subject: string }[]>({
+    queryKey: ["/api/standards/subjects", selectedCountry, selectedState],
+    enabled: !!selectedCountry && !!selectedState,
+  });
+  const subjects = subjectsData || [];
+
+  const { data: standardCodesData } = useQuery<StandardCode[]>({
+    queryKey: ["/api/standards/codes", selectedCountry, selectedState, selectedSubject],
+    enabled: !!selectedCountry && !!selectedState && !!selectedSubject,
+  });
+  const standardCodes = standardCodesData || [];
+
+  const standardsName = useMemo(() => {
+    const stateInfo = states.find(s => s.abbreviation === selectedState);
+    return stateInfo?.standardsName || "";
+  }, [states, selectedState]);
 
   const handleCountryChange = (country: string) => {
     setSelectedCountry(country);
