@@ -1426,6 +1426,24 @@ export async function registerRoutes(
         return;
       }
       
+      // Validate class student limits when distributing to a class
+      if (recipientType === "class") {
+        for (const classId of recipientIds) {
+          const classData = await storage.getClass(classId);
+          if (classData) {
+            const classStudentsList = await storage.getClassStudents(classId);
+            const maxStudents = classData.maxStudents || 35;
+            if (classStudentsList.length > maxStudents) {
+              res.status(400).json({ 
+                error: `Class "${classData.name}" exceeds the ${maxStudents} student limit for assignment distribution. Please reduce class size.`,
+                code: "CLASS_OVER_LIMIT"
+              });
+              return;
+            }
+          }
+        }
+      }
+      
       const recipients = [];
       for (const recipientId of recipientIds) {
         const recipient = await storage.createAssignmentRecipient({
@@ -1583,8 +1601,12 @@ export async function registerRoutes(
       const { studentId } = req.body;
       const enrollment = await storage.addStudentToClass(id, studentId);
       res.json(enrollment);
-    } catch (error) {
-      res.status(500).json({ error: "Failed to add student to class" });
+    } catch (error: any) {
+      if (error.message?.includes("maximum capacity")) {
+        res.status(400).json({ error: error.message, code: "CLASS_FULL" });
+      } else {
+        res.status(500).json({ error: "Failed to add student to class" });
+      }
     }
   });
 

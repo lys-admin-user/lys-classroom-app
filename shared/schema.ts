@@ -707,6 +707,7 @@ export const classes = pgTable("classes", {
   gradeLevel: text("grade_level"),
   period: text("period"),
   schoolYear: text("school_year"),
+  maxStudents: integer("max_students").default(35).notNull(),
   isActive: boolean("is_active").default(true),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),

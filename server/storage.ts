@@ -1678,6 +1678,18 @@ export class DatabaseStorage implements IStorage {
   }
 
   async addStudentToClass(classId: string, studentId: string): Promise<ClassStudent> {
+    const classData = await this.getClass(classId);
+    if (!classData) {
+      throw new Error("Class not found");
+    }
+    
+    const currentStudents = await this.getClassStudents(classId);
+    const maxStudents = classData.maxStudents || 35;
+    
+    if (currentStudents.length >= maxStudents) {
+      throw new Error(`Class has reached maximum capacity of ${maxStudents} students`);
+    }
+    
     const [created] = await db.insert(classStudents)
       .values({ classId, studentId } as any)
       .returning();
