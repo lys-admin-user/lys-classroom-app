@@ -12,8 +12,9 @@ import { Separator } from "@/components/ui/separator";
 import { GraduationCap, MapPin, BookOpen, School, Loader2, Check, ChevronRight } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
-import { educationalStandards, getStates, getSubjects, getStandardCodes, getStandardsName, type StandardCode } from "@shared/standards";
+import { educationalStandards, getStates as getStandardsStates, getSubjects, getStandardCodes, getStandardsName, type StandardCode } from "@shared/standards";
 import type { EducatorProfile } from "@shared/schema";
+import allCountries from "country-region-data/data.json";
 
 const allGradeLevels = [
   "Elementary (K-2)",
