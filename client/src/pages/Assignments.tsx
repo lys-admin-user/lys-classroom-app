@@ -633,101 +633,109 @@ export default function Assignments() {
                       </div>
                     </div>
 
-                    {generatedAssignment.worksheet && (
-                      <div className="mb-6">
-                        <table className="w-full border-collapse text-sm mb-4">
-                          <thead>
-                            <tr className="bg-muted print:bg-gray-100">
-                              <th className="border p-2 text-left font-semibold">Course</th>
-                              <th className="border p-2 text-left font-semibold">Unit</th>
-                              <th className="border p-2 text-left font-semibold">Content Objective (TEKS)</th>
-                              <th className="border p-2 text-left font-semibold">Lesson Objective</th>
-                              <th className="border p-2 text-left font-semibold">LYS Methodology</th>
-                            </tr>
-                          </thead>
-                          <tbody>
-                            <tr>
-                              <td className="border p-2 align-top">
-                                {isEditing ? (
-                                  <Input value={generatedAssignment.worksheet.course} onChange={(e) => updateWorksheetField("course", e.target.value)} className="text-sm" data-testid="input-edit-course" />
-                                ) : generatedAssignment.worksheet.course}
-                              </td>
-                              <td className="border p-2 align-top">
-                                {isEditing ? (
-                                  <Input value={generatedAssignment.worksheet.unit} onChange={(e) => updateWorksheetField("unit", e.target.value)} className="text-sm" data-testid="input-edit-unit" />
-                                ) : generatedAssignment.worksheet.unit}
-                              </td>
-                              <td className="border p-2 align-top">
-                                {isEditing ? (
-                                  <Textarea value={generatedAssignment.worksheet.contentObjective} onChange={(e) => updateWorksheetField("contentObjective", e.target.value)} className="text-sm min-h-[60px]" data-testid="input-edit-content-objective" />
-                                ) : generatedAssignment.worksheet.contentObjective}
-                              </td>
-                              <td className="border p-2 align-top">
-                                {isEditing ? (
-                                  <Textarea value={generatedAssignment.worksheet.lessonObjective} onChange={(e) => updateWorksheetField("lessonObjective", e.target.value)} className="text-sm min-h-[60px]" data-testid="input-edit-lesson-objective" />
-                                ) : generatedAssignment.worksheet.lessonObjective}
-                              </td>
-                              <td className="border p-2 align-top">
-                                {isEditing ? (
-                                  <div className="space-y-2">
-                                    <div>
-                                      <Label className="text-xs">BE:</Label>
-                                      <Input value={generatedAssignment.worksheet.lysMethodology?.be || ""} onChange={(e) => updateLysMethodology("be", e.target.value)} className="text-sm mt-1" data-testid="input-edit-be" />
-                                    </div>
-                                    <div>
-                                      <Label className="text-xs">KNOW:</Label>
-                                      <Input value={generatedAssignment.worksheet.lysMethodology?.know || ""} onChange={(e) => updateLysMethodology("know", e.target.value)} className="text-sm mt-1" data-testid="input-edit-know" />
-                                    </div>
-                                    <div>
-                                      <Label className="text-xs">DO:</Label>
-                                      <Input value={generatedAssignment.worksheet.lysMethodology?.do || ""} onChange={(e) => updateLysMethodology("do", e.target.value)} className="text-sm mt-1" data-testid="input-edit-do" />
-                                    </div>
+                    {/* Worksheet Layout with Sidebar */}
+                    <div className="flex flex-col md:flex-row gap-4">
+                      {/* Left Sidebar - Lesson Metadata */}
+                      {generatedAssignment.worksheet && (
+                        <div className="md:w-1/3 border-r md:pr-4 space-y-4 print:w-1/3">
+                          <div className="space-y-3 text-sm">
+                            <div className="border-b pb-2">
+                              <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Course</Label>
+                              {isEditing ? (
+                                <Input value={generatedAssignment.worksheet.course} onChange={(e) => updateWorksheetField("course", e.target.value)} className="text-sm mt-1" data-testid="input-edit-course" />
+                              ) : (
+                                <p className="mt-1 font-medium">{generatedAssignment.worksheet.course}</p>
+                              )}
+                            </div>
+                            
+                            <div className="border-b pb-2">
+                              <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Unit</Label>
+                              {isEditing ? (
+                                <Input value={generatedAssignment.worksheet.unit} onChange={(e) => updateWorksheetField("unit", e.target.value)} className="text-sm mt-1" data-testid="input-edit-unit" />
+                              ) : (
+                                <p className="mt-1 font-medium">{generatedAssignment.worksheet.unit}</p>
+                              )}
+                            </div>
+                            
+                            <div className="border-b pb-2">
+                              <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Content Objective (TEKS)</Label>
+                              {isEditing ? (
+                                <Textarea value={generatedAssignment.worksheet.contentObjective} onChange={(e) => updateWorksheetField("contentObjective", e.target.value)} className="text-sm min-h-[60px] mt-1" data-testid="input-edit-content-objective" />
+                              ) : (
+                                <p className="mt-1">{generatedAssignment.worksheet.contentObjective}</p>
+                              )}
+                            </div>
+                            
+                            <div className="border-b pb-2">
+                              <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Lesson Objective</Label>
+                              {isEditing ? (
+                                <Textarea value={generatedAssignment.worksheet.lessonObjective} onChange={(e) => updateWorksheetField("lessonObjective", e.target.value)} className="text-sm min-h-[60px] mt-1" data-testid="input-edit-lesson-objective" />
+                              ) : (
+                                <p className="mt-1">{generatedAssignment.worksheet.lessonObjective}</p>
+                              )}
+                            </div>
+                            
+                            <div className="border-b pb-2">
+                              <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">LYS Methodology</Label>
+                              {isEditing ? (
+                                <div className="space-y-2 mt-1">
+                                  <div>
+                                    <Label className="text-xs">BE:</Label>
+                                    <Input value={generatedAssignment.worksheet.lysMethodology?.be || ""} onChange={(e) => updateLysMethodology("be", e.target.value)} className="text-sm mt-1" data-testid="input-edit-be" />
                                   </div>
-                                ) : (
-                                  <div className="space-y-1">
-                                    <p><strong>BE:</strong> {generatedAssignment.worksheet.lysMethodology?.be}</p>
-                                    <p><strong>KNOW:</strong> {generatedAssignment.worksheet.lysMethodology?.know}</p>
-                                    <p><strong>DO:</strong> {generatedAssignment.worksheet.lysMethodology?.do}</p>
+                                  <div>
+                                    <Label className="text-xs">KNOW:</Label>
+                                    <Input value={generatedAssignment.worksheet.lysMethodology?.know || ""} onChange={(e) => updateLysMethodology("know", e.target.value)} className="text-sm mt-1" data-testid="input-edit-know" />
                                   </div>
-                                )}
-                              </td>
-                            </tr>
-                          </tbody>
-                        </table>
-
-                        <div className="grid md:grid-cols-2 gap-4 mb-4">
-                          <div className="p-3 border rounded-md">
-                            <Label className="text-xs font-semibold text-muted-foreground">Essential Questions</Label>
-                            {isEditing ? (
-                              <Textarea value={generatedAssignment.worksheet.essentialQuestions} onChange={(e) => updateWorksheetField("essentialQuestions", e.target.value)} className="mt-1 text-sm min-h-[60px]" data-testid="input-edit-essential-questions" />
-                            ) : (
-                              <p className="mt-1 text-sm">{generatedAssignment.worksheet.essentialQuestions}</p>
-                            )}
-                          </div>
-                          <div className="p-3 border rounded-md">
-                            <Label className="text-xs font-semibold text-muted-foreground">Lesson Close</Label>
-                            {isEditing ? (
-                              <Textarea value={generatedAssignment.worksheet.lessonClose} onChange={(e) => updateWorksheetField("lessonClose", e.target.value)} className="mt-1 text-sm min-h-[60px]" data-testid="input-edit-lesson-close" />
-                            ) : (
-                              <p className="mt-1 text-sm">{generatedAssignment.worksheet.lessonClose}</p>
-                            )}
+                                  <div>
+                                    <Label className="text-xs">DO:</Label>
+                                    <Input value={generatedAssignment.worksheet.lysMethodology?.do || ""} onChange={(e) => updateLysMethodology("do", e.target.value)} className="text-sm mt-1" data-testid="input-edit-do" />
+                                  </div>
+                                </div>
+                              ) : (
+                                <div className="space-y-1 mt-1">
+                                  <p><strong className="text-lys-red">BE:</strong> {generatedAssignment.worksheet.lysMethodology?.be}</p>
+                                  <p><strong className="text-lys-yellow">KNOW:</strong> {generatedAssignment.worksheet.lysMethodology?.know}</p>
+                                  <p><strong className="text-lys-teal">DO:</strong> {generatedAssignment.worksheet.lysMethodology?.do}</p>
+                                </div>
+                              )}
+                            </div>
+                            
+                            <div className="border-b pb-2">
+                              <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Essential Questions</Label>
+                              {isEditing ? (
+                                <Textarea value={generatedAssignment.worksheet.essentialQuestions} onChange={(e) => updateWorksheetField("essentialQuestions", e.target.value)} className="mt-1 text-sm min-h-[60px]" data-testid="input-edit-essential-questions" />
+                              ) : (
+                                <p className="mt-1">{generatedAssignment.worksheet.essentialQuestions}</p>
+                              )}
+                            </div>
+                            
+                            <div>
+                              <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Lesson Close</Label>
+                              {isEditing ? (
+                                <Textarea value={generatedAssignment.worksheet.lessonClose} onChange={(e) => updateWorksheetField("lessonClose", e.target.value)} className="mt-1 text-sm min-h-[60px]" data-testid="input-edit-lesson-close" />
+                              ) : (
+                                <p className="mt-1">{generatedAssignment.worksheet.lessonClose}</p>
+                              )}
+                            </div>
                           </div>
                         </div>
-                      </div>
-                    )}
-
-                    <div className="mb-4 p-3 bg-muted print:bg-gray-50 rounded-md">
-                      <Label className="text-xs font-semibold">Assignment Instructions</Label>
-                      {isEditing ? (
-                        <Textarea value={generatedAssignment.instructions} onChange={(e) => updateInstructions(e.target.value)} className="mt-1 min-h-[60px]" data-testid="input-edit-instructions" />
-                      ) : (
-                        <p className="mt-1">{generatedAssignment.instructions}</p>
                       )}
-                    </div>
 
-                    <Separator className="my-4" />
+                      {/* Right Main Content - Questions */}
+                      <div className={`${generatedAssignment.worksheet ? "md:w-2/3" : "w-full"} print:w-2/3`}>
+                        <div className="mb-4 p-3 bg-muted print:bg-gray-50 rounded-md">
+                          <Label className="text-xs font-semibold">Assignment Instructions</Label>
+                          {isEditing ? (
+                            <Textarea value={generatedAssignment.instructions} onChange={(e) => updateInstructions(e.target.value)} className="mt-1 min-h-[60px]" data-testid="input-edit-instructions" />
+                          ) : (
+                            <p className="mt-1">{generatedAssignment.instructions}</p>
+                          )}
+                        </div>
 
-                    <div className="space-y-4">
+                        <Separator className="my-4" />
+
+                        <div className="space-y-4">
                       {(generatedAssignment.questions || []).map((q: any, i: number) => (
                         <div key={q.id || i} className="p-4 border rounded-md print:break-inside-avoid">
                           <div className="flex items-start gap-3">
@@ -781,61 +789,63 @@ export default function Assignments() {
                           </div>
                         </div>
                       ))}
-                    </div>
-
-                    {generatedAssignment.accommodationChecklist && (
-                      <>
-                        <Separator className="my-6" />
-                        <div className="print:break-inside-avoid">
-                          <h3 className="font-oswald text-lg mb-3">Accommodations/Modifications Provided On This Assignment</h3>
-                          <table className="w-full border-collapse text-sm">
-                            <thead>
-                              <tr className="bg-muted print:bg-gray-100">
-                                <th className="border p-2 text-left font-semibold">Accommodation/Modification</th>
-                                <th className="border p-2 text-center font-semibold w-32">Applied (Y/N)</th>
-                              </tr>
-                            </thead>
-                            <tbody>
-                              {[
-                                { key: "extraTime", label: "Extra Time" },
-                                { key: "notesCopyProvided", label: "Notes/Presentation Copy Provided" },
-                                { key: "studySheetProvided", label: "Study Sheet Provided" },
-                                { key: "graphicOrganizer", label: "Graphic Organizer" },
-                                { key: "mnemonicDevices", label: "Mnemonic Devices" },
-                                { key: "largerFont", label: "Larger Size Font" },
-                                { key: "shortenedText", label: "Shortened Text" },
-                                { key: "peerSupport", label: "Peer Support" },
-                                { key: "preferentialSeating", label: "Preferential Seating" },
-                                { key: "frequentReminders", label: "Frequent On Task Reminders" },
-                                { key: "completedExample", label: "Provided A Completed Example" },
-                                { key: "visualOrganizer", label: "Visual Organizer Provided" },
-                              ].map((item) => (
-                                <tr key={item.key}>
-                                  <td className="border p-2">{item.label}</td>
-                                  <td className="border p-2 text-center">
-                                    {isEditing ? (
-                                      <Checkbox 
-                                        checked={(generatedAssignment.accommodationChecklist as any)?.[item.key]} 
-                                        onCheckedChange={() => toggleAccommodation(item.key)}
-                                        data-testid={`checkbox-accommodation-${item.key}`}
-                                      />
-                                    ) : (generatedAssignment.accommodationChecklist as any)?.[item.key] ? (
-                                      <span className="text-green-600 font-semibold">Y</span>
-                                    ) : (
-                                      <span className="text-muted-foreground">N</span>
-                                    )}
-                                  </td>
-                                </tr>
-                              ))}
-                            </tbody>
-                          </table>
                         </div>
-                      </>
-                    )}
 
-                    <div className="mt-6 text-center text-xs text-muted-foreground print:mt-8">
-                      <Badge variant="outline" className="print:hidden">{generatedAssignment.totalPoints} Total Points</Badge>
-                      <p className="hidden print:block">Total Points: {generatedAssignment.totalPoints}</p>
+                        {generatedAssignment.accommodationChecklist && (
+                          <>
+                            <Separator className="my-6" />
+                            <div className="print:break-inside-avoid">
+                              <h3 className="font-oswald text-lg mb-3">Accommodations/Modifications Provided On This Assignment</h3>
+                              <table className="w-full border-collapse text-sm">
+                                <thead>
+                                  <tr className="bg-muted print:bg-gray-100">
+                                    <th className="border p-2 text-left font-semibold">Accommodation/Modification</th>
+                                    <th className="border p-2 text-center font-semibold w-32">Applied (Y/N)</th>
+                                  </tr>
+                                </thead>
+                                <tbody>
+                                  {[
+                                    { key: "extraTime", label: "Extra Time" },
+                                    { key: "notesCopyProvided", label: "Notes/Presentation Copy Provided" },
+                                    { key: "studySheetProvided", label: "Study Sheet Provided" },
+                                    { key: "graphicOrganizer", label: "Graphic Organizer" },
+                                    { key: "mnemonicDevices", label: "Mnemonic Devices" },
+                                    { key: "largerFont", label: "Larger Size Font" },
+                                    { key: "shortenedText", label: "Shortened Text" },
+                                    { key: "peerSupport", label: "Peer Support" },
+                                    { key: "preferentialSeating", label: "Preferential Seating" },
+                                    { key: "frequentReminders", label: "Frequent On Task Reminders" },
+                                    { key: "completedExample", label: "Provided A Completed Example" },
+                                    { key: "visualOrganizer", label: "Visual Organizer Provided" },
+                                  ].map((item) => (
+                                    <tr key={item.key}>
+                                      <td className="border p-2">{item.label}</td>
+                                      <td className="border p-2 text-center">
+                                        {isEditing ? (
+                                          <Checkbox 
+                                            checked={(generatedAssignment.accommodationChecklist as any)?.[item.key]} 
+                                            onCheckedChange={() => toggleAccommodation(item.key)}
+                                            data-testid={`checkbox-accommodation-${item.key}`}
+                                          />
+                                        ) : (generatedAssignment.accommodationChecklist as any)?.[item.key] ? (
+                                          <span className="text-green-600 font-semibold">Y</span>
+                                        ) : (
+                                          <span className="text-muted-foreground">N</span>
+                                        )}
+                                      </td>
+                                    </tr>
+                                  ))}
+                                </tbody>
+                              </table>
+                            </div>
+                          </>
+                        )}
+
+                        <div className="mt-6 text-center text-xs text-muted-foreground print:mt-8">
+                          <Badge variant="outline" className="print:hidden">{generatedAssignment.totalPoints} Total Points</Badge>
+                          <p className="hidden print:block">Total Points: {generatedAssignment.totalPoints}</p>
+                        </div>
+                      </div>
                     </div>
                   </CardContent>
                 </Card>
