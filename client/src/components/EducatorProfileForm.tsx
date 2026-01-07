@@ -56,9 +56,35 @@ export default function EducatorProfileForm({ onComplete, isOnboarding = false, 
   );
   const [standardsSubject, setStandardsSubject] = useState("");
 
-  const countries = useMemo(() => educationalStandards.map(c => c.country), []);
-  const states = useMemo(() => selectedCountry ? getStates(selectedCountry) : [], [selectedCountry]);
-  const standardsName = useMemo(() => selectedCountry && selectedState ? getStandardsName(selectedCountry, selectedState) : "", [selectedCountry, selectedState]);
+  // Use comprehensive country list from country-region-data
+  const countries = useMemo(() => 
+    allCountries.map(c => ({ name: c.countryName, code: c.countryShortCode })).sort((a, b) => a.name.localeCompare(b.name)), 
+    []
+  );
+  
+  // Get regions for selected country
+  const regions = useMemo(() => {
+    if (!selectedCountry) return [];
+    const countryData = allCountries.find(c => c.countryName === selectedCountry || c.countryShortCode === selectedCountry);
+    return countryData?.regions?.map(r => ({ name: r.name, code: r.shortCode || r.name })) || [];
+  }, [selectedCountry]);
+  
+  // Check if this country has educational standards defined
+  const hasStandardsSupport = useMemo(() => 
+    educationalStandards.some(c => c.country === selectedCountry), 
+    [selectedCountry]
+  );
+  
+  // Get standards-specific states if available
+  const standardsStates = useMemo(() => 
+    hasStandardsSupport ? getStandardsStates(selectedCountry) : [], 
+    [selectedCountry, hasStandardsSupport]
+  );
+  
+  const standardsName = useMemo(() => 
+    hasStandardsSupport && selectedState ? getStandardsName(selectedCountry, selectedState) : "", 
+    [selectedCountry, selectedState, hasStandardsSupport]
+  );
   const availableStandardCodes = useMemo(() => 
     selectedCountry && selectedState && standardsSubject ? getStandardCodes(selectedCountry, selectedState, standardsSubject) : [], 
     [selectedCountry, selectedState, standardsSubject]
@@ -113,11 +139,11 @@ export default function EducatorProfileForm({ onComplete, isOnboarding = false, 
 
   const saveMutation = useMutation({
     mutationFn: async () => {
-      const stateData = states.find(s => s.abbreviation === selectedState);
+      const stateData = hasStandardsSupport ? standardsStates.find((s: { abbreviation: string; standardsName: string }) => s.abbreviation === selectedState) : null;
       const response = await apiRequest("PATCH", "/api/educator-profile", {
         country: selectedCountry,
         state: selectedState,
-        standardsName: stateData?.standardsName || standardsName,
+        standardsName: stateData?.standardsName || standardsName || null,
         schoolDistrict,
         schoolName,
         gradeLevels: selectedGradeLevels,
@@ -169,26 +195,35 @@ export default function EducatorProfileForm({ onComplete, isOnboarding = false, 
             <SelectValue placeholder="Select your country" />
           </SelectTrigger>
           <SelectContent>
-            {countries.map(country => (
-              <SelectItem key={country} value={country}>{country}</SelectItem>
-            ))}
+            <ScrollArea className="h-80">
+              {countries.map(country => (
+                <SelectItem key={country.code} value={country.name}>{country.name}</SelectItem>
+              ))}
+            </ScrollArea>
           </SelectContent>
         </Select>
       </div>
 
       {selectedCountry && (
         <div className="space-y-2">
-          <Label className="text-base font-medium">State / Region</Label>
+          <Label className="text-base font-medium">State / Province / Region</Label>
           <Select value={selectedState} onValueChange={handleStateChange}>
             <SelectTrigger data-testid="select-state">
-              <SelectValue placeholder="Select your state" />
+              <SelectValue placeholder="Select your state or region" />
             </SelectTrigger>
             <SelectContent>
-              {states.map(state => (
-                <SelectItem key={state.abbreviation} value={state.abbreviation}>
-                  {state.state} ({state.standardsName})
-                </SelectItem>
-              ))}
+              <ScrollArea className="h-80">
+                {regions.map((region: { name: string; code: string }) => {
+                  const standardsMatch = hasStandardsSupport 
+                    ? standardsStates.find((s: { abbreviation: string; state: string; standardsName: string }) => s.abbreviation === region.code || s.state === region.name)
+                    : null;
+                  return (
+                    <SelectItem key={region.code} value={region.code}>
+                      {region.name}{standardsMatch ? ` (${standardsMatch.standardsName})` : ''}
+                    </SelectItem>
+                  );
+                })}
+              </ScrollArea>
             </SelectContent>
           </Select>
         </div>
@@ -276,74 +311,91 @@ export default function EducatorProfileForm({ onComplete, isOnboarding = false, 
 
   const renderStep3 = () => (
     <div className="space-y-6">
-      <div className="space-y-2">
-        <div className="flex items-center gap-2">
-          <Badge variant="secondary">{standardsName}</Badge>
-          <span className="text-sm text-muted-foreground">Standards</span>
-        </div>
-        <p className="text-sm text-muted-foreground">
-          Select your frequently used standard codes. These will be pre-selected when creating lessons.
-        </p>
-      </div>
-
-      <div className="space-y-2">
-        <Label>Select Subject to Browse Standards</Label>
-        <Select value={standardsSubject} onValueChange={setStandardsSubject}>
-          <SelectTrigger data-testid="select-standards-subject">
-            <SelectValue placeholder="Choose a subject" />
-          </SelectTrigger>
-          <SelectContent>
-            {getSubjects(selectedCountry, selectedState).map(subjectData => (
-              <SelectItem key={subjectData.subject} value={subjectData.subject}>{subjectData.subject}</SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      </div>
-
-      {standardsSubject && (
-        <div className="space-y-2">
-          <Label>Available Standard Codes</Label>
-          <ScrollArea className="h-64 border rounded-md p-2">
-            <div className="space-y-1">
-              {availableStandardCodes.map(code => {
-                const isSelected = selectedStandardCodes.some(c => c.code === code.code);
-                return (
-                  <div
-                    key={code.code}
-                    className={`flex items-start gap-2 p-2 rounded cursor-pointer transition-colors ${
-                      isSelected ? "bg-primary/10" : "hover-elevate"
-                    }`}
-                    onClick={() => toggleStandardCode(code)}
-                    data-testid={`standard-${code.code}`}
-                  >
-                    <Checkbox checked={isSelected} onCheckedChange={() => toggleStandardCode(code)} className="mt-0.5" />
-                    <div className="flex-1 min-w-0">
-                      <span className="font-mono text-sm font-medium">{code.code}</span>
-                      <p className="text-xs text-muted-foreground line-clamp-2">{code.description}</p>
-                    </div>
-                  </div>
-                );
-              })}
+      {hasStandardsSupport ? (
+        <>
+          <div className="space-y-2">
+            <div className="flex items-center gap-2">
+              <Badge variant="secondary">{standardsName || 'Educational Standards'}</Badge>
+              <span className="text-sm text-muted-foreground">Standards</span>
             </div>
-          </ScrollArea>
-        </div>
-      )}
+            <p className="text-sm text-muted-foreground">
+              Select your frequently used standard codes. These will be pre-selected when creating lessons.
+            </p>
+          </div>
 
-      {selectedStandardCodes.length > 0 && (
-        <div className="space-y-2">
-          <Label>Selected Standards ({selectedStandardCodes.length})</Label>
-          <div className="flex flex-wrap gap-1">
-            {selectedStandardCodes.map(code => (
-              <Badge 
-                key={code.code} 
-                variant="secondary" 
-                className="cursor-pointer"
-                onClick={() => toggleStandardCode(code)}
-                data-testid={`selected-standard-${code.code}`}
-              >
-                {code.code}
-              </Badge>
-            ))}
+          <div className="space-y-2">
+            <Label>Select Subject to Browse Standards</Label>
+            <Select value={standardsSubject} onValueChange={setStandardsSubject}>
+              <SelectTrigger data-testid="select-standards-subject">
+                <SelectValue placeholder="Choose a subject" />
+              </SelectTrigger>
+              <SelectContent>
+                {getSubjects(selectedCountry, selectedState).map(subjectData => (
+                  <SelectItem key={subjectData.subject} value={subjectData.subject}>{subjectData.subject}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          {standardsSubject && (
+            <div className="space-y-2">
+              <Label>Available Standard Codes</Label>
+              <ScrollArea className="h-64 border rounded-md p-2">
+                <div className="space-y-1">
+                  {availableStandardCodes.map(code => {
+                    const isSelected = selectedStandardCodes.some(c => c.code === code.code);
+                    return (
+                      <div
+                        key={code.code}
+                        className={`flex items-start gap-2 p-2 rounded cursor-pointer transition-colors ${
+                          isSelected ? "bg-primary/10" : "hover-elevate"
+                        }`}
+                        onClick={() => toggleStandardCode(code)}
+                        data-testid={`standard-${code.code}`}
+                      >
+                        <Checkbox checked={isSelected} onCheckedChange={() => toggleStandardCode(code)} className="mt-0.5" />
+                        <div className="flex-1 min-w-0">
+                          <span className="font-mono text-sm font-medium">{code.code}</span>
+                          <p className="text-xs text-muted-foreground line-clamp-2">{code.description}</p>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </ScrollArea>
+            </div>
+          )}
+
+          {selectedStandardCodes.length > 0 && (
+            <div className="space-y-2">
+              <Label>Selected Standards ({selectedStandardCodes.length})</Label>
+              <div className="flex flex-wrap gap-1">
+                {selectedStandardCodes.map(code => (
+                  <Badge 
+                    key={code.code} 
+                    variant="secondary" 
+                    className="cursor-pointer"
+                    onClick={() => toggleStandardCode(code)}
+                    data-testid={`selected-standard-${code.code}`}
+                  >
+                    {code.code}
+                  </Badge>
+                ))}
+              </div>
+            </div>
+          )}
+        </>
+      ) : (
+        <div className="text-center py-8 space-y-4">
+          <div className="mx-auto w-16 h-16 rounded-full bg-muted flex items-center justify-center">
+            <BookOpen className="w-8 h-8 text-muted-foreground" />
+          </div>
+          <div className="space-y-2">
+            <p className="text-lg font-medium">Educational Standards Coming Soon</p>
+            <p className="text-sm text-muted-foreground max-w-md mx-auto">
+              We're working on adding educational standards for {selectedCountry}. 
+              In the meantime, you can still use LYS to create great lessons!
+            </p>
           </div>
         </div>
       )}
