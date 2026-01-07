@@ -14,7 +14,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
-import { Sparkles, FileText, Users, UserPlus, AlertTriangle, Check, Clock, BookOpen, Target, Compass, Lightbulb, Lock, GraduationCap } from "lucide-react";
+import { Sparkles, FileText, Users, UserPlus, AlertTriangle, Check, Clock, BookOpen, Target, Compass, Lightbulb, Lock, GraduationCap, Copy, Printer } from "lucide-react";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/use-auth";
@@ -412,7 +412,7 @@ export default function Assignments() {
             </div>
 
             {generatedAssignment && (
-              <Card>
+              <Card id="generated-assignment">
                 <CardHeader>
                   <div className="flex items-center justify-between gap-4 flex-wrap">
                     <div>
@@ -434,14 +434,14 @@ export default function Assignments() {
                   </div>
 
                   <div className="space-y-4">
-                    {generatedAssignment.questions.map((q: any, i: number) => (
-                      <div key={q.id} className="p-4 border rounded-md">
+                    {(generatedAssignment.questions || []).map((q: any, i: number) => (
+                      <div key={q.id || i} className="p-4 border rounded-md">
                         <div className="flex items-start gap-3">
                           <span className="font-oswald text-lg text-muted-foreground">{i + 1}.</span>
                           <div className="flex-1">
                             <div className="flex items-center gap-2 mb-2 flex-wrap">
                               {getBkdIcon(q.bkdFocus)}
-                              <Badge variant="outline">{q.type.replace("_", " ")}</Badge>
+                              <Badge variant="outline">{(q.type || "").replace("_", " ")}</Badge>
                               <Badge>{q.points} pts</Badge>
                             </div>
                             <p className="font-medium">{q.question}</p>
@@ -463,13 +463,39 @@ export default function Assignments() {
                     ))}
                   </div>
                 </CardContent>
-                <CardFooter className="justify-end gap-2">
-                  <Button variant="outline" onClick={() => setGeneratedAssignment(null)} data-testid="button-discard">
-                    Discard
-                  </Button>
-                  <Button onClick={handleSave} disabled={saveMutation.isPending} data-testid="button-save-assignment">
-                    {saveMutation.isPending ? "Saving..." : "Save Assignment"}
-                  </Button>
+                <CardFooter className="justify-between gap-2 flex-wrap">
+                  <div className="flex gap-2 flex-wrap">
+                    <Button 
+                      variant="outline" 
+                      size="sm"
+                      onClick={() => {
+                        const text = `${generatedAssignment.title}\n\n${generatedAssignment.instructions}\n\n${(generatedAssignment.questions || []).map((q: any, i: number) => `${i + 1}. ${q.question}${q.options ? '\n   ' + q.options.map((o: string, oi: number) => `${String.fromCharCode(65 + oi)}) ${o}`).join('\n   ') : ''}`).join('\n\n')}`;
+                        navigator.clipboard.writeText(text);
+                        toast({ title: "Copied!", description: "Assignment copied to clipboard." });
+                      }}
+                      data-testid="button-copy-assignment"
+                    >
+                      <Copy className="h-4 w-4 mr-1" />
+                      Copy
+                    </Button>
+                    <Button 
+                      variant="outline" 
+                      size="sm"
+                      onClick={() => window.print()}
+                      data-testid="button-print-assignment"
+                    >
+                      <Printer className="h-4 w-4 mr-1" />
+                      Print
+                    </Button>
+                  </div>
+                  <div className="flex gap-2 flex-wrap">
+                    <Button variant="outline" onClick={() => setGeneratedAssignment(null)} data-testid="button-discard">
+                      Discard
+                    </Button>
+                    <Button onClick={handleSave} disabled={saveMutation.isPending} data-testid="button-save-assignment">
+                      {saveMutation.isPending ? "Saving..." : "Save Assignment"}
+                    </Button>
+                  </div>
                 </CardFooter>
               </Card>
             )}
