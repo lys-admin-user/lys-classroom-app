@@ -6,11 +6,11 @@ import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { BookOpen, Trash2, Clock, Target, GraduationCap, Heart, Compass, Lightbulb, AlertCircle, Share2, Link2, BarChart3, Library, Loader2, Search, Filter, LayoutGrid, List, Globe, Lock, Sparkles, Zap } from "lucide-react";
+import { BookOpen, Trash2, Clock, Target, GraduationCap, Heart, Compass, Lightbulb, AlertCircle, Share2, Link2, BarChart3, Library, Loader2, Search, Filter, LayoutGrid, List, Globe, Lock, Sparkles, Zap, ClipboardList, FileText } from "lucide-react";
 import { useAuth } from "@/hooks/use-auth";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
-import type { Lesson, LessonTemplate } from "@shared/schema";
+import type { Lesson, LessonTemplate, Assignment } from "@shared/schema";
 import { Link } from "wouter";
 import { TemplateCard, CreateTemplateDialog, UseTemplateDialog, templateCategories, templateGradeLevels } from "./TemplateLibrary";
 import {
@@ -76,6 +76,11 @@ export default function MyLessons() {
 
   const { data: publicTemplates = [], isLoading: publicTemplatesLoading } = useQuery<LessonTemplate[]>({
     queryKey: ["/api/templates/public"],
+    enabled: isAuthenticated,
+  });
+
+  const { data: assignments = [], isLoading: assignmentsLoading } = useQuery<Assignment[]>({
+    queryKey: ["/api/assignments"],
     enabled: isAuthenticated,
   });
 
@@ -283,10 +288,14 @@ export default function MyLessons() {
       </div>
 
       <Tabs value={activeMainTab} onValueChange={setActiveMainTab} className="space-y-6">
-        <TabsList className="grid w-full max-w-md grid-cols-2">
+        <TabsList className="grid w-full max-w-lg grid-cols-3">
           <TabsTrigger value="lessons" data-testid="tab-my-lessons">
             <BookOpen className="w-4 h-4 mr-2" />
-            Saved Lessons ({lessons.length})
+            Lessons ({lessons.length})
+          </TabsTrigger>
+          <TabsTrigger value="assignments" data-testid="tab-my-assignments">
+            <ClipboardList className="w-4 h-4 mr-2" />
+            Assignments ({assignments.length})
           </TabsTrigger>
           <TabsTrigger value="templates" data-testid="tab-templates">
             <Library className="w-4 h-4 mr-2" />
@@ -468,6 +477,75 @@ export default function MyLessons() {
           })}
           </div>
         )}
+        </TabsContent>
+
+        <TabsContent value="assignments" className="space-y-6">
+          {assignmentsLoading ? (
+            <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {[1, 2, 3].map((i) => (
+                <Card key={i}>
+                  <CardHeader>
+                    <Skeleton className="h-5 w-3/4" />
+                    <Skeleton className="h-4 w-1/2" />
+                  </CardHeader>
+                  <CardContent>
+                    <Skeleton className="h-4 w-full" />
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          ) : assignments.length === 0 ? (
+            <Card className="text-center py-12">
+              <CardContent>
+                <ClipboardList className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
+                <h3 className="font-oswald text-lg mb-2">No Assignments Yet</h3>
+                <p className="text-muted-foreground mb-4">
+                  Generate assignments from your saved lessons to distribute to students.
+                </p>
+                <Link href="/assignments">
+                  <Button data-testid="button-create-assignment">
+                    <Sparkles className="h-4 w-4 mr-2" />
+                    Create Assignment
+                  </Button>
+                </Link>
+              </CardContent>
+            </Card>
+          ) : (
+            <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {assignments.map((assignment) => (
+                <Card key={assignment.id} data-testid={`card-assignment-${assignment.id}`}>
+                  <CardHeader className="pb-2">
+                    <div className="flex items-start justify-between gap-2">
+                      <CardTitle className="font-oswald text-lg">{assignment.title}</CardTitle>
+                      {assignment.accommodationModified && (
+                        <Badge variant="outline">{assignment.accommodationType}</Badge>
+                      )}
+                    </div>
+                    <CardDescription className="line-clamp-2">{assignment.description}</CardDescription>
+                  </CardHeader>
+                  <CardContent className="pb-2">
+                    <div className="flex items-center gap-4 text-sm text-muted-foreground flex-wrap">
+                      <span className="flex items-center gap-1">
+                        <FileText className="h-4 w-4" />
+                        {(assignment.questions as any[])?.length || 0} questions
+                      </span>
+                      <span className="flex items-center gap-1">
+                        <Target className="h-4 w-4" />
+                        {assignment.totalPoints} pts
+                      </span>
+                    </div>
+                  </CardContent>
+                  <CardFooter className="gap-2 flex-wrap">
+                    <Link href="/assignments">
+                      <Button variant="outline" size="sm" data-testid={`button-view-assignment-${assignment.id}`}>
+                        View Details
+                      </Button>
+                    </Link>
+                  </CardFooter>
+                </Card>
+              ))}
+            </div>
+          )}
         </TabsContent>
 
         <TabsContent value="templates" className="space-y-6">
