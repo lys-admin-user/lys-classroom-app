@@ -290,27 +290,41 @@
   }
 }
 
-/* Print Styles for Lesson Plans */
+/* Print Styles - Hide everything except the worksheet */
 @media print {
-  /* Hide non-printable elements */
-  .no-print,
-  header,
-  footer,
-  nav,
-  .sidebar,
-  button,
-  [data-radix-scroll-area-viewport] > div > div:first-child,
-  .print\\:hidden {
-    display: none !important;
+  /* Hide all elements by default */
+  body * {
+    visibility: hidden !important;
+  }
+
+  /* Show only the generated assignment and its contents */
+  #generated-assignment,
+  #generated-assignment * {
+    visibility: visible !important;
+  }
+
+  /* Position the assignment at the top of the page */
+  #generated-assignment {
+    position: absolute !important;
+    top: 0 !important;
+    left: 0 !important;
+    width: 100% !important;
+    max-width: none !important;
+    box-shadow: none !important;
+    border: 2px solid black !important;
+    border-radius: 0 !important;
+    margin: 0 !important;
+    padding: 16pt !important;
+    background: white !important;
   }
 
   /* Reset page margins */
   @page {
-    margin: 0.75in;
+    margin: 0.5in;
     size: letter;
   }
 
-  /* Reset background colors for printing */
+  /* Reset body for printing */
   body {
     background: white !important;
     color: black !important;
@@ -318,84 +332,15 @@
     line-height: 1.4 !important;
   }
 
-  /* Make the printable content full width */
-  .print-content {
-    width: 100% !important;
-    max-width: none !important;
-    margin: 0 !important;
-    padding: 0 !important;
-    box-shadow: none !important;
-    border: none !important;
+  /* Hide print:hidden elements even if they're inside the assignment */
+  #generated-assignment .print\\:hidden,
+  #generated-assignment button,
+  #generated-assignment [data-testid*="button"] {
+    display: none !important;
+    visibility: hidden !important;
   }
 
-  /* Override card styles for print */
-  .print-content .bg-muted\/30,
-  .print-content [class*="bg-lys-"] {
-    background-color: #f5f5f5 !important;
-    -webkit-print-color-adjust: exact;
-    print-color-adjust: exact;
-  }
-
-  /* Ensure text is readable */
-  .print-content * {
-    color: black !important;
-  }
-
-  .print-content .text-muted-foreground {
-    color: #555 !important;
-  }
-
-  /* Keep badge colors visible */
-  .print-content .badge,
-  .print-content [class*="Badge"] {
-    border: 1px solid #ccc !important;
-    background-color: #f0f0f0 !important;
-    -webkit-print-color-adjust: exact;
-    print-color-adjust: exact;
-  }
-
-  /* Prevent page breaks inside sections */
-  .print-content > div {
-    page-break-inside: avoid;
-  }
-
-  /* Style separators for print */
-  .print-content hr,
-  .print-content [class*="Separator"] {
-    border-color: #ccc !important;
-    margin: 12pt 0 !important;
-  }
-
-  /* Ensure headers stand out */
-  .print-content h1,
-  .print-content h2,
-  .print-content h3 {
-    color: black !important;
-    font-weight: bold !important;
-    page-break-after: avoid;
-  }
-
-  /* LYS branding for print - use grayscale-friendly styling */
-  .print-content .font-marker {
-    font-size: 18pt !important;
-  }
-
-  /* ScrollArea should not clip content when printing */
-  [data-radix-scroll-area-viewport] {
-    overflow: visible !important;
-    height: auto !important;
-  }
-
-  /* Assignment Worksheet Print Styles */
-  #generated-assignment {
-    width: 100% !important;
-    max-width: none !important;
-    box-shadow: none !important;
-    border: 2px solid black !important;
-    border-radius: 0 !important;
-    margin: 0 !important;
-  }
-
+  /* Table styling for print */
   #generated-assignment table {
     border-collapse: collapse !important;
     width: 100% !important;
@@ -410,11 +355,21 @@
     background-color: white !important;
   }
 
-  #generated-assignment th {
+  #generated-assignment th,
+  #generated-assignment .bg-muted,
+  #generated-assignment .print\\:bg-gray-100 {
     background-color: #f0f0f0 !important;
     -webkit-print-color-adjust: exact;
     print-color-adjust: exact;
-    font-weight: bold !important;
+  }
+
+  /* Ensure all text is visible */
+  #generated-assignment * {
+    color: black !important;
+  }
+
+  #generated-assignment .text-muted-foreground {
+    color: #555 !important;
   }
 
   #generated-assignment .font-oswald {
@@ -422,9 +377,9 @@
   }
 
   /* Answer lines for short answer questions */
-  #generated-assignment .border-b {
+  #generated-assignment .border-b.border-muted-foreground\/30 {
     border-bottom: 1px solid #666 !important;
-    min-height: 30pt !important;
+    min-height: 40pt !important;
   }
 
   /* Prevent page breaks inside questions */
@@ -433,19 +388,10 @@
     break-inside: avoid !important;
   }
 
-  /* Hide sidebar and navigation during print */
-  [data-sidebar],
-  .sidebar-wrapper,
-  aside {
-    display: none !important;
-  }
-
-  /* Full width main content */
-  main {
-    width: 100% !important;
-    max-width: 100% !important;
-    margin: 0 !important;
-    padding: 0 !important;
+  /* Badge styling for print */
+  #generated-assignment .hidden.print\\:block {
+    display: block !important;
+    visibility: visible !important;
   }
 }
 

@@ -172,27 +172,38 @@ Assessment: ${request.lesson.assessment}
 
 function extractWorksheetMetadata(lesson: Lesson): WorksheetMetadata {
   const objectives = lesson.objectives as string[] || [];
-  const bkdContent = lesson.bkdContent as any || {};
-  const essentialQs = lesson.essentialQuestions as string[] | string | undefined;
-  const essentialQuestionsText = Array.isArray(essentialQs) 
-    ? essentialQs.join("; ") 
-    : (essentialQs || bkdContent.essentialQuestions || "What key question drives this lesson?");
+  const bkdFocus = lesson.bkdFocus || "know";
+  const standards = lesson.standards || "";
+  
+  // Generate BKD methodology content based on the lesson's focus and objectives
+  const bkdMethodology = {
+    be: bkdFocus === "be" 
+      ? objectives[0] || "Character and values development focus"
+      : "Reflect on personal values and identity in this context",
+    know: bkdFocus === "know"
+      ? objectives[0] || "Key concepts and knowledge to acquire"
+      : objectives.length > 1 ? objectives[1] : "Understanding core concepts and information",
+    do: bkdFocus === "do"
+      ? objectives[0] || "Practical skills and action steps"
+      : objectives.length > 2 ? objectives[2] : "Apply learning through hands-on practice",
+  };
+
+  // Generate essential questions from objectives
+  const essentialQuestions = objectives.length > 0
+    ? `How can students demonstrate understanding of: ${objectives[0]}?`
+    : "What key concepts will students master in this lesson?";
   
   return {
-    course: (lesson as any).subject || lesson.topic || "Course Name",
-    unit: lesson.topic || "Unit Topic",
-    contentObjective: (Array.isArray(lesson.standards) ? lesson.standards.join(", ") : (lesson.standards || "")) || objectives[0] || "Content objective from TEKS",
+    course: lesson.topic || "Course Name",
+    unit: lesson.title || "Unit Topic",
+    contentObjective: standards || objectives[0] || "Content objective from TEKS",
     lessonObjective: objectives.join("; ") || "Lesson objectives",
-    lysMethodology: {
-      be: bkdContent.be?.identity || bkdContent.be?.values || bkdContent.be || "Character/Values/Principles focus",
-      know: bkdContent.know?.resources || bkdContent.know?.concepts || bkdContent.know || "Resources and knowledge available to students",
-      do: bkdContent.do?.action || bkdContent.do?.skills || bkdContent.do || "Execute with Excellence action steps",
-    },
-    essentialQuestions: essentialQuestionsText,
-    lessonClose: lesson.assessment || "Lesson close summary and reflection",
+    lysMethodology: bkdMethodology,
+    essentialQuestions: essentialQuestions,
+    lessonClose: lesson.assessment || "Assessment and reflection on learning",
     gradeLevel: lesson.gradeLevel || "Grade Level",
     duration: lesson.duration || "Duration",
-    standards: (Array.isArray(lesson.standards) ? lesson.standards.join(", ") : (lesson.standards || "")) || "TEKS/Standards",
+    standards: standards || "TEKS/Standards",
   };
 }
 
