@@ -1,7 +1,7 @@
 import { Link, useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
 import { ThemeToggle } from "./ThemeToggle";
-import { Menu, X, Sparkles, LogIn, LogOut, BookOpen, User, BarChart3, Award, Database, Users, Library, Briefcase } from "lucide-react";
+import { Menu, X, Sparkles, LogIn, LogOut, BookOpen, User, BarChart3, Award, Database, Users, Library, Briefcase, Settings, CreditCard, Map } from "lucide-react";
 import { useState } from "react";
 import { useAuth } from "@/hooks/use-auth";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -123,13 +123,26 @@ export function Header() {
                     </Avatar>
                   </Button>
                 </DropdownMenuTrigger>
-                <DropdownMenuContent align="end" className="w-48">
+                <DropdownMenuContent align="end" className="w-56">
                   <div className="px-2 py-1.5">
                     <p className="text-sm font-medium">
                       {user?.firstName} {user?.lastName}
                     </p>
                     <p className="text-xs text-muted-foreground truncate">{user?.email}</p>
                   </div>
+                  <DropdownMenuSeparator />
+                  <Link href="/settings">
+                    <DropdownMenuItem className="cursor-pointer" data-testid="menu-settings">
+                      <Settings className="mr-2 h-4 w-4" />
+                      Profile & Settings
+                    </DropdownMenuItem>
+                  </Link>
+                  <Link href="/pricing">
+                    <DropdownMenuItem className="cursor-pointer" data-testid="menu-billing">
+                      <CreditCard className="mr-2 h-4 w-4" />
+                      Plans & Billing
+                    </DropdownMenuItem>
+                  </Link>
                   <DropdownMenuSeparator />
                   <Link href="/my-lessons">
                     <DropdownMenuItem className="cursor-pointer" data-testid="menu-my-lessons">
