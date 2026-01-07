@@ -240,20 +240,8 @@ function getDefaultAccommodationChecklist(accommodationType?: string): Accommoda
 }
 
 function getDefaultInstructions(type: string): string {
-  switch (type) {
-    case "quiz":
-      return "Read each question carefully and select or write the best answer. You have the full class period to complete this quiz.";
-    case "worksheet":
-      return "Complete all sections of this worksheet. Show your work where applicable.";
-    case "project":
-      return "Follow the project guidelines below. Be creative and apply what you learned from the lesson.";
-    case "discussion":
-      return "Read the discussion prompts and provide thoughtful responses. Support your ideas with examples from the lesson.";
-    case "reflection":
-      return "Reflect on the lesson and your learning experience. Be honest and thoughtful in your responses.";
-    default:
-      return "Complete all items in this assignment.";
-  }
+  // Instructions are left blank for educators to fill in
+  return "";
 }
 
 function generateMockAssignment(request: GenerateAssignmentRequest): GeneratedAssignment {

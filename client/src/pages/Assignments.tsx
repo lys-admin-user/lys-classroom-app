@@ -61,6 +61,18 @@ export default function Assignments() {
 
   const isPaidUser = user?.tier === "pro" || user?.tier === "campus";
   const [isEditing, setIsEditing] = useState(false);
+  const [selectedClassId, setSelectedClassId] = useState<string>("");
+  
+  // Worksheet header fields - auto-populated from lesson, user, and class data
+  const [worksheetHeader, setWorksheetHeader] = useState({
+    date: new Date().toLocaleDateString(),
+    teacherName: "",
+    periodSection: "",
+  });
+
+  const updateWorksheetHeader = (field: string, value: string) => {
+    setWorksheetHeader(prev => ({ ...prev, [field]: value }));
+  };
 
   const updateWorksheetField = (field: string, value: string) => {
     if (!generatedAssignment) return;
@@ -164,8 +176,22 @@ export default function Assignments() {
 
   const generateMutation = useMutation({
     mutationFn: (data: any) => apiRequest("POST", "/api/assignments/generate", data),
-    onSuccess: (data) => {
-      setGeneratedAssignment(data);
+    onSuccess: (response: any) => {
+      // Auto-populate title with lesson name
+      const updatedData = {
+        ...response,
+        title: selectedLesson?.title || response.title,
+      };
+      setGeneratedAssignment(updatedData);
+      
+      // Auto-populate worksheet header from user profile and selected class
+      const selectedClass = classes?.find(c => c.id === selectedClassId);
+      setWorksheetHeader({
+        date: new Date().toLocaleDateString(),
+        teacherName: user ? `${user.firstName || ''} ${user.lastName || ''}`.trim() : "",
+        periodSection: selectedClass?.period || "",
+      });
+      
       toast({ title: "Assignment Generated", description: "Review and save your assignment below." });
     },
     onError: (error: any) => {
@@ -384,6 +410,25 @@ export default function Assignments() {
                     </Select>
                   </div>
 
+                  {classes && classes.length > 0 && (
+                    <div>
+                      <Label className="font-oswald">Class (Optional - for Period/Section)</Label>
+                      <Select value={selectedClassId} onValueChange={setSelectedClassId}>
+                        <SelectTrigger className="mt-2" data-testid="select-class">
+                          <SelectValue placeholder="Select a class (optional)" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="">No class selected</SelectItem>
+                          {classes.map((c) => (
+                            <SelectItem key={c.id} value={c.id}>
+                              {c.name} {c.period ? `- Period ${c.period}` : ""}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  )}
+
                   <div className="grid grid-cols-2 gap-4">
                     <div>
                       <Label className="font-oswald">Questions</Label>
@@ -511,7 +556,7 @@ export default function Assignments() {
                       onClick={() => {
                         const ws = generatedAssignment.worksheet;
                         const acc = generatedAssignment.accommodationChecklist;
-                        const text = `ASSIGNMENT WORKSHEET\n\nStudent Name: _________________ Date: _________\nTeacher Name: _________________ Period/Section: _________\n\nCourse: ${ws?.course || ''}\nUnit: ${ws?.unit || ''}\nContent Objective: ${ws?.contentObjective || ''}\nLesson Objective: ${ws?.lessonObjective || ''}\n\nLYS Methodology:\n- BE: ${ws?.lysMethodology?.be || ''}\n- KNOW: ${ws?.lysMethodology?.know || ''}\n- DO: ${ws?.lysMethodology?.do || ''}\n\nEssential Questions:\n${ws?.essentialQuestions || ''}\n\nINSTRUCTIONS:\n${generatedAssignment.instructions}\n\nQUESTIONS:\n${(generatedAssignment.questions || []).map((q: any, i: number) => `${i + 1}. ${q.question}${q.options ? '\n   ' + q.options.map((o: string, oi: number) => `${String.fromCharCode(65 + oi)}) ${o}`).join('\n   ') : ''}`).join('\n\n')}\n\nLesson Close:\n${ws?.lessonClose || ''}\n\nAccommodations Applied: ${acc ? Object.entries(acc).filter(([k, v]) => v).map(([k]) => k.replace(/([A-Z])/g, ' $1').trim()).join(', ') : 'None'}`;
+                        const text = `${generatedAssignment.title}\n\nStudent Name: _________________ Date: ${worksheetHeader.date}\nTeacher Name: ${worksheetHeader.teacherName || '_________________'} Period/Section: ${worksheetHeader.periodSection || '_________'}\n\nCourse: ${ws?.course || ''}\nUnit: ${ws?.unit || ''}\nContent Objective: ${ws?.contentObjective || ''}\nLesson Objective: ${ws?.lessonObjective || ''}\n\nLYS Methodology:\n- BE: ${ws?.lysMethodology?.be || ''}\n- KNOW: ${ws?.lysMethodology?.know || ''}\n- DO: ${ws?.lysMethodology?.do || ''}\n\nEssential Questions:\n${ws?.essentialQuestions || ''}\n\nINSTRUCTIONS:\n${generatedAssignment.instructions || ''}\n\nQUESTIONS:\n${(generatedAssignment.questions || []).map((q: any, i: number) => `${i + 1}. ${q.question}${q.options ? '\n   ' + q.options.map((o: string, oi: number) => `${String.fromCharCode(65 + oi)}) ${o}`).join('\n   ') : ''}`).join('\n\n')}\n\nLesson Close:\n${ws?.lessonClose || ''}\n\nAccommodations Applied: ${acc ? Object.entries(acc).filter(([k, v]) => v).map(([k]) => k.replace(/([A-Z])/g, ' $1').trim()).join(', ') : 'None'}`;
                         navigator.clipboard.writeText(text);
                         toast({ title: "Copied!", description: "Worksheet copied to clipboard." });
                       }}
@@ -542,21 +587,48 @@ export default function Assignments() {
                   <CardContent className="p-6 print:p-4">
                     <div className="border-b-2 border-foreground pb-4 mb-4">
                       <div className="grid grid-cols-2 gap-4 text-sm">
-                        <div className="flex gap-2">
+                        <div className="flex gap-2 items-center">
                           <span className="font-semibold">Student Name:</span>
                           <span className="border-b border-foreground flex-1 min-w-[150px]"></span>
                         </div>
-                        <div className="flex gap-2">
+                        <div className="flex gap-2 items-center">
                           <span className="font-semibold">Date:</span>
-                          <span className="border-b border-foreground flex-1 min-w-[100px]"></span>
+                          {isEditing ? (
+                            <Input 
+                              value={worksheetHeader.date} 
+                              onChange={(e) => updateWorksheetHeader("date", e.target.value)} 
+                              className="text-sm flex-1" 
+                              data-testid="input-edit-date" 
+                            />
+                          ) : (
+                            <span className="border-b border-foreground flex-1 min-w-[100px]">{worksheetHeader.date}</span>
+                          )}
                         </div>
-                        <div className="flex gap-2">
+                        <div className="flex gap-2 items-center">
                           <span className="font-semibold">Teacher Name:</span>
-                          <span className="border-b border-foreground flex-1 min-w-[150px]"></span>
+                          {isEditing ? (
+                            <Input 
+                              value={worksheetHeader.teacherName} 
+                              onChange={(e) => updateWorksheetHeader("teacherName", e.target.value)} 
+                              className="text-sm flex-1" 
+                              data-testid="input-edit-teacher-name" 
+                            />
+                          ) : (
+                            <span className="border-b border-foreground flex-1 min-w-[150px]">{worksheetHeader.teacherName}</span>
+                          )}
                         </div>
-                        <div className="flex gap-2">
+                        <div className="flex gap-2 items-center">
                           <span className="font-semibold">Period/Section:</span>
-                          <span className="border-b border-foreground flex-1 min-w-[100px]"></span>
+                          {isEditing ? (
+                            <Input 
+                              value={worksheetHeader.periodSection} 
+                              onChange={(e) => updateWorksheetHeader("periodSection", e.target.value)} 
+                              className="text-sm flex-1" 
+                              data-testid="input-edit-period" 
+                            />
+                          ) : (
+                            <span className="border-b border-foreground flex-1 min-w-[100px]">{worksheetHeader.periodSection}</span>
+                          )}
                         </div>
                       </div>
                     </div>
