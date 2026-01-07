@@ -11,13 +11,14 @@ import { Separator } from "@/components/ui/separator";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Sparkles, Clock, Target, BookOpen, Users, Loader2, Copy, Download, Heart, Compass, Save, Check, GraduationCap, FileText, Globe, MapPin, Lightbulb, Play, UserCheck, Settings, Printer, LayoutList, AlertCircle, ExternalLink, Plus, X, Search, Library, ClipboardList, PenLine, MessageSquare, Brain, ChevronRight, Award } from "lucide-react";
+import { Sparkles, Clock, Target, BookOpen, Users, Loader2, Copy, Download, Heart, Compass, Save, Check, GraduationCap, FileText, Globe, MapPin, Lightbulb, Play, UserCheck, Settings, Printer, LayoutList, AlertCircle, ExternalLink, Plus, X, Search, Library, ClipboardList, PenLine, MessageSquare, Brain, ChevronRight, Award, ChevronDown, ChevronUp, Trash2, Eye } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useAuth } from "@/hooks/use-auth";
 import { useTier } from "@/hooks/use-tier";
 import { AdBanner } from "@/components/AdBanner";
-import type { LessonPlan, EducatorProfile } from "@shared/schema";
+import type { LessonPlan, EducatorProfile, Lesson } from "@shared/schema";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import type { StandardCode } from "@shared/standards";
 import { educationalResourceProviders, getSearchUrl, type EducationalResourceProvider, type EducationalResource } from "@shared/educationalResources";
 import { Link, useLocation } from "wouter";
@@ -70,6 +71,7 @@ export default function LessonGenerator() {
   const [customResourceUrl, setCustomResourceUrl] = useState("");
   const [customResourceTitle, setCustomResourceTitle] = useState("");
   const [selectedResourceCategory, setSelectedResourceCategory] = useState<"all" | "oer" | "government" | "video" | "interactive" | "textbooks">("all");
+  const [myLessonsOpen, setMyLessonsOpen] = useState(false);
 
   const { data: profileData } = useQuery<{ profile: EducatorProfile | null; tier: string }>({
     queryKey: ["/api/educator-profile"],
@@ -79,6 +81,21 @@ export default function LessonGenerator() {
   const { data: usageData, refetch: refetchUsage } = useQuery<{ tier: string; monthlyCount: number; limit: number | null; remaining: number | null; unlimited: boolean }>({
     queryKey: ["/api/lessons/usage"],
     enabled: isAuthenticated,
+  });
+
+  const { data: savedLessons = [], isLoading: lessonsLoading } = useQuery<Lesson[]>({
+    queryKey: ["/api/lessons"],
+    enabled: isAuthenticated,
+  });
+
+  const deleteLessonMutation = useMutation({
+    mutationFn: async (id: string) => {
+      return await apiRequest("DELETE", `/api/lessons/${id}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/lessons"] });
+      toast({ title: "Lesson deleted" });
+    },
   });
 
   const educatorProfile = profileData?.profile;
@@ -1464,6 +1481,114 @@ ${addedResources.length > 0 ? addedResources.map(r => `- ${r.title}: ${r.url}`).
             </Card>
           </div>
         </div>
+
+        {isAuthenticated && (
+          <div className="mt-8 no-print">
+            <Collapsible open={myLessonsOpen} onOpenChange={setMyLessonsOpen}>
+              <Card className="border-muted">
+                <CollapsibleTrigger asChild>
+                  <CardHeader className="cursor-pointer hover-elevate py-4">
+                    <div className="flex items-center justify-between gap-4">
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-md bg-lys-yellow/10 flex items-center justify-center">
+                          <BookOpen className="h-5 w-5 text-lys-yellow" />
+                        </div>
+                        <div>
+                          <CardTitle className="font-oswald text-lg">My Saved Lessons</CardTitle>
+                          <CardDescription className="font-roboto text-sm">
+                            {savedLessons.length} lesson{savedLessons.length !== 1 ? "s" : ""} in your library
+                          </CardDescription>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        {savedLessons.length > 0 && (
+                          <Link href="/my-lessons">
+                            <Button variant="outline" size="sm" className="gap-1" data-testid="button-view-all-lessons">
+                              View All
+                              <ChevronRight className="h-4 w-4" />
+                            </Button>
+                          </Link>
+                        )}
+                        <Button variant="ghost" size="icon" data-testid="button-toggle-lessons">
+                          {myLessonsOpen ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+                        </Button>
+                      </div>
+                    </div>
+                  </CardHeader>
+                </CollapsibleTrigger>
+                <CollapsibleContent>
+                  <CardContent className="pt-0 pb-4">
+                    {lessonsLoading ? (
+                      <div className="flex items-center justify-center py-8">
+                        <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+                      </div>
+                    ) : savedLessons.length === 0 ? (
+                      <div className="text-center py-8 text-muted-foreground">
+                        <BookOpen className="h-10 w-10 mx-auto mb-3 opacity-50" />
+                        <p className="font-roboto">No saved lessons yet.</p>
+                        <p className="text-sm">Generate and save your first lesson above.</p>
+                      </div>
+                    ) : (
+                      <div className="space-y-2 max-h-[300px] overflow-y-auto pr-2">
+                        {savedLessons.slice(0, 10).map((lesson) => {
+                          const bkdConfig: Record<string, { color: string; icon: typeof Heart }> = {
+                            be: { color: "bg-lys-yellow/10 text-lys-yellow", icon: Heart },
+                            know: { color: "bg-lys-teal/10 text-lys-teal", icon: Compass },
+                            do: { color: "bg-lys-red/10 text-lys-red", icon: Target },
+                          };
+                          const bkd = bkdConfig[lesson.bkdFocus || "be"] || bkdConfig.be;
+                          const BkdIcon = bkd.icon;
+                          return (
+                            <div 
+                              key={lesson.id} 
+                              className="flex items-center gap-3 p-3 rounded-md border bg-card/50 hover-elevate group"
+                              data-testid={`lesson-row-${lesson.id}`}
+                            >
+                              <div className={`w-8 h-8 rounded-md flex items-center justify-center ${bkd.color}`}>
+                                <BkdIcon className="h-4 w-4" />
+                              </div>
+                              <div className="flex-1 min-w-0">
+                                <p className="font-oswald text-sm font-medium truncate">{lesson.title}</p>
+                                <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                                  <span>{lesson.gradeLevel}</span>
+                                  {lesson.standards && <span className="truncate max-w-[150px]">{lesson.standards.split(":")[0]}</span>}
+                                </div>
+                              </div>
+                              <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                <Link href={`/lesson/${lesson.id}`}>
+                                  <Button size="icon" variant="ghost" data-testid={`button-view-lesson-${lesson.id}`}>
+                                    <Eye className="h-4 w-4" />
+                                  </Button>
+                                </Link>
+                                <Button 
+                                  size="icon" 
+                                  variant="ghost"
+                                  onClick={() => deleteLessonMutation.mutate(lesson.id)}
+                                  data-testid={`button-delete-lesson-${lesson.id}`}
+                                >
+                                  <Trash2 className="h-4 w-4 text-destructive" />
+                                </Button>
+                              </div>
+                            </div>
+                          );
+                        })}
+                        {savedLessons.length > 10 && (
+                          <div className="text-center pt-2">
+                            <Link href="/my-lessons">
+                              <Button variant="ghost" size="sm" className="text-muted-foreground">
+                                + {savedLessons.length - 10} more lessons
+                              </Button>
+                            </Link>
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </CardContent>
+                </CollapsibleContent>
+              </Card>
+            </Collapsible>
+          </div>
+        )}
       </div>
     </div>
   );
