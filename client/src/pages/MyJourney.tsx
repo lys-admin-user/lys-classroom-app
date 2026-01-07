@@ -38,7 +38,9 @@ import {
   Zap,
   GraduationCap,
   PenLine,
-  Send
+  Send,
+  FolderOpen,
+  ExternalLink
 } from "lucide-react";
 import type { StudentJourneyProgress, StudentJourneyMilestone, StudentJourneyActivity, Career } from "@shared/schema";
 
@@ -827,6 +829,10 @@ export default function MyJourney() {
             <Clock className="w-4 h-4 mr-2" />
             Recent Activity ({activities.length})
           </TabsTrigger>
+          <TabsTrigger value="portfolio" data-testid="tab-portfolio">
+            <Briefcase className="w-4 h-4 mr-2" />
+            Portfolio
+          </TabsTrigger>
         </TabsList>
 
         <TabsContent value="milestones">
@@ -967,6 +973,50 @@ export default function MyJourney() {
                   </div>
                 </ScrollArea>
               )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="portfolio">
+          <Card>
+            <CardHeader>
+              <div className="flex items-center justify-between gap-4 flex-wrap">
+                <div>
+                  <CardTitle className="font-oswald">Your Portfolio</CardTitle>
+                  <CardDescription className="font-roboto">Showcase your achievements, projects, and work</CardDescription>
+                </div>
+                <Button asChild data-testid="button-go-to-portfolio">
+                  <Link href="/portfolio">
+                    <ExternalLink className="w-4 h-4 mr-2" />
+                    Open Full Portfolio
+                  </Link>
+                </Button>
+              </div>
+            </CardHeader>
+            <CardContent>
+              <div className="text-center py-12">
+                <div className="w-16 h-16 mx-auto rounded-full bg-lys-teal/10 flex items-center justify-center mb-4">
+                  <FolderOpen className="w-8 h-8 text-lys-teal" />
+                </div>
+                <h3 className="font-medium mb-2 font-oswald">Build Your Digital Portfolio</h3>
+                <p className="text-sm text-muted-foreground mb-6 font-roboto max-w-md mx-auto">
+                  Create a professional portfolio to showcase your completed assignments, projects, certifications, and achievements. Share it with colleges, employers, and scholarship committees.
+                </p>
+                <div className="flex flex-wrap justify-center gap-3">
+                  <Button asChild data-testid="button-create-portfolio">
+                    <Link href="/portfolio">
+                      <Plus className="w-4 h-4 mr-2" />
+                      Create Portfolio
+                    </Link>
+                  </Button>
+                  <Button variant="outline" asChild data-testid="button-learn-portfolio">
+                    <Link href="/portfolio">
+                      <Briefcase className="w-4 h-4 mr-2" />
+                      View Portfolio
+                    </Link>
+                  </Button>
+                </div>
+              </div>
             </CardContent>
           </Card>
         </TabsContent>
