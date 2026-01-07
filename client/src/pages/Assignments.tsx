@@ -412,66 +412,19 @@ export default function Assignments() {
             </div>
 
             {generatedAssignment && (
-              <Card id="generated-assignment">
-                <CardHeader>
-                  <div className="flex items-center justify-between gap-4 flex-wrap">
-                    <div>
-                      <CardTitle className="font-oswald">{generatedAssignment.title}</CardTitle>
-                      <CardDescription>{generatedAssignment.description}</CardDescription>
-                    </div>
-                    <div className="flex gap-2 flex-wrap">
-                      {generatedAssignment.accommodationModified && (
-                        <Badge variant="outline">{generatedAssignment.accommodationType} Modified</Badge>
-                      )}
-                      <Badge>{generatedAssignment.totalPoints} points</Badge>
-                    </div>
-                  </div>
-                </CardHeader>
-                <CardContent>
-                  <div className="mb-4 p-3 bg-muted rounded-md">
-                    <Label className="text-xs text-muted-foreground">Instructions</Label>
-                    <p className="mt-1">{generatedAssignment.instructions}</p>
-                  </div>
-
-                  <div className="space-y-4">
-                    {(generatedAssignment.questions || []).map((q: any, i: number) => (
-                      <div key={q.id || i} className="p-4 border rounded-md">
-                        <div className="flex items-start gap-3">
-                          <span className="font-oswald text-lg text-muted-foreground">{i + 1}.</span>
-                          <div className="flex-1">
-                            <div className="flex items-center gap-2 mb-2 flex-wrap">
-                              {getBkdIcon(q.bkdFocus)}
-                              <Badge variant="outline">{(q.type || "").replace("_", " ")}</Badge>
-                              <Badge>{q.points} pts</Badge>
-                            </div>
-                            <p className="font-medium">{q.question}</p>
-                            {q.options && (
-                              <ul className="mt-2 space-y-1">
-                                {q.options.map((opt: string, oi: number) => (
-                                  <li key={oi} className="text-sm text-muted-foreground flex items-center gap-2">
-                                    <span className="w-5 h-5 rounded-full border flex items-center justify-center text-xs">
-                                      {String.fromCharCode(65 + oi)}
-                                    </span>
-                                    {opt}
-                                  </li>
-                                ))}
-                              </ul>
-                            )}
-                          </div>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </CardContent>
-                <CardFooter className="justify-between gap-2 flex-wrap">
+              <div className="space-y-4">
+                <div className="flex items-center justify-between gap-4 flex-wrap print:hidden">
+                  <h2 className="font-oswald text-xl">{generatedAssignment.title}</h2>
                   <div className="flex gap-2 flex-wrap">
                     <Button 
                       variant="outline" 
                       size="sm"
                       onClick={() => {
-                        const text = `${generatedAssignment.title}\n\n${generatedAssignment.instructions}\n\n${(generatedAssignment.questions || []).map((q: any, i: number) => `${i + 1}. ${q.question}${q.options ? '\n   ' + q.options.map((o: string, oi: number) => `${String.fromCharCode(65 + oi)}) ${o}`).join('\n   ') : ''}`).join('\n\n')}`;
+                        const ws = generatedAssignment.worksheet;
+                        const acc = generatedAssignment.accommodationChecklist;
+                        const text = `ASSIGNMENT WORKSHEET\n\nStudent Name: _________________ Date: _________\nTeacher Name: _________________ Period/Section: _________\n\nCourse: ${ws?.course || ''}\nUnit: ${ws?.unit || ''}\nContent Objective: ${ws?.contentObjective || ''}\nLesson Objective: ${ws?.lessonObjective || ''}\n\nLYS Methodology:\n- BE: ${ws?.lysMethodology?.be || ''}\n- KNOW: ${ws?.lysMethodology?.know || ''}\n- DO: ${ws?.lysMethodology?.do || ''}\n\nEssential Questions:\n${ws?.essentialQuestions || ''}\n\nINSTRUCTIONS:\n${generatedAssignment.instructions}\n\nQUESTIONS:\n${(generatedAssignment.questions || []).map((q: any, i: number) => `${i + 1}. ${q.question}${q.options ? '\n   ' + q.options.map((o: string, oi: number) => `${String.fromCharCode(65 + oi)}) ${o}`).join('\n   ') : ''}`).join('\n\n')}\n\nLesson Close:\n${ws?.lessonClose || ''}\n\nAccommodations Applied: ${acc ? Object.entries(acc).filter(([k, v]) => v).map(([k]) => k.replace(/([A-Z])/g, ' $1').trim()).join(', ') : 'None'}`;
                         navigator.clipboard.writeText(text);
-                        toast({ title: "Copied!", description: "Assignment copied to clipboard." });
+                        toast({ title: "Copied!", description: "Worksheet copied to clipboard." });
                       }}
                       data-testid="button-copy-assignment"
                     >
@@ -487,8 +440,6 @@ export default function Assignments() {
                       <Printer className="h-4 w-4 mr-1" />
                       Print
                     </Button>
-                  </div>
-                  <div className="flex gap-2 flex-wrap">
                     <Button variant="outline" onClick={() => setGeneratedAssignment(null)} data-testid="button-discard">
                       Discard
                     </Button>
@@ -496,8 +447,164 @@ export default function Assignments() {
                       {saveMutation.isPending ? "Saving..." : "Save Assignment"}
                     </Button>
                   </div>
-                </CardFooter>
-              </Card>
+                </div>
+
+                <Card id="generated-assignment" className="print:shadow-none print:border-2 print:border-black">
+                  <CardContent className="p-6 print:p-4">
+                    <div className="border-b-2 border-foreground pb-4 mb-4">
+                      <div className="grid grid-cols-2 gap-4 text-sm">
+                        <div className="flex gap-2">
+                          <span className="font-semibold">Student Name:</span>
+                          <span className="border-b border-foreground flex-1 min-w-[150px]"></span>
+                        </div>
+                        <div className="flex gap-2">
+                          <span className="font-semibold">Date:</span>
+                          <span className="border-b border-foreground flex-1 min-w-[100px]"></span>
+                        </div>
+                        <div className="flex gap-2">
+                          <span className="font-semibold">Teacher Name:</span>
+                          <span className="border-b border-foreground flex-1 min-w-[150px]"></span>
+                        </div>
+                        <div className="flex gap-2">
+                          <span className="font-semibold">Period/Section:</span>
+                          <span className="border-b border-foreground flex-1 min-w-[100px]"></span>
+                        </div>
+                      </div>
+                    </div>
+
+                    {generatedAssignment.worksheet && (
+                      <div className="mb-6">
+                        <table className="w-full border-collapse text-sm mb-4">
+                          <thead>
+                            <tr className="bg-muted print:bg-gray-100">
+                              <th className="border p-2 text-left font-semibold">Course</th>
+                              <th className="border p-2 text-left font-semibold">Unit</th>
+                              <th className="border p-2 text-left font-semibold">Content Objective (TEKS)</th>
+                              <th className="border p-2 text-left font-semibold">Lesson Objective</th>
+                              <th className="border p-2 text-left font-semibold">LYS Methodology</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            <tr>
+                              <td className="border p-2 align-top">{generatedAssignment.worksheet.course}</td>
+                              <td className="border p-2 align-top">{generatedAssignment.worksheet.unit}</td>
+                              <td className="border p-2 align-top">{generatedAssignment.worksheet.contentObjective}</td>
+                              <td className="border p-2 align-top">{generatedAssignment.worksheet.lessonObjective}</td>
+                              <td className="border p-2 align-top">
+                                <div className="space-y-1">
+                                  <p><strong>BE:</strong> {generatedAssignment.worksheet.lysMethodology?.be}</p>
+                                  <p><strong>KNOW:</strong> {generatedAssignment.worksheet.lysMethodology?.know}</p>
+                                  <p><strong>DO:</strong> {generatedAssignment.worksheet.lysMethodology?.do}</p>
+                                </div>
+                              </td>
+                            </tr>
+                          </tbody>
+                        </table>
+
+                        <div className="grid md:grid-cols-2 gap-4 mb-4">
+                          <div className="p-3 border rounded-md">
+                            <Label className="text-xs font-semibold text-muted-foreground">Essential Questions</Label>
+                            <p className="mt-1 text-sm">{generatedAssignment.worksheet.essentialQuestions}</p>
+                          </div>
+                          <div className="p-3 border rounded-md">
+                            <Label className="text-xs font-semibold text-muted-foreground">Lesson Close</Label>
+                            <p className="mt-1 text-sm">{generatedAssignment.worksheet.lessonClose}</p>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
+                    <div className="mb-4 p-3 bg-muted print:bg-gray-50 rounded-md">
+                      <Label className="text-xs font-semibold">Assignment Instructions</Label>
+                      <p className="mt-1">{generatedAssignment.instructions}</p>
+                    </div>
+
+                    <Separator className="my-4" />
+
+                    <div className="space-y-4">
+                      {(generatedAssignment.questions || []).map((q: any, i: number) => (
+                        <div key={q.id || i} className="p-4 border rounded-md print:break-inside-avoid">
+                          <div className="flex items-start gap-3">
+                            <span className="font-oswald text-lg text-muted-foreground">{i + 1}.</span>
+                            <div className="flex-1">
+                              <div className="flex items-center gap-2 mb-2 flex-wrap print:hidden">
+                                {getBkdIcon(q.bkdFocus)}
+                                <Badge variant="outline">{(q.type || "").replace("_", " ")}</Badge>
+                                <Badge>{q.points} pts</Badge>
+                              </div>
+                              <p className="font-medium">{q.question}</p>
+                              {q.options && (
+                                <ul className="mt-2 space-y-1">
+                                  {q.options.map((opt: string, oi: number) => (
+                                    <li key={oi} className="text-sm flex items-center gap-2">
+                                      <span className="w-5 h-5 rounded-full border flex items-center justify-center text-xs">
+                                        {String.fromCharCode(65 + oi)}
+                                      </span>
+                                      {opt}
+                                    </li>
+                                  ))}
+                                </ul>
+                              )}
+                              {!q.options && q.type !== "multiple_choice" && q.type !== "true_false" && (
+                                <div className="mt-3 border-b border-muted-foreground/30 min-h-[60px] print:min-h-[80px]"></div>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+
+                    {generatedAssignment.accommodationChecklist && (
+                      <>
+                        <Separator className="my-6" />
+                        <div className="print:break-inside-avoid">
+                          <h3 className="font-oswald text-lg mb-3">Accommodations/Modifications Provided On This Assignment</h3>
+                          <table className="w-full border-collapse text-sm">
+                            <thead>
+                              <tr className="bg-muted print:bg-gray-100">
+                                <th className="border p-2 text-left font-semibold">Accommodation/Modification</th>
+                                <th className="border p-2 text-center font-semibold w-32">Applied (Y/N)</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {[
+                                { key: "extraTime", label: "Extra Time" },
+                                { key: "notesCopyProvided", label: "Notes/Presentation Copy Provided" },
+                                { key: "studySheetProvided", label: "Study Sheet Provided" },
+                                { key: "graphicOrganizer", label: "Graphic Organizer" },
+                                { key: "mnemonicDevices", label: "Mnemonic Devices" },
+                                { key: "largerFont", label: "Larger Size Font" },
+                                { key: "shortenedText", label: "Shortened Text" },
+                                { key: "peerSupport", label: "Peer Support" },
+                                { key: "preferentialSeating", label: "Preferential Seating" },
+                                { key: "frequentReminders", label: "Frequent On Task Reminders" },
+                                { key: "completedExample", label: "Provided A Completed Example" },
+                                { key: "visualOrganizer", label: "Visual Organizer Provided" },
+                              ].map((item) => (
+                                <tr key={item.key}>
+                                  <td className="border p-2">{item.label}</td>
+                                  <td className="border p-2 text-center">
+                                    {(generatedAssignment.accommodationChecklist as any)?.[item.key] ? (
+                                      <span className="text-green-600 font-semibold">Y</span>
+                                    ) : (
+                                      <span className="text-muted-foreground">N</span>
+                                    )}
+                                  </td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      </>
+                    )}
+
+                    <div className="mt-6 text-center text-xs text-muted-foreground print:mt-8">
+                      <Badge variant="outline" className="print:hidden">{generatedAssignment.totalPoints} Total Points</Badge>
+                      <p className="hidden print:block">Total Points: {generatedAssignment.totalPoints}</p>
+                    </div>
+                  </CardContent>
+                </Card>
+              </div>
             )}
           </TabsContent>
 

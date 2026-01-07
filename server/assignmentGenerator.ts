@@ -26,6 +26,38 @@ interface AssignmentQuestion {
   bkdFocus?: "be" | "know" | "do";
 }
 
+interface AccommodationChecklist {
+  extraTime: boolean;
+  notesCopyProvided: boolean;
+  studySheetProvided: boolean;
+  graphicOrganizer: boolean;
+  mnemonicDevices: boolean;
+  largerFont: boolean;
+  shortenedText: boolean;
+  peerSupport: boolean;
+  preferentialSeating: boolean;
+  frequentReminders: boolean;
+  completedExample: boolean;
+  visualOrganizer: boolean;
+}
+
+interface WorksheetMetadata {
+  course: string;
+  unit: string;
+  contentObjective: string;
+  lessonObjective: string;
+  lysMethodology: {
+    be: string;
+    know: string;
+    do: string;
+  };
+  essentialQuestions: string;
+  lessonClose: string;
+  gradeLevel: string;
+  duration: string;
+  standards: string;
+}
+
 interface GeneratedAssignment {
   title: string;
   description: string;
@@ -35,6 +67,8 @@ interface GeneratedAssignment {
   accommodationModified: boolean;
   accommodationType?: string;
   accommodationNotes?: string;
+  worksheet: WorksheetMetadata;
+  accommodationChecklist: AccommodationChecklist;
 }
 
 const accommodationGuidelines = {
@@ -127,11 +161,82 @@ Assessment: ${request.lesson.assessment}
       accommodationModified: !!request.accommodationType,
       accommodationType: request.accommodationType,
       accommodationNotes: request.accommodationNotes,
+      worksheet: extractWorksheetMetadata(request.lesson),
+      accommodationChecklist: getDefaultAccommodationChecklist(request.accommodationType),
     };
   } catch (error) {
     console.error("AI assignment generation error:", error);
     return generateMockAssignment(request);
   }
+}
+
+function extractWorksheetMetadata(lesson: Lesson): WorksheetMetadata {
+  const objectives = lesson.objectives as string[] || [];
+  const bkdContent = lesson.bkdContent as any || {};
+  const essentialQs = lesson.essentialQuestions as string[] | string | undefined;
+  const essentialQuestionsText = Array.isArray(essentialQs) 
+    ? essentialQs.join("; ") 
+    : (essentialQs || bkdContent.essentialQuestions || "What key question drives this lesson?");
+  
+  return {
+    course: (lesson as any).subject || lesson.topic || "Course Name",
+    unit: lesson.topic || "Unit Topic",
+    contentObjective: (lesson.standards as string[] || []).join(", ") || objectives[0] || "Content objective from TEKS",
+    lessonObjective: objectives.join("; ") || "Lesson objectives",
+    lysMethodology: {
+      be: bkdContent.be?.identity || bkdContent.be?.values || bkdContent.be || "Character/Values/Principles focus",
+      know: bkdContent.know?.resources || bkdContent.know?.concepts || bkdContent.know || "Resources and knowledge available to students",
+      do: bkdContent.do?.action || bkdContent.do?.skills || bkdContent.do || "Execute with Excellence action steps",
+    },
+    essentialQuestions: essentialQuestionsText,
+    lessonClose: lesson.assessment || "Lesson close summary and reflection",
+    gradeLevel: lesson.gradeLevel || "Grade Level",
+    duration: lesson.duration || "Duration",
+    standards: (lesson.standards as string[] || []).join(", ") || "TEKS/Standards",
+  };
+}
+
+function getDefaultAccommodationChecklist(accommodationType?: string): AccommodationChecklist {
+  const defaults: AccommodationChecklist = {
+    extraTime: false,
+    notesCopyProvided: false,
+    studySheetProvided: false,
+    graphicOrganizer: false,
+    mnemonicDevices: false,
+    largerFont: false,
+    shortenedText: false,
+    peerSupport: false,
+    preferentialSeating: false,
+    frequentReminders: false,
+    completedExample: false,
+    visualOrganizer: false,
+  };
+
+  if (accommodationType === "IEP") {
+    return {
+      ...defaults,
+      extraTime: true,
+      notesCopyProvided: true,
+      graphicOrganizer: true,
+      visualOrganizer: true,
+    };
+  } else if (accommodationType === "504") {
+    return {
+      ...defaults,
+      extraTime: true,
+      preferentialSeating: true,
+      frequentReminders: true,
+    };
+  } else if (accommodationType === "BIP") {
+    return {
+      ...defaults,
+      frequentReminders: true,
+      peerSupport: true,
+      completedExample: true,
+    };
+  }
+
+  return defaults;
 }
 
 function getDefaultInstructions(type: string): string {
@@ -196,6 +301,8 @@ function generateMockAssignment(request: GenerateAssignmentRequest): GeneratedAs
     accommodationModified: !!request.accommodationType,
     accommodationType: request.accommodationType,
     accommodationNotes: request.accommodationNotes,
+    worksheet: extractWorksheetMetadata(request.lesson),
+    accommodationChecklist: getDefaultAccommodationChecklist(request.accommodationType),
   };
 }
 

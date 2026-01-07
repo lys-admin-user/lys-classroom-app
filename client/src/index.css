@@ -385,6 +385,68 @@
     overflow: visible !important;
     height: auto !important;
   }
+
+  /* Assignment Worksheet Print Styles */
+  #generated-assignment {
+    width: 100% !important;
+    max-width: none !important;
+    box-shadow: none !important;
+    border: 2px solid black !important;
+    border-radius: 0 !important;
+    margin: 0 !important;
+  }
+
+  #generated-assignment table {
+    border-collapse: collapse !important;
+    width: 100% !important;
+  }
+
+  #generated-assignment th,
+  #generated-assignment td {
+    border: 1px solid #333 !important;
+    padding: 6pt !important;
+    font-size: 10pt !important;
+    color: black !important;
+    background-color: white !important;
+  }
+
+  #generated-assignment th {
+    background-color: #f0f0f0 !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+    font-weight: bold !important;
+  }
+
+  #generated-assignment .font-oswald {
+    font-weight: bold !important;
+  }
+
+  /* Answer lines for short answer questions */
+  #generated-assignment .border-b {
+    border-bottom: 1px solid #666 !important;
+    min-height: 30pt !important;
+  }
+
+  /* Prevent page breaks inside questions */
+  #generated-assignment .print\\:break-inside-avoid {
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
+  }
+
+  /* Hide sidebar and navigation during print */
+  [data-sidebar],
+  .sidebar-wrapper,
+  aside {
+    display: none !important;
+  }
+
+  /* Full width main content */
+  main {
+    width: 100% !important;
+    max-width: 100% !important;
+    margin: 0 !important;
+    padding: 0 !important;
+  }
 }
 
 /* Always-visible scrollbar styling */
