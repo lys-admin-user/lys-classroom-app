@@ -181,7 +181,7 @@ function extractWorksheetMetadata(lesson: Lesson): WorksheetMetadata {
   return {
     course: (lesson as any).subject || lesson.topic || "Course Name",
     unit: lesson.topic || "Unit Topic",
-    contentObjective: (lesson.standards as string[] || []).join(", ") || objectives[0] || "Content objective from TEKS",
+    contentObjective: (Array.isArray(lesson.standards) ? lesson.standards.join(", ") : (lesson.standards || "")) || objectives[0] || "Content objective from TEKS",
     lessonObjective: objectives.join("; ") || "Lesson objectives",
     lysMethodology: {
       be: bkdContent.be?.identity || bkdContent.be?.values || bkdContent.be || "Character/Values/Principles focus",
@@ -192,7 +192,7 @@ function extractWorksheetMetadata(lesson: Lesson): WorksheetMetadata {
     lessonClose: lesson.assessment || "Lesson close summary and reflection",
     gradeLevel: lesson.gradeLevel || "Grade Level",
     duration: lesson.duration || "Duration",
-    standards: (lesson.standards as string[] || []).join(", ") || "TEKS/Standards",
+    standards: (Array.isArray(lesson.standards) ? lesson.standards.join(", ") : (lesson.standards || "")) || "TEKS/Standards",
   };
 }
 
