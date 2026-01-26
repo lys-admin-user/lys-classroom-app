@@ -1642,3 +1642,40 @@ export const profileSitemapSchema = z.object({
 });
 
 export type ProfileSitemap = z.infer<typeof profileSitemapSchema>;
+
+// Country Affordability Index (CAI) Schema
+// Based on The Nomad Network Global Pricing System
+export const caiCountrySchema = z.object({
+  code: z.string(), // ISO 3166-1 alpha-2 country code
+  name: z.string(),
+  currency: z.string(), // ISO 4217 currency code
+  currencySymbol: z.string(),
+  caiScore: z.number().min(0.05).max(1.0), // Affordability score
+  lcsiAdjustment: z.number().min(0).max(0.15), // Local cost adjustment
+  region: z.string(),
+  incomeLevel: z.enum(["high", "upper_middle", "lower_middle", "low"]),
+  avgMonthlyIncomeUSD: z.number().optional(),
+  lastUpdated: z.string(),
+});
+
+export type CAICountry = z.infer<typeof caiCountrySchema>;
+
+// CAI Pricing calculation
+export const caiPricingSchema = z.object({
+  globalReferencePrice: z.number(),
+  country: caiCountrySchema,
+  adjustedPrice: z.number(),
+  adjustedPriceLocal: z.number().optional(),
+  savings: z.number(),
+  savingsPercent: z.number(),
+});
+
+export type CAIPricing = z.infer<typeof caiPricingSchema>;
+
+// Base prices in USD (Global Reference Prices)
+export const BASE_PRICES_USD = {
+  free: 0,
+  pro: 19,
+  campus: 99,
+  enterprise: 299,
+} as const;

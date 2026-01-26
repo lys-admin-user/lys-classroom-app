@@ -28,6 +28,7 @@ import {
   type EducatorAffiliate,
   type InsertEducatorAffiliate,
   type ReferralEvent,
+  type CAICountry,
   type InsertReferralEvent,
   type AffiliateReward,
   type InsertAffiliateReward,
@@ -559,6 +560,11 @@ export interface IStorage {
   createPortfolioComment(comment: InsertPortfolioComment): Promise<PortfolioComment>;
   updatePortfolioComment(id: string, authorId: string, updates: Partial<PortfolioComment>): Promise<PortfolioComment | undefined>;
   deletePortfolioComment(id: string, authorId: string): Promise<boolean>;
+  
+  // CAI (Country Affordability Index)
+  getCAICountries(): Promise<CAICountry[]>;
+  getCAICountry(code: string): Promise<CAICountry | undefined>;
+  getCAICountriesByRegion(region: string): Promise<CAICountry[]>;
 }
 
 // Seed data for careers and resources (static content - mutable for BLS sync updates)
@@ -1290,6 +1296,196 @@ const seedResources: Resource[] = [
     url: "https://bigfuture.collegeboard.org/plan-for-college/your-college-application-timeline",
     tags: ["Applications", "Planning", "Deadlines"],
   },
+];
+
+// Country Affordability Index (CAI) Database - 120+ countries
+// Based on The Nomad Network Global Pricing System
+const caiCountries: CAICountry[] = [
+  // High Income (CAI: 0.70-1.0)
+  { code: "US", name: "United States", currency: "USD", currencySymbol: "$", caiScore: 1.0, lcsiAdjustment: 0.0, region: "Americas", incomeLevel: "high", avgMonthlyIncomeUSD: 5500, lastUpdated: "2024-12" },
+  { code: "CH", name: "Switzerland", currency: "CHF", currencySymbol: "CHF", caiScore: 0.95, lcsiAdjustment: 0.05, region: "Europe", incomeLevel: "high", avgMonthlyIncomeUSD: 6500, lastUpdated: "2024-12" },
+  { code: "NO", name: "Norway", currency: "NOK", currencySymbol: "kr", caiScore: 0.92, lcsiAdjustment: 0.05, region: "Europe", incomeLevel: "high", avgMonthlyIncomeUSD: 5800, lastUpdated: "2024-12" },
+  { code: "AU", name: "Australia", currency: "AUD", currencySymbol: "$", caiScore: 0.88, lcsiAdjustment: 0.03, region: "Oceania", incomeLevel: "high", avgMonthlyIncomeUSD: 4800, lastUpdated: "2024-12" },
+  { code: "DE", name: "Germany", currency: "EUR", currencySymbol: "\u20AC", caiScore: 0.85, lcsiAdjustment: 0.02, region: "Europe", incomeLevel: "high", avgMonthlyIncomeUSD: 4200, lastUpdated: "2024-12" },
+  { code: "CA", name: "Canada", currency: "CAD", currencySymbol: "$", caiScore: 0.85, lcsiAdjustment: 0.02, region: "Americas", incomeLevel: "high", avgMonthlyIncomeUSD: 4000, lastUpdated: "2024-12" },
+  { code: "GB", name: "United Kingdom", currency: "GBP", currencySymbol: "\u00A3", caiScore: 0.82, lcsiAdjustment: 0.03, region: "Europe", incomeLevel: "high", avgMonthlyIncomeUSD: 4100, lastUpdated: "2024-12" },
+  { code: "NL", name: "Netherlands", currency: "EUR", currencySymbol: "\u20AC", caiScore: 0.82, lcsiAdjustment: 0.02, region: "Europe", incomeLevel: "high", avgMonthlyIncomeUSD: 4300, lastUpdated: "2024-12" },
+  { code: "SE", name: "Sweden", currency: "SEK", currencySymbol: "kr", caiScore: 0.80, lcsiAdjustment: 0.03, region: "Europe", incomeLevel: "high", avgMonthlyIncomeUSD: 4000, lastUpdated: "2024-12" },
+  { code: "DK", name: "Denmark", currency: "DKK", currencySymbol: "kr", caiScore: 0.80, lcsiAdjustment: 0.04, region: "Europe", incomeLevel: "high", avgMonthlyIncomeUSD: 4800, lastUpdated: "2024-12" },
+  { code: "AT", name: "Austria", currency: "EUR", currencySymbol: "\u20AC", caiScore: 0.78, lcsiAdjustment: 0.02, region: "Europe", incomeLevel: "high", avgMonthlyIncomeUSD: 3800, lastUpdated: "2024-12" },
+  { code: "BE", name: "Belgium", currency: "EUR", currencySymbol: "\u20AC", caiScore: 0.78, lcsiAdjustment: 0.02, region: "Europe", incomeLevel: "high", avgMonthlyIncomeUSD: 3700, lastUpdated: "2024-12" },
+  { code: "IE", name: "Ireland", currency: "EUR", currencySymbol: "\u20AC", caiScore: 0.78, lcsiAdjustment: 0.03, region: "Europe", incomeLevel: "high", avgMonthlyIncomeUSD: 4200, lastUpdated: "2024-12" },
+  { code: "FR", name: "France", currency: "EUR", currencySymbol: "\u20AC", caiScore: 0.75, lcsiAdjustment: 0.03, region: "Europe", incomeLevel: "high", avgMonthlyIncomeUSD: 3500, lastUpdated: "2024-12" },
+  { code: "FI", name: "Finland", currency: "EUR", currencySymbol: "\u20AC", caiScore: 0.75, lcsiAdjustment: 0.02, region: "Europe", incomeLevel: "high", avgMonthlyIncomeUSD: 3800, lastUpdated: "2024-12" },
+  { code: "NZ", name: "New Zealand", currency: "NZD", currencySymbol: "$", caiScore: 0.75, lcsiAdjustment: 0.03, region: "Oceania", incomeLevel: "high", avgMonthlyIncomeUSD: 3400, lastUpdated: "2024-12" },
+  { code: "JP", name: "Japan", currency: "JPY", currencySymbol: "\u00A5", caiScore: 0.72, lcsiAdjustment: 0.03, region: "Asia", incomeLevel: "high", avgMonthlyIncomeUSD: 3200, lastUpdated: "2024-12" },
+  { code: "SG", name: "Singapore", currency: "SGD", currencySymbol: "$", caiScore: 0.72, lcsiAdjustment: 0.05, region: "Asia", incomeLevel: "high", avgMonthlyIncomeUSD: 4500, lastUpdated: "2024-12" },
+  { code: "KR", name: "South Korea", currency: "KRW", currencySymbol: "\u20A9", caiScore: 0.70, lcsiAdjustment: 0.03, region: "Asia", incomeLevel: "high", avgMonthlyIncomeUSD: 2800, lastUpdated: "2024-12" },
+  { code: "IT", name: "Italy", currency: "EUR", currencySymbol: "\u20AC", caiScore: 0.70, lcsiAdjustment: 0.02, region: "Europe", incomeLevel: "high", avgMonthlyIncomeUSD: 2600, lastUpdated: "2024-12" },
+  { code: "ES", name: "Spain", currency: "EUR", currencySymbol: "\u20AC", caiScore: 0.68, lcsiAdjustment: 0.02, region: "Europe", incomeLevel: "high", avgMonthlyIncomeUSD: 2400, lastUpdated: "2024-12" },
+  { code: "PT", name: "Portugal", currency: "EUR", currencySymbol: "\u20AC", caiScore: 0.65, lcsiAdjustment: 0.02, region: "Europe", incomeLevel: "high", avgMonthlyIncomeUSD: 1800, lastUpdated: "2024-12" },
+  { code: "IL", name: "Israel", currency: "ILS", currencySymbol: "\u20AA", caiScore: 0.70, lcsiAdjustment: 0.04, region: "Asia", incomeLevel: "high", avgMonthlyIncomeUSD: 3200, lastUpdated: "2024-12" },
+  { code: "AE", name: "United Arab Emirates", currency: "AED", currencySymbol: "AED", caiScore: 0.75, lcsiAdjustment: 0.05, region: "Asia", incomeLevel: "high", avgMonthlyIncomeUSD: 4000, lastUpdated: "2024-12" },
+  { code: "QA", name: "Qatar", currency: "QAR", currencySymbol: "QR", caiScore: 0.78, lcsiAdjustment: 0.05, region: "Asia", incomeLevel: "high", avgMonthlyIncomeUSD: 5000, lastUpdated: "2024-12" },
+  
+  // Upper-Middle Income (CAI: 0.40-0.69)
+  { code: "CZ", name: "Czech Republic", currency: "CZK", currencySymbol: "K\u010D", caiScore: 0.58, lcsiAdjustment: 0.02, region: "Europe", incomeLevel: "upper_middle", avgMonthlyIncomeUSD: 1600, lastUpdated: "2024-12" },
+  { code: "PL", name: "Poland", currency: "PLN", currencySymbol: "z\u0142", caiScore: 0.55, lcsiAdjustment: 0.02, region: "Europe", incomeLevel: "upper_middle", avgMonthlyIncomeUSD: 1500, lastUpdated: "2024-12" },
+  { code: "HU", name: "Hungary", currency: "HUF", currencySymbol: "Ft", caiScore: 0.52, lcsiAdjustment: 0.02, region: "Europe", incomeLevel: "upper_middle", avgMonthlyIncomeUSD: 1300, lastUpdated: "2024-12" },
+  { code: "GR", name: "Greece", currency: "EUR", currencySymbol: "\u20AC", caiScore: 0.55, lcsiAdjustment: 0.02, region: "Europe", incomeLevel: "upper_middle", avgMonthlyIncomeUSD: 1400, lastUpdated: "2024-12" },
+  { code: "HR", name: "Croatia", currency: "EUR", currencySymbol: "\u20AC", caiScore: 0.50, lcsiAdjustment: 0.02, region: "Europe", incomeLevel: "upper_middle", avgMonthlyIncomeUSD: 1200, lastUpdated: "2024-12" },
+  { code: "RO", name: "Romania", currency: "RON", currencySymbol: "lei", caiScore: 0.45, lcsiAdjustment: 0.02, region: "Europe", incomeLevel: "upper_middle", avgMonthlyIncomeUSD: 1100, lastUpdated: "2024-12" },
+  { code: "BG", name: "Bulgaria", currency: "BGN", currencySymbol: "лв", caiScore: 0.42, lcsiAdjustment: 0.02, region: "Europe", incomeLevel: "upper_middle", avgMonthlyIncomeUSD: 900, lastUpdated: "2024-12" },
+  { code: "RU", name: "Russia", currency: "RUB", currencySymbol: "\u20BD", caiScore: 0.45, lcsiAdjustment: 0.03, region: "Europe", incomeLevel: "upper_middle", avgMonthlyIncomeUSD: 800, lastUpdated: "2024-12" },
+  { code: "TR", name: "Turkey", currency: "TRY", currencySymbol: "\u20BA", caiScore: 0.42, lcsiAdjustment: 0.03, region: "Europe", incomeLevel: "upper_middle", avgMonthlyIncomeUSD: 700, lastUpdated: "2024-12" },
+  { code: "MX", name: "Mexico", currency: "MXN", currencySymbol: "$", caiScore: 0.45, lcsiAdjustment: 0.03, region: "Americas", incomeLevel: "upper_middle", avgMonthlyIncomeUSD: 650, lastUpdated: "2024-12" },
+  { code: "BR", name: "Brazil", currency: "BRL", currencySymbol: "R$", caiScore: 0.42, lcsiAdjustment: 0.04, region: "Americas", incomeLevel: "upper_middle", avgMonthlyIncomeUSD: 600, lastUpdated: "2024-12" },
+  { code: "AR", name: "Argentina", currency: "ARS", currencySymbol: "$", caiScore: 0.35, lcsiAdjustment: 0.05, region: "Americas", incomeLevel: "upper_middle", avgMonthlyIncomeUSD: 450, lastUpdated: "2024-12" },
+  { code: "CL", name: "Chile", currency: "CLP", currencySymbol: "$", caiScore: 0.50, lcsiAdjustment: 0.03, region: "Americas", incomeLevel: "upper_middle", avgMonthlyIncomeUSD: 1000, lastUpdated: "2024-12" },
+  { code: "CO", name: "Colombia", currency: "COP", currencySymbol: "$", caiScore: 0.38, lcsiAdjustment: 0.03, region: "Americas", incomeLevel: "upper_middle", avgMonthlyIncomeUSD: 400, lastUpdated: "2024-12" },
+  { code: "PE", name: "Peru", currency: "PEN", currencySymbol: "S/", caiScore: 0.35, lcsiAdjustment: 0.03, region: "Americas", incomeLevel: "upper_middle", avgMonthlyIncomeUSD: 450, lastUpdated: "2024-12" },
+  { code: "EC", name: "Ecuador", currency: "USD", currencySymbol: "$", caiScore: 0.35, lcsiAdjustment: 0.03, region: "Americas", incomeLevel: "upper_middle", avgMonthlyIncomeUSD: 400, lastUpdated: "2024-12" },
+  { code: "CN", name: "China", currency: "CNY", currencySymbol: "\u00A5", caiScore: 0.48, lcsiAdjustment: 0.05, region: "Asia", incomeLevel: "upper_middle", avgMonthlyIncomeUSD: 900, lastUpdated: "2024-12" },
+  { code: "TH", name: "Thailand", currency: "THB", currencySymbol: "\u0E3F", caiScore: 0.42, lcsiAdjustment: 0.03, region: "Asia", incomeLevel: "upper_middle", avgMonthlyIncomeUSD: 550, lastUpdated: "2024-12" },
+  { code: "MY", name: "Malaysia", currency: "MYR", currencySymbol: "RM", caiScore: 0.48, lcsiAdjustment: 0.03, region: "Asia", incomeLevel: "upper_middle", avgMonthlyIncomeUSD: 800, lastUpdated: "2024-12" },
+  { code: "ZA", name: "South Africa", currency: "ZAR", currencySymbol: "R", caiScore: 0.40, lcsiAdjustment: 0.04, region: "Africa", incomeLevel: "upper_middle", avgMonthlyIncomeUSD: 500, lastUpdated: "2024-12" },
+  { code: "EG", name: "Egypt", currency: "EGP", currencySymbol: "\u00A3", caiScore: 0.32, lcsiAdjustment: 0.04, region: "Africa", incomeLevel: "upper_middle", avgMonthlyIncomeUSD: 300, lastUpdated: "2024-12" },
+  { code: "JO", name: "Jordan", currency: "JOD", currencySymbol: "JD", caiScore: 0.38, lcsiAdjustment: 0.03, region: "Asia", incomeLevel: "upper_middle", avgMonthlyIncomeUSD: 500, lastUpdated: "2024-12" },
+  { code: "SA", name: "Saudi Arabia", currency: "SAR", currencySymbol: "SR", caiScore: 0.60, lcsiAdjustment: 0.04, region: "Asia", incomeLevel: "upper_middle", avgMonthlyIncomeUSD: 2000, lastUpdated: "2024-12" },
+  { code: "KW", name: "Kuwait", currency: "KWD", currencySymbol: "KD", caiScore: 0.65, lcsiAdjustment: 0.04, region: "Asia", incomeLevel: "upper_middle", avgMonthlyIncomeUSD: 2500, lastUpdated: "2024-12" },
+  
+  // Lower-Middle Income (CAI: 0.20-0.39)
+  { code: "IN", name: "India", currency: "INR", currencySymbol: "\u20B9", caiScore: 0.25, lcsiAdjustment: 0.05, region: "Asia", incomeLevel: "lower_middle", avgMonthlyIncomeUSD: 200, lastUpdated: "2024-12" },
+  { code: "PH", name: "Philippines", currency: "PHP", currencySymbol: "\u20B1", caiScore: 0.28, lcsiAdjustment: 0.04, region: "Asia", incomeLevel: "lower_middle", avgMonthlyIncomeUSD: 300, lastUpdated: "2024-12" },
+  { code: "ID", name: "Indonesia", currency: "IDR", currencySymbol: "Rp", caiScore: 0.30, lcsiAdjustment: 0.04, region: "Asia", incomeLevel: "lower_middle", avgMonthlyIncomeUSD: 350, lastUpdated: "2024-12" },
+  { code: "VN", name: "Vietnam", currency: "VND", currencySymbol: "\u20AB", caiScore: 0.28, lcsiAdjustment: 0.03, region: "Asia", incomeLevel: "lower_middle", avgMonthlyIncomeUSD: 280, lastUpdated: "2024-12" },
+  { code: "PK", name: "Pakistan", currency: "PKR", currencySymbol: "Rs", caiScore: 0.22, lcsiAdjustment: 0.04, region: "Asia", incomeLevel: "lower_middle", avgMonthlyIncomeUSD: 150, lastUpdated: "2024-12" },
+  { code: "BD", name: "Bangladesh", currency: "BDT", currencySymbol: "\u09F3", caiScore: 0.20, lcsiAdjustment: 0.04, region: "Asia", incomeLevel: "lower_middle", avgMonthlyIncomeUSD: 120, lastUpdated: "2024-12" },
+  { code: "LK", name: "Sri Lanka", currency: "LKR", currencySymbol: "Rs", caiScore: 0.25, lcsiAdjustment: 0.03, region: "Asia", incomeLevel: "lower_middle", avgMonthlyIncomeUSD: 180, lastUpdated: "2024-12" },
+  { code: "NP", name: "Nepal", currency: "NPR", currencySymbol: "Rs", caiScore: 0.20, lcsiAdjustment: 0.03, region: "Asia", incomeLevel: "lower_middle", avgMonthlyIncomeUSD: 100, lastUpdated: "2024-12" },
+  { code: "MM", name: "Myanmar", currency: "MMK", currencySymbol: "K", caiScore: 0.18, lcsiAdjustment: 0.03, region: "Asia", incomeLevel: "lower_middle", avgMonthlyIncomeUSD: 80, lastUpdated: "2024-12" },
+  { code: "KH", name: "Cambodia", currency: "KHR", currencySymbol: "\u17DB", caiScore: 0.22, lcsiAdjustment: 0.03, region: "Asia", incomeLevel: "lower_middle", avgMonthlyIncomeUSD: 150, lastUpdated: "2024-12" },
+  { code: "NG", name: "Nigeria", currency: "NGN", currencySymbol: "\u20A6", caiScore: 0.25, lcsiAdjustment: 0.05, region: "Africa", incomeLevel: "lower_middle", avgMonthlyIncomeUSD: 150, lastUpdated: "2024-12" },
+  { code: "KE", name: "Kenya", currency: "KES", currencySymbol: "KSh", caiScore: 0.25, lcsiAdjustment: 0.04, region: "Africa", incomeLevel: "lower_middle", avgMonthlyIncomeUSD: 180, lastUpdated: "2024-12" },
+  { code: "GH", name: "Ghana", currency: "GHS", currencySymbol: "\u20B5", caiScore: 0.25, lcsiAdjustment: 0.04, region: "Africa", incomeLevel: "lower_middle", avgMonthlyIncomeUSD: 200, lastUpdated: "2024-12" },
+  { code: "TZ", name: "Tanzania", currency: "TZS", currencySymbol: "TSh", caiScore: 0.22, lcsiAdjustment: 0.04, region: "Africa", incomeLevel: "lower_middle", avgMonthlyIncomeUSD: 100, lastUpdated: "2024-12" },
+  { code: "UG", name: "Uganda", currency: "UGX", currencySymbol: "USh", caiScore: 0.20, lcsiAdjustment: 0.04, region: "Africa", incomeLevel: "lower_middle", avgMonthlyIncomeUSD: 80, lastUpdated: "2024-12" },
+  { code: "SN", name: "Senegal", currency: "XOF", currencySymbol: "CFA", caiScore: 0.22, lcsiAdjustment: 0.04, region: "Africa", incomeLevel: "lower_middle", avgMonthlyIncomeUSD: 150, lastUpdated: "2024-12" },
+  { code: "CI", name: "Ivory Coast", currency: "XOF", currencySymbol: "CFA", caiScore: 0.25, lcsiAdjustment: 0.04, region: "Africa", incomeLevel: "lower_middle", avgMonthlyIncomeUSD: 180, lastUpdated: "2024-12" },
+  { code: "CM", name: "Cameroon", currency: "XAF", currencySymbol: "FCFA", caiScore: 0.22, lcsiAdjustment: 0.04, region: "Africa", incomeLevel: "lower_middle", avgMonthlyIncomeUSD: 130, lastUpdated: "2024-12" },
+  { code: "ZW", name: "Zimbabwe", currency: "ZWL", currencySymbol: "$", caiScore: 0.18, lcsiAdjustment: 0.05, region: "Africa", incomeLevel: "lower_middle", avgMonthlyIncomeUSD: 100, lastUpdated: "2024-12" },
+  { code: "MA", name: "Morocco", currency: "MAD", currencySymbol: "DH", caiScore: 0.32, lcsiAdjustment: 0.03, region: "Africa", incomeLevel: "lower_middle", avgMonthlyIncomeUSD: 350, lastUpdated: "2024-12" },
+  { code: "TN", name: "Tunisia", currency: "TND", currencySymbol: "DT", caiScore: 0.30, lcsiAdjustment: 0.03, region: "Africa", incomeLevel: "lower_middle", avgMonthlyIncomeUSD: 300, lastUpdated: "2024-12" },
+  { code: "DZ", name: "Algeria", currency: "DZD", currencySymbol: "DA", caiScore: 0.30, lcsiAdjustment: 0.03, region: "Africa", incomeLevel: "lower_middle", avgMonthlyIncomeUSD: 280, lastUpdated: "2024-12" },
+  { code: "UA", name: "Ukraine", currency: "UAH", currencySymbol: "\u20B4", caiScore: 0.28, lcsiAdjustment: 0.04, region: "Europe", incomeLevel: "lower_middle", avgMonthlyIncomeUSD: 350, lastUpdated: "2024-12" },
+  { code: "BY", name: "Belarus", currency: "BYN", currencySymbol: "Br", caiScore: 0.32, lcsiAdjustment: 0.03, region: "Europe", incomeLevel: "lower_middle", avgMonthlyIncomeUSD: 450, lastUpdated: "2024-12" },
+  { code: "BO", name: "Bolivia", currency: "BOB", currencySymbol: "Bs", caiScore: 0.28, lcsiAdjustment: 0.03, region: "Americas", incomeLevel: "lower_middle", avgMonthlyIncomeUSD: 300, lastUpdated: "2024-12" },
+  { code: "PY", name: "Paraguay", currency: "PYG", currencySymbol: "\u20B2", caiScore: 0.30, lcsiAdjustment: 0.03, region: "Americas", incomeLevel: "lower_middle", avgMonthlyIncomeUSD: 350, lastUpdated: "2024-12" },
+  { code: "GT", name: "Guatemala", currency: "GTQ", currencySymbol: "Q", caiScore: 0.28, lcsiAdjustment: 0.04, region: "Americas", incomeLevel: "lower_middle", avgMonthlyIncomeUSD: 280, lastUpdated: "2024-12" },
+  { code: "HN", name: "Honduras", currency: "HNL", currencySymbol: "L", caiScore: 0.25, lcsiAdjustment: 0.04, region: "Americas", incomeLevel: "lower_middle", avgMonthlyIncomeUSD: 220, lastUpdated: "2024-12" },
+  { code: "NI", name: "Nicaragua", currency: "NIO", currencySymbol: "C$", caiScore: 0.22, lcsiAdjustment: 0.04, region: "Americas", incomeLevel: "lower_middle", avgMonthlyIncomeUSD: 180, lastUpdated: "2024-12" },
+  { code: "SV", name: "El Salvador", currency: "USD", currencySymbol: "$", caiScore: 0.30, lcsiAdjustment: 0.03, region: "Americas", incomeLevel: "lower_middle", avgMonthlyIncomeUSD: 350, lastUpdated: "2024-12" },
+  { code: "DO", name: "Dominican Republic", currency: "DOP", currencySymbol: "RD$", caiScore: 0.35, lcsiAdjustment: 0.03, region: "Americas", incomeLevel: "lower_middle", avgMonthlyIncomeUSD: 400, lastUpdated: "2024-12" },
+  { code: "JM", name: "Jamaica", currency: "JMD", currencySymbol: "$", caiScore: 0.32, lcsiAdjustment: 0.04, region: "Americas", incomeLevel: "lower_middle", avgMonthlyIncomeUSD: 350, lastUpdated: "2024-12" },
+  { code: "CR", name: "Costa Rica", currency: "CRC", currencySymbol: "\u20A1", caiScore: 0.40, lcsiAdjustment: 0.03, region: "Americas", incomeLevel: "lower_middle", avgMonthlyIncomeUSD: 600, lastUpdated: "2024-12" },
+  { code: "PA", name: "Panama", currency: "PAB", currencySymbol: "B/.", caiScore: 0.45, lcsiAdjustment: 0.03, region: "Americas", incomeLevel: "lower_middle", avgMonthlyIncomeUSD: 700, lastUpdated: "2024-12" },
+  { code: "UY", name: "Uruguay", currency: "UYU", currencySymbol: "$", caiScore: 0.48, lcsiAdjustment: 0.02, region: "Americas", incomeLevel: "lower_middle", avgMonthlyIncomeUSD: 900, lastUpdated: "2024-12" },
+  
+  // Low Income (CAI: 0.05-0.19)
+  { code: "ET", name: "Ethiopia", currency: "ETB", currencySymbol: "Br", caiScore: 0.12, lcsiAdjustment: 0.05, region: "Africa", incomeLevel: "low", avgMonthlyIncomeUSD: 60, lastUpdated: "2024-12" },
+  { code: "CD", name: "DR Congo", currency: "CDF", currencySymbol: "FC", caiScore: 0.08, lcsiAdjustment: 0.05, region: "Africa", incomeLevel: "low", avgMonthlyIncomeUSD: 40, lastUpdated: "2024-12" },
+  { code: "ML", name: "Mali", currency: "XOF", currencySymbol: "CFA", caiScore: 0.10, lcsiAdjustment: 0.05, region: "Africa", incomeLevel: "low", avgMonthlyIncomeUSD: 50, lastUpdated: "2024-12" },
+  { code: "NE", name: "Niger", currency: "XOF", currencySymbol: "CFA", caiScore: 0.08, lcsiAdjustment: 0.05, region: "Africa", incomeLevel: "low", avgMonthlyIncomeUSD: 35, lastUpdated: "2024-12" },
+  { code: "MZ", name: "Mozambique", currency: "MZN", currencySymbol: "MT", caiScore: 0.10, lcsiAdjustment: 0.05, region: "Africa", incomeLevel: "low", avgMonthlyIncomeUSD: 45, lastUpdated: "2024-12" },
+  { code: "MW", name: "Malawi", currency: "MWK", currencySymbol: "MK", caiScore: 0.08, lcsiAdjustment: 0.05, region: "Africa", incomeLevel: "low", avgMonthlyIncomeUSD: 30, lastUpdated: "2024-12" },
+  { code: "ZM", name: "Zambia", currency: "ZMW", currencySymbol: "ZK", caiScore: 0.15, lcsiAdjustment: 0.04, region: "Africa", incomeLevel: "low", avgMonthlyIncomeUSD: 90, lastUpdated: "2024-12" },
+  { code: "RW", name: "Rwanda", currency: "RWF", currencySymbol: "FRw", caiScore: 0.12, lcsiAdjustment: 0.04, region: "Africa", incomeLevel: "low", avgMonthlyIncomeUSD: 70, lastUpdated: "2024-12" },
+  { code: "BF", name: "Burkina Faso", currency: "XOF", currencySymbol: "CFA", caiScore: 0.10, lcsiAdjustment: 0.05, region: "Africa", incomeLevel: "low", avgMonthlyIncomeUSD: 55, lastUpdated: "2024-12" },
+  { code: "BJ", name: "Benin", currency: "XOF", currencySymbol: "CFA", caiScore: 0.12, lcsiAdjustment: 0.04, region: "Africa", incomeLevel: "low", avgMonthlyIncomeUSD: 75, lastUpdated: "2024-12" },
+  { code: "TG", name: "Togo", currency: "XOF", currencySymbol: "CFA", caiScore: 0.10, lcsiAdjustment: 0.04, region: "Africa", incomeLevel: "low", avgMonthlyIncomeUSD: 50, lastUpdated: "2024-12" },
+  { code: "MG", name: "Madagascar", currency: "MGA", currencySymbol: "Ar", caiScore: 0.08, lcsiAdjustment: 0.05, region: "Africa", incomeLevel: "low", avgMonthlyIncomeUSD: 35, lastUpdated: "2024-12" },
+  { code: "SD", name: "Sudan", currency: "SDG", currencySymbol: "SDG", caiScore: 0.10, lcsiAdjustment: 0.05, region: "Africa", incomeLevel: "low", avgMonthlyIncomeUSD: 50, lastUpdated: "2024-12" },
+  { code: "SS", name: "South Sudan", currency: "SSP", currencySymbol: "SSP", caiScore: 0.05, lcsiAdjustment: 0.05, region: "Africa", incomeLevel: "low", avgMonthlyIncomeUSD: 25, lastUpdated: "2024-12" },
+  { code: "SO", name: "Somalia", currency: "SOS", currencySymbol: "Sh", caiScore: 0.05, lcsiAdjustment: 0.05, region: "Africa", incomeLevel: "low", avgMonthlyIncomeUSD: 25, lastUpdated: "2024-12" },
+  { code: "CF", name: "Central African Republic", currency: "XAF", currencySymbol: "FCFA", caiScore: 0.05, lcsiAdjustment: 0.05, region: "Africa", incomeLevel: "low", avgMonthlyIncomeUSD: 30, lastUpdated: "2024-12" },
+  { code: "TD", name: "Chad", currency: "XAF", currencySymbol: "FCFA", caiScore: 0.08, lcsiAdjustment: 0.05, region: "Africa", incomeLevel: "low", avgMonthlyIncomeUSD: 40, lastUpdated: "2024-12" },
+  { code: "SL", name: "Sierra Leone", currency: "SLE", currencySymbol: "Le", caiScore: 0.08, lcsiAdjustment: 0.05, region: "Africa", incomeLevel: "low", avgMonthlyIncomeUSD: 40, lastUpdated: "2024-12" },
+  { code: "LR", name: "Liberia", currency: "LRD", currencySymbol: "$", caiScore: 0.10, lcsiAdjustment: 0.05, region: "Africa", incomeLevel: "low", avgMonthlyIncomeUSD: 50, lastUpdated: "2024-12" },
+  { code: "GM", name: "Gambia", currency: "GMD", currencySymbol: "D", caiScore: 0.12, lcsiAdjustment: 0.04, region: "Africa", incomeLevel: "low", avgMonthlyIncomeUSD: 60, lastUpdated: "2024-12" },
+  { code: "GN", name: "Guinea", currency: "GNF", currencySymbol: "FG", caiScore: 0.10, lcsiAdjustment: 0.05, region: "Africa", incomeLevel: "low", avgMonthlyIncomeUSD: 55, lastUpdated: "2024-12" },
+  { code: "GW", name: "Guinea-Bissau", currency: "XOF", currencySymbol: "CFA", caiScore: 0.08, lcsiAdjustment: 0.05, region: "Africa", incomeLevel: "low", avgMonthlyIncomeUSD: 40, lastUpdated: "2024-12" },
+  { code: "BI", name: "Burundi", currency: "BIF", currencySymbol: "FBu", caiScore: 0.05, lcsiAdjustment: 0.05, region: "Africa", incomeLevel: "low", avgMonthlyIncomeUSD: 20, lastUpdated: "2024-12" },
+  { code: "ER", name: "Eritrea", currency: "ERN", currencySymbol: "Nfk", caiScore: 0.08, lcsiAdjustment: 0.05, region: "Africa", incomeLevel: "low", avgMonthlyIncomeUSD: 45, lastUpdated: "2024-12" },
+  { code: "AF", name: "Afghanistan", currency: "AFN", currencySymbol: "\u060B", caiScore: 0.08, lcsiAdjustment: 0.05, region: "Asia", incomeLevel: "low", avgMonthlyIncomeUSD: 40, lastUpdated: "2024-12" },
+  { code: "YE", name: "Yemen", currency: "YER", currencySymbol: "\uFDFC", caiScore: 0.08, lcsiAdjustment: 0.05, region: "Asia", incomeLevel: "low", avgMonthlyIncomeUSD: 40, lastUpdated: "2024-12" },
+  { code: "HT", name: "Haiti", currency: "HTG", currencySymbol: "G", caiScore: 0.10, lcsiAdjustment: 0.05, region: "Americas", incomeLevel: "low", avgMonthlyIncomeUSD: 60, lastUpdated: "2024-12" },
+  
+  // Additional countries (various income levels)
+  { code: "CU", name: "Cuba", currency: "CUP", currencySymbol: "$", caiScore: 0.25, lcsiAdjustment: 0.05, region: "Americas", incomeLevel: "lower_middle", avgMonthlyIncomeUSD: 30, lastUpdated: "2024-12" },
+  { code: "VE", name: "Venezuela", currency: "VES", currencySymbol: "Bs", caiScore: 0.15, lcsiAdjustment: 0.05, region: "Americas", incomeLevel: "lower_middle", avgMonthlyIncomeUSD: 50, lastUpdated: "2024-12" },
+  { code: "IR", name: "Iran", currency: "IRR", currencySymbol: "\uFDFC", caiScore: 0.30, lcsiAdjustment: 0.05, region: "Asia", incomeLevel: "lower_middle", avgMonthlyIncomeUSD: 200, lastUpdated: "2024-12" },
+  { code: "IQ", name: "Iraq", currency: "IQD", currencySymbol: "IQD", caiScore: 0.32, lcsiAdjustment: 0.05, region: "Asia", incomeLevel: "lower_middle", avgMonthlyIncomeUSD: 350, lastUpdated: "2024-12" },
+  { code: "SY", name: "Syria", currency: "SYP", currencySymbol: "\u00A3", caiScore: 0.12, lcsiAdjustment: 0.05, region: "Asia", incomeLevel: "low", avgMonthlyIncomeUSD: 50, lastUpdated: "2024-12" },
+  { code: "LB", name: "Lebanon", currency: "LBP", currencySymbol: "\u00A3", caiScore: 0.25, lcsiAdjustment: 0.05, region: "Asia", incomeLevel: "lower_middle", avgMonthlyIncomeUSD: 100, lastUpdated: "2024-12" },
+  { code: "KZ", name: "Kazakhstan", currency: "KZT", currencySymbol: "\u20B8", caiScore: 0.38, lcsiAdjustment: 0.03, region: "Asia", incomeLevel: "upper_middle", avgMonthlyIncomeUSD: 550, lastUpdated: "2024-12" },
+  { code: "UZ", name: "Uzbekistan", currency: "UZS", currencySymbol: "so'm", caiScore: 0.25, lcsiAdjustment: 0.04, region: "Asia", incomeLevel: "lower_middle", avgMonthlyIncomeUSD: 200, lastUpdated: "2024-12" },
+  { code: "AZ", name: "Azerbaijan", currency: "AZN", currencySymbol: "\u20BC", caiScore: 0.35, lcsiAdjustment: 0.03, region: "Asia", incomeLevel: "upper_middle", avgMonthlyIncomeUSD: 450, lastUpdated: "2024-12" },
+  { code: "GE", name: "Georgia", currency: "GEL", currencySymbol: "\u20BE", caiScore: 0.35, lcsiAdjustment: 0.03, region: "Europe", incomeLevel: "upper_middle", avgMonthlyIncomeUSD: 400, lastUpdated: "2024-12" },
+  { code: "AM", name: "Armenia", currency: "AMD", currencySymbol: "\u058F", caiScore: 0.32, lcsiAdjustment: 0.03, region: "Asia", incomeLevel: "upper_middle", avgMonthlyIncomeUSD: 350, lastUpdated: "2024-12" },
+  { code: "MD", name: "Moldova", currency: "MDL", currencySymbol: "L", caiScore: 0.28, lcsiAdjustment: 0.03, region: "Europe", incomeLevel: "lower_middle", avgMonthlyIncomeUSD: 300, lastUpdated: "2024-12" },
+  { code: "RS", name: "Serbia", currency: "RSD", currencySymbol: "din", caiScore: 0.42, lcsiAdjustment: 0.02, region: "Europe", incomeLevel: "upper_middle", avgMonthlyIncomeUSD: 700, lastUpdated: "2024-12" },
+  { code: "BA", name: "Bosnia and Herzegovina", currency: "BAM", currencySymbol: "KM", caiScore: 0.38, lcsiAdjustment: 0.02, region: "Europe", incomeLevel: "upper_middle", avgMonthlyIncomeUSD: 550, lastUpdated: "2024-12" },
+  { code: "MK", name: "North Macedonia", currency: "MKD", currencySymbol: "den", caiScore: 0.35, lcsiAdjustment: 0.02, region: "Europe", incomeLevel: "upper_middle", avgMonthlyIncomeUSD: 500, lastUpdated: "2024-12" },
+  { code: "AL", name: "Albania", currency: "ALL", currencySymbol: "L", caiScore: 0.35, lcsiAdjustment: 0.02, region: "Europe", incomeLevel: "upper_middle", avgMonthlyIncomeUSD: 450, lastUpdated: "2024-12" },
+  { code: "ME", name: "Montenegro", currency: "EUR", currencySymbol: "\u20AC", caiScore: 0.42, lcsiAdjustment: 0.02, region: "Europe", incomeLevel: "upper_middle", avgMonthlyIncomeUSD: 650, lastUpdated: "2024-12" },
+  { code: "XK", name: "Kosovo", currency: "EUR", currencySymbol: "\u20AC", caiScore: 0.32, lcsiAdjustment: 0.03, region: "Europe", incomeLevel: "lower_middle", avgMonthlyIncomeUSD: 400, lastUpdated: "2024-12" },
+  { code: "SI", name: "Slovenia", currency: "EUR", currencySymbol: "\u20AC", caiScore: 0.62, lcsiAdjustment: 0.02, region: "Europe", incomeLevel: "high", avgMonthlyIncomeUSD: 2000, lastUpdated: "2024-12" },
+  { code: "SK", name: "Slovakia", currency: "EUR", currencySymbol: "\u20AC", caiScore: 0.55, lcsiAdjustment: 0.02, region: "Europe", incomeLevel: "high", avgMonthlyIncomeUSD: 1400, lastUpdated: "2024-12" },
+  { code: "EE", name: "Estonia", currency: "EUR", currencySymbol: "\u20AC", caiScore: 0.58, lcsiAdjustment: 0.02, region: "Europe", incomeLevel: "high", avgMonthlyIncomeUSD: 1700, lastUpdated: "2024-12" },
+  { code: "LV", name: "Latvia", currency: "EUR", currencySymbol: "\u20AC", caiScore: 0.52, lcsiAdjustment: 0.02, region: "Europe", incomeLevel: "high", avgMonthlyIncomeUSD: 1400, lastUpdated: "2024-12" },
+  { code: "LT", name: "Lithuania", currency: "EUR", currencySymbol: "\u20AC", caiScore: 0.55, lcsiAdjustment: 0.02, region: "Europe", incomeLevel: "high", avgMonthlyIncomeUSD: 1500, lastUpdated: "2024-12" },
+  { code: "CY", name: "Cyprus", currency: "EUR", currencySymbol: "\u20AC", caiScore: 0.58, lcsiAdjustment: 0.03, region: "Europe", incomeLevel: "high", avgMonthlyIncomeUSD: 1800, lastUpdated: "2024-12" },
+  { code: "MT", name: "Malta", currency: "EUR", currencySymbol: "\u20AC", caiScore: 0.60, lcsiAdjustment: 0.03, region: "Europe", incomeLevel: "high", avgMonthlyIncomeUSD: 2000, lastUpdated: "2024-12" },
+  { code: "LU", name: "Luxembourg", currency: "EUR", currencySymbol: "\u20AC", caiScore: 0.90, lcsiAdjustment: 0.05, region: "Europe", incomeLevel: "high", avgMonthlyIncomeUSD: 5500, lastUpdated: "2024-12" },
+  { code: "IS", name: "Iceland", currency: "ISK", currencySymbol: "kr", caiScore: 0.80, lcsiAdjustment: 0.05, region: "Europe", incomeLevel: "high", avgMonthlyIncomeUSD: 4500, lastUpdated: "2024-12" },
+  { code: "HK", name: "Hong Kong", currency: "HKD", currencySymbol: "$", caiScore: 0.68, lcsiAdjustment: 0.05, region: "Asia", incomeLevel: "high", avgMonthlyIncomeUSD: 3000, lastUpdated: "2024-12" },
+  { code: "TW", name: "Taiwan", currency: "TWD", currencySymbol: "NT$", caiScore: 0.60, lcsiAdjustment: 0.03, region: "Asia", incomeLevel: "high", avgMonthlyIncomeUSD: 2000, lastUpdated: "2024-12" },
+  { code: "MN", name: "Mongolia", currency: "MNT", currencySymbol: "\u20AE", caiScore: 0.28, lcsiAdjustment: 0.04, region: "Asia", incomeLevel: "lower_middle", avgMonthlyIncomeUSD: 300, lastUpdated: "2024-12" },
+  { code: "LA", name: "Laos", currency: "LAK", currencySymbol: "\u20AD", caiScore: 0.20, lcsiAdjustment: 0.04, region: "Asia", incomeLevel: "lower_middle", avgMonthlyIncomeUSD: 150, lastUpdated: "2024-12" },
+  { code: "BN", name: "Brunei", currency: "BND", currencySymbol: "$", caiScore: 0.65, lcsiAdjustment: 0.03, region: "Asia", incomeLevel: "high", avgMonthlyIncomeUSD: 2500, lastUpdated: "2024-12" },
+  { code: "BT", name: "Bhutan", currency: "BTN", currencySymbol: "Nu.", caiScore: 0.22, lcsiAdjustment: 0.04, region: "Asia", incomeLevel: "lower_middle", avgMonthlyIncomeUSD: 200, lastUpdated: "2024-12" },
+  { code: "MV", name: "Maldives", currency: "MVR", currencySymbol: "Rf", caiScore: 0.40, lcsiAdjustment: 0.05, region: "Asia", incomeLevel: "upper_middle", avgMonthlyIncomeUSD: 700, lastUpdated: "2024-12" },
+  { code: "FJ", name: "Fiji", currency: "FJD", currencySymbol: "$", caiScore: 0.35, lcsiAdjustment: 0.04, region: "Oceania", incomeLevel: "upper_middle", avgMonthlyIncomeUSD: 400, lastUpdated: "2024-12" },
+  { code: "PG", name: "Papua New Guinea", currency: "PGK", currencySymbol: "K", caiScore: 0.22, lcsiAdjustment: 0.05, region: "Oceania", incomeLevel: "lower_middle", avgMonthlyIncomeUSD: 180, lastUpdated: "2024-12" },
+  { code: "WS", name: "Samoa", currency: "WST", currencySymbol: "T", caiScore: 0.28, lcsiAdjustment: 0.04, region: "Oceania", incomeLevel: "lower_middle", avgMonthlyIncomeUSD: 280, lastUpdated: "2024-12" },
+  { code: "TO", name: "Tonga", currency: "TOP", currencySymbol: "T$", caiScore: 0.30, lcsiAdjustment: 0.04, region: "Oceania", incomeLevel: "lower_middle", avgMonthlyIncomeUSD: 350, lastUpdated: "2024-12" },
+  { code: "VU", name: "Vanuatu", currency: "VUV", currencySymbol: "Vt", caiScore: 0.25, lcsiAdjustment: 0.05, region: "Oceania", incomeLevel: "lower_middle", avgMonthlyIncomeUSD: 250, lastUpdated: "2024-12" },
+  { code: "SB", name: "Solomon Islands", currency: "SBD", currencySymbol: "$", caiScore: 0.18, lcsiAdjustment: 0.05, region: "Oceania", incomeLevel: "lower_middle", avgMonthlyIncomeUSD: 150, lastUpdated: "2024-12" },
+  { code: "AO", name: "Angola", currency: "AOA", currencySymbol: "Kz", caiScore: 0.22, lcsiAdjustment: 0.05, region: "Africa", incomeLevel: "lower_middle", avgMonthlyIncomeUSD: 250, lastUpdated: "2024-12" },
+  { code: "BW", name: "Botswana", currency: "BWP", currencySymbol: "P", caiScore: 0.38, lcsiAdjustment: 0.03, region: "Africa", incomeLevel: "upper_middle", avgMonthlyIncomeUSD: 600, lastUpdated: "2024-12" },
+  { code: "NA", name: "Namibia", currency: "NAD", currencySymbol: "$", caiScore: 0.35, lcsiAdjustment: 0.03, region: "Africa", incomeLevel: "upper_middle", avgMonthlyIncomeUSD: 500, lastUpdated: "2024-12" },
+  { code: "MU", name: "Mauritius", currency: "MUR", currencySymbol: "Rs", caiScore: 0.42, lcsiAdjustment: 0.03, region: "Africa", incomeLevel: "upper_middle", avgMonthlyIncomeUSD: 700, lastUpdated: "2024-12" },
+  { code: "SC", name: "Seychelles", currency: "SCR", currencySymbol: "Rs", caiScore: 0.48, lcsiAdjustment: 0.04, region: "Africa", incomeLevel: "upper_middle", avgMonthlyIncomeUSD: 900, lastUpdated: "2024-12" },
+  { code: "CV", name: "Cabo Verde", currency: "CVE", currencySymbol: "$", caiScore: 0.28, lcsiAdjustment: 0.04, region: "Africa", incomeLevel: "lower_middle", avgMonthlyIncomeUSD: 300, lastUpdated: "2024-12" },
+  { code: "DJ", name: "Djibouti", currency: "DJF", currencySymbol: "Fdj", caiScore: 0.22, lcsiAdjustment: 0.05, region: "Africa", incomeLevel: "lower_middle", avgMonthlyIncomeUSD: 200, lastUpdated: "2024-12" },
+  { code: "LS", name: "Lesotho", currency: "LSL", currencySymbol: "L", caiScore: 0.15, lcsiAdjustment: 0.04, region: "Africa", incomeLevel: "lower_middle", avgMonthlyIncomeUSD: 100, lastUpdated: "2024-12" },
+  { code: "SZ", name: "Eswatini", currency: "SZL", currencySymbol: "E", caiScore: 0.22, lcsiAdjustment: 0.04, region: "Africa", incomeLevel: "lower_middle", avgMonthlyIncomeUSD: 200, lastUpdated: "2024-12" },
+  { code: "TT", name: "Trinidad and Tobago", currency: "TTD", currencySymbol: "$", caiScore: 0.48, lcsiAdjustment: 0.03, region: "Americas", incomeLevel: "upper_middle", avgMonthlyIncomeUSD: 1200, lastUpdated: "2024-12" },
+  { code: "BS", name: "Bahamas", currency: "BSD", currencySymbol: "$", caiScore: 0.60, lcsiAdjustment: 0.04, region: "Americas", incomeLevel: "high", avgMonthlyIncomeUSD: 2200, lastUpdated: "2024-12" },
+  { code: "BB", name: "Barbados", currency: "BBD", currencySymbol: "$", caiScore: 0.52, lcsiAdjustment: 0.04, region: "Americas", incomeLevel: "high", avgMonthlyIncomeUSD: 1500, lastUpdated: "2024-12" },
+  { code: "BZ", name: "Belize", currency: "BZD", currencySymbol: "$", caiScore: 0.32, lcsiAdjustment: 0.04, region: "Americas", incomeLevel: "lower_middle", avgMonthlyIncomeUSD: 400, lastUpdated: "2024-12" },
+  { code: "GY", name: "Guyana", currency: "GYD", currencySymbol: "$", caiScore: 0.35, lcsiAdjustment: 0.04, region: "Americas", incomeLevel: "upper_middle", avgMonthlyIncomeUSD: 500, lastUpdated: "2024-12" },
+  { code: "SR", name: "Suriname", currency: "SRD", currencySymbol: "$", caiScore: 0.32, lcsiAdjustment: 0.04, region: "Americas", incomeLevel: "upper_middle", avgMonthlyIncomeUSD: 400, lastUpdated: "2024-12" },
+  { code: "OM", name: "Oman", currency: "OMR", currencySymbol: "OMR", caiScore: 0.55, lcsiAdjustment: 0.04, region: "Asia", incomeLevel: "high", avgMonthlyIncomeUSD: 1800, lastUpdated: "2024-12" },
+  { code: "BH", name: "Bahrain", currency: "BHD", currencySymbol: "BD", caiScore: 0.58, lcsiAdjustment: 0.04, region: "Asia", incomeLevel: "high", avgMonthlyIncomeUSD: 2000, lastUpdated: "2024-12" },
+  { code: "TJ", name: "Tajikistan", currency: "TJS", currencySymbol: "SM", caiScore: 0.15, lcsiAdjustment: 0.04, region: "Asia", incomeLevel: "low", avgMonthlyIncomeUSD: 90, lastUpdated: "2024-12" },
+  { code: "KG", name: "Kyrgyzstan", currency: "KGS", currencySymbol: "c", caiScore: 0.18, lcsiAdjustment: 0.04, region: "Asia", incomeLevel: "lower_middle", avgMonthlyIncomeUSD: 120, lastUpdated: "2024-12" },
+  { code: "TM", name: "Turkmenistan", currency: "TMT", currencySymbol: "m", caiScore: 0.32, lcsiAdjustment: 0.05, region: "Asia", incomeLevel: "upper_middle", avgMonthlyIncomeUSD: 400, lastUpdated: "2024-12" },
+  { code: "LY", name: "Libya", currency: "LYD", currencySymbol: "LD", caiScore: 0.35, lcsiAdjustment: 0.05, region: "Africa", incomeLevel: "upper_middle", avgMonthlyIncomeUSD: 400, lastUpdated: "2024-12" },
+  { code: "MR", name: "Mauritania", currency: "MRU", currencySymbol: "UM", caiScore: 0.15, lcsiAdjustment: 0.05, region: "Africa", incomeLevel: "lower_middle", avgMonthlyIncomeUSD: 100, lastUpdated: "2024-12" },
+  { code: "GQ", name: "Equatorial Guinea", currency: "XAF", currencySymbol: "FCFA", caiScore: 0.35, lcsiAdjustment: 0.05, region: "Africa", incomeLevel: "upper_middle", avgMonthlyIncomeUSD: 600, lastUpdated: "2024-12" },
+  { code: "GA", name: "Gabon", currency: "XAF", currencySymbol: "FCFA", caiScore: 0.38, lcsiAdjustment: 0.04, region: "Africa", incomeLevel: "upper_middle", avgMonthlyIncomeUSD: 650, lastUpdated: "2024-12" },
+  { code: "CG", name: "Republic of Congo", currency: "XAF", currencySymbol: "FCFA", caiScore: 0.22, lcsiAdjustment: 0.05, region: "Africa", incomeLevel: "lower_middle", avgMonthlyIncomeUSD: 200, lastUpdated: "2024-12" },
 ];
 
 export class DatabaseStorage implements IStorage {
@@ -3554,6 +3750,19 @@ export class DatabaseStorage implements IStorage {
   async deletePortfolioComment(id: string, authorId: string): Promise<boolean> {
     await db.delete(portfolioComments).where(and(eq(portfolioComments.id, id), eq(portfolioComments.authorId, authorId)));
     return true;
+  }
+
+  // CAI (Country Affordability Index) Methods
+  async getCAICountries(): Promise<CAICountry[]> {
+    return caiCountries;
+  }
+
+  async getCAICountry(code: string): Promise<CAICountry | undefined> {
+    return caiCountries.find(c => c.code.toUpperCase() === code.toUpperCase());
+  }
+
+  async getCAICountriesByRegion(region: string): Promise<CAICountry[]> {
+    return caiCountries.filter(c => c.region.toLowerCase() === region.toLowerCase());
   }
 }
 

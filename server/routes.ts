@@ -4733,6 +4733,101 @@ export async function registerRoutes(
   });
 
   // ================================
+  // Country Affordability Index (CAI) Pricing
+  // ================================
+  // Based on The Nomad Network Global Pricing System
+  // Enables equitable, cross-border pricing based on local purchasing power
+  
+  // Get all CAI countries
+  app.get("/api/cai/countries", async (req, res) => {
+    try {
+      const countries = await storage.getCAICountries();
+      res.json(countries);
+    } catch (error) {
+      console.error("Failed to get CAI countries:", error);
+      res.status(500).json({ error: "Failed to get CAI countries" });
+    }
+  });
+
+  // Get CAI country by code
+  app.get("/api/cai/countries/:code", async (req, res) => {
+    try {
+      const country = await storage.getCAICountry(req.params.code);
+      if (!country) {
+        res.status(404).json({ error: "Country not found" });
+        return;
+      }
+      res.json(country);
+    } catch (error) {
+      console.error("Failed to get CAI country:", error);
+      res.status(500).json({ error: "Failed to get CAI country" });
+    }
+  });
+
+  // Get countries by region
+  app.get("/api/cai/regions/:region", async (req, res) => {
+    try {
+      const countries = await storage.getCAICountriesByRegion(req.params.region);
+      res.json(countries);
+    } catch (error) {
+      console.error("Failed to get CAI countries by region:", error);
+      res.status(500).json({ error: "Failed to get CAI countries by region" });
+    }
+  });
+
+  // Calculate CAI-adjusted pricing
+  // Formula: Recommended Price = Global Reference Price × (CAI Score + LCSI Adjustment)
+  app.get("/api/cai/pricing/:countryCode", async (req, res) => {
+    try {
+      const country = await storage.getCAICountry(req.params.countryCode);
+      if (!country) {
+        res.status(404).json({ error: "Country not found" });
+        return;
+      }
+
+      const basePrices = {
+        free: { base: 0, name: "Free" },
+        pro: { base: 19, name: "Pro" },
+        campus: { base: 99, name: "Campus" },
+        enterprise: { base: 299, name: "Enterprise" },
+      };
+
+      const adjustmentFactor = country.caiScore + country.lcsiAdjustment;
+      
+      const pricing = Object.entries(basePrices).map(([tier, info]) => {
+        const adjustedPrice = Math.round(info.base * adjustmentFactor * 100) / 100;
+        const savings = info.base - adjustedPrice;
+        const savingsPercent = info.base > 0 ? Math.round((savings / info.base) * 100) : 0;
+        
+        return {
+          tier,
+          name: info.name,
+          globalPrice: info.base,
+          adjustedPrice: adjustedPrice,
+          savings: savings,
+          savingsPercent: savingsPercent,
+          currency: "USD",
+        };
+      });
+
+      res.json({
+        country,
+        adjustmentFactor,
+        pricing,
+        methodology: {
+          formula: "Adjusted Price = Global Reference Price × (CAI Score + LCSI Adjustment)",
+          caiScore: country.caiScore,
+          lcsiAdjustment: country.lcsiAdjustment,
+          description: "Prices adjusted based on local purchasing power to ensure equitable access globally.",
+        },
+      });
+    } catch (error) {
+      console.error("Failed to calculate CAI pricing:", error);
+      res.status(500).json({ error: "Failed to calculate CAI pricing" });
+    }
+  });
+
+  // ================================
   // Subscription / Tier Management (Demo Mode)
   // ================================
   // NOTE: This is a demo/development mode that simulates tier upgrades
