@@ -60,6 +60,8 @@ export const userPreferences = pgTable("user_preferences", {
   state: varchar("state"),
   jurisdictionId: varchar("jurisdiction_id"),
   standardSetId: varchar("standard_set_id"),
+  gradeLevels: jsonb("grade_levels").$type<string[]>().default([]),
+  gradeBands: jsonb("grade_bands").$type<string[]>().default([]),
   needsAnalysis: jsonb("needs_analysis").$type<{
     primaryGoal: string;
     interests: string[];

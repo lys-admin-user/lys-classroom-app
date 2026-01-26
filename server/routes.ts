@@ -2528,6 +2528,8 @@ export async function registerRoutes(
   app.get("/api/standards/codes/:country/:stateAbbr/:subject", async (req, res) => {
     try {
       const { country, stateAbbr, subject } = req.params;
+      const gradeLevels = req.query.gradeLevels as string | undefined;
+      const gradeLevelsArray = gradeLevels ? gradeLevels.split(',') : [];
       
       // For US, look up by state name instead of abbreviation (database has wrong abbreviations)
       let jurisdiction;
@@ -2574,14 +2576,87 @@ export async function registerRoutes(
         res.json([]);
         return;
       }
-      const standards = await storage.getEducationalStandards(subjectSet.id);
+      
+      // Use grade level filtering if provided
+      const standards = gradeLevelsArray.length > 0
+        ? await storage.getEducationalStandardsByGradeLevels(subjectSet.id, gradeLevelsArray)
+        : await storage.getEducationalStandards(subjectSet.id);
+        
       res.json(standards.map(s => ({
         code: s.humanCoding,
         description: s.statement,
+        gradeLevel: s.gradeLevel,
         source: 'csp',
       })));
     } catch (error) {
       console.error("Get standard codes error:", error);
+      res.status(500).json({ error: "Failed to get standard codes" });
+    }
+  });
+  
+  // Get standards filtered by user's saved grade preferences
+  app.get("/api/standards/my-codes/:country/:stateAbbr/:subject", isAuthenticated, async (req: any, res) => {
+    try {
+      const { country, stateAbbr, subject } = req.params;
+      const userId = req.user?.claims?.sub;
+      
+      // Get user preferences to find their grade levels
+      const prefs = await storage.getUserPreferences(userId);
+      const gradeLevels = prefs?.gradeBands || prefs?.gradeLevels || [];
+      
+      // For US, look up by state name instead of abbreviation
+      let jurisdiction;
+      if (country === 'United States') {
+        const stateName = getStateNameFromAbbr(stateAbbr);
+        if (stateName) {
+          const jurisdictions = await storage.getJurisdictions(country);
+          jurisdiction = jurisdictions.find(j => j.name === stateName);
+        }
+      } else {
+        jurisdiction = await storage.getJurisdictionByAbbr(country, stateAbbr);
+      }
+      
+      if (!jurisdiction) {
+        const { getStandardCodes } = await import("@shared/standards");
+        const fallbackCodes = getStandardCodes(country, stateAbbr, subject);
+        res.json(fallbackCodes.map(s => ({
+          code: s.code,
+          description: s.description,
+          source: 'fallback',
+        })));
+        return;
+      }
+      
+      const sets = await storage.getStandardSets(jurisdiction.id);
+      const subjectSet = sets.find(s => s.subject === subject);
+      if (!subjectSet) {
+        const { getStandardCodes } = await import("@shared/standards");
+        const fallbackCodes = getStandardCodes(country, stateAbbr, subject);
+        res.json(fallbackCodes.map(s => ({
+          code: s.code,
+          description: s.description,
+          source: 'fallback',
+        })));
+        return;
+      }
+      
+      // Filter by user's grade preferences
+      const standards = (gradeLevels as string[]).length > 0
+        ? await storage.getEducationalStandardsByGradeLevels(subjectSet.id, gradeLevels as string[])
+        : await storage.getEducationalStandards(subjectSet.id);
+        
+      res.json({
+        standards: standards.map(s => ({
+          code: s.humanCoding,
+          description: s.statement,
+          gradeLevel: s.gradeLevel,
+          source: 'csp',
+        })),
+        userGradeLevels: gradeLevels,
+        filteredByGrade: (gradeLevels as string[]).length > 0,
+      });
+    } catch (error) {
+      console.error("Get my standard codes error:", error);
       res.status(500).json({ error: "Failed to get standard codes" });
     }
   });

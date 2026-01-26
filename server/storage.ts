@@ -311,6 +311,7 @@ export interface IStorage {
   updateStandardSet(id: string, updates: Partial<StandardSet>): Promise<StandardSet | undefined>;
   
   getEducationalStandards(standardSetId: string): Promise<EducationalStandard[]>;
+  getEducationalStandardsByGradeLevels(standardSetId: string, gradeLevels: string[]): Promise<EducationalStandard[]>;
   getEducationalStandard(id: string): Promise<EducationalStandard | undefined>;
   getEducationalStandardByUid(uid: string): Promise<EducationalStandard | undefined>;
   createEducationalStandard(standard: InsertEducationalStandard): Promise<EducationalStandard>;
@@ -2178,6 +2179,56 @@ export class DatabaseStorage implements IStorage {
     return await db.select().from(educationalStandardsDb)
       .where(eq(educationalStandardsDb.standardSetId, standardSetId))
       .orderBy(asc(educationalStandardsDb.position));
+  }
+
+  async getEducationalStandardsByGradeLevels(standardSetId: string, gradeLevels: string[]): Promise<EducationalStandard[]> {
+    if (!gradeLevels || gradeLevels.length === 0) {
+      return this.getEducationalStandards(standardSetId);
+    }
+    
+    // Expand grade bands to individual grades for matching
+    const expandedGrades = new Set<string>();
+    const gradeBandMapping: Record<string, string[]> = {
+      'elementary': ['K', '1', '2', '3', '4', '5'],
+      'middle_school': ['6', '7', '8'],
+      'high_school': ['9', '10', '11', '12'],
+      'post_secondary': ['post_secondary', 'college', 'university', '13+'],
+    };
+    
+    gradeLevels.forEach(level => {
+      if (gradeBandMapping[level]) {
+        gradeBandMapping[level].forEach(g => expandedGrades.add(g));
+      } else {
+        expandedGrades.add(level);
+      }
+    });
+    
+    const allStandards = await this.getEducationalStandards(standardSetId);
+    
+    // Filter standards by grade level
+    return allStandards.filter(standard => {
+      if (!standard.gradeLevel) return true; // Include standards without grade info
+      
+      const standardGrade = standard.gradeLevel.toLowerCase();
+      
+      // Check for exact match or range overlap
+      for (const grade of expandedGrades) {
+        const g = grade.toLowerCase();
+        if (standardGrade === g) return true;
+        if (standardGrade.includes(g)) return true;
+        // Handle ranges like "9-12", "K-2", etc.
+        if (standardGrade.includes('-')) {
+          const [start, end] = standardGrade.split('-').map(s => s.trim());
+          const gradeNum = parseInt(g);
+          const startNum = start === 'k' ? 0 : parseInt(start);
+          const endNum = parseInt(end);
+          if (!isNaN(gradeNum) && !isNaN(startNum) && !isNaN(endNum)) {
+            if (gradeNum >= startNum && gradeNum <= endNum) return true;
+          }
+        }
+      }
+      return false;
+    });
   }
 
   async getEducationalStandard(id: string): Promise<EducationalStandard | undefined> {
