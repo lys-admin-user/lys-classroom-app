@@ -107,13 +107,15 @@ const updatePreferencesSchema = z.object({
 });
 
 const completeOnboardingSchema = z.object({
-  role: z.enum(["student", "educator", "campus_admin"]).optional(),
+  role: z.enum(["student", "educator", "campus_admin", "homeschool_parent"]).optional(),
   preferences: z.object({
     language: z.string().optional(),
     country: z.string().optional(),
     state: z.string().optional(),
     jurisdictionId: z.string().optional(),
     standardSetId: z.string().optional(),
+    gradeLevels: z.array(z.string()).optional(),
+    gradeBands: z.array(z.string()).optional(),
   }).optional(),
   needsAnalysis: z.object({
     primaryGoal: z.string(),
@@ -124,7 +126,7 @@ const completeOnboardingSchema = z.object({
 });
 
 const updateRoleSchema = z.object({
-  role: z.enum(["student", "educator", "campus_admin"]),
+  role: z.enum(["student", "educator", "campus_admin", "homeschool_parent"]),
 });
 
 export async function registerRoutes(
