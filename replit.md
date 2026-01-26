@@ -114,4 +114,44 @@ Preferred communication style: Simple, everyday language.
 ## Onboarding Flow
 -   New users are automatically redirected to `/onboarding` if they haven't completed the onboarding wizard.
 -   Onboarding collects: role (student/educator/campus_admin), primary goals, interests, language, and location preferences.
+-   **Educator Grade Level Selection**: Educators select grade levels during onboarding (K-5, 6-8, 9-12, Post-Secondary) to filter educational standards.
 -   Exempt paths from onboarding redirect: `/onboarding`, `/pricing`, `/shared/*`
+
+## External Integrations
+
+### HubSpot CRM Integration
+-   **Service File**: `server/services/hubspotService.ts`
+-   **Connection**: Uses Replit's HubSpot connector with OAuth and automatic token refresh
+-   **Capabilities**:
+    -   Create/update contacts with LYS user data
+    -   Create/update companies for organizations
+    -   Create deals for subscription upgrades
+    -   Sync users automatically to HubSpot CRM
+-   **API Endpoints**:
+    -   `GET /api/integrations/hubspot/status` - Check connection status
+    -   `GET /api/integrations/hubspot/contacts` - List contacts (admin only)
+    -   `GET /api/integrations/hubspot/companies` - List companies (admin only)
+    -   `POST /api/integrations/hubspot/sync-user` - Sync current user to HubSpot
+    -   `POST /api/integrations/hubspot/create-contact` - Create contact (admin only)
+    -   `POST /api/integrations/hubspot/create-company` - Create company (admin only)
+    -   `POST /api/integrations/hubspot/create-deal` - Create deal (admin only)
+
+### WordPress Integration
+-   **Service File**: `server/services/wordpressService.ts`
+-   **Integration Methods**:
+    -   **Iframe Embeds**: Embed LYS widgets in WordPress via iframe
+    -   **Shortcodes**: WordPress shortcode support for easy integration
+    -   **oEmbed**: Standard oEmbed protocol for auto-embedding
+    -   **REST API**: Two-way data exchange between platforms
+    -   **Lesson Sync**: Push lesson plans to WordPress as draft posts
+-   **WordPress Shortcodes**:
+    -   `[lys_lesson_generator]` - Embed lesson generator
+    -   `[lys_career_explorer]` - Embed career explorer
+    -   `[lys_self_discovery]` - Embed self-discovery assessment
+    -   `[lys_pricing]` - Embed pricing calculator with CAI
+-   **API Endpoints**:
+    -   `GET /api/integrations/wordpress/status` - Integration status and features
+    -   `GET /api/integrations/wordpress/embed-code` - Generate embed code
+    -   `GET /api/integrations/wordpress/shortcode-instructions` - Get WordPress plugin code
+    -   `GET /api/oembed` - oEmbed endpoint for WordPress auto-discovery
+    -   `POST /api/integrations/wordpress/sync-lesson` - Sync lesson plan to WordPress

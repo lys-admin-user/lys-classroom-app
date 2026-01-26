@@ -30,6 +30,8 @@ import multer from "multer";
 import { syncJurisdictionsFromCSP, syncStandardSetFromCSP, getSyncStatus, fetchCSPJurisdictions, syncAllStandardsFromCSP, getImportProgress } from "./services/cspService";
 import { extractStandardsFromText, processPdfImport, checkSourceForChanges } from "./services/llmExtractionService";
 import { syncBlsData, getLastSyncStatus, getSyncHistory, startBlsScheduler, getSchedulerStatus } from "./services/blsService";
+import * as hubspotService from "./services/hubspotService";
+import * as wordpressService from "./services/wordpressService";
 import { db } from "./db";
 import { eq, desc } from "drizzle-orm";
 
@@ -6268,6 +6270,296 @@ export async function registerRoutes(
     } catch (error) {
       console.error("Failed to trigger BLS sync:", error);
       res.status(500).json({ error: "Failed to trigger sync" });
+    }
+  });
+
+  // ================================
+  // HubSpot Integration Routes
+  // ================================
+
+  app.get("/api/integrations/hubspot/status", isAuthenticated, async (req: any, res) => {
+    try {
+      const client = await hubspotService.getUncachableHubSpotClient();
+      res.json({ 
+        connected: true,
+        message: "HubSpot integration is active"
+      });
+    } catch (error: any) {
+      res.json({ 
+        connected: false,
+        message: error.message || "HubSpot not connected"
+      });
+    }
+  });
+
+  app.get("/api/integrations/hubspot/contacts", isAuthenticated, async (req: any, res) => {
+    try {
+      const user = req.user as User;
+      if (user.role !== "system_admin" && user.role !== "campus_admin") {
+        res.status(403).json({ error: "Admin access required" });
+        return;
+      }
+
+      const limit = parseInt(req.query.limit as string) || 10;
+      const contacts = await hubspotService.getContacts(limit);
+      res.json(contacts);
+    } catch (error) {
+      console.error("Failed to get HubSpot contacts:", error);
+      res.status(500).json({ error: "Failed to get contacts from HubSpot" });
+    }
+  });
+
+  app.get("/api/integrations/hubspot/companies", isAuthenticated, async (req: any, res) => {
+    try {
+      const user = req.user as User;
+      if (user.role !== "system_admin" && user.role !== "campus_admin") {
+        res.status(403).json({ error: "Admin access required" });
+        return;
+      }
+
+      const limit = parseInt(req.query.limit as string) || 10;
+      const companies = await hubspotService.getCompanies(limit);
+      res.json(companies);
+    } catch (error) {
+      console.error("Failed to get HubSpot companies:", error);
+      res.status(500).json({ error: "Failed to get companies from HubSpot" });
+    }
+  });
+
+  app.post("/api/integrations/hubspot/sync-user", isAuthenticated, async (req: any, res) => {
+    try {
+      const user = req.user as User;
+      
+      if (!user.email) {
+        res.status(400).json({ error: "User email is required for HubSpot sync" });
+        return;
+      }
+      
+      const result = await hubspotService.syncUserToHubSpot({
+        email: user.email,
+        firstName: user.firstName || undefined,
+        lastName: user.lastName || undefined,
+        role: user.role || undefined,
+        tier: user.tier || undefined,
+      });
+      
+      res.json({ success: true, contact: result });
+    } catch (error) {
+      console.error("Failed to sync user to HubSpot:", error);
+      res.status(500).json({ error: "Failed to sync user to HubSpot" });
+    }
+  });
+
+  app.post("/api/integrations/hubspot/create-contact", isAuthenticated, async (req: any, res) => {
+    try {
+      const user = req.user as User;
+      if (user.role !== "system_admin" && user.role !== "campus_admin") {
+        res.status(403).json({ error: "Admin access required" });
+        return;
+      }
+
+      const contactSchema = z.object({
+        email: z.string().email(),
+        firstName: z.string().optional(),
+        lastName: z.string().optional(),
+        role: z.string().optional(),
+        organization: z.string().optional(),
+        country: z.string().optional(),
+        tier: z.string().optional(),
+      });
+
+      const validated = contactSchema.parse(req.body);
+      const result = await hubspotService.createOrUpdateContact(validated);
+      res.json({ success: true, contact: result });
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        res.status(400).json({ error: "Invalid contact data", details: error.errors });
+        return;
+      }
+      console.error("Failed to create HubSpot contact:", error);
+      res.status(500).json({ error: "Failed to create contact in HubSpot" });
+    }
+  });
+
+  app.post("/api/integrations/hubspot/create-company", isAuthenticated, async (req: any, res) => {
+    try {
+      const user = req.user as User;
+      if (user.role !== "system_admin" && user.role !== "campus_admin") {
+        res.status(403).json({ error: "Admin access required" });
+        return;
+      }
+
+      const companySchema = z.object({
+        name: z.string().min(1),
+        domain: z.string().optional(),
+        type: z.string().optional(),
+        country: z.string().optional(),
+        industry: z.string().optional(),
+      });
+
+      const validated = companySchema.parse(req.body);
+      const result = await hubspotService.createOrUpdateCompany(validated);
+      res.json({ success: true, company: result });
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        res.status(400).json({ error: "Invalid company data", details: error.errors });
+        return;
+      }
+      console.error("Failed to create HubSpot company:", error);
+      res.status(500).json({ error: "Failed to create company in HubSpot" });
+    }
+  });
+
+  app.post("/api/integrations/hubspot/create-deal", isAuthenticated, async (req: any, res) => {
+    try {
+      const user = req.user as User;
+      if (user.role !== "system_admin" && user.role !== "campus_admin") {
+        res.status(403).json({ error: "Admin access required" });
+        return;
+      }
+
+      const dealSchema = z.object({
+        name: z.string().min(1),
+        amount: z.number().optional(),
+        stage: z.string().optional(),
+        contactId: z.string().optional(),
+        companyId: z.string().optional(),
+      });
+
+      const validated = dealSchema.parse(req.body);
+      const result = await hubspotService.createDeal(validated);
+      res.json({ success: true, deal: result });
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        res.status(400).json({ error: "Invalid deal data", details: error.errors });
+        return;
+      }
+      console.error("Failed to create HubSpot deal:", error);
+      res.status(500).json({ error: "Failed to create deal in HubSpot" });
+    }
+  });
+
+  // ================================
+  // WordPress Integration Routes
+  // ================================
+
+  app.get("/api/integrations/wordpress/status", async (req, res) => {
+    try {
+      const status = wordpressService.getWordPressIntegrationStatus();
+      res.json(status);
+    } catch (error) {
+      console.error("Failed to get WordPress status:", error);
+      res.status(500).json({ error: "Failed to get WordPress integration status" });
+    }
+  });
+
+  app.get("/api/integrations/wordpress/embed-code", async (req, res) => {
+    try {
+      const type = req.query.type as string || 'lesson-generator';
+      const validTypes = ['lesson-generator', 'career-explorer', 'self-discovery', 'pricing'];
+      
+      if (!validTypes.includes(type)) {
+        res.status(400).json({ error: "Invalid embed type" });
+        return;
+      }
+
+      const options = {
+        theme: (req.query.theme as 'light' | 'dark') || 'light',
+        width: req.query.width as string,
+        height: req.query.height as string,
+        locale: req.query.locale as string,
+      };
+
+      const embedCode = wordpressService.generateEmbedCode(type as any, options);
+      res.json({ embedCode, type, options });
+    } catch (error) {
+      console.error("Failed to generate embed code:", error);
+      res.status(500).json({ error: "Failed to generate embed code" });
+    }
+  });
+
+  app.get("/api/integrations/wordpress/shortcode-instructions", async (req, res) => {
+    try {
+      const instructions = wordpressService.generateShortcodeInstructions();
+      res.json({ instructions });
+    } catch (error) {
+      console.error("Failed to get shortcode instructions:", error);
+      res.status(500).json({ error: "Failed to get shortcode instructions" });
+    }
+  });
+
+  app.get("/api/oembed", async (req, res) => {
+    try {
+      const url = req.query.url as string;
+      const format = req.query.format as string || 'json';
+      
+      if (!url) {
+        res.status(400).json({ error: "URL parameter required" });
+        return;
+      }
+
+      let type = 'lesson-generator';
+      if (url.includes('/careers')) type = 'career-explorer';
+      if (url.includes('/self-discovery')) type = 'self-discovery';
+      if (url.includes('/pricing')) type = 'pricing';
+
+      const oembedResponse = wordpressService.generateOEmbedResponse(url, type);
+      
+      if (format === 'xml') {
+        res.type('application/xml');
+        res.send(`<?xml version="1.0" encoding="utf-8"?>
+<oembed>
+  <version>${oembedResponse.version}</version>
+  <type>${oembedResponse.type}</type>
+  <provider_name>${oembedResponse.provider_name}</provider_name>
+  <provider_url>${oembedResponse.provider_url}</provider_url>
+  <title>${oembedResponse.title}</title>
+  <width>${oembedResponse.width}</width>
+  <height>${oembedResponse.height}</height>
+  <html><![CDATA[${oembedResponse.html}]]></html>
+</oembed>`);
+      } else {
+        res.json(oembedResponse);
+      }
+    } catch (error) {
+      console.error("Failed to generate oEmbed response:", error);
+      res.status(500).json({ error: "Failed to generate oEmbed response" });
+    }
+  });
+
+  app.post("/api/integrations/wordpress/sync-lesson", isAuthenticated, async (req: any, res) => {
+    try {
+      const syncSchema = z.object({
+        siteUrl: z.string().url(),
+        username: z.string().optional(),
+        applicationPassword: z.string().optional(),
+        lessonPlan: z.object({
+          title: z.string(),
+          content: z.string(),
+          objectives: z.array(z.string()),
+          standards: z.array(z.string()),
+          gradeLevel: z.string(),
+        }),
+      });
+
+      const validated = syncSchema.parse(req.body);
+      
+      const config: wordpressService.WordPressConfig = {
+        siteUrl: validated.siteUrl,
+        apiEndpoint: '/wp-json/wp/v2',
+        username: validated.username,
+        applicationPassword: validated.applicationPassword,
+      };
+
+      const result = await wordpressService.syncLessonPlanToWordPress(config, validated.lessonPlan);
+      res.json({ success: true, post: result });
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        res.status(400).json({ error: "Invalid sync data", details: error.errors });
+        return;
+      }
+      console.error("Failed to sync lesson to WordPress:", error);
+      res.status(500).json({ error: "Failed to sync lesson to WordPress" });
     }
   });
 
