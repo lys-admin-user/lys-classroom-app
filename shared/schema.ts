@@ -441,10 +441,15 @@ export type InsertSelfDiscoveryResult = z.infer<typeof insertSelfDiscoveryResult
 export type SelfDiscoveryResult = typeof selfDiscoveryResults.$inferSelect;
 
 // Student Journey - Tracks individual Be-Know-Do progress over time
+// Note: "student" in the table name is legacy - this tracks both student AND educator journeys
+// The userRole field differentiates between:
+//   - student: Knowledge/career seeking (BE=identity, KNOW=career info, DO=skill building)
+//   - educator: Career advancement/opportunity seeking (BE=teaching philosophy, KNOW=pedagogy, DO=professional growth)
 export const studentJourneyEntries = pgTable("student_journey_entries", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   userId: varchar("user_id").notNull(),
-  entryType: text("entry_type").notNull(), // 'assessment', 'goal_completed', 'milestone', 'reflection', 'career_exploration', 'skill_gained'
+  userRole: text("user_role").default("student"), // 'student', 'educator', 'campus_admin' - determines BKD context
+  entryType: text("entry_type").notNull(), // 'assessment', 'goal_completed', 'milestone', 'reflection', 'career_exploration', 'skill_gained', 'professional_development', 'teaching_achievement', 'opportunity_created'
   bkdPillar: text("bkd_pillar").notNull(), // 'be', 'know', 'do'
   title: text("title").notNull(),
   description: text("description"),
@@ -456,6 +461,9 @@ export const studentJourneyEntries = pgTable("student_journey_entries", {
     skillName?: string;
     reflectionPrompt?: string;
     linkedStandards?: string[];
+    opportunityType?: string; // for educator opportunities
+    certificationName?: string; // for educator certifications
+    lessonPlanId?: string; // for educator lesson achievements
   }>(),
   createdAt: timestamp("created_at").defaultNow(),
 });

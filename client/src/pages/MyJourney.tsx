@@ -50,7 +50,8 @@ interface JourneyData {
   activities: StudentJourneyActivity[];
 }
 
-const categoryConfig = {
+// Base category styling (shared between roles)
+const baseCategoryStyles = {
   be: { 
     label: "Being", 
     icon: Heart, 
@@ -58,7 +59,6 @@ const categoryConfig = {
     bgColor: "bg-yellow-500",
     lightBg: "bg-yellow-500/10",
     borderColor: "border-yellow-500/20",
-    description: "Self-awareness and identity" 
   },
   know: { 
     label: "Knowing", 
@@ -67,7 +67,6 @@ const categoryConfig = {
     bgColor: "bg-teal-500",
     lightBg: "bg-teal-500/10",
     borderColor: "border-teal-500/20",
-    description: "Knowledge and exploration" 
   },
   do: { 
     label: "Doing", 
@@ -76,9 +75,48 @@ const categoryConfig = {
     bgColor: "bg-red-500",
     lightBg: "bg-red-500/10",
     borderColor: "border-red-500/20",
-    description: "Action and achievement" 
   },
 };
+
+// Role-specific descriptions and context
+// Students: Knowledge and career seeking
+// Educators: Career advancement and opportunity seeking
+const roleDescriptions = {
+  student: {
+    be: "Self-discovery and identity",
+    know: "Career exploration and knowledge",
+    do: "Skill building and goal achievement",
+    journeyTitle: "Your Learning Journey",
+    journeySubtitle: "Track your growth across Be-Know-Do as you discover yourself, explore careers, and build skills",
+  },
+  educator: {
+    be: "Teaching philosophy and professional identity",
+    know: "Pedagogical expertise and industry trends",
+    do: "Career advancement and opportunity creation",
+    journeyTitle: "Your Professional Journey",
+    journeySubtitle: "Track your growth across Be-Know-Do as you develop your practice, expand knowledge, and create opportunities",
+  },
+  campus_admin: {
+    be: "Leadership style and institutional vision",
+    know: "Educational management and policy expertise",
+    do: "Strategic initiatives and institutional growth",
+    journeyTitle: "Your Leadership Journey",
+    journeySubtitle: "Track your growth across Be-Know-Do as you develop your leadership, expand expertise, and drive impact",
+  },
+};
+
+// Function to get role-specific category config
+const getCategoryConfig = (role: string = "student") => {
+  const descriptions = roleDescriptions[role as keyof typeof roleDescriptions] || roleDescriptions.student;
+  return {
+    be: { ...baseCategoryStyles.be, description: descriptions.be },
+    know: { ...baseCategoryStyles.know, description: descriptions.know },
+    do: { ...baseCategoryStyles.do, description: descriptions.do },
+  };
+};
+
+// Default for backward compatibility
+const categoryConfig = getCategoryConfig("student");
 
 const achievementsList = [
   { id: "first_assessment", title: "First Steps", description: "Complete your first self-discovery assessment", icon: Sparkles, category: "be", requirement: 1 },
@@ -632,6 +670,11 @@ export default function MyJourney() {
     category: "do" as "be" | "know" | "do",
   });
 
+  // Get role-specific category config and descriptions
+  const userRole = (user?.role as keyof typeof roleDescriptions) || "student";
+  const roleCategoryConfig = getCategoryConfig(userRole);
+  const roleContent = roleDescriptions[userRole] || roleDescriptions.student;
+
   const { data: journeyData, isLoading, error } = useQuery<JourneyData>({
     queryKey: ["/api/my-journey"],
     enabled: isAuthenticated,
@@ -765,9 +808,9 @@ export default function MyJourney() {
   return (
     <div className="container mx-auto px-4 py-8" data-testid="my-journey-page">
       <div className="flex flex-col gap-2 mb-8">
-        <h1 className="text-3xl font-bold font-marker">My Be-Know-Do Journey</h1>
+        <h1 className="text-3xl font-bold font-marker">{roleContent.journeyTitle}</h1>
         <p className="text-muted-foreground font-roboto">
-          Track your personal growth across Being, Knowing, and Doing
+          {roleContent.journeySubtitle}
         </p>
       </div>
 
@@ -786,18 +829,18 @@ export default function MyJourney() {
             <div className="flex items-center justify-around flex-wrap gap-4">
               <div className="flex flex-col items-center">
                 <ScoreRing score={progress.beScore} category="be" />
-                <span className="font-medium mt-2 font-oswald">Being</span>
-                <span className="text-xs text-muted-foreground font-roboto">Self-awareness</span>
+                <span className="font-medium mt-2 font-oswald">{roleCategoryConfig.be.label}</span>
+                <span className="text-xs text-muted-foreground font-roboto text-center max-w-24">{roleCategoryConfig.be.description}</span>
               </div>
               <div className="flex flex-col items-center">
                 <ScoreRing score={progress.knowScore} category="know" />
-                <span className="font-medium mt-2 font-oswald">Knowing</span>
-                <span className="text-xs text-muted-foreground font-roboto">Exploration</span>
+                <span className="font-medium mt-2 font-oswald">{roleCategoryConfig.know.label}</span>
+                <span className="text-xs text-muted-foreground font-roboto text-center max-w-24">{roleCategoryConfig.know.description}</span>
               </div>
               <div className="flex flex-col items-center">
                 <ScoreRing score={progress.doScore} category="do" />
-                <span className="font-medium mt-2 font-oswald">Doing</span>
-                <span className="text-xs text-muted-foreground font-roboto">Achievement</span>
+                <span className="font-medium mt-2 font-oswald">{roleCategoryConfig.do.label}</span>
+                <span className="text-xs text-muted-foreground font-roboto text-center max-w-24">{roleCategoryConfig.do.description}</span>
               </div>
             </div>
             

@@ -485,8 +485,11 @@ export async function registerRoutes(
       // to avoid pre-authorization data access
       if (userId && isCompletingGoal && updated.status === "completed") {
         const bkdPillar = (updated.bkdPillar as "be" | "know" | "do") || "do";
+        // Get user role for journey entry context
+        const user = await storage.getUser(userId);
         await storage.createStudentJourneyEntry({
           userId,
+          userRole: user?.role || "student",
           entryType: "goal_completed",
           bkdPillar,
           title: `Completed Goal: ${updated.title}`,
@@ -1249,8 +1252,11 @@ export async function registerRoutes(
       });
       
       // Also create a journey entry for the timeline
+      // Get user role for journey entry context
+      const user = await storage.getUser(userId);
       await storage.createStudentJourneyEntry({
         userId,
+        userRole: user?.role || "student",
         entryType: "assessment",
         bkdPillar: "be",
         title: "Completed Self-Discovery Assessment",
@@ -1288,8 +1294,11 @@ export async function registerRoutes(
       });
       
       // Create a journey entry for career exploration
+      // Get user role for journey entry context
+      const user = await storage.getUser(userId);
       await storage.createStudentJourneyEntry({
         userId,
+        userRole: user?.role || "student",
         entryType: "career_exploration",
         bkdPillar: "know",
         title: `Saved Career: ${req.body.careerTitle || "New Career"}`,
@@ -5907,8 +5916,12 @@ export async function registerRoutes(
       
       const { entryType, bkdPillar, title, description, pointsEarned, metadata } = parseResult.data;
       
+      // Get user role for journey entry context
+      const user = await storage.getUser(userId);
+      
       const entry = await storage.createStudentJourneyEntry({
         userId,
+        userRole: user?.role || "student",
         entryType,
         bkdPillar,
         title,
