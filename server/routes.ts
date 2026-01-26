@@ -2267,7 +2267,19 @@ export async function registerRoutes(
     }
   });
 
-  // Get all jurisdictions (from database)
+  // Get all jurisdictions (public endpoint for onboarding)
+  app.get("/api/standards/jurisdictions", async (req: any, res) => {
+    try {
+      const country = req.query.country as string | undefined;
+      const jurisdictions = await storage.getJurisdictions(country);
+      res.json(jurisdictions);
+    } catch (error) {
+      console.error("Get jurisdictions error:", error);
+      res.status(500).json({ error: "Failed to get jurisdictions" });
+    }
+  });
+
+  // Get all jurisdictions (from database) - admin version
   app.get("/api/admin/standards/jurisdictions", isAuthenticated, async (req: any, res) => {
     try {
       const country = req.query.country as string | undefined;
