@@ -142,7 +142,7 @@ export default function Pricing() {
   });
 
   const { data: caiPricing } = useQuery<CAIPricing>({
-    queryKey: ["/api/cai/pricing", selectedCountry],
+    queryKey: [`/api/cai/pricing/${selectedCountry}`],
     enabled: !!selectedCountry,
   });
 

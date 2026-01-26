@@ -90,6 +90,27 @@ Preferred communication style: Simple, everyday language.
 -   **Demo Mode**: Currently the platform operates in demo mode for tier upgrades. Users can simulate upgrading to Pro or Campus tiers via `/api/subscription/demo-upgrade`.
 -   **Future**: When ready for production payments, connect Stripe via Replit's Stripe connector integration. The user fields `stripeCustomerId`, `stripeSubscriptionId`, and `subscriptionStatus` are ready in the database schema.
 
+### Country Affordability Index (CAI) Global Pricing
+-   **Purpose**: Enables equitable, cross-border pricing based on local purchasing power rather than simple currency conversion.
+-   **CAI Score**: Each country receives a score from 0.05-1.0 based on:
+    -   GDP per Capita (PPP) - 35%
+    -   Median Monthly Income - 25%
+    -   Out-of-Pocket Healthcare Spend - 20%
+    -   Urban Cost-of-Living Index - 20%
+-   **LCSI (Local Cost-of-Services Index)**: Additional adjustment factor (0-0.15) for regional variations.
+-   **Pricing Formula**: `Adjusted Price = Global Reference Price × (CAI Score + LCSI Adjustment)`
+-   **Income Level Categories**:
+    -   High Income: CAI 0.70-1.0 (USA, Germany, Australia, etc.)
+    -   Upper-Middle: CAI 0.40-0.69 (Brazil, Mexico, China, etc.)
+    -   Lower-Middle: CAI 0.20-0.39 (India, Nigeria, Philippines, etc.)
+    -   Low Income: CAI 0.05-0.19 (Ethiopia, DR Congo, etc.)
+-   **Coverage**: 120+ countries across all regions
+-   **API Endpoints**:
+    -   `GET /api/cai/countries` - All countries with CAI data
+    -   `GET /api/cai/countries/:code` - Single country by ISO code
+    -   `GET /api/cai/pricing/:countryCode` - Adjusted pricing for country
+-   **UI**: Pricing page includes country selector with transparent pricing breakdown
+
 ## Onboarding Flow
 -   New users are automatically redirected to `/onboarding` if they haven't completed the onboarding wizard.
 -   Onboarding collects: role (student/educator/campus_admin), primary goals, interests, language, and location preferences.
