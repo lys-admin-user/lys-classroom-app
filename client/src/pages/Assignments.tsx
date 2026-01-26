@@ -14,7 +14,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
-import { Sparkles, FileText, Users, UserPlus, AlertTriangle, Check, Clock, BookOpen, Target, Compass, Lightbulb, Lock, GraduationCap, Copy, Printer, Pencil, Trash2, Plus } from "lucide-react";
+import { Sparkles, FileText, Users, UserPlus, AlertTriangle, Check, Clock, BookOpen, Target, Compass, Lightbulb, Lock, GraduationCap, Copy, Printer, Pencil, Trash2, Plus, CheckCircle, Play, Search, RefreshCw, Star, ArrowRight } from "lucide-react";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/use-auth";
@@ -23,9 +23,41 @@ import type { Lesson, Assignment, Class, Student, StudentGroup, AccommodationTyp
 const ASSIGNMENT_TYPES = [
   { value: "quiz", label: "Quiz", description: "Multiple choice and short answer questions" },
   { value: "worksheet", label: "Worksheet", description: "Comprehensive practice problems" },
-  { value: "project", label: "Project", description: "Extended creative assignment" },
+  { value: "project", label: "Project", description: "Extended creative assignment with phases" },
   { value: "discussion", label: "Discussion", description: "Open-ended discussion prompts" },
   { value: "reflection", label: "Reflection", description: "Self-reflection and journaling" },
+];
+
+// Project Templates using "Low-Floor, High-Ceiling" method
+const PROJECT_TEMPLATES = [
+  { 
+    value: "community_consultant", 
+    label: "Community Consultant", 
+    description: "Service Learning: Identify a real-world problem and propose a solution",
+    bkdFocus: "do" as const,
+    icon: Users
+  },
+  { 
+    value: "kitchen_lab", 
+    label: "Kitchen Lab", 
+    description: "Inquiry-Based: Use household items to test scientific principles",
+    bkdFocus: "know" as const,
+    icon: Lightbulb
+  },
+  { 
+    value: "digital_storyteller", 
+    label: "Digital Storyteller", 
+    description: "Creative Synthesis: Teach a concept by creating content for younger students",
+    bkdFocus: "be" as const,
+    icon: BookOpen
+  },
+  { 
+    value: "custom", 
+    label: "Custom Project", 
+    description: "Create a tailored project for your specific lesson objectives",
+    bkdFocus: "do" as const,
+    icon: Target
+  },
 ];
 
 const DIFFICULTY_LEVELS = [
@@ -54,6 +86,7 @@ export default function Assignments() {
   const [accommodationType, setAccommodationType] = useState<AccommodationType | undefined>();
   const [accommodationNotes, setAccommodationNotes] = useState("");
   const [generatedAssignment, setGeneratedAssignment] = useState<any>(null);
+  const [projectTemplate, setProjectTemplate] = useState("community_consultant");
   const [assignDialogOpen, setAssignDialogOpen] = useState(false);
   const [selectedRecipients, setSelectedRecipients] = useState<string[]>([]);
   const [recipientType, setRecipientType] = useState<"student" | "group" | "class">("student");
@@ -247,6 +280,7 @@ export default function Assignments() {
       includeBeKnowDo,
       accommodationType,
       accommodationNotes: accommodationNotes || undefined,
+      projectTemplate: assignmentType === "project" ? projectTemplate : undefined,
     });
   };
 
@@ -409,6 +443,63 @@ export default function Assignments() {
                       </SelectContent>
                     </Select>
                   </div>
+
+                  {/* Project Template Selection - Only show for project type */}
+                  {assignmentType === "project" && (
+                    <div className="space-y-3">
+                      <Label className="font-oswald flex items-center gap-2">
+                        <Target className="w-4 h-4 text-primary" />
+                        Project Template (Low-Floor, High-Ceiling)
+                      </Label>
+                      <p className="text-xs text-muted-foreground">
+                        Low-Floor: Easy entry for all students. High-Ceiling: Advanced challenges for deeper exploration.
+                      </p>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                        {PROJECT_TEMPLATES.map((template) => {
+                          const IconComponent = template.icon;
+                          const isSelected = projectTemplate === template.value;
+                          return (
+                            <div
+                              key={template.value}
+                              onClick={() => setProjectTemplate(template.value)}
+                              className={`p-4 rounded-md border cursor-pointer transition-all hover-elevate ${
+                                isSelected 
+                                  ? "border-primary bg-primary/5" 
+                                  : "border-border hover:border-primary/50"
+                              }`}
+                              data-testid={`project-template-${template.value}`}
+                            >
+                              <div className="flex items-start gap-3">
+                                <div className={`p-2 rounded-md ${
+                                  template.bkdFocus === "be" ? "bg-yellow-100 text-yellow-700" :
+                                  template.bkdFocus === "know" ? "bg-blue-100 text-blue-700" :
+                                  "bg-red-100 text-red-700"
+                                }`}>
+                                  <IconComponent className="w-5 h-5" />
+                                </div>
+                                <div className="flex-1 min-w-0">
+                                  <div className="flex items-center gap-2">
+                                    <span className="font-medium">{template.label}</span>
+                                    <Badge variant="outline" className={`text-xs ${
+                                      template.bkdFocus === "be" ? "border-yellow-500 text-yellow-700" :
+                                      template.bkdFocus === "know" ? "border-blue-500 text-blue-700" :
+                                      "border-red-500 text-red-700"
+                                    }`}>
+                                      {template.bkdFocus.toUpperCase()}
+                                    </Badge>
+                                  </div>
+                                  <p className="text-xs text-muted-foreground mt-1">{template.description}</p>
+                                </div>
+                                {isSelected && (
+                                  <CheckCircle className="w-5 h-5 text-primary flex-shrink-0" />
+                                )}
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
 
                   {classes && classes.length > 0 && (
                     <div>
@@ -841,6 +932,168 @@ export default function Assignments() {
                         </div>
                       ))}
                         </div>
+
+                        {/* Project Phases Display - Low Floor High Ceiling */}
+                        {generatedAssignment.project && (
+                          <>
+                            <Separator className="my-6" />
+                            <div className="print:break-inside-avoid">
+                              <h3 className="font-oswald text-lg mb-3 flex items-center gap-2">
+                                <Target className="w-5 h-5 text-primary" />
+                                {generatedAssignment.project.templateName} - Project Phases
+                              </h3>
+                              
+                              {/* Low Floor / High Ceiling Summary */}
+                              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+                                <div className="p-4 rounded-md bg-green-50 dark:bg-green-950 border border-green-200 dark:border-green-800">
+                                  <div className="flex items-center gap-2 mb-2">
+                                    <Play className="w-4 h-4 text-green-600" />
+                                    <span className="font-oswald text-sm text-green-700 dark:text-green-400">Low Floor (Entry Point)</span>
+                                  </div>
+                                  <p className="text-sm text-green-800 dark:text-green-300">{generatedAssignment.project.lowFloor}</p>
+                                </div>
+                                <div className="p-4 rounded-md bg-purple-50 dark:bg-purple-950 border border-purple-200 dark:border-purple-800">
+                                  <div className="flex items-center gap-2 mb-2">
+                                    <Star className="w-4 h-4 text-purple-600" />
+                                    <span className="font-oswald text-sm text-purple-700 dark:text-purple-400">High Ceiling (Advanced)</span>
+                                  </div>
+                                  <p className="text-sm text-purple-800 dark:text-purple-300">{generatedAssignment.project.highCeiling}</p>
+                                </div>
+                              </div>
+
+                              {/* Phase Timeline */}
+                              <div className="space-y-4">
+                                {(generatedAssignment.project.phases || []).map((phase: any, i: number) => (
+                                  <div key={i} className="relative pl-8 pb-4 border-l-2 border-muted last:border-l-0">
+                                    <div className="absolute -left-3 top-0 w-6 h-6 rounded-full bg-primary flex items-center justify-center text-white text-xs font-bold">
+                                      {i + 1}
+                                    </div>
+                                    <div className="p-4 rounded-md border bg-card">
+                                      <div className="flex items-center justify-between gap-2 mb-3 flex-wrap">
+                                        <h4 className="font-oswald text-base">{phase.name}</h4>
+                                        <Badge variant="outline" className="text-xs">
+                                          <Clock className="w-3 h-3 mr-1" />
+                                          {phase.estimatedTime}
+                                        </Badge>
+                                      </div>
+                                      
+                                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+                                        {/* Async (Independent) Task */}
+                                        <div className="space-y-2">
+                                          <div className="flex items-center gap-1 text-muted-foreground">
+                                            <RefreshCw className="w-3 h-3" />
+                                            <span className="font-semibold text-xs uppercase">Async (Independent)</span>
+                                          </div>
+                                          <p className="text-foreground">{phase.asyncTask}</p>
+                                        </div>
+                                        
+                                        {/* Sync (Classroom) Task */}
+                                        <div className="space-y-2">
+                                          <div className="flex items-center gap-1 text-muted-foreground">
+                                            <Users className="w-3 h-3" />
+                                            <span className="font-semibold text-xs uppercase">Sync (Classroom)</span>
+                                          </div>
+                                          <p className="text-foreground">{phase.syncTask}</p>
+                                        </div>
+                                      </div>
+                                      
+                                      {/* Phase Deliverable */}
+                                      <div className="mt-3 pt-3 border-t flex items-center gap-2 text-sm">
+                                        <ArrowRight className="w-4 h-4 text-primary" />
+                                        <span className="text-muted-foreground">Deliverable:</span>
+                                        <span className="font-medium">{phase.deliverable}</span>
+                                      </div>
+                                      
+                                      {/* Phase Materials */}
+                                      {phase.materials && phase.materials.length > 0 && (
+                                        <div className="mt-2 flex flex-wrap gap-1">
+                                          {phase.materials.map((mat: string, mi: number) => (
+                                            <Badge key={mi} variant="secondary" className="text-xs">{mat}</Badge>
+                                          ))}
+                                        </div>
+                                      )}
+                                    </div>
+                                  </div>
+                                ))}
+                              </div>
+
+                              {/* Materials List */}
+                              {generatedAssignment.project.materials && generatedAssignment.project.materials.length > 0 && (
+                                <div className="mt-6">
+                                  <h4 className="font-oswald text-sm mb-2">Materials Needed</h4>
+                                  <div className="flex flex-wrap gap-2">
+                                    {generatedAssignment.project.materials.map((mat: string, i: number) => (
+                                      <Badge key={i} variant="outline">{mat}</Badge>
+                                    ))}
+                                  </div>
+                                </div>
+                              )}
+
+                              {/* Project Rubric */}
+                              {generatedAssignment.project.rubric && generatedAssignment.project.rubric.length > 0 && (
+                                <div className="mt-6">
+                                  <h4 className="font-oswald text-sm mb-2">Project Rubric</h4>
+                                  <div className="overflow-x-auto">
+                                    <table className="w-full border-collapse text-xs">
+                                      <thead>
+                                        <tr className="bg-muted">
+                                          <th className="border p-2 text-left">Criteria</th>
+                                          <th className="border p-2 text-center">Exemplary</th>
+                                          <th className="border p-2 text-center">Proficient</th>
+                                          <th className="border p-2 text-center">Developing</th>
+                                          <th className="border p-2 text-center">Beginning</th>
+                                          <th className="border p-2 text-center w-16">Points</th>
+                                        </tr>
+                                      </thead>
+                                      <tbody>
+                                        {generatedAssignment.project.rubric.map((row: any, ri: number) => (
+                                          <tr key={ri}>
+                                            <td className="border p-2 font-medium">{row.criteria}</td>
+                                            <td className="border p-2 text-center">{row.exemplary}</td>
+                                            <td className="border p-2 text-center">{row.proficient}</td>
+                                            <td className="border p-2 text-center">{row.developing}</td>
+                                            <td className="border p-2 text-center">{row.beginning}</td>
+                                            <td className="border p-2 text-center font-bold">{row.points}</td>
+                                          </tr>
+                                        ))}
+                                      </tbody>
+                                    </table>
+                                  </div>
+                                </div>
+                              )}
+
+                              {/* Extensions */}
+                              {generatedAssignment.project.extensions && generatedAssignment.project.extensions.length > 0 && (
+                                <div className="mt-6">
+                                  <h4 className="font-oswald text-sm mb-2 flex items-center gap-1">
+                                    <Star className="w-4 h-4 text-yellow-500" />
+                                    Extension Activities (High Ceiling)
+                                  </h4>
+                                  <ul className="list-disc list-inside text-sm space-y-1 text-muted-foreground">
+                                    {generatedAssignment.project.extensions.map((ext: string, i: number) => (
+                                      <li key={i}>{ext}</li>
+                                    ))}
+                                  </ul>
+                                </div>
+                              )}
+
+                              {/* Reflection Prompts */}
+                              {generatedAssignment.project.reflectionPrompts && generatedAssignment.project.reflectionPrompts.length > 0 && (
+                                <div className="mt-6">
+                                  <h4 className="font-oswald text-sm mb-2 flex items-center gap-1">
+                                    <Lightbulb className="w-4 h-4 text-primary" />
+                                    Reflection Prompts (Be-Know-Do)
+                                  </h4>
+                                  <ul className="list-disc list-inside text-sm space-y-1 text-muted-foreground">
+                                    {generatedAssignment.project.reflectionPrompts.map((prompt: string, i: number) => (
+                                      <li key={i}>{prompt}</li>
+                                    ))}
+                                  </ul>
+                                </div>
+                              )}
+                            </div>
+                          </>
+                        )}
 
                         {generatedAssignment.accommodationChecklist && (
                           <>

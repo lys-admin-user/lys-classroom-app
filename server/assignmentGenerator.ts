@@ -6,6 +6,30 @@ const openai = process.env.OPENAI_API_KEY
   ? new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
   : null;
 
+// Project Template Types for "Low-Floor, High-Ceiling" method
+type ProjectTemplateType = "community_consultant" | "kitchen_lab" | "digital_storyteller" | "custom";
+
+interface ProjectPhase {
+  name: string;
+  asyncTask: string;
+  syncTask: string;
+  materials: string[];
+  deliverable: string;
+  estimatedTime: string;
+}
+
+interface ProjectTemplate {
+  id: ProjectTemplateType;
+  name: string;
+  description: string;
+  lowFloor: string;   // Easy entry point
+  highCeiling: string; // Advanced extension
+  phases: ProjectPhase[];
+  materials: string[];
+  standardAlignment: string[];
+  bkdFocus: "be" | "know" | "do";
+}
+
 interface GenerateAssignmentRequest {
   lesson: Lesson;
   assignmentType: "quiz" | "worksheet" | "project" | "discussion" | "reflection";
@@ -14,6 +38,7 @@ interface GenerateAssignmentRequest {
   includeBeKnowDo: boolean;
   accommodationType?: "IEP" | "504" | "BIP";
   accommodationNotes?: string;
+  projectTemplate?: ProjectTemplateType;
 }
 
 // Polymorphic Question Schema following Learning Standard Schema best practices
@@ -82,6 +107,25 @@ interface WorksheetMetadata {
   standards: string;
 }
 
+interface GeneratedProject {
+  templateType: ProjectTemplateType;
+  templateName: string;
+  lowFloor: string;
+  highCeiling: string;
+  phases: ProjectPhase[];
+  materials: string[];
+  rubric: {
+    criteria: string;
+    exemplary: string;
+    proficient: string;
+    developing: string;
+    beginning: string;
+    points: number;
+  }[];
+  extensions: string[];
+  reflectionPrompts: string[];
+}
+
 interface GeneratedAssignment {
   title: string;
   description: string;
@@ -93,6 +137,7 @@ interface GeneratedAssignment {
   accommodationNotes?: string;
   worksheet: WorksheetMetadata;
   accommodationChecklist: AccommodationChecklist;
+  project?: GeneratedProject;
 }
 
 const accommodationGuidelines = {
@@ -115,6 +160,273 @@ const accommodationGuidelines = {
 - Offer choice where possible
 - Include breaks or transition points`,
 };
+
+// "Low-Floor, High-Ceiling" Project Templates
+const PROJECT_TEMPLATES: Record<ProjectTemplateType, ProjectTemplate> = {
+  community_consultant: {
+    id: "community_consultant",
+    name: "Community Consultant",
+    description: "Service Learning: Students identify a real-world problem in their neighborhood or school and propose a solution.",
+    lowFloor: "Take photos with a phone and describe a problem you see in your community using paper and pencil.",
+    highCeiling: "Design a comprehensive action plan with budget, timeline, stakeholder analysis, and present to actual community leaders.",
+    bkdFocus: "do",
+    materials: ["Digital camera or smartphone", "Free Google Slides or Canva", "Interview questions template", "Community mapping worksheet"],
+    standardAlignment: ["Service Learning", "Civic Engagement", "Problem Solving", "Communication"],
+    phases: [
+      {
+        name: "Launch",
+        asyncTask: "Watch a 2-minute video about community change-makers. Brainstorm problems you notice in your neighborhood.",
+        syncTask: "Class discussion: Share problems observed. Teacher facilitates Q&A to spark interest.",
+        materials: ["Hook video", "Brainstorm worksheet"],
+        deliverable: "List of 3-5 community problems",
+        estimatedTime: "Day 1"
+      },
+      {
+        name: "Research",
+        asyncTask: "Photo-document the problem. Interview 2-3 community members about the issue.",
+        syncTask: "Think-Pair-Share: Students discuss findings in pairs, then share with class.",
+        materials: ["Phone/camera", "Interview guide"],
+        deliverable: "Photo essay with interview notes",
+        estimatedTime: "Days 2-4"
+      },
+      {
+        name: "Iteration",
+        asyncTask: "Create draft solution proposal with sketches or slides. Submit for feedback.",
+        syncTask: "Peer-review 'Critique Circles': Give and receive structured feedback.",
+        materials: ["Slides template", "Feedback rubric"],
+        deliverable: "Draft proposal v2",
+        estimatedTime: "Days 5-7"
+      },
+      {
+        name: "Showcase",
+        asyncTask: "Upload final project to class gallery. Write reflection on learning.",
+        syncTask: "Present to peer 'Board of Directors' panel for feedback and questions.",
+        materials: ["Presentation tools", "Reflection template"],
+        deliverable: "Final presentation + reflection",
+        estimatedTime: "Day 8-10"
+      }
+    ]
+  },
+  kitchen_lab: {
+    id: "kitchen_lab",
+    name: "Kitchen Lab",
+    description: "Inquiry-Based: Students use household items to test scientific or mathematical principles.",
+    lowFloor: "Use water and salt to conduct a simple experiment and draw what you observe.",
+    highCeiling: "Design a multi-variable experiment, collect quantitative data, create graphs, and draw evidence-based conclusions.",
+    bkdFocus: "know",
+    materials: ["Water", "Salt", "Food coloring", "Measuring cups", "Timer", "Recycled cardboard", "Shadows (sunlight)"],
+    standardAlignment: ["Experimental Design", "Scientific Method", "Data Analysis", "Geometry"],
+    phases: [
+      {
+        name: "Launch",
+        asyncTask: "Watch video on the scientific method. Write a question you want to investigate.",
+        syncTask: "Teacher demo of sample experiment. Class brainstorm on testable questions.",
+        materials: ["Demo materials", "Question template"],
+        deliverable: "Research question + hypothesis",
+        estimatedTime: "Day 1"
+      },
+      {
+        name: "Research",
+        asyncTask: "Gather materials at home. Design your experiment procedure step-by-step.",
+        syncTask: "Lab partner check-in: Review each other's procedures for clarity.",
+        materials: ["Household items", "Procedure template"],
+        deliverable: "Written procedure",
+        estimatedTime: "Days 2-3"
+      },
+      {
+        name: "Iteration",
+        asyncTask: "Conduct experiment. Record time-lapse or take photos of each stage. Collect data.",
+        syncTask: "Data analysis session: Create graphs, identify patterns.",
+        materials: ["Camera", "Data table", "Graph paper"],
+        deliverable: "Data + visuals",
+        estimatedTime: "Days 4-6"
+      },
+      {
+        name: "Showcase",
+        asyncTask: "Create a 'Lab Report' poster or digital presentation.",
+        syncTask: "Science fair style: Gallery walk where students explain their experiments.",
+        materials: ["Poster/slides", "Presentation rubric"],
+        deliverable: "Lab report + presentation",
+        estimatedTime: "Days 7-8"
+      }
+    ]
+  },
+  digital_storyteller: {
+    id: "digital_storyteller",
+    name: "Digital Storyteller",
+    description: "Creative Synthesis: Students teach a concept they just learned by creating a 'Manual' or 'Mini-Movie' for a younger student.",
+    lowFloor: "Draw a comic strip or write a simple story explaining the concept to a friend.",
+    highCeiling: "Produce a polished educational video with script, visuals, voiceover, and interactive elements.",
+    bkdFocus: "be",
+    materials: ["Paper and colored pencils", "Free Adobe Express", "Loom (free)", "Canva", "Notebook"],
+    standardAlignment: ["Communication", "Creative Expression", "Content Mastery", "Digital Literacy"],
+    phases: [
+      {
+        name: "Launch",
+        asyncTask: "Review the concept to be taught. Identify key ideas a younger student needs to know.",
+        syncTask: "Class discussion: What makes explanations clear? Analyze examples of good teaching.",
+        materials: ["Concept notes", "Examples of tutorials"],
+        deliverable: "Key concepts list",
+        estimatedTime: "Day 1"
+      },
+      {
+        name: "Research",
+        asyncTask: "Create a script or storyboard for your explanation. Decide on format (comic, video, booklet).",
+        syncTask: "Peer feedback on scripts: Is it clear? What's missing?",
+        materials: ["Storyboard template", "Script outline"],
+        deliverable: "Script/storyboard draft",
+        estimatedTime: "Days 2-3"
+      },
+      {
+        name: "Iteration",
+        asyncTask: "Create your 'teaching material' - draw, record, or design your content.",
+        syncTask: "Work session with check-ins. Teacher provides mini-lessons on tools as needed.",
+        materials: ["Chosen creation tools"],
+        deliverable: "Draft teaching material",
+        estimatedTime: "Days 4-6"
+      },
+      {
+        name: "Showcase",
+        asyncTask: "Polish and upload final product. Write reflection: 'What did I learn by teaching?'",
+        syncTask: "Presentation to class or 'buddy class' of younger students.",
+        materials: ["Final product", "Reflection prompt"],
+        deliverable: "Final teaching material + reflection",
+        estimatedTime: "Days 7-8"
+      }
+    ]
+  },
+  custom: {
+    id: "custom",
+    name: "Custom Project",
+    description: "Create a custom project tailored to your specific lesson objectives.",
+    lowFloor: "Start with basic materials and simple tasks accessible to all students.",
+    highCeiling: "Extend with advanced challenges for students ready for deeper exploration.",
+    bkdFocus: "do",
+    materials: ["To be determined based on project"],
+    standardAlignment: ["Custom alignment"],
+    phases: [
+      {
+        name: "Launch",
+        asyncTask: "Introduction to the project topic and requirements.",
+        syncTask: "Class discussion and project overview.",
+        materials: ["Project guidelines"],
+        deliverable: "Project plan",
+        estimatedTime: "Day 1"
+      },
+      {
+        name: "Research",
+        asyncTask: "Gather information and materials needed for the project.",
+        syncTask: "Collaborative research and planning session.",
+        materials: ["Research resources"],
+        deliverable: "Research notes",
+        estimatedTime: "Days 2-4"
+      },
+      {
+        name: "Iteration",
+        asyncTask: "Create project draft and refine based on feedback.",
+        syncTask: "Peer review and revision workshop.",
+        materials: ["Draft materials"],
+        deliverable: "Revised project",
+        estimatedTime: "Days 5-7"
+      },
+      {
+        name: "Showcase",
+        asyncTask: "Finalize and submit project.",
+        syncTask: "Class presentations and celebration.",
+        materials: ["Final project"],
+        deliverable: "Completed project",
+        estimatedTime: "Days 8-10"
+      }
+    ]
+  }
+};
+
+function generateProjectFromTemplate(
+  lesson: Lesson,
+  templateType: ProjectTemplateType,
+  difficulty: string
+): GeneratedProject {
+  const template = PROJECT_TEMPLATES[templateType] || PROJECT_TEMPLATES.custom;
+  
+  // Customize the template based on the lesson
+  const customizedPhases = template.phases.map(phase => ({
+    ...phase,
+    asyncTask: phase.asyncTask.replace(/the concept|the topic/gi, `"${lesson.topic}"`),
+    syncTask: phase.syncTask.replace(/the concept|the topic/gi, `"${lesson.topic}"`),
+  }));
+
+  // Generate rubric criteria based on difficulty
+  const rubricCriteria = [
+    {
+      criteria: "Understanding of Concept",
+      exemplary: `Demonstrates deep understanding of ${lesson.topic} with original insights.`,
+      proficient: `Shows solid understanding of ${lesson.topic} with accurate explanations.`,
+      developing: `Shows basic understanding of ${lesson.topic} with some gaps.`,
+      beginning: `Shows limited understanding of ${lesson.topic}. Needs revision.`,
+      points: difficulty === "hard" ? 30 : difficulty === "medium" ? 25 : 20
+    },
+    {
+      criteria: "Quality of Work",
+      exemplary: "Work is polished, creative, and exceeds expectations.",
+      proficient: "Work is complete, neat, and meets all requirements.",
+      developing: "Work is mostly complete but lacks attention to detail.",
+      beginning: "Work is incomplete or does not meet basic requirements.",
+      points: difficulty === "hard" ? 25 : difficulty === "medium" ? 25 : 20
+    },
+    {
+      criteria: "Process & Effort",
+      exemplary: "Evidence of iteration, revision, and growth throughout the project.",
+      proficient: "Followed all phases and submitted work on time.",
+      developing: "Completed most phases with some missed deadlines.",
+      beginning: "Missed multiple phases or deadlines.",
+      points: 20
+    },
+    {
+      criteria: "Presentation & Communication",
+      exemplary: "Presents ideas clearly and engages audience effectively.",
+      proficient: "Communicates ideas clearly with good organization.",
+      developing: "Ideas are present but organization could improve.",
+      beginning: "Presentation lacks clarity or organization.",
+      points: difficulty === "hard" ? 25 : difficulty === "medium" ? 25 : 20
+    }
+  ];
+
+  // Generate extension activities based on difficulty
+  const extensions = difficulty === "hard" ? [
+    `Connect ${lesson.topic} to real-world applications beyond the classroom.`,
+    "Create a follow-up project that builds on your findings.",
+    "Mentor a peer who is working on a similar project.",
+    "Present to an authentic audience (community members, experts, etc.)."
+  ] : difficulty === "medium" ? [
+    `Research how ${lesson.topic} relates to other subjects you're studying.`,
+    "Add multimedia elements to enhance your project.",
+    "Interview an expert or professional in this field."
+  ] : [
+    `Find one more example of ${lesson.topic} in your daily life.`,
+    "Create a visual aid to explain your project to a younger student."
+  ];
+
+  // Generate reflection prompts aligned with Be-Know-Do
+  const reflectionPrompts = [
+    `BE: How has working on this project changed how you see yourself as a learner?`,
+    `KNOW: What is the most important thing you learned about ${lesson.topic}?`,
+    `DO: How will you apply what you learned in this project to other areas of your life?`,
+    "What was the most challenging part of this project and how did you overcome it?",
+    "What would you do differently if you could start over?"
+  ];
+
+  return {
+    templateType,
+    templateName: template.name,
+    lowFloor: template.lowFloor,
+    highCeiling: template.highCeiling,
+    phases: customizedPhases,
+    materials: template.materials,
+    rubric: rubricCriteria,
+    extensions,
+    reflectionPrompts
+  };
+}
 
 export async function generateAssignment(request: GenerateAssignmentRequest): Promise<GeneratedAssignment> {
   if (!openai) {
@@ -409,17 +721,29 @@ function generateMockAssignment(request: GenerateAssignmentRequest): GeneratedAs
     questions.push(question);
   }
 
+  // Generate project data if assignment type is project
+  const projectData = request.assignmentType === "project" 
+    ? generateProjectFromTemplate(request.lesson, request.projectTemplate || "community_consultant", request.difficulty)
+    : undefined;
+
+  // Calculate total points including project rubric if applicable
+  const questionPoints = questions.reduce((sum, q) => sum + q.points, 0);
+  const projectPoints = projectData?.rubric.reduce((sum, r) => sum + r.points, 0) || 0;
+
   return {
     title: `${request.lesson.title} - ${request.assignmentType.charAt(0).toUpperCase() + request.assignmentType.slice(1)}`,
-    description: `A ${request.difficulty} difficulty ${request.assignmentType} covering the key concepts from "${request.lesson.title}".`,
+    description: request.assignmentType === "project" && projectData
+      ? `${projectData.templateName}: ${projectData.lowFloor} → ${projectData.highCeiling}`
+      : `A ${request.difficulty} difficulty ${request.assignmentType} covering the key concepts from "${request.lesson.title}".`,
     instructions: getDefaultInstructions(request.assignmentType),
     questions,
-    totalPoints: questions.reduce((sum, q) => sum + q.points, 0),
+    totalPoints: request.assignmentType === "project" ? projectPoints : questionPoints,
     accommodationModified: !!request.accommodationType,
     accommodationType: request.accommodationType,
     accommodationNotes: request.accommodationNotes,
     worksheet: extractWorksheetMetadata(request.lesson),
     accommodationChecklist: getDefaultAccommodationChecklist(request.accommodationType),
+    project: projectData,
   };
 }
 

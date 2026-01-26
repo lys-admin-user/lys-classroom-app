@@ -1309,7 +1309,7 @@ export async function registerRoutes(
   app.post("/api/assignments/generate", isAuthenticated, requirePaidTier, async (req: any, res) => {
     try {
       const userId = req.user?.claims?.sub;
-      const { lessonId, assignmentType, questionCount, difficulty, includeBeKnowDo, accommodationType, accommodationNotes } = req.body;
+      const { lessonId, assignmentType, questionCount, difficulty, includeBeKnowDo, accommodationType, accommodationNotes, projectTemplate } = req.body;
       
       const lesson = await storage.getLesson(lessonId);
       if (!lesson) {
@@ -1331,6 +1331,7 @@ export async function registerRoutes(
         includeBeKnowDo: includeBeKnowDo !== false,
         accommodationType,
         accommodationNotes,
+        projectTemplate: projectTemplate || "community_consultant",
       });
       
       res.json(generated);
