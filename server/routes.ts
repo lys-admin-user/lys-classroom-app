@@ -6909,5 +6909,567 @@ export async function registerRoutes(
     }
   });
 
+  // ================================
+  // SIS Integration Routes
+  // ================================
+  // Supports Clever, PowerSchool, Canvas, Infinite Campus, OneRoster
+  
+  const { sisService } = await import("./services/sisService");
+  const { SIS_PROVIDERS } = await import("@shared/schema");
+
+  // Get available SIS providers
+  app.get("/api/integrations/sis/providers", async (req, res) => {
+    res.json(SIS_PROVIDERS);
+  });
+
+  // Get user's SIS connections
+  app.get("/api/integrations/sis/connections", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user?.claims?.sub;
+      const connections = await storage.getSisConnections(userId);
+      
+      // Don't expose tokens in response
+      const safeConnections = connections.map(c => ({
+        ...c,
+        accessToken: c.accessToken ? "[ENCRYPTED]" : null,
+        refreshToken: c.refreshToken ? "[ENCRYPTED]" : null,
+      }));
+      
+      res.json(safeConnections);
+    } catch (error) {
+      console.error("Failed to get SIS connections:", error);
+      res.status(500).json({ error: "Failed to get SIS connections" });
+    }
+  });
+
+  // Get organization's SIS connections (for campus admins)
+  app.get("/api/integrations/sis/connections/org/:organizationId", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user?.claims?.sub;
+      const { organizationId } = req.params;
+      
+      // Verify user has access to this organization
+      const membership = await storage.getOrgMembership(organizationId, userId);
+      if (!membership || !["owner", "admin"].includes(membership.role)) {
+        res.status(403).json({ error: "Access denied" });
+        return;
+      }
+      
+      const connections = await storage.getSisConnectionsByOrg(organizationId);
+      
+      const safeConnections = connections.map(c => ({
+        ...c,
+        accessToken: c.accessToken ? "[ENCRYPTED]" : null,
+        refreshToken: c.refreshToken ? "[ENCRYPTED]" : null,
+      }));
+      
+      res.json(safeConnections);
+    } catch (error) {
+      console.error("Failed to get organization SIS connections:", error);
+      res.status(500).json({ error: "Failed to get organization SIS connections" });
+    }
+  });
+
+  // Create a new SIS connection (manual configuration)
+  const createSisConnectionSchema = z.object({
+    provider: z.enum(["clever", "powerschool", "canvas", "infinite_campus", "skyward", "oneroster"]),
+    providerName: z.string().optional(),
+    organizationId: z.string().optional(),
+    baseUrl: z.string().url().optional(),
+    accessToken: z.string().optional(),
+    districtId: z.string().optional(),
+    settings: z.object({
+      autoSync: z.boolean().default(false),
+      syncFrequency: z.string().default("manual"),
+      syncStudents: z.boolean().default(true),
+      syncTeachers: z.boolean().default(true),
+      syncCourses: z.boolean().default(true),
+      syncGrades: z.boolean().default(false),
+      syncAttendance: z.boolean().default(false),
+    }).optional(),
+  });
+
+  app.post("/api/integrations/sis/connections", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user?.claims?.sub;
+      const user = await storage.getUser(userId);
+      
+      // Only educators and campus admins can connect SIS
+      if (!user || !["educator", "campus_admin"].includes(user.role || "")) {
+        res.status(403).json({ error: "Only educators and administrators can connect SIS systems" });
+        return;
+      }
+      
+      const validated = createSisConnectionSchema.parse(req.body);
+      
+      const connection = await storage.createSisConnection({
+        userId,
+        provider: validated.provider,
+        providerName: validated.providerName || SIS_PROVIDERS[validated.provider].name,
+        organizationId: validated.organizationId,
+        status: validated.accessToken ? "connected" : "pending",
+        accessToken: validated.accessToken,
+        districtId: validated.districtId,
+        settings: validated.settings || {
+          autoSync: false,
+          syncFrequency: "manual",
+          syncStudents: true,
+          syncTeachers: true,
+          syncCourses: true,
+          syncGrades: false,
+          syncAttendance: false,
+        },
+        metadata: { baseUrl: validated.baseUrl },
+      });
+      
+      res.json({
+        ...connection,
+        accessToken: connection.accessToken ? "[ENCRYPTED]" : null,
+      });
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        res.status(400).json({ error: "Invalid connection data", details: error.errors });
+        return;
+      }
+      console.error("Failed to create SIS connection:", error);
+      res.status(500).json({ error: "Failed to create SIS connection" });
+    }
+  });
+
+  // Update SIS connection settings
+  app.patch("/api/integrations/sis/connections/:id", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user?.claims?.sub;
+      const { id } = req.params;
+      
+      const connection = await storage.getSisConnection(id);
+      if (!connection || connection.userId !== userId) {
+        res.status(404).json({ error: "Connection not found" });
+        return;
+      }
+      
+      const updateSchema = z.object({
+        providerName: z.string().optional(),
+        settings: z.object({
+          autoSync: z.boolean().optional(),
+          syncFrequency: z.string().optional(),
+          syncStudents: z.boolean().optional(),
+          syncTeachers: z.boolean().optional(),
+          syncCourses: z.boolean().optional(),
+          syncGrades: z.boolean().optional(),
+          syncAttendance: z.boolean().optional(),
+        }).optional(),
+      });
+      
+      const validated = updateSchema.parse(req.body);
+      
+      const updated = await storage.updateSisConnection(id, {
+        providerName: validated.providerName,
+        settings: validated.settings ? { ...connection.settings, ...validated.settings } : undefined,
+      });
+      
+      if (!updated) {
+        res.status(404).json({ error: "Connection not found" });
+        return;
+      }
+      
+      res.json({
+        ...updated,
+        accessToken: updated.accessToken ? "[ENCRYPTED]" : null,
+        refreshToken: updated.refreshToken ? "[ENCRYPTED]" : null,
+      });
+    } catch (error) {
+      console.error("Failed to update SIS connection:", error);
+      res.status(500).json({ error: "Failed to update SIS connection" });
+    }
+  });
+
+  // Delete SIS connection
+  app.delete("/api/integrations/sis/connections/:id", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user?.claims?.sub;
+      const { id } = req.params;
+      
+      await storage.deleteSisConnection(id, userId);
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Failed to delete SIS connection:", error);
+      res.status(500).json({ error: "Failed to delete SIS connection" });
+    }
+  });
+
+  // Test SIS connection
+  app.post("/api/integrations/sis/connections/:id/test", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user?.claims?.sub;
+      const { id } = req.params;
+      
+      const connection = await storage.getSisConnection(id);
+      if (!connection || connection.userId !== userId) {
+        res.status(404).json({ error: "Connection not found" });
+        return;
+      }
+      
+      if (!connection.accessToken) {
+        res.status(400).json({ error: "Connection not configured with access token" });
+        return;
+      }
+      
+      sisService.setConfig(connection.provider as any, {
+        baseUrl: (connection.metadata as any)?.baseUrl || SIS_PROVIDERS[connection.provider as keyof typeof SIS_PROVIDERS].apiBase,
+        accessToken: connection.accessToken,
+        refreshToken: connection.refreshToken || undefined,
+        districtId: connection.districtId || undefined,
+      });
+      
+      const result = await sisService.testConnection();
+      
+      // Update connection status
+      await storage.updateSisConnection(id, {
+        status: result.success ? "connected" : "error",
+        syncError: result.success ? null : result.message,
+      });
+      
+      res.json(result);
+    } catch (error) {
+      console.error("Failed to test SIS connection:", error);
+      res.status(500).json({ error: "Failed to test SIS connection" });
+    }
+  });
+
+  // Sync data from SIS
+  app.post("/api/integrations/sis/connections/:id/sync", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user?.claims?.sub;
+      const { id } = req.params;
+      
+      const syncTypeSchema = z.object({
+        syncType: z.enum(["full", "students", "teachers", "courses"]).default("full"),
+      });
+      
+      const { syncType } = syncTypeSchema.parse(req.body);
+      
+      const connection = await storage.getSisConnection(id);
+      if (!connection || connection.userId !== userId) {
+        res.status(404).json({ error: "Connection not found" });
+        return;
+      }
+      
+      if (!connection.accessToken) {
+        res.status(400).json({ error: "Connection not configured" });
+        return;
+      }
+      
+      // Update connection sync status
+      await storage.updateSisConnection(id, {
+        syncStatus: "syncing",
+        lastSyncAt: new Date(),
+      });
+      
+      // Create sync history entry
+      const syncHistory = await storage.createSisSyncHistory({
+        connectionId: id,
+        userId,
+        syncType,
+        status: "started",
+      });
+      
+      // Configure service
+      sisService.setConfig(connection.provider as any, {
+        baseUrl: (connection.metadata as any)?.baseUrl || SIS_PROVIDERS[connection.provider as keyof typeof SIS_PROVIDERS].apiBase,
+        accessToken: connection.accessToken,
+        refreshToken: connection.refreshToken || undefined,
+        districtId: connection.districtId || undefined,
+      });
+      
+      let recordsProcessed = 0;
+      let recordsCreated = 0;
+      let recordsUpdated = 0;
+      const errors: { message: string; record?: any }[] = [];
+      
+      try {
+        // Sync students
+        if (syncType === "full" || syncType === "students") {
+          const students = await sisService.fetchStudents(200, 0);
+          for (const student of students) {
+            recordsProcessed++;
+            try {
+              const existing = await storage.getSisStudentBySisId(id, student.sisId);
+              if (existing) {
+                await storage.updateSisStudent(existing.id, {
+                  firstName: student.firstName,
+                  lastName: student.lastName,
+                  email: student.email,
+                  gradeLevel: student.gradeLevel,
+                  schoolId: student.schoolId,
+                  enrollmentStatus: student.enrollmentStatus,
+                  sisData: student.rawData,
+                });
+                recordsUpdated++;
+              } else {
+                await storage.createSisStudent({
+                  connectionId: id,
+                  sisStudentId: student.sisId,
+                  firstName: student.firstName,
+                  lastName: student.lastName,
+                  email: student.email,
+                  gradeLevel: student.gradeLevel,
+                  schoolId: student.schoolId,
+                  enrollmentStatus: student.enrollmentStatus,
+                  sisData: student.rawData,
+                });
+                recordsCreated++;
+              }
+            } catch (e: any) {
+              errors.push({ message: e.message, record: { sisId: student.sisId } });
+            }
+          }
+        }
+        
+        // Sync courses
+        if (syncType === "full" || syncType === "courses") {
+          const courses = await sisService.fetchCourses(200, 0);
+          for (const course of courses) {
+            recordsProcessed++;
+            try {
+              const existing = await storage.getSisCourseBySisId(id, course.sisId);
+              if (existing) {
+                await storage.updateSisCourse(existing.id, {
+                  name: course.name,
+                  courseCode: course.courseCode,
+                  subject: course.subject,
+                  gradeLevel: course.gradeLevel,
+                  schoolId: course.schoolId,
+                  teacherIds: course.teacherIds,
+                  studentCount: course.studentCount,
+                  term: course.term,
+                  status: course.status,
+                  sisData: course.rawData,
+                });
+                recordsUpdated++;
+              } else {
+                await storage.createSisCourse({
+                  connectionId: id,
+                  sisCourseId: course.sisId,
+                  name: course.name,
+                  courseCode: course.courseCode,
+                  subject: course.subject,
+                  gradeLevel: course.gradeLevel,
+                  schoolId: course.schoolId,
+                  teacherIds: course.teacherIds,
+                  studentCount: course.studentCount,
+                  term: course.term,
+                  status: course.status,
+                  sisData: course.rawData,
+                });
+                recordsCreated++;
+              }
+            } catch (e: any) {
+              errors.push({ message: e.message, record: { sisId: course.sisId } });
+            }
+          }
+        }
+        
+        // Update sync history
+        await storage.updateSisSyncHistory(syncHistory.id, {
+          status: "completed",
+          recordsProcessed,
+          recordsCreated,
+          recordsUpdated,
+          recordsSkipped: recordsProcessed - recordsCreated - recordsUpdated,
+          errorCount: errors.length,
+          errors: errors.length > 0 ? errors : null,
+          completedAt: new Date(),
+        });
+        
+        // Update connection status
+        await storage.updateSisConnection(id, {
+          syncStatus: "idle",
+          syncError: errors.length > 0 ? `${errors.length} errors during sync` : null,
+        });
+        
+        res.json({
+          success: true,
+          syncHistoryId: syncHistory.id,
+          recordsProcessed,
+          recordsCreated,
+          recordsUpdated,
+          errorCount: errors.length,
+        });
+      } catch (syncError: any) {
+        // Update sync history on failure
+        await storage.updateSisSyncHistory(syncHistory.id, {
+          status: "failed",
+          recordsProcessed,
+          recordsCreated,
+          recordsUpdated,
+          errorCount: 1,
+          errors: [{ message: syncError.message }],
+          completedAt: new Date(),
+        });
+        
+        await storage.updateSisConnection(id, {
+          syncStatus: "error",
+          syncError: syncError.message,
+        });
+        
+        throw syncError;
+      }
+    } catch (error) {
+      console.error("Failed to sync SIS data:", error);
+      res.status(500).json({ error: "Failed to sync SIS data" });
+    }
+  });
+
+  // Get sync history for a connection
+  app.get("/api/integrations/sis/connections/:id/history", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user?.claims?.sub;
+      const { id } = req.params;
+      
+      const connection = await storage.getSisConnection(id);
+      if (!connection || connection.userId !== userId) {
+        res.status(404).json({ error: "Connection not found" });
+        return;
+      }
+      
+      const history = await storage.getSisSyncHistory(id, 20);
+      res.json(history);
+    } catch (error) {
+      console.error("Failed to get sync history:", error);
+      res.status(500).json({ error: "Failed to get sync history" });
+    }
+  });
+
+  // Get students from a SIS connection
+  app.get("/api/integrations/sis/connections/:id/students", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user?.claims?.sub;
+      const { id } = req.params;
+      
+      const connection = await storage.getSisConnection(id);
+      if (!connection || connection.userId !== userId) {
+        res.status(404).json({ error: "Connection not found" });
+        return;
+      }
+      
+      const students = await storage.getSisStudents(id);
+      res.json(students);
+    } catch (error) {
+      console.error("Failed to get SIS students:", error);
+      res.status(500).json({ error: "Failed to get SIS students" });
+    }
+  });
+
+  // Get courses from a SIS connection
+  app.get("/api/integrations/sis/connections/:id/courses", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user?.claims?.sub;
+      const { id } = req.params;
+      
+      const connection = await storage.getSisConnection(id);
+      if (!connection || connection.userId !== userId) {
+        res.status(404).json({ error: "Connection not found" });
+        return;
+      }
+      
+      const courses = await storage.getSisCourses(id);
+      res.json(courses);
+    } catch (error) {
+      console.error("Failed to get SIS courses:", error);
+      res.status(500).json({ error: "Failed to get SIS courses" });
+    }
+  });
+
+  // OAuth callback for Clever
+  app.get("/api/integrations/sis/oauth/clever/callback", async (req, res) => {
+    try {
+      const { code, state } = req.query;
+      
+      if (!code || !state) {
+        res.status(400).send("Missing OAuth parameters");
+        return;
+      }
+      
+      // Parse state to get userId and connectionId
+      const stateData = JSON.parse(Buffer.from(state as string, "base64").toString());
+      const { userId, connectionId } = stateData;
+      
+      // Get the redirect URI (same as what was used to initiate OAuth)
+      const redirectUri = `${req.protocol}://${req.get("host")}/api/integrations/sis/oauth/clever/callback`;
+      
+      const tokens = await sisService.exchangeCodeForTokens("clever", code as string, redirectUri);
+      
+      if (!tokens) {
+        res.status(400).send("Failed to exchange OAuth code");
+        return;
+      }
+      
+      // Update the connection with the new tokens
+      await storage.updateSisConnection(connectionId, {
+        accessToken: tokens.accessToken,
+        refreshToken: tokens.refreshToken,
+        tokenExpiresAt: tokens.expiresAt,
+        status: "connected",
+      });
+      
+      // Redirect back to the app
+      res.redirect("/settings?sis=connected");
+    } catch (error) {
+      console.error("Clever OAuth callback error:", error);
+      res.redirect("/settings?sis=error");
+    }
+  });
+
+  // Get OAuth URL for connecting a SIS
+  app.post("/api/integrations/sis/oauth/initiate", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user?.claims?.sub;
+      
+      const initiateSchema = z.object({
+        provider: z.enum(["clever", "powerschool", "canvas", "infinite_campus", "skyward", "oneroster"]),
+        organizationId: z.string().optional(),
+      });
+      
+      const { provider, organizationId } = initiateSchema.parse(req.body);
+      
+      // Create a pending connection
+      const connection = await storage.createSisConnection({
+        userId,
+        provider,
+        providerName: SIS_PROVIDERS[provider].name,
+        organizationId,
+        status: "pending",
+        settings: {
+          autoSync: false,
+          syncFrequency: "manual",
+          syncStudents: true,
+          syncTeachers: true,
+          syncCourses: true,
+          syncGrades: false,
+          syncAttendance: false,
+        },
+      });
+      
+      const redirectUri = `${req.protocol}://${req.get("host")}/api/integrations/sis/oauth/${provider}/callback`;
+      const state = Buffer.from(JSON.stringify({ userId, connectionId: connection.id })).toString("base64");
+      
+      const oauthUrl = sisService.getOAuthUrl(provider, redirectUri, state);
+      
+      if (!oauthUrl) {
+        res.status(400).json({ 
+          error: "OAuth not available for this provider. Please configure manually with an access token.",
+          connectionId: connection.id,
+        });
+        return;
+      }
+      
+      res.json({ oauthUrl, connectionId: connection.id });
+    } catch (error) {
+      console.error("Failed to initiate SIS OAuth:", error);
+      res.status(500).json({ error: "Failed to initiate SIS OAuth" });
+    }
+  });
+
   return httpServer;
 }

@@ -38,6 +38,7 @@ import StudentDashboard from "@/pages/StudentDashboard";
 import MyJourney from "@/pages/MyJourney";
 import PortfolioBuilder from "@/pages/PortfolioBuilder";
 import PortfolioView from "@/pages/PortfolioView";
+import SISIntegration from "@/pages/SISIntegration";
 import NotFound from "@/pages/not-found";
 
 const EXEMPT_PATHS = ["/onboarding", "/pricing", "/shared", "/p/"];
@@ -70,6 +71,7 @@ function Router() {
       <Route path="/resources" component={Resources} />
       <Route path="/my-lessons" component={MyLessons} />
       <Route path="/settings" component={Settings} />
+      <Route path="/sis-integration" component={SISIntegration} />
       <Route path="/analytics" component={Analytics} />
       <Route path="/scope-sequence" component={ScopeSequence} />
       <Route path="/scope/:id" component={ScopeEditor} />

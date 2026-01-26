@@ -1711,3 +1711,160 @@ export const BASE_PRICES_USD = {
   campus: 99,
   enterprise: 299,
 } as const;
+
+// SIS (Student Information System) Integration
+// Supports Clever, PowerSchool, Canvas, Infinite Campus, OneRoster
+export const sisConnections = pgTable("sis_connections", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull(), // The educator/admin who connected
+  organizationId: varchar("organization_id"), // Optional school/district organization
+  provider: text("provider").notNull(), // clever, powerschool, canvas, infinite_campus, oneroster, skyward
+  providerName: text("provider_name"), // Display name (e.g., "PowerSchool - Lincoln High")
+  status: text("status").notNull().default("pending"), // pending, connected, error, disconnected
+  accessToken: text("access_token"), // Encrypted OAuth access token
+  refreshToken: text("refresh_token"), // Encrypted OAuth refresh token
+  tokenExpiresAt: timestamp("token_expires_at"),
+  districtId: varchar("district_id"), // Provider's district/school identifier
+  schoolIds: jsonb("school_ids").$type<string[]>(), // Connected school IDs
+  lastSyncAt: timestamp("last_sync_at"),
+  syncStatus: text("sync_status"), // idle, syncing, error
+  syncError: text("sync_error"),
+  settings: jsonb("settings").$type<{
+    autoSync: boolean;
+    syncFrequency: string; // daily, weekly, manual
+    syncStudents: boolean;
+    syncTeachers: boolean;
+    syncCourses: boolean;
+    syncGrades: boolean;
+    syncAttendance: boolean;
+  }>(),
+  metadata: jsonb("metadata").$type<Record<string, any>>(),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertSisConnectionSchema = createInsertSchema(sisConnections).omit({ id: true, createdAt: true, updatedAt: true });
+export type InsertSisConnection = z.infer<typeof insertSisConnectionSchema>;
+export type SisConnection = typeof sisConnections.$inferSelect;
+
+// SIS Sync History - Track data transfer logs
+export const sisSyncHistory = pgTable("sis_sync_history", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  connectionId: varchar("connection_id").notNull(),
+  userId: varchar("user_id").notNull(),
+  syncType: text("sync_type").notNull(), // full, incremental, students, teachers, courses, grades
+  status: text("status").notNull(), // started, completed, failed
+  recordsProcessed: integer("records_processed").default(0),
+  recordsCreated: integer("records_created").default(0),
+  recordsUpdated: integer("records_updated").default(0),
+  recordsSkipped: integer("records_skipped").default(0),
+  errorCount: integer("error_count").default(0),
+  errors: jsonb("errors").$type<{ message: string; record?: any }[]>(),
+  startedAt: timestamp("started_at").defaultNow(),
+  completedAt: timestamp("completed_at"),
+  metadata: jsonb("metadata").$type<Record<string, any>>(),
+});
+
+export const insertSisSyncHistorySchema = createInsertSchema(sisSyncHistory).omit({ id: true, startedAt: true });
+export type InsertSisSyncHistory = z.infer<typeof insertSisSyncHistorySchema>;
+export type SisSyncHistory = typeof sisSyncHistory.$inferSelect;
+
+// SIS Imported Students - Students imported from SIS
+export const sisStudents = pgTable("sis_students", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  connectionId: varchar("connection_id").notNull(),
+  sisStudentId: varchar("sis_student_id").notNull(), // ID from the SIS
+  lysUserId: varchar("lys_user_id"), // Linked LYS user if exists
+  firstName: text("first_name").notNull(),
+  lastName: text("last_name").notNull(),
+  email: text("email"),
+  gradeLevel: text("grade_level"),
+  schoolId: varchar("school_id"),
+  schoolName: text("school_name"),
+  enrollmentStatus: text("enrollment_status"), // active, inactive, transferred
+  sisData: jsonb("sis_data").$type<Record<string, any>>(), // Raw data from SIS
+  lastSyncAt: timestamp("last_sync_at").defaultNow(),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertSisStudentSchema = createInsertSchema(sisStudents).omit({ id: true, createdAt: true, lastSyncAt: true });
+export type InsertSisStudent = z.infer<typeof insertSisStudentSchema>;
+export type SisStudent = typeof sisStudents.$inferSelect;
+
+// SIS Imported Courses/Sections
+export const sisCourses = pgTable("sis_courses", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  connectionId: varchar("connection_id").notNull(),
+  sisCourseId: varchar("sis_course_id").notNull(), // ID from the SIS
+  name: text("name").notNull(),
+  courseCode: text("course_code"),
+  subject: text("subject"),
+  gradeLevel: text("grade_level"),
+  schoolId: varchar("school_id"),
+  schoolName: text("school_name"),
+  teacherIds: jsonb("teacher_ids").$type<string[]>(),
+  studentCount: integer("student_count").default(0),
+  term: text("term"), // Fall 2024, Spring 2025, etc.
+  status: text("status"), // active, completed, upcoming
+  sisData: jsonb("sis_data").$type<Record<string, any>>(),
+  lastSyncAt: timestamp("last_sync_at").defaultNow(),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertSisCourseSchema = createInsertSchema(sisCourses).omit({ id: true, createdAt: true, lastSyncAt: true });
+export type InsertSisCourse = z.infer<typeof insertSisCourseSchema>;
+export type SisCourse = typeof sisCourses.$inferSelect;
+
+// SIS Provider Configuration
+export const SIS_PROVIDERS = {
+  clever: {
+    name: "Clever",
+    description: "Rostering & SSO platform used by 100,000+ schools",
+    apiBase: "https://api.clever.com/v3.1",
+    authType: "oauth2",
+    supports: ["students", "teachers", "courses", "schools"],
+    icon: "graduation-cap",
+  },
+  powerschool: {
+    name: "PowerSchool",
+    description: "Leading K-12 student information system",
+    apiBase: "", // District-specific
+    authType: "oauth2",
+    supports: ["students", "teachers", "courses", "grades", "attendance"],
+    icon: "school",
+  },
+  canvas: {
+    name: "Canvas LMS",
+    description: "Learning management system by Instructure",
+    apiBase: "", // Institution-specific
+    authType: "access_token",
+    supports: ["students", "teachers", "courses", "grades", "assignments"],
+    icon: "book-open",
+  },
+  infinite_campus: {
+    name: "Infinite Campus",
+    description: "Cloud-based student information system",
+    apiBase: "", // District-specific
+    authType: "oauth2",
+    supports: ["students", "teachers", "courses", "grades", "attendance"],
+    icon: "building",
+  },
+  skyward: {
+    name: "Skyward",
+    description: "K-12 school administration software",
+    apiBase: "", // District-specific
+    authType: "oauth2",
+    supports: ["students", "teachers", "courses", "grades"],
+    icon: "cloud",
+  },
+  oneroster: {
+    name: "OneRoster",
+    description: "Industry standard API for interoperability",
+    apiBase: "", // District-specific
+    authType: "oauth2",
+    supports: ["students", "teachers", "courses", "schools"],
+    icon: "link",
+  },
+} as const;
+
+export type SisProvider = keyof typeof SIS_PROVIDERS;

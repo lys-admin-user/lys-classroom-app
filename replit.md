@@ -155,3 +155,41 @@ Preferred communication style: Simple, everyday language.
     -   `GET /api/integrations/wordpress/shortcode-instructions` - Get WordPress plugin code
     -   `GET /api/oembed` - oEmbed endpoint for WordPress auto-discovery
     -   `POST /api/integrations/wordpress/sync-lesson` - Sync lesson plan to WordPress
+
+### SIS (Student Information System) Integration
+-   **Service File**: `server/services/sisService.ts`
+-   **Supported Providers**:
+    -   **Clever**: Most popular rostering platform (OAuth 2.0, SSO, 100,000+ schools)
+    -   **PowerSchool**: Leading K-12 SIS with OneRoster support
+    -   **Canvas LMS**: Learning management system by Instructure
+    -   **Infinite Campus**: Cloud-based student information system
+    -   **Skyward**: K-12 school administration software
+    -   **OneRoster**: Industry standard API for interoperability
+-   **Features**:
+    -   OAuth authentication flow for supported providers
+    -   Manual API token configuration for all providers
+    -   Student roster import and sync
+    -   Course/section import and sync
+    -   Sync history tracking with success/failure counts
+    -   Configurable sync settings (students, teachers, courses, grades, attendance)
+    -   Role-based access (educators and campus_admin only)
+-   **Database Tables**:
+    -   `sis_connections` - Provider connections with encrypted tokens
+    -   `sis_sync_history` - Track sync operations and results
+    -   `sis_students` - Imported student data from SIS
+    -   `sis_courses` - Imported course/section data from SIS
+-   **API Endpoints**:
+    -   `GET /api/integrations/sis/providers` - List available SIS providers
+    -   `GET /api/integrations/sis/connections` - Get user's SIS connections
+    -   `GET /api/integrations/sis/connections/org/:orgId` - Get organization's connections (admin)
+    -   `POST /api/integrations/sis/connections` - Create new SIS connection
+    -   `PATCH /api/integrations/sis/connections/:id` - Update connection settings
+    -   `DELETE /api/integrations/sis/connections/:id` - Delete connection
+    -   `POST /api/integrations/sis/connections/:id/test` - Test connection
+    -   `POST /api/integrations/sis/connections/:id/sync` - Sync data from SIS
+    -   `GET /api/integrations/sis/connections/:id/history` - Get sync history
+    -   `GET /api/integrations/sis/connections/:id/students` - Get synced students
+    -   `GET /api/integrations/sis/connections/:id/courses` - Get synced courses
+    -   `POST /api/integrations/sis/oauth/initiate` - Start OAuth flow
+    -   `GET /api/integrations/sis/oauth/clever/callback` - Clever OAuth callback
+-   **UI Page**: `/sis-integration` - Educator interface for managing SIS connections

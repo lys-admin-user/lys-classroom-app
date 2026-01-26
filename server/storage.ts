@@ -189,6 +189,18 @@ import {
   sponsoredAccess,
   type ContextualSponsorship,
   contextualSponsorships,
+  type SisConnection,
+  type InsertSisConnection,
+  sisConnections,
+  type SisSyncHistory,
+  type InsertSisSyncHistory,
+  sisSyncHistory,
+  type SisStudent,
+  type InsertSisStudent,
+  sisStudents,
+  type SisCourse,
+  type InsertSisCourse,
+  sisCourses,
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, desc, and, asc, gte, sql } from "drizzle-orm";
@@ -575,6 +587,35 @@ export interface IStorage {
   getCAICountries(): Promise<CAICountry[]>;
   getCAICountry(code: string): Promise<CAICountry | undefined>;
   getCAICountriesByRegion(region: string): Promise<CAICountry[]>;
+  
+  // SIS Integration
+  getSisConnections(userId: string): Promise<SisConnection[]>;
+  getSisConnection(id: string): Promise<SisConnection | undefined>;
+  getSisConnectionsByOrg(organizationId: string): Promise<SisConnection[]>;
+  createSisConnection(connection: InsertSisConnection): Promise<SisConnection>;
+  updateSisConnection(id: string, updates: Partial<SisConnection>): Promise<SisConnection | undefined>;
+  deleteSisConnection(id: string, userId: string): Promise<boolean>;
+  
+  // SIS Sync History
+  getSisSyncHistory(connectionId: string, limit?: number): Promise<SisSyncHistory[]>;
+  createSisSyncHistory(history: InsertSisSyncHistory): Promise<SisSyncHistory>;
+  updateSisSyncHistory(id: string, updates: Partial<SisSyncHistory>): Promise<SisSyncHistory | undefined>;
+  
+  // SIS Students
+  getSisStudents(connectionId: string): Promise<SisStudent[]>;
+  getSisStudent(id: string): Promise<SisStudent | undefined>;
+  getSisStudentBySisId(connectionId: string, sisStudentId: string): Promise<SisStudent | undefined>;
+  createSisStudent(student: InsertSisStudent): Promise<SisStudent>;
+  updateSisStudent(id: string, updates: Partial<SisStudent>): Promise<SisStudent | undefined>;
+  deleteSisStudent(id: string): Promise<boolean>;
+  
+  // SIS Courses
+  getSisCourses(connectionId: string): Promise<SisCourse[]>;
+  getSisCourse(id: string): Promise<SisCourse | undefined>;
+  getSisCourseBySisId(connectionId: string, sisCourseId: string): Promise<SisCourse | undefined>;
+  createSisCourse(course: InsertSisCourse): Promise<SisCourse>;
+  updateSisCourse(id: string, updates: Partial<SisCourse>): Promise<SisCourse | undefined>;
+  deleteSisCourse(id: string): Promise<boolean>;
 }
 
 // Seed data for careers and resources (static content - mutable for BLS sync updates)
@@ -3850,6 +3891,139 @@ export class DatabaseStorage implements IStorage {
 
   async getCAICountriesByRegion(region: string): Promise<CAICountry[]> {
     return caiCountries.filter(c => c.region.toLowerCase() === region.toLowerCase());
+  }
+
+  // SIS Connection Methods
+  async getSisConnections(userId: string): Promise<SisConnection[]> {
+    return await db.select().from(sisConnections)
+      .where(eq(sisConnections.userId, userId))
+      .orderBy(desc(sisConnections.createdAt));
+  }
+
+  async getSisConnection(id: string): Promise<SisConnection | undefined> {
+    const [connection] = await db.select().from(sisConnections)
+      .where(eq(sisConnections.id, id));
+    return connection || undefined;
+  }
+
+  async getSisConnectionsByOrg(organizationId: string): Promise<SisConnection[]> {
+    return await db.select().from(sisConnections)
+      .where(eq(sisConnections.organizationId, organizationId))
+      .orderBy(desc(sisConnections.createdAt));
+  }
+
+  async createSisConnection(connection: InsertSisConnection): Promise<SisConnection> {
+    const [created] = await db.insert(sisConnections).values(connection as any).returning();
+    return created;
+  }
+
+  async updateSisConnection(id: string, updates: Partial<SisConnection>): Promise<SisConnection | undefined> {
+    const [updated] = await db.update(sisConnections)
+      .set({ ...updates, updatedAt: new Date() })
+      .where(eq(sisConnections.id, id))
+      .returning();
+    return updated || undefined;
+  }
+
+  async deleteSisConnection(id: string, userId: string): Promise<boolean> {
+    await db.delete(sisConnections)
+      .where(and(eq(sisConnections.id, id), eq(sisConnections.userId, userId)));
+    return true;
+  }
+
+  // SIS Sync History Methods
+  async getSisSyncHistory(connectionId: string, limit: number = 50): Promise<SisSyncHistory[]> {
+    return await db.select().from(sisSyncHistory)
+      .where(eq(sisSyncHistory.connectionId, connectionId))
+      .orderBy(desc(sisSyncHistory.startedAt))
+      .limit(limit);
+  }
+
+  async createSisSyncHistory(history: InsertSisSyncHistory): Promise<SisSyncHistory> {
+    const [created] = await db.insert(sisSyncHistory).values(history as any).returning();
+    return created;
+  }
+
+  async updateSisSyncHistory(id: string, updates: Partial<SisSyncHistory>): Promise<SisSyncHistory | undefined> {
+    const [updated] = await db.update(sisSyncHistory)
+      .set(updates)
+      .where(eq(sisSyncHistory.id, id))
+      .returning();
+    return updated || undefined;
+  }
+
+  // SIS Students Methods
+  async getSisStudents(connectionId: string): Promise<SisStudent[]> {
+    return await db.select().from(sisStudents)
+      .where(eq(sisStudents.connectionId, connectionId))
+      .orderBy(asc(sisStudents.lastName), asc(sisStudents.firstName));
+  }
+
+  async getSisStudent(id: string): Promise<SisStudent | undefined> {
+    const [student] = await db.select().from(sisStudents)
+      .where(eq(sisStudents.id, id));
+    return student || undefined;
+  }
+
+  async getSisStudentBySisId(connectionId: string, sisStudentId: string): Promise<SisStudent | undefined> {
+    const [student] = await db.select().from(sisStudents)
+      .where(and(eq(sisStudents.connectionId, connectionId), eq(sisStudents.sisStudentId, sisStudentId)));
+    return student || undefined;
+  }
+
+  async createSisStudent(student: InsertSisStudent): Promise<SisStudent> {
+    const [created] = await db.insert(sisStudents).values(student as any).returning();
+    return created;
+  }
+
+  async updateSisStudent(id: string, updates: Partial<SisStudent>): Promise<SisStudent | undefined> {
+    const [updated] = await db.update(sisStudents)
+      .set({ ...updates, lastSyncAt: new Date() })
+      .where(eq(sisStudents.id, id))
+      .returning();
+    return updated || undefined;
+  }
+
+  async deleteSisStudent(id: string): Promise<boolean> {
+    await db.delete(sisStudents).where(eq(sisStudents.id, id));
+    return true;
+  }
+
+  // SIS Courses Methods
+  async getSisCourses(connectionId: string): Promise<SisCourse[]> {
+    return await db.select().from(sisCourses)
+      .where(eq(sisCourses.connectionId, connectionId))
+      .orderBy(asc(sisCourses.name));
+  }
+
+  async getSisCourse(id: string): Promise<SisCourse | undefined> {
+    const [course] = await db.select().from(sisCourses)
+      .where(eq(sisCourses.id, id));
+    return course || undefined;
+  }
+
+  async getSisCourseBySisId(connectionId: string, sisCourseId: string): Promise<SisCourse | undefined> {
+    const [course] = await db.select().from(sisCourses)
+      .where(and(eq(sisCourses.connectionId, connectionId), eq(sisCourses.sisCourseId, sisCourseId)));
+    return course || undefined;
+  }
+
+  async createSisCourse(course: InsertSisCourse): Promise<SisCourse> {
+    const [created] = await db.insert(sisCourses).values(course as any).returning();
+    return created;
+  }
+
+  async updateSisCourse(id: string, updates: Partial<SisCourse>): Promise<SisCourse | undefined> {
+    const [updated] = await db.update(sisCourses)
+      .set({ ...updates, lastSyncAt: new Date() })
+      .where(eq(sisCourses.id, id))
+      .returning();
+    return updated || undefined;
+  }
+
+  async deleteSisCourse(id: string): Promise<boolean> {
+    await db.delete(sisCourses).where(eq(sisCourses.id, id));
+    return true;
   }
 }
 
