@@ -745,6 +745,12 @@ export default function Assignments() {
                                 <div className="flex items-center gap-2 flex-wrap">
                                   {getBkdIcon(q.bkdFocus)}
                                   <Badge variant="outline">{(q.type || "").replace("_", " ")}</Badge>
+                                  {q.bloomsLevel && (
+                                    <Badge variant="secondary" className="text-xs capitalize">{q.bloomsLevel}</Badge>
+                                  )}
+                                  {q.depthOfKnowledge && (
+                                    <Badge variant="secondary" className="text-xs">DOK {q.depthOfKnowledge}</Badge>
+                                  )}
                                   {isEditing ? (
                                     <Input 
                                       type="number" 
@@ -763,6 +769,22 @@ export default function Assignments() {
                                   </Button>
                                 )}
                               </div>
+                              {/* Stimulus - context/scenario presented first */}
+                              {q.stimulus && (
+                                <div className="mb-2 p-2 bg-muted/50 rounded text-sm italic print:bg-gray-50">
+                                  {isEditing ? (
+                                    <Textarea 
+                                      value={q.stimulus} 
+                                      onChange={(e) => updateQuestion(i, "stimulus", e.target.value)} 
+                                      className="min-h-[40px] text-sm italic"
+                                      placeholder="Context or scenario for the question..."
+                                      data-testid={`input-edit-stimulus-${i}`}
+                                    />
+                                  ) : (
+                                    q.stimulus
+                                  )}
+                                </div>
+                              )}
                               {isEditing ? (
                                 <Textarea value={q.question} onChange={(e) => updateQuestion(i, "question", e.target.value)} className="font-medium min-h-[60px]" data-testid={`input-edit-question-${i}`} />
                               ) : (
@@ -770,17 +792,46 @@ export default function Assignments() {
                               )}
                               {q.options && (
                                 <ul className="mt-2 space-y-1">
-                                  {q.options.map((opt: string, oi: number) => (
-                                    <li key={oi} className="text-sm flex items-center gap-2">
-                                      <span className="w-5 h-5 rounded-full border flex items-center justify-center text-xs">
-                                        {String.fromCharCode(65 + oi)}
-                                      </span>
-                                      {isEditing ? (
-                                        <Input value={opt} onChange={(e) => updateQuestionOption(i, oi, e.target.value)} className="flex-1 h-7 text-sm" data-testid={`input-edit-option-${i}-${oi}`} />
-                                      ) : opt}
-                                    </li>
-                                  ))}
+                                  {q.options.map((opt: string, oi: number) => {
+                                    const isCorrect = q.rubric?.correctAnswer === opt;
+                                    const distractor = q.rubric?.distractors?.find((d: any) => d.option === opt);
+                                    return (
+                                      <li key={oi} className="text-sm">
+                                        <div className="flex items-center gap-2">
+                                          <span className={`w-5 h-5 rounded-full border flex items-center justify-center text-xs ${isCorrect ? "border-green-500 text-green-600 font-semibold print:hidden" : ""}`}>
+                                            {String.fromCharCode(65 + oi)}
+                                          </span>
+                                          {isEditing ? (
+                                            <Input value={opt} onChange={(e) => updateQuestionOption(i, oi, e.target.value)} className="flex-1 h-7 text-sm" data-testid={`input-edit-option-${i}-${oi}`} />
+                                          ) : opt}
+                                          {isCorrect && !isEditing && (
+                                            <Badge variant="outline" className="text-green-600 border-green-500 print:hidden">Correct</Badge>
+                                          )}
+                                        </div>
+                                        {/* Show distractor feedback for educators (hidden in print) */}
+                                        {distractor?.feedback && !isEditing && (
+                                          <p className="ml-7 mt-1 text-xs text-muted-foreground italic print:hidden">
+                                            Feedback: {distractor.feedback}
+                                          </p>
+                                        )}
+                                      </li>
+                                    );
+                                  })}
                                 </ul>
+                              )}
+                              {/* Rubric for open-ended questions */}
+                              {q.rubric?.partialCreditRules && q.rubric.partialCreditRules.length > 0 && !isEditing && (
+                                <div className="mt-3 p-2 bg-muted/30 rounded text-xs print:hidden">
+                                  <p className="font-semibold mb-1">Grading Rubric:</p>
+                                  <ul className="space-y-1">
+                                    {q.rubric.partialCreditRules.map((rule: any, ri: number) => (
+                                      <li key={ri} className="flex justify-between">
+                                        <span>{rule.condition}</span>
+                                        <Badge variant="secondary" className="text-xs">{rule.points} pts</Badge>
+                                      </li>
+                                    ))}
+                                  </ul>
+                                </div>
                               )}
                               {!q.options && q.type !== "multiple_choice" && q.type !== "true_false" && (
                                 <div className="mt-3 border-b border-muted-foreground/30 min-h-[60px] print:min-h-[80px]"></div>
