@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useLocation } from "wouter";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from "@/components/ui/card";
@@ -8,7 +8,8 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Progress } from "@/components/ui/progress";
-import { GraduationCap, BookOpen, Building2, ChevronRight, ChevronLeft, Sparkles, Target, Compass, BookMarked } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+import { GraduationCap, BookOpen, Building2, ChevronRight, ChevronLeft, Sparkles, Target, Compass, BookMarked, School } from "lucide-react";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import type { StandardsJurisdiction } from "@shared/schema";
@@ -45,23 +46,81 @@ const INTERESTS = [
   { id: "analytics", label: "Progress Analytics" },
 ];
 
-type StepKey = "role" | "goals" | "location" | "complete";
+const GRADE_LEVELS = [
+  { id: "K", label: "Kindergarten", band: "elementary" },
+  { id: "1", label: "1st Grade", band: "elementary" },
+  { id: "2", label: "2nd Grade", band: "elementary" },
+  { id: "3", label: "3rd Grade", band: "elementary" },
+  { id: "4", label: "4th Grade", band: "elementary" },
+  { id: "5", label: "5th Grade", band: "elementary" },
+  { id: "6", label: "6th Grade", band: "middle_school" },
+  { id: "7", label: "7th Grade", band: "middle_school" },
+  { id: "8", label: "8th Grade", band: "middle_school" },
+  { id: "9", label: "9th Grade", band: "high_school" },
+  { id: "10", label: "10th Grade", band: "high_school" },
+  { id: "11", label: "11th Grade", band: "high_school" },
+  { id: "12", label: "12th Grade", band: "high_school" },
+  { id: "post_secondary", label: "Post-Secondary / College", band: "post_secondary" },
+];
+
+const GRADE_BANDS = [
+  { id: "elementary", label: "Elementary (K-5)" },
+  { id: "middle_school", label: "Middle School (6-8)" },
+  { id: "high_school", label: "High School (9-12)" },
+  { id: "post_secondary", label: "Post-Secondary" },
+];
+
+type StepKey = "role" | "classes" | "goals" | "location" | "complete";
 
 export default function Onboarding() {
   const [, setLocation] = useLocation();
   const { toast } = useToast();
   const [step, setStep] = useState<StepKey>("role");
   const [role, setRole] = useState<string>("");
+  const [selectedGradeLevels, setSelectedGradeLevels] = useState<string[]>([]);
   const [primaryGoal, setPrimaryGoal] = useState<string>("");
   const [interests, setInterests] = useState<string[]>([]);
   const [language, setLanguage] = useState("en");
   const [country, setCountry] = useState("");
-  const [state, setState] = useState("");
+  const [stateValue, setStateValue] = useState("");
 
   const { data: jurisdictions } = useQuery<StandardsJurisdiction[]>({
     queryKey: ["/api/standards/jurisdictions"],
     enabled: !!country,
   });
+
+  const selectedGradeBands = useMemo(() => {
+    const bands: string[] = [];
+    selectedGradeLevels.forEach(level => {
+      const gradeInfo = GRADE_LEVELS.find(g => g.id === level);
+      if (gradeInfo && !bands.includes(gradeInfo.band)) {
+        bands.push(gradeInfo.band);
+      }
+    });
+    return bands;
+  }, [selectedGradeLevels]);
+
+  const toggleGradeLevel = (gradeId: string) => {
+    setSelectedGradeLevels(prev => 
+      prev.includes(gradeId) 
+        ? prev.filter(g => g !== gradeId)
+        : [...prev, gradeId]
+    );
+  };
+
+  const toggleGradeBand = (bandId: string) => {
+    const bandsGrades = GRADE_LEVELS.filter(g => g.band === bandId).map(g => g.id);
+    const allSelected = bandsGrades.every(g => selectedGradeLevels.includes(g));
+    
+    if (allSelected) {
+      setSelectedGradeLevels(prev => prev.filter(g => !bandsGrades.includes(g)));
+    } else {
+      setSelectedGradeLevels(prev => {
+        const combined = [...prev, ...bandsGrades];
+        return combined.filter((v, i, a) => a.indexOf(v) === i);
+      });
+    }
+  };
 
   const completeMutation = useMutation({
     mutationFn: (data: any) => apiRequest("POST", "/api/onboarding/complete", data),
@@ -110,24 +169,37 @@ export default function Onboarding() {
       preferences: {
         language,
         country,
-        state,
+        state: stateValue,
+        gradeLevels: selectedGradeLevels,
+        gradeBands: selectedGradeBands,
       },
       needsAnalysis,
     });
   };
 
-  const steps: { key: StepKey; label: string }[] = [
-    { key: "role", label: "Your Role" },
-    { key: "goals", label: "Your Goals" },
-    { key: "location", label: "Location & Standards" },
-    { key: "complete", label: "Get Started" },
-  ];
+  const isEducator = role === "educator" || role === "campus_admin";
+
+  const steps: { key: StepKey; label: string }[] = isEducator
+    ? [
+        { key: "role", label: "Your Role" },
+        { key: "classes", label: "Your Classes" },
+        { key: "goals", label: "Your Goals" },
+        { key: "location", label: "Location & Standards" },
+        { key: "complete", label: "Get Started" },
+      ]
+    : [
+        { key: "role", label: "Your Role" },
+        { key: "goals", label: "Your Goals" },
+        { key: "location", label: "Location & Standards" },
+        { key: "complete", label: "Get Started" },
+      ];
 
   const currentStepIndex = steps.findIndex(s => s.key === step);
   const progress = ((currentStepIndex + 1) / steps.length) * 100;
 
   const canProceed = () => {
     if (step === "role") return !!role;
+    if (step === "classes") return selectedGradeLevels.length > 0;
     if (step === "goals") return !!primaryGoal;
     if (step === "location") return !!language && !!country;
     return true;
@@ -214,6 +286,81 @@ export default function Onboarding() {
             </div>
           )}
 
+          {step === "classes" && (
+            <div className="space-y-6">
+              <div>
+                <Label className="text-lg font-oswald">What grade levels do you teach?</Label>
+                <p className="text-sm text-muted-foreground mt-1 mb-4">
+                  Select all the grade levels for your classes. This helps us show you relevant educational standards.
+                </p>
+                
+                <div className="space-y-4">
+                  {GRADE_BANDS.map((band) => {
+                    const bandGrades = GRADE_LEVELS.filter(g => g.band === band.id);
+                    const allSelected = bandGrades.every(g => selectedGradeLevels.includes(g.id));
+                    const someSelected = bandGrades.some(g => selectedGradeLevels.includes(g.id));
+                    
+                    return (
+                      <div key={band.id} className="rounded-md border p-4">
+                        <div className="flex items-center gap-3 mb-3">
+                          <Checkbox
+                            id={`band-${band.id}`}
+                            checked={allSelected}
+                            ref={(el) => {
+                              if (el && someSelected && !allSelected) {
+                                (el as HTMLButtonElement).dataset.state = "indeterminate";
+                              }
+                            }}
+                            onCheckedChange={() => toggleGradeBand(band.id)}
+                            data-testid={`checkbox-band-${band.id}`}
+                          />
+                          <Label htmlFor={`band-${band.id}`} className="font-oswald cursor-pointer flex items-center gap-2">
+                            <School className="h-4 w-4 text-muted-foreground" />
+                            {band.label}
+                          </Label>
+                        </div>
+                        <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 ml-6">
+                          {bandGrades.map((grade) => (
+                            <div key={grade.id} className="flex items-center gap-2">
+                              <Checkbox
+                                id={`grade-${grade.id}`}
+                                checked={selectedGradeLevels.includes(grade.id)}
+                                onCheckedChange={() => toggleGradeLevel(grade.id)}
+                                data-testid={`checkbox-grade-${grade.id}`}
+                              />
+                              <Label htmlFor={`grade-${grade.id}`} className="text-sm cursor-pointer">
+                                {grade.label}
+                              </Label>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+
+                {selectedGradeLevels.length > 0 && (
+                  <div className="mt-4 p-3 bg-muted rounded-md">
+                    <p className="text-sm text-muted-foreground mb-2">Selected grades:</p>
+                    <div className="flex flex-wrap gap-1">
+                      {selectedGradeLevels.sort((a, b) => {
+                        const order = GRADE_LEVELS.map(g => g.id);
+                        return order.indexOf(a) - order.indexOf(b);
+                      }).map(gradeId => {
+                        const grade = GRADE_LEVELS.find(g => g.id === gradeId);
+                        return (
+                          <Badge key={gradeId} variant="secondary" className="text-xs">
+                            {grade?.label || gradeId}
+                          </Badge>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
           {step === "goals" && (
             <div className="space-y-6">
               <div>
@@ -278,7 +425,7 @@ export default function Onboarding() {
 
                 <div>
                   <Label className="font-oswald">Country</Label>
-                  <Select value={country} onValueChange={(v) => { setCountry(v); setState(""); }}>
+                  <Select value={country} onValueChange={(v) => { setCountry(v); setStateValue(""); }}>
                     <SelectTrigger className="mt-2" data-testid="select-country">
                       <SelectValue placeholder="Select country" />
                     </SelectTrigger>
@@ -293,7 +440,7 @@ export default function Onboarding() {
                 {country && (
                   <div>
                     <Label className="font-oswald">State/Jurisdiction (for standards)</Label>
-                    <Select value={state} onValueChange={setState}>
+                    <Select value={stateValue} onValueChange={setStateValue}>
                       <SelectTrigger className="mt-2" data-testid="select-state">
                         <SelectValue placeholder="Select state" />
                       </SelectTrigger>
@@ -309,6 +456,24 @@ export default function Onboarding() {
                     <p className="text-xs text-muted-foreground mt-1">
                       This helps us show relevant educational standards
                     </p>
+                  </div>
+                )}
+
+                {isEducator && selectedGradeLevels.length > 0 && (
+                  <div className="p-3 bg-lys-teal/10 border border-lys-teal/20 rounded-md">
+                    <p className="text-sm text-foreground">
+                      <span className="font-medium">Standards will be filtered</span> to show only content relevant to your selected grade levels:
+                    </p>
+                    <div className="flex flex-wrap gap-1 mt-2">
+                      {selectedGradeBands.map(bandId => {
+                        const band = GRADE_BANDS.find(b => b.id === bandId);
+                        return (
+                          <Badge key={bandId} variant="outline" className="text-xs border-lys-teal/30 text-lys-teal">
+                            {band?.label}
+                          </Badge>
+                        );
+                      })}
+                    </div>
                   </div>
                 )}
               </div>
