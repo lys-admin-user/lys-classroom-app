@@ -837,49 +837,95 @@ function generateMockAssignment(request: GenerateAssignmentRequest): GeneratedAs
 }
 
 function getQuestionByType(type: string, bkdFocus: "be" | "know" | "do", lesson: Lesson, num: number): { stimulus: string; questionText: string } {
-  // Polymorphic question data with stimulus (context) and question text
+  // Extract lesson context for richer questions
+  const objectives = lesson.objectives || [];
+  const primaryObjective = objectives[0] || `understanding ${lesson.topic}`;
+  const secondaryObjective = objectives[1] || `applying concepts from ${lesson.topic}`;
+  
+  // Generate essential questions from lesson reflection or create them
+  const essentialQuestion = lesson.reflection || `How does ${lesson.topic} impact your understanding and growth?`;
+  
+  // 5W1H Question Framework - Who, What, When, Where, Why, How
+  const fiveW1HQuestions = {
+    who: [
+      { stimulus: `Consider the people involved in or affected by "${lesson.topic}".`, questionText: `Who are the key individuals or groups most impacted by ${lesson.topic}?` },
+      { stimulus: `Think about expertise and authority related to "${lesson.topic}".`, questionText: `Who would be considered an expert on ${lesson.topic}, and what makes them qualified?` },
+      { stimulus: `Consider perspectives and stakeholders.`, questionText: `Who might have a different perspective on ${lesson.topic}, and why?` },
+    ],
+    what: [
+      { stimulus: `Focus on the core content of today's lesson.`, questionText: `What are the most important concepts you learned about ${lesson.topic}?` },
+      { stimulus: `Consider the key definitions and terms from this lesson.`, questionText: `What key terms or vocabulary are essential to understanding ${lesson.topic}?` },
+      { stimulus: `Think about the main takeaway from this lesson.`, questionText: `What is the single most important thing everyone should know about ${lesson.topic}?` },
+    ],
+    when: [
+      { stimulus: `Consider the timing and context of "${lesson.topic}".`, questionText: `When is knowledge of ${lesson.topic} most relevant or useful?` },
+      { stimulus: `Think about historical or future implications.`, questionText: `When did ${lesson.topic} become important, and when might it change?` },
+      { stimulus: `Consider timing in your own life.`, questionText: `When have you encountered or will you encounter ${lesson.topic} in your own experience?` },
+    ],
+    where: [
+      { stimulus: `Think about the settings and contexts for "${lesson.topic}".`, questionText: `Where is ${lesson.topic} most commonly applied or observed?` },
+      { stimulus: `Consider geographic or situational contexts.`, questionText: `Where might understanding ${lesson.topic} be most valuable?` },
+      { stimulus: `Think about resources and locations.`, questionText: `Where can you go to learn more about ${lesson.topic}?` },
+    ],
+    why: [
+      { stimulus: `Consider the purpose and importance of understanding "${lesson.topic}".`, questionText: `Why is it important to understand ${lesson.topic}?` },
+      { stimulus: `Think about cause and effect relationships.`, questionText: `Why does ${lesson.topic} matter for your future success?` },
+      { stimulus: `Consider deeper reasoning and motivation.`, questionText: `Why might someone disagree about the importance of ${lesson.topic}?` },
+    ],
+    how: [
+      { stimulus: `Think about application and process.`, questionText: `How can you apply what you learned about ${lesson.topic} in real life?` },
+      { stimulus: `Consider methods and approaches.`, questionText: `How would you explain ${lesson.topic} to someone who has never heard of it?` },
+      { stimulus: `Think about connections and relationships.`, questionText: `How does ${lesson.topic} connect to other subjects or areas of your life?` },
+    ],
+  };
+
+  // Objective-based questions (reworded from lesson objectives)
+  const objectiveQuestions = [
+    { stimulus: `Reflect on the lesson objective: "${primaryObjective}".`, questionText: `In your own words, explain how you demonstrated "${primaryObjective.replace(/Students will |will /gi, '')}" during this lesson.` },
+    { stimulus: `Consider the learning goal: "${secondaryObjective}".`, questionText: `How confident are you in your ability to "${secondaryObjective.replace(/Students will |will /gi, '')}"? Explain with evidence.` },
+    { stimulus: `Think about mastery of the lesson objectives.`, questionText: `Which lesson objective was most challenging for you, and what would help you master it?` },
+  ];
+
+  // Essential question-based prompts
+  const essentialQuestionPrompts = [
+    { stimulus: `Consider this essential question: "${essentialQuestion}"`, questionText: `How would you answer: "${essentialQuestion}" based on what you learned today?` },
+    { stimulus: `Essential questions drive deep learning. Reflect on: "${essentialQuestion}"`, questionText: `What new insights about "${essentialQuestion}" did you gain from this lesson?` },
+    { stimulus: `Connect the essential question to your own life.`, questionText: `How does the question "${essentialQuestion}" relate to your personal experiences?` },
+  ];
+
+  // BKD-focused question bank with 5W1H integration
   const bkdQuestionData = {
     be: [
-      {
-        stimulus: `Think about the topic "${lesson.topic}" and how it connects to who you are as a person.`,
-        questionText: `How does the concept of "${lesson.topic}" relate to your personal values and goals?`
-      },
-      {
-        stimulus: `Consider a real-world scenario where understanding "${lesson.topic}" would be valuable.`,
-        questionText: `Reflect on a time when understanding "${lesson.topic}" would have helped you in a real-life situation.`
-      },
-      {
-        stimulus: `Character and values are essential when applying any knowledge. Consider "${lesson.topic}" in this context.`,
-        questionText: `What character traits are important when applying knowledge about "${lesson.topic}"?`
-      },
+      // Identity & Values (BE focus)
+      ...fiveW1HQuestions.who,
+      ...fiveW1HQuestions.why.slice(0, 2),
+      { stimulus: `Think about the topic "${lesson.topic}" and how it connects to who you are as a person.`, questionText: `How does the concept of "${lesson.topic}" relate to your personal values and goals?` },
+      { stimulus: `Consider a real-world scenario where understanding "${lesson.topic}" would be valuable.`, questionText: `Reflect on a time when understanding "${lesson.topic}" would have helped you in a real-life situation.` },
+      { stimulus: `Character and values are essential when applying any knowledge.`, questionText: `What character traits are important when applying knowledge about "${lesson.topic}"?` },
+      ...essentialQuestionPrompts,
+      { stimulus: `Self-awareness is key to growth. Reflect on your learning.`, questionText: `How has your understanding of "${lesson.topic}" changed your perspective or thinking?` },
     ],
     know: [
-      {
-        stimulus: `Review what you learned in today's lesson about "${lesson.topic}".`,
-        questionText: `What are the key concepts covered in the lesson about "${lesson.topic}"?`
-      },
-      {
-        stimulus: `Demonstrate your understanding by explaining concepts in your own words.`,
-        questionText: `Explain the main principles of "${lesson.topic}" in your own words.`
-      },
-      {
-        stimulus: `Consider how you might continue learning about "${lesson.topic}" beyond this lesson.`,
-        questionText: `What resources or strategies can help you learn more about "${lesson.topic}"?`
-      },
+      // Knowledge & Understanding (KNOW focus)
+      ...fiveW1HQuestions.what,
+      ...fiveW1HQuestions.when.slice(0, 2),
+      ...fiveW1HQuestions.where.slice(0, 2),
+      { stimulus: `Review what you learned in today's lesson about "${lesson.topic}".`, questionText: `What are the key concepts covered in the lesson about "${lesson.topic}"?` },
+      { stimulus: `Demonstrate your understanding by explaining concepts in your own words.`, questionText: `Explain the main principles of "${lesson.topic}" in your own words.` },
+      ...objectiveQuestions,
+      { stimulus: `Compare and contrast concepts from the lesson.`, questionText: `How does ${lesson.topic} compare to or connect with other topics you've studied?` },
+      { stimulus: `Analyze the evidence presented in the lesson.`, questionText: `What evidence or examples best support the key ideas about ${lesson.topic}?` },
     ],
     do: [
-      {
-        stimulus: `Think about practical ways to apply what you've learned about "${lesson.topic}".`,
-        questionText: `Describe one action step you can take to apply what you learned about "${lesson.topic}".`
-      },
-      {
-        stimulus: `Planning helps turn knowledge into action. Consider "${lesson.topic}" and the coming week.`,
-        questionText: `Create a plan for using your knowledge of "${lesson.topic}" in the next week.`
-      },
-      {
-        stimulus: `Goals should be specific and measurable. Think about "${lesson.topic}" and what you want to achieve.`,
-        questionText: `What measurable goal could you set related to "${lesson.topic}"?`
-      },
+      // Skills & Action (DO focus)
+      ...fiveW1HQuestions.how,
+      ...fiveW1HQuestions.where.slice(1, 3),
+      { stimulus: `Think about practical ways to apply what you've learned about "${lesson.topic}".`, questionText: `Describe one action step you can take to apply what you learned about "${lesson.topic}".` },
+      { stimulus: `Planning helps turn knowledge into action.`, questionText: `Create a plan for using your knowledge of "${lesson.topic}" in the next week.` },
+      { stimulus: `Goals should be specific and measurable.`, questionText: `What measurable goal could you set related to "${lesson.topic}"?` },
+      { stimulus: `Consider how you will transfer this learning.`, questionText: `How will you teach or share what you learned about "${lesson.topic}" with someone else?` },
+      { stimulus: `Problem-solving requires action. Consider a challenge.`, questionText: `Describe a problem you could solve using your knowledge of "${lesson.topic}".` },
+      { stimulus: `Skills develop through practice.`, questionText: `What skill from this lesson on "${lesson.topic}" do you want to practice more?` },
     ],
   };
 
