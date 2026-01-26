@@ -331,6 +331,10 @@ export default function SystemAdminPage() {
             <Library className="h-4 w-4" />
             <span className="hidden sm:inline">Standards</span>
           </TabsTrigger>
+          <TabsTrigger value="datasync" className="gap-2" data-testid="tab-datasync">
+            <Activity className="h-4 w-4" />
+            <span className="hidden sm:inline">Data Sync</span>
+          </TabsTrigger>
         </TabsList>
 
         <TabsContent value="overview" className="space-y-6">
@@ -1124,7 +1128,251 @@ export default function SystemAdminPage() {
             </CardContent>
           </Card>
         </TabsContent>
+
+        <TabsContent value="datasync" className="space-y-6">
+          <BlsSyncSection />
+        </TabsContent>
       </Tabs>
     </div>
+  );
+}
+
+interface BlsSyncStatus {
+  lastSync: {
+    id: string;
+    syncType: string;
+    status: string;
+    totalOccupations: number | null;
+    processedOccupations: number | null;
+    updatedOccupations: number | null;
+    errorCount: number | null;
+    startedAt: string | null;
+    completedAt: string | null;
+    nextScheduledAt: string | null;
+    triggeredBy: string | null;
+  } | null;
+  scheduler: {
+    running: boolean;
+    nextCheck: string | null;
+  };
+}
+
+function BlsSyncSection() {
+  const { toast } = useToast();
+  
+  const { data: syncStatus, isLoading: statusLoading } = useQuery<BlsSyncStatus>({
+    queryKey: ["/api/bls-sync/status"],
+    refetchInterval: 30000,
+  });
+
+  const { data: syncHistory = [], isLoading: historyLoading } = useQuery<BlsSyncStatus["lastSync"][]>({
+    queryKey: ["/api/bls-sync/history"],
+  });
+
+  const triggerSyncMutation = useMutation({
+    mutationFn: async () => {
+      return await apiRequest("POST", "/api/bls-sync/trigger");
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/bls-sync/status"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/bls-sync/history"] });
+      toast({ title: "BLS data sync started" });
+    },
+    onError: () => {
+      toast({ title: "Failed to trigger sync", variant: "destructive" });
+    },
+  });
+
+  const formatDate = (date: string | null) => {
+    if (!date) return "Never";
+    return new Date(date).toLocaleString();
+  };
+
+  return (
+    <>
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-4">
+        <div>
+          <h2 className="font-oswald text-xl font-semibold">BLS Occupational Outlook Data</h2>
+          <p className="text-sm text-muted-foreground font-roboto">
+            Automatic weekly sync with Bureau of Labor Statistics employment projections and wage data
+          </p>
+        </div>
+        <Button
+          onClick={() => triggerSyncMutation.mutate()}
+          disabled={triggerSyncMutation.isPending}
+          data-testid="button-trigger-bls-sync"
+        >
+          {triggerSyncMutation.isPending ? (
+            <Loader2 className="h-4 w-4 animate-spin mr-2" />
+          ) : (
+            <Activity className="h-4 w-4 mr-2" />
+          )}
+          Sync Now
+        </Button>
+      </div>
+
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+        <Card data-testid="card-scheduler-status">
+          <CardHeader className="flex flex-row items-center justify-between gap-4 pb-2">
+            <CardTitle className="text-sm font-medium">Scheduler Status</CardTitle>
+            <Activity className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="flex items-center gap-2">
+              <Badge className={syncStatus?.scheduler.running ? "bg-green-500" : "bg-red-500"}>
+                {syncStatus?.scheduler.running ? "Running" : "Stopped"}
+              </Badge>
+            </div>
+            <p className="text-xs text-muted-foreground mt-1">
+              Weekly auto-sync enabled
+            </p>
+          </CardContent>
+        </Card>
+
+        <Card data-testid="card-last-sync">
+          <CardHeader className="flex flex-row items-center justify-between gap-4 pb-2">
+            <CardTitle className="text-sm font-medium">Last Sync</CardTitle>
+            <BarChart3 className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <p className="text-lg font-semibold font-oswald">
+              {formatDate(syncStatus?.lastSync?.completedAt || syncStatus?.lastSync?.startedAt || null)}
+            </p>
+            <p className="text-xs text-muted-foreground">
+              Status: {syncStatus?.lastSync?.status || "No sync yet"}
+            </p>
+          </CardContent>
+        </Card>
+
+        <Card data-testid="card-next-sync">
+          <CardHeader className="flex flex-row items-center justify-between gap-4 pb-2">
+            <CardTitle className="text-sm font-medium">Next Scheduled</CardTitle>
+            <TrendingUp className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <p className="text-lg font-semibold font-oswald">
+              {formatDate(syncStatus?.lastSync?.nextScheduledAt || null)}
+            </p>
+            <p className="text-xs text-muted-foreground">
+              Runs every 7 days
+            </p>
+          </CardContent>
+        </Card>
+
+        <Card data-testid="card-occupations-synced">
+          <CardHeader className="flex flex-row items-center justify-between gap-4 pb-2">
+            <CardTitle className="text-sm font-medium">Occupations</CardTitle>
+            <GraduationCap className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <p className="text-2xl font-bold font-oswald">
+              {syncStatus?.lastSync?.processedOccupations || 0}
+            </p>
+            <p className="text-xs text-muted-foreground">
+              {syncStatus?.lastSync?.updatedOccupations || 0} updated
+            </p>
+          </CardContent>
+        </Card>
+      </div>
+
+      <Card className="mt-6">
+        <CardHeader>
+          <CardTitle className="text-lg">Sync History</CardTitle>
+          <CardDescription>
+            Recent BLS data synchronization operations
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          {historyLoading ? (
+            <div className="flex items-center justify-center py-8">
+              <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+            </div>
+          ) : syncHistory.length === 0 ? (
+            <p className="text-center text-muted-foreground py-8">
+              No sync history yet. Click "Sync Now" to start the first sync.
+            </p>
+          ) : (
+            <div className="space-y-4">
+              {syncHistory.map((sync) => sync && (
+                <div
+                  key={sync.id}
+                  className="flex items-center justify-between p-4 border rounded-lg"
+                  data-testid={`row-sync-${sync.id}`}
+                >
+                  <div className="flex items-center gap-4">
+                    <Badge
+                      className={
+                        sync.status === "completed"
+                          ? "bg-green-500"
+                          : sync.status === "failed"
+                          ? "bg-red-500"
+                          : sync.status === "in_progress"
+                          ? "bg-yellow-500"
+                          : "bg-gray-500"
+                      }
+                    >
+                      {sync.status}
+                    </Badge>
+                    <div>
+                      <p className="font-medium font-roboto">
+                        {sync.syncType === "full" ? "Full Sync" : sync.syncType}
+                      </p>
+                      <p className="text-xs text-muted-foreground">
+                        {formatDate(sync.startedAt)}
+                        {sync.triggeredBy && ` • Triggered by: ${sync.triggeredBy}`}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="text-right">
+                    <p className="font-semibold font-oswald">
+                      {sync.processedOccupations}/{sync.totalOccupations}
+                    </p>
+                    <p className="text-xs text-muted-foreground">
+                      {sync.updatedOccupations} updated
+                      {(sync.errorCount || 0) > 0 && (
+                        <span className="text-red-500 ml-2">{sync.errorCount} errors</span>
+                      )}
+                    </p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      <Card className="mt-6">
+        <CardHeader>
+          <CardTitle className="text-lg">About BLS Data Integration</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="grid md:grid-cols-2 gap-4">
+            <div className="p-4 bg-muted/50 rounded-lg">
+              <h4 className="font-semibold font-oswald mb-2">Data Sources</h4>
+              <ul className="text-sm space-y-1 text-muted-foreground font-roboto">
+                <li>• BLS Occupational Employment and Wage Statistics (OEWS)</li>
+                <li>• BLS Employment Projections (2023-2033)</li>
+                <li>• Occupational Outlook Handbook</li>
+              </ul>
+            </div>
+            <div className="p-4 bg-muted/50 rounded-lg">
+              <h4 className="font-semibold font-oswald mb-2">Sync Schedule</h4>
+              <ul className="text-sm space-y-1 text-muted-foreground font-roboto">
+                <li>• Automatic sync every 7 days</li>
+                <li>• Updates wage data, job outlook, and projections</li>
+                <li>• Manual sync available anytime</li>
+              </ul>
+            </div>
+          </div>
+          <div className="flex items-start gap-2 p-3 bg-amber-50 dark:bg-amber-900/20 rounded-lg border border-amber-200 dark:border-amber-800">
+            <AlertTriangle className="h-5 w-5 text-amber-600 shrink-0 mt-0.5" />
+            <p className="text-sm text-amber-800 dark:text-amber-200 font-roboto">
+              BLS data is updated annually. The sync fetches the latest available data from the public BLS API 
+              and updates career salary and outlook information in the platform.
+            </p>
+          </div>
+        </CardContent>
+      </Card>
+    </>
   );
 }

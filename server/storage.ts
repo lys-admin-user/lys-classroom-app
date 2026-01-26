@@ -246,6 +246,7 @@ export interface IStorage {
   getCareersByGrade(gradeBand: string): Promise<Career[]>;
   getTrendingCareers(limit?: number): Promise<Career[]>;
   getCareersByState(stateCode: string): Promise<Career[]>;
+  updateCareerFromBls(blsCode: string, updates: Partial<Career>): Promise<Career | undefined>;
   getResources(): Promise<Resource[]>;
   getResource(id: string): Promise<Resource | undefined>;
   getAssessments(): Promise<Assessment[]>;
@@ -560,8 +561,8 @@ export interface IStorage {
   deletePortfolioComment(id: string, authorId: string): Promise<boolean>;
 }
 
-// Seed data for careers and resources (static content)
-const seedCareers: Career[] = [
+// Seed data for careers and resources (static content - mutable for BLS sync updates)
+let seedCareers: Career[] = [
   {
     id: "1",
     title: "Software Developer",
@@ -1652,6 +1653,19 @@ export class DatabaseStorage implements IStorage {
       salaryMedian: c.stateSalaryData![stateCode].median,
       demandLevel: c.stateSalaryData![stateCode].demandLevel || c.demandLevel,
     }));
+  }
+
+  async updateCareerFromBls(blsCode: string, updates: Partial<Career>): Promise<Career | undefined> {
+    const index = seedCareers.findIndex(c => c.blsCode === blsCode);
+    if (index === -1) return undefined;
+    
+    seedCareers[index] = {
+      ...seedCareers[index],
+      ...updates,
+      blsLastUpdated: new Date().toISOString().slice(0, 7), // YYYY-MM format
+    };
+    
+    return seedCareers[index];
   }
 
   // Static data - resources

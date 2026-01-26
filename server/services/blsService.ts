@@ -181,8 +181,15 @@ export async function syncBlsData(triggeredBy: string = "scheduled"): Promise<Bl
           if (existingCareer) {
             const wageChanged = Math.abs(existingCareer.salaryMedian - newWage) > 1000;
             if (wageChanged) {
-              updatedCount++;
-              console.log(`Updated wage for ${info.title}: $${existingCareer.salaryMedian} -> $${newWage}`);
+              const updated = await storage.updateCareerFromBls(socCode, {
+                salaryMedian: newWage,
+                salaryMin: Math.round(newWage * 0.6),
+                salaryMax: Math.round(newWage * 1.4),
+              });
+              if (updated) {
+                updatedCount++;
+                console.log(`Updated wage for ${info.title}: $${existingCareer.salaryMedian} -> $${newWage}`);
+              }
             }
           }
         }

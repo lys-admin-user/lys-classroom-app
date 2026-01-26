@@ -58,7 +58,12 @@ Preferred communication style: Simple, everyday language.
     -   Gatekeeper logic for blocking milestones (hard deadlines, prerequisites)
     -   Regional multipliers for gamification weighting
     -   Alternative pathway support for flexible progression
--   **Workforce Trends Integration**: Monthly sync with BLS/OECD/UNESCO data for career alignment
+-   **Workforce Trends Integration**: Weekly automated sync with BLS Occupational Outlook Handbook data for career alignment
+    -   Automatic weekly sync scheduler runs in background
+    -   Fetches data from BLS Employment Projections and OEWS wage statistics
+    -   Updates career salary, job outlook, and growth projections
+    -   Admin dashboard at System Admin > Data Sync for monitoring and manual triggers
+    -   Sync history tracking with status, processed counts, and error logs
 -   **Alignment Matrix**: Regional gamification weights connecting authorities to workforce data
 
 ## External Dependencies
