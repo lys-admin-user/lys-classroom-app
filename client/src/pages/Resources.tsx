@@ -6,6 +6,8 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
+import { Separator } from "@/components/ui/separator";
 import { 
   BookOpen, 
   Search, 
@@ -21,7 +23,10 @@ import {
   Star,
   Video,
   FileText,
-  Wrench
+  Wrench,
+  Clock,
+  CheckCircle,
+  AlertCircle
 } from "lucide-react";
 import type { Resource } from "@shared/schema";
 import { useTier } from "@/hooks/use-tier";
@@ -46,7 +51,14 @@ const categoryConfig = {
 export default function Resources() {
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedCategory, setSelectedCategory] = useState<string>("all");
+  const [selectedResource, setSelectedResource] = useState<Resource | null>(null);
+  const [detailsOpen, setDetailsOpen] = useState(false);
   const { showAds } = useTier();
+
+  const openResourceDetails = (resource: Resource) => {
+    setSelectedResource(resource);
+    setDetailsOpen(true);
+  };
 
   const { data: resources = [], isLoading } = useQuery<Resource[]>({
     queryKey: ["/api/resources"],
@@ -210,7 +222,12 @@ export default function Resources() {
                             </Badge>
                           ))}
                         </div>
-                        <Button className="w-full font-oswald gap-2" variant="secondary" data-testid={`button-apply-${scholarship.id}`}>
+                        <Button 
+                          className="w-full font-oswald gap-2" 
+                          variant="secondary" 
+                          onClick={() => openResourceDetails(scholarship)}
+                          data-testid={`button-apply-${scholarship.id}`}
+                        >
                           <Star className="h-4 w-4" />
                           View Details
                         </Button>
@@ -258,7 +275,12 @@ export default function Resources() {
                               </Badge>
                             ))}
                           </div>
-                          <Button className="w-full font-oswald gap-2" variant="secondary" data-testid={`button-view-${resource.id}`}>
+                          <Button 
+                            className="w-full font-oswald gap-2" 
+                            variant="secondary" 
+                            onClick={() => openResourceDetails(resource)}
+                            data-testid={`button-view-${resource.id}`}
+                          >
                             {resource.type === "video" ? "Watch Now" : "Read More"}
                             <ArrowRight className="h-4 w-4" />
                           </Button>
@@ -316,6 +338,123 @@ export default function Resources() {
           </Card>
         </div>
       </div>
+
+      {/* Resource Details Dialog */}
+      <Dialog open={detailsOpen} onOpenChange={setDetailsOpen}>
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+          {selectedResource && (
+            <>
+              <DialogHeader>
+                <div className="flex items-center gap-2 mb-2">
+                  <Badge className={typeConfig[selectedResource.type as keyof typeof typeConfig]?.color}>
+                    {(() => {
+                      const TypeIcon = typeConfig[selectedResource.type as keyof typeof typeConfig]?.icon;
+                      return TypeIcon ? <TypeIcon className="h-3 w-3 mr-1" /> : null;
+                    })()}
+                    {typeConfig[selectedResource.type as keyof typeof typeConfig]?.label}
+                  </Badge>
+                  <Badge variant="outline">
+                    {(() => {
+                      const CatIcon = categoryConfig[selectedResource.category as keyof typeof categoryConfig]?.icon;
+                      return CatIcon ? <CatIcon className="h-3 w-3 mr-1" /> : null;
+                    })()}
+                    {categoryConfig[selectedResource.category as keyof typeof categoryConfig]?.label}
+                  </Badge>
+                </div>
+                <DialogTitle className="font-oswald text-xl">{selectedResource.title}</DialogTitle>
+                <DialogDescription className="font-roboto">
+                  {selectedResource.description}
+                </DialogDescription>
+              </DialogHeader>
+
+              <div className="space-y-4 mt-4">
+                {/* Scholarship-specific details */}
+                {selectedResource.type === "scholarship" && (
+                  <>
+                    <div className="grid grid-cols-2 gap-4">
+                      {selectedResource.amount && (
+                        <div className="p-3 rounded-md bg-green-50 dark:bg-green-950 border border-green-200 dark:border-green-800">
+                          <div className="flex items-center gap-2 text-green-700 dark:text-green-400">
+                            <DollarSign className="h-4 w-4" />
+                            <span className="text-sm font-medium">Award Amount</span>
+                          </div>
+                          <p className="font-oswald text-lg mt-1">{formatAmount(selectedResource.amount)}</p>
+                        </div>
+                      )}
+                      {selectedResource.deadline && (
+                        <div className="p-3 rounded-md bg-amber-50 dark:bg-amber-950 border border-amber-200 dark:border-amber-800">
+                          <div className="flex items-center gap-2 text-amber-700 dark:text-amber-400">
+                            <Calendar className="h-4 w-4" />
+                            <span className="text-sm font-medium">Deadline</span>
+                          </div>
+                          <p className="font-oswald text-lg mt-1">
+                            {new Date(selectedResource.deadline).toLocaleDateString()}
+                          </p>
+                        </div>
+                      )}
+                    </div>
+
+                    {selectedResource.eligibility && selectedResource.eligibility.length > 0 && (
+                      <div>
+                        <h4 className="font-oswald text-sm mb-2 flex items-center gap-2">
+                          <CheckCircle className="h-4 w-4 text-primary" />
+                          Eligibility Requirements
+                        </h4>
+                        <ul className="space-y-2">
+                          {selectedResource.eligibility.map((req: string, i: number) => (
+                            <li key={i} className="flex items-start gap-2 text-sm">
+                              <CheckCircle className="h-4 w-4 text-green-500 mt-0.5 flex-shrink-0" />
+                              <span>{req}</span>
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+                  </>
+                )}
+
+                {/* Tags */}
+                {selectedResource.tags && selectedResource.tags.length > 0 && (
+                  <div>
+                    <h4 className="font-oswald text-sm mb-2">Topics</h4>
+                    <div className="flex flex-wrap gap-2">
+                      {selectedResource.tags.map((tag, i) => (
+                        <Badge key={i} variant="secondary" className="text-xs">
+                          {tag}
+                        </Badge>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                <Separator />
+
+                {/* Action buttons */}
+                <div className="flex gap-3">
+                  {selectedResource.url && (
+                    <Button 
+                      className="flex-1 font-oswald gap-2" 
+                      onClick={() => window.open(selectedResource.url, "_blank")}
+                      data-testid="button-open-resource"
+                    >
+                      <ExternalLink className="h-4 w-4" />
+                      {selectedResource.type === "scholarship" ? "Apply Now" : 
+                       selectedResource.type === "video" ? "Watch Video" : "Open Resource"}
+                    </Button>
+                  )}
+                  <Button 
+                    variant="outline" 
+                    onClick={() => setDetailsOpen(false)}
+                    data-testid="button-close-details"
+                  >
+                    Close
+                  </Button>
+                </div>
+              </div>
+            </>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
