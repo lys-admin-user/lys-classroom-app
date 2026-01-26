@@ -29,6 +29,7 @@ import { randomUUID } from "crypto";
 import multer from "multer";
 import { syncJurisdictionsFromCSP, syncStandardSetFromCSP, getSyncStatus, fetchCSPJurisdictions, syncAllStandardsFromCSP, getImportProgress } from "./services/cspService";
 import { extractStandardsFromText, processPdfImport, checkSourceForChanges } from "./services/llmExtractionService";
+import { syncBlsData, getLastSyncStatus, getSyncHistory, startBlsScheduler, getSchedulerStatus } from "./services/blsService";
 import { db } from "./db";
 import { eq, desc } from "drizzle-orm";
 
@@ -6107,6 +6108,71 @@ export async function registerRoutes(
     } catch (error) {
       console.error("Failed to delete comment:", error);
       res.status(500).json({ error: "Failed to delete comment" });
+    }
+  });
+
+  // ================================
+  // BLS Data Sync Routes
+  // ================================
+
+  // Start the BLS scheduler when server starts
+  startBlsScheduler();
+
+  // Get BLS sync status
+  app.get("/api/bls-sync/status", isAuthenticated, async (req, res) => {
+    try {
+      const user = req.user as User;
+      if (user.role !== "system_admin" && user.role !== "campus_admin") {
+        res.status(403).json({ error: "Admin access required" });
+        return;
+      }
+
+      const lastSync = await getLastSyncStatus();
+      const schedulerStatus = getSchedulerStatus();
+
+      res.json({
+        lastSync,
+        scheduler: schedulerStatus,
+      });
+    } catch (error) {
+      console.error("Failed to get BLS sync status:", error);
+      res.status(500).json({ error: "Failed to get sync status" });
+    }
+  });
+
+  // Get BLS sync history
+  app.get("/api/bls-sync/history", isAuthenticated, async (req, res) => {
+    try {
+      const user = req.user as User;
+      if (user.role !== "system_admin" && user.role !== "campus_admin") {
+        res.status(403).json({ error: "Admin access required" });
+        return;
+      }
+
+      const limit = parseInt(req.query.limit as string) || 10;
+      const history = await getSyncHistory(limit);
+
+      res.json(history);
+    } catch (error) {
+      console.error("Failed to get BLS sync history:", error);
+      res.status(500).json({ error: "Failed to get sync history" });
+    }
+  });
+
+  // Trigger manual BLS sync (admin only)
+  app.post("/api/bls-sync/trigger", isAuthenticated, async (req, res) => {
+    try {
+      const user = req.user as User;
+      if (user.role !== "system_admin") {
+        res.status(403).json({ error: "System admin access required" });
+        return;
+      }
+
+      const syncLog = await syncBlsData(user.id);
+      res.json(syncLog);
+    } catch (error) {
+      console.error("Failed to trigger BLS sync:", error);
+      res.status(500).json({ error: "Failed to trigger sync" });
     }
   });
 

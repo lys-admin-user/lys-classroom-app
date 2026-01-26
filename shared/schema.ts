@@ -719,6 +719,29 @@ export const insertChecksumSchema = createInsertSchema(sourceChecksums).omit({ i
 export type InsertSourceChecksum = z.infer<typeof insertChecksumSchema>;
 export type SourceChecksum = typeof sourceChecksums.$inferSelect;
 
+// BLS Data Sync Log (tracks BLS Occupational Outlook updates)
+export const blsSyncLog = pgTable("bls_sync_log", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  syncType: text("sync_type").notNull(), // "full", "incremental", "wage_update"
+  status: text("status").notNull(), // "started", "in_progress", "completed", "failed"
+  totalOccupations: integer("total_occupations").default(0),
+  processedOccupations: integer("processed_occupations").default(0),
+  updatedOccupations: integer("updated_occupations").default(0),
+  newOccupations: integer("new_occupations").default(0),
+  errorCount: integer("error_count").default(0),
+  errorMessages: jsonb("error_messages").$type<string[]>(),
+  dataSource: text("data_source"), // "bls_api", "oews", "employment_projections"
+  apiVersion: text("api_version"),
+  startedAt: timestamp("started_at").defaultNow(),
+  completedAt: timestamp("completed_at"),
+  nextScheduledAt: timestamp("next_scheduled_at"),
+  triggeredBy: text("triggered_by"), // "scheduled", "manual", user ID
+});
+
+export const insertBlsSyncLogSchema = createInsertSchema(blsSyncLog).omit({ id: true, startedAt: true });
+export type InsertBlsSyncLog = z.infer<typeof insertBlsSyncLogSchema>;
+export type BlsSyncLog = typeof blsSyncLog.$inferSelect;
+
 // ================================
 // Assignment System (Paid Feature)
 // ================================
