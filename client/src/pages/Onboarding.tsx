@@ -558,9 +558,60 @@ export default function Onboarding() {
                           ) || [];
                           
                           if (matchingJurisdictions.length > 0) {
-                            return matchingJurisdictions.map((j) => (
-                              <SelectItem key={j.id} value={j.abbreviation}>{j.name}</SelectItem>
-                            ));
+                            // For US, group by region
+                            if (country === "US") {
+                              const usRegions: Record<string, string[]> = {
+                                "Northeast": ["CT", "ME", "MA", "NH", "NJ", "NY", "PA", "RI", "VT"],
+                                "Southeast": ["AL", "AR", "FL", "GA", "KY", "LA", "MD", "MS", "NC", "SC", "TN", "VA", "WV", "DE", "DC"],
+                                "Midwest": ["IL", "IN", "IA", "KS", "MI", "MN", "MO", "NE", "ND", "OH", "SD", "WI"],
+                                "Southwest": ["AZ", "NM", "OK", "TX"],
+                                "West": ["AK", "CA", "CO", "HI", "ID", "MT", "NV", "OR", "UT", "WA", "WY"],
+                              };
+                              
+                              const groupedItems: JSX.Element[] = [];
+                              Object.entries(usRegions).forEach(([region, stateAbbrevs]) => {
+                                const regionStates = matchingJurisdictions.filter(j => 
+                                  stateAbbrevs.includes(j.abbreviation)
+                                ).sort((a, b) => a.name.localeCompare(b.name));
+                                
+                                if (regionStates.length > 0) {
+                                  groupedItems.push(
+                                    <SelectGroup key={region}>
+                                      <SelectLabel className="font-oswald text-xs text-muted-foreground">{region}</SelectLabel>
+                                      {regionStates.map((j) => (
+                                        <SelectItem key={j.id} value={j.abbreviation}>{j.name}</SelectItem>
+                                      ))}
+                                    </SelectGroup>
+                                  );
+                                }
+                              });
+                              
+                              // Add any states not in regions (national standards, etc.)
+                              const allRegionAbbrevs = Object.values(usRegions).flat();
+                              const otherStandards = matchingJurisdictions.filter(j => 
+                                !allRegionAbbrevs.includes(j.abbreviation)
+                              ).sort((a, b) => a.name.localeCompare(b.name));
+                              
+                              if (otherStandards.length > 0) {
+                                groupedItems.push(
+                                  <SelectGroup key="national">
+                                    <SelectLabel className="font-oswald text-xs text-muted-foreground">National / Other</SelectLabel>
+                                    {otherStandards.map((j) => (
+                                      <SelectItem key={j.id} value={j.abbreviation}>{j.name}</SelectItem>
+                                    ))}
+                                  </SelectGroup>
+                                );
+                              }
+                              
+                              return groupedItems;
+                            }
+                            
+                            // For other countries, sort alphabetically
+                            return matchingJurisdictions
+                              .sort((a, b) => a.name.localeCompare(b.name))
+                              .map((j) => (
+                                <SelectItem key={j.id} value={j.abbreviation}>{j.name}</SelectItem>
+                              ));
                           }
                           
                           return <SelectItem value="other">Other / Not Listed</SelectItem>;
