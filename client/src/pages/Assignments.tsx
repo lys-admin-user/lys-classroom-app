@@ -14,7 +14,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
-import { Sparkles, FileText, Users, UserPlus, AlertTriangle, Check, Clock, BookOpen, Target, Compass, Lightbulb, Lock, GraduationCap, Copy, Printer, Pencil, Trash2, Plus, CheckCircle, Play, Search, RefreshCw, Star, ArrowRight } from "lucide-react";
+import { Sparkles, FileText, Users, UserPlus, AlertTriangle, Check, Clock, BookOpen, Target, Compass, Lightbulb, Lock, GraduationCap, Copy, Printer, Pencil, Trash2, Plus, CheckCircle, Play, Search, RefreshCw, Star, ArrowRight, HelpCircle, ScrollText, Heart } from "lucide-react";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/use-auth";
@@ -1077,18 +1077,104 @@ export default function Assignments() {
                                 </div>
                               )}
 
-                              {/* Reflection Prompts */}
+                              {/* Enhanced Reflection Prompts - Socratic, Hebraic, Be-Know-Do */}
                               {generatedAssignment.project.reflectionPrompts && generatedAssignment.project.reflectionPrompts.length > 0 && (
                                 <div className="mt-6">
-                                  <h4 className="font-oswald text-sm mb-2 flex items-center gap-1">
+                                  <h4 className="font-oswald text-sm mb-3 flex items-center gap-1">
                                     <Lightbulb className="w-4 h-4 text-primary" />
-                                    Reflection Prompts (Be-Know-Do)
+                                    Reflection Prompts
                                   </h4>
-                                  <ul className="list-disc list-inside text-sm space-y-1 text-muted-foreground">
-                                    {generatedAssignment.project.reflectionPrompts.map((prompt: string, i: number) => (
-                                      <li key={i}>{prompt}</li>
-                                    ))}
-                                  </ul>
+                                  <p className="text-xs text-muted-foreground mb-4">
+                                    These prompts incorporate Socratic questioning, Hebraic learning traditions, and the Be-Know-Do framework to deepen understanding.
+                                  </p>
+                                  
+                                  {/* Group by style */}
+                                  {["socratic", "hebraic", "bkd"].map((styleType) => {
+                                    const stylePrompts = generatedAssignment.project.reflectionPrompts.filter((p: any) => p.style === styleType);
+                                    if (stylePrompts.length === 0) return null;
+                                    
+                                    const styleConfig = {
+                                      socratic: {
+                                        title: "Socratic Method",
+                                        description: "Questioning to illuminate understanding and examine assumptions",
+                                        color: "blue",
+                                        IconComponent: HelpCircle
+                                      },
+                                      hebraic: {
+                                        title: "Hebraic Learning",
+                                        description: "Discussion, narrative, and life application through partnership",
+                                        color: "amber",
+                                        IconComponent: ScrollText
+                                      },
+                                      bkd: {
+                                        title: "Be-Know-Do Framework",
+                                        description: "Identity, knowledge, and action integration",
+                                        color: "primary",
+                                        IconComponent: Target
+                                      }
+                                    }[styleType];
+                                    
+                                    const StyleIcon = styleConfig?.IconComponent || HelpCircle;
+                                    
+                                    return (
+                                      <div key={styleType} className="mb-5">
+                                        <div className={`flex items-center gap-2 mb-2 pb-1 border-b ${
+                                          styleType === "socratic" ? "border-blue-200" :
+                                          styleType === "hebraic" ? "border-amber-200" :
+                                          "border-primary/20"
+                                        }`}>
+                                          <StyleIcon className={`w-5 h-5 ${
+                                            styleType === "socratic" ? "text-blue-600" :
+                                            styleType === "hebraic" ? "text-amber-600" :
+                                            "text-primary"
+                                          }`} />
+                                          <div>
+                                            <span className={`font-oswald text-sm ${
+                                              styleType === "socratic" ? "text-blue-700 dark:text-blue-400" :
+                                              styleType === "hebraic" ? "text-amber-700 dark:text-amber-400" :
+                                              "text-primary"
+                                            }`}>
+                                              {styleConfig?.title}
+                                            </span>
+                                            <p className="text-xs text-muted-foreground">{styleConfig?.description}</p>
+                                          </div>
+                                        </div>
+                                        
+                                        <div className="space-y-3 ml-6">
+                                          {stylePrompts.map((rp: any, ri: number) => (
+                                            <div key={ri} className={`p-3 rounded-md border ${
+                                              styleType === "socratic" ? "bg-blue-50/50 dark:bg-blue-950/30 border-blue-100 dark:border-blue-900" :
+                                              styleType === "hebraic" ? "bg-amber-50/50 dark:bg-amber-950/30 border-amber-100 dark:border-amber-900" :
+                                              "bg-primary/5 border-primary/10"
+                                            }`}>
+                                              <div className="flex items-start gap-2">
+                                                <Badge variant="outline" className={`text-xs flex-shrink-0 ${
+                                                  styleType === "socratic" ? "border-blue-300 text-blue-700 dark:text-blue-400" :
+                                                  styleType === "hebraic" ? "border-amber-300 text-amber-700 dark:text-amber-400" :
+                                                  "border-primary/50"
+                                                }`}>
+                                                  {rp.category}
+                                                </Badge>
+                                              </div>
+                                              <p className="text-sm font-medium mt-2 text-foreground">{rp.prompt}</p>
+                                              {rp.followUp && (
+                                                <p className="text-xs text-muted-foreground mt-1 italic flex items-center gap-1">
+                                                  <ArrowRight className="w-3 h-3" />
+                                                  Follow-up: {rp.followUp}
+                                                </p>
+                                              )}
+                                              {rp.connectionToObjective && (
+                                                <p className="text-xs text-muted-foreground mt-2 pt-2 border-t border-dashed flex items-center gap-1">
+                                                  <Target className="w-3 h-3" />
+                                                  Connected to: {rp.connectionToObjective}
+                                                </p>
+                                              )}
+                                            </div>
+                                          ))}
+                                        </div>
+                                      </div>
+                                    );
+                                  })}
                                 </div>
                               )}
                             </div>

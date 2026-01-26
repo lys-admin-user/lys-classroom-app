@@ -107,6 +107,14 @@ interface WorksheetMetadata {
   standards: string;
 }
 
+interface ReflectionPrompt {
+  style: "socratic" | "hebraic" | "bkd";
+  category: string;
+  prompt: string;
+  followUp?: string;
+  connectionToObjective?: string;
+}
+
 interface GeneratedProject {
   templateType: ProjectTemplateType;
   templateName: string;
@@ -123,7 +131,7 @@ interface GeneratedProject {
     points: number;
   }[];
   extensions: string[];
-  reflectionPrompts: string[];
+  reflectionPrompts: ReflectionPrompt[];
 }
 
 interface GeneratedAssignment {
@@ -406,13 +414,94 @@ function generateProjectFromTemplate(
     "Create a visual aid to explain your project to a younger student."
   ];
 
-  // Generate reflection prompts aligned with Be-Know-Do
-  const reflectionPrompts = [
-    `BE: How has working on this project changed how you see yourself as a learner?`,
-    `KNOW: What is the most important thing you learned about ${lesson.topic}?`,
-    `DO: How will you apply what you learned in this project to other areas of your life?`,
-    "What was the most challenging part of this project and how did you overcome it?",
-    "What would you do differently if you could start over?"
+  // Generate reflection prompts incorporating Socratic, Hebraic, and Be-Know-Do styles
+  // Connected to learning objectives and essential questions
+  const contentObjective = lesson.contentObjective || `understanding ${lesson.topic}`;
+  const lessonObjective = lesson.lessonObjective || `mastering concepts in ${lesson.topic}`;
+  
+  const reflectionPrompts: ReflectionPrompt[] = [
+    // SOCRATIC STYLE - Questioning to illuminate understanding
+    {
+      style: "socratic",
+      category: "Examining Assumptions",
+      prompt: `What did you assume to be true about "${lesson.topic}" before this project that you now question?`,
+      followUp: "What evidence from your work challenged or confirmed this assumption?",
+      connectionToObjective: contentObjective
+    },
+    {
+      style: "socratic",
+      category: "Exploring Evidence",
+      prompt: `If someone disagreed with your conclusions about "${lesson.topic}", what would be their strongest argument?`,
+      followUp: "How would you respond to that argument using evidence from your project?",
+      connectionToObjective: lessonObjective
+    },
+    {
+      style: "socratic",
+      category: "Implications & Consequences",
+      prompt: `What are the implications if your understanding of "${lesson.topic}" is correct? What changes?`,
+      followUp: "Who else needs to understand this, and why does it matter to them?",
+      connectionToObjective: contentObjective
+    },
+    {
+      style: "socratic",
+      category: "Meta-Questioning",
+      prompt: "What question about this topic do you still not know how to answer?",
+      followUp: "Why is this question important, and where might you find answers?",
+      connectionToObjective: lessonObjective
+    },
+
+    // HEBRAIC STYLE - Discussion, debate, story, and life application
+    {
+      style: "hebraic",
+      category: "Chavruta (Partner Learning)",
+      prompt: "If you were to teach this project to a study partner, what would be the most important insight you would share first?",
+      followUp: "What question would you want them to ask you to deepen both of your understanding?",
+      connectionToObjective: contentObjective
+    },
+    {
+      style: "hebraic",
+      category: "Story & Narrative",
+      prompt: `Tell the story of your learning journey with "${lesson.topic}" - what was the beginning, middle, and turning point?`,
+      followUp: "What character in a story or history faced a similar challenge to what you explored?",
+      connectionToObjective: lessonObjective
+    },
+    {
+      style: "hebraic",
+      category: "Action & Life Application",
+      prompt: "Learning is incomplete without action. What specific action will you take in the next week because of what you learned?",
+      followUp: "How will you know if your action was successful?",
+      connectionToObjective: contentObjective
+    },
+    {
+      style: "hebraic",
+      category: "Generational Wisdom",
+      prompt: "If you could share one insight from this project with a younger student, what would it be and why?",
+      followUp: "What advice would someone who mastered this topic give to you as you continue learning?",
+      connectionToObjective: lessonObjective
+    },
+
+    // BE-KNOW-DO FRAMEWORK
+    {
+      style: "bkd",
+      category: "BE (Identity & Character)",
+      prompt: `How has working on this project shaped who you are becoming as a person?`,
+      followUp: "What character trait did you develop or strengthen through this work?",
+      connectionToObjective: contentObjective
+    },
+    {
+      style: "bkd",
+      category: "KNOW (Knowledge & Understanding)",
+      prompt: `What is the most important concept about "${lesson.topic}" that you now understand deeply?`,
+      followUp: "How would you explain this concept to someone who has never encountered it?",
+      connectionToObjective: lessonObjective
+    },
+    {
+      style: "bkd",
+      category: "DO (Skills & Action)",
+      prompt: "What new skill did you practice or develop through this project?",
+      followUp: "Where else in your life can you apply this skill?",
+      connectionToObjective: contentObjective
+    }
   ];
 
   return {
