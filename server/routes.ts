@@ -731,13 +731,93 @@ export async function registerRoutes(
     }
   });
 
-  // Careers - public
+  // Careers - public with filtering options
   app.get("/api/careers", async (req, res) => {
     try {
-      const careers = await storage.getCareers();
+      const { grade, state } = req.query;
+      let careers;
+      
+      if (grade && typeof grade === "string") {
+        careers = await storage.getCareersByGrade(grade);
+      } else if (state && typeof state === "string") {
+        careers = await storage.getCareersByState(state);
+      } else {
+        careers = await storage.getCareers();
+      }
       res.json(careers);
     } catch (error) {
       res.status(500).json({ error: "Failed to fetch careers" });
+    }
+  });
+
+  // Get trending/high-growth careers based on BLS data
+  app.get("/api/careers/trending", async (req, res) => {
+    try {
+      const limit = parseInt(req.query.limit as string) || 10;
+      const trendingCareers = await storage.getTrendingCareers(limit);
+      res.json(trendingCareers);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch trending careers" });
+    }
+  });
+
+  // Get market trends data - aggregated BLS statistics
+  app.get("/api/careers/market-trends", async (req, res) => {
+    try {
+      const { state } = req.query;
+      const allCareers = state && typeof state === "string" 
+        ? await storage.getCareersByState(state)
+        : await storage.getCareers();
+      
+      // Calculate market trends summary
+      const outlookCounts = { 
+        much_faster: 0, 
+        faster_than_average: 0, 
+        average: 0, 
+        little_change: 0, 
+        declining: 0 
+      };
+      const demandCounts = { very_high: 0, high: 0, moderate: 0, low: 0 };
+      const categoryCounts: Record<string, number> = {};
+      let totalProjectedOpenings = 0;
+      let avgGrowthRate = 0;
+      
+      allCareers.forEach(c => {
+        if (c.jobOutlook) outlookCounts[c.jobOutlook]++;
+        if (c.demandLevel) demandCounts[c.demandLevel]++;
+        categoryCounts[c.category] = (categoryCounts[c.category] || 0) + 1;
+        totalProjectedOpenings += c.projectedOpenings || 0;
+        avgGrowthRate += c.projectedGrowth || 0;
+      });
+      
+      avgGrowthRate = allCareers.length > 0 ? avgGrowthRate / allCareers.length : 0;
+      
+      const topGrowingCareers = [...allCareers]
+        .sort((a, b) => (b.projectedGrowth || 0) - (a.projectedGrowth || 0))
+        .slice(0, 5)
+        .map(c => ({ id: c.id, title: c.title, growth: c.projectedGrowth, category: c.category }));
+      
+      const highDemandCategories = Object.entries(categoryCounts)
+        .sort(([, a], [, b]) => b - a)
+        .slice(0, 5)
+        .map(([category, count]) => ({ category, count }));
+      
+      res.json({
+        summary: {
+          totalCareers: allCareers.length,
+          totalProjectedOpenings,
+          avgGrowthRate: Math.round(avgGrowthRate * 10) / 10,
+          lastUpdated: "2024-09",
+          source: "Bureau of Labor Statistics (BLS)"
+        },
+        outlookDistribution: outlookCounts,
+        demandDistribution: demandCounts,
+        topGrowingCareers,
+        highDemandCategories,
+        stateFilter: state || null
+      });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch market trends" });
     }
   });
 

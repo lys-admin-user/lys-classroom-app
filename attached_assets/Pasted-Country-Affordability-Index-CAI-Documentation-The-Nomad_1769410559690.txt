@@ -1,0 +1,313 @@
+Country Affordability Index (CAI) Documentation
+
+The Nomad Network Global Pricing System
+
+Last Updated: December 2024
+Version: 1.0
+
+Overview
+
+The Country Affordability Index (CAI) is a proprietary scoring system developed by The Nomad Network to enable equitable, cross-border pricing for healthcare services, consulting, education, and business transactions. The CAI ensures that pricing reflects true local purchasing power rather than simple currency conversion.
+
+The Problem CAI Solves
+
+Foreign exchange (FX) conversion alone does not equal affordability.
+
+A service priced at $100 USD may be affordable in the United States but represent a significant financial burden in developing countries, even after currency conversion. The CAI addresses this by adjusting prices based on local economic realities.
+
+CAI Score Calculation
+
+Each country receives a CAI Score ranging from 0.05 to 1.0, derived from four weighted factors:
+
+Factor
+
+Weight
+
+Description
+
+GDP per Capita (PPP)
+
+35%
+
+Purchasing power parity-adjusted gross domestic product per person
+
+Median Monthly Income
+
+25%
+
+Average monthly earnings for working-age population
+
+Out-of-Pocket Healthcare Spend
+
+20%
+
+Average individual healthcare expenditure as percentage of income
+
+Urban Cost-of-Living Index
+
+20%
+
+Relative cost of goods and services in major urban centers
+
+CAI Score Ranges
+
+CAI Score
+
+Income Level
+
+Example Countries
+
+0.70 - 1.0
+
+High Income
+
+USA, Switzerland, Norway, Australia, Germany
+
+0.40 - 0.69
+
+Upper-Middle Income
+
+Brazil, Mexico, China, Turkey, Thailand
+
+0.20 - 0.39
+
+Lower-Middle Income
+
+India, Nigeria, Philippines, Kenya, Morocco
+
+0.05 - 0.19
+
+Low Income
+
+Ethiopia, DR Congo, Mali, Niger, Mozambique
+
+Local Cost-of-Services Index (LCSI)
+
+The LCSI is an additional adjustment factor (0 to 0.15) that accounts for:
+
+Regional cost variations within countries
+Local healthcare infrastructure costs
+Professional service availability premiums
+Urban vs. rural pricing differences
+The CAI-FX Pricing Formula
+
+Recommended Local Price = Global Reference Price x (CAI Score + LCSI Adjustment)
+
+Example Calculation
+
+Parameter
+
+Value
+
+Global Reference Price (GRP)
+
+$100 USD
+
+Country
+
+Nigeria
+
+CAI Score
+
+0.25
+
+LCSI Adjustment
+
+0.05
+
+Recommended Price
+
+$100 x (0.25 + 0.05) = $30 USD equivalent
+
+Platform Applications
+
+1. Healthcare Service Pricing
+
+Telemedicine consultations
+Second opinion services
+International patient referrals
+Cross-border specialist consultations
+2. Consulting & Professional Services
+
+Business consulting fees
+Legal advisory services
+Technical consulting rates
+3. Educational Services
+
+Online course pricing
+Certification programs
+Professional development training
+4. Research & Collaboration
+
+Research partnership contributions
+Data sharing agreements
+Collaborative project funding
+CAI Database Structure
+
+Each country entry in the CAI database contains:
+
+Field
+
+Type
+
+Description
+
+code
+
+String
+
+ISO 3166-1 alpha-2 country code
+
+name
+
+String
+
+Full country name
+
+currency
+
+String
+
+ISO 4217 currency code
+
+currencySymbol
+
+String
+
+Local currency symbol
+
+caiScore
+
+Number
+
+Affordability score (0.05-1.0)
+
+lcsiAdjustment
+
+Number
+
+Local adjustment (0-0.15)
+
+region
+
+String
+
+Geographic region
+
+incomeLevel
+
+String
+
+World Bank income classification
+
+avgDoctorVisitUSD
+
+Number
+
+Average doctor visit cost in USD
+
+avgMonthlyIncomeUSD
+
+Number
+
+Average monthly income in USD
+
+healthcareSpendPctIncome
+
+Number
+
+Healthcare spend as % of income
+
+lastUpdated
+
+Date
+
+Last data verification date
+
+Data Verification
+
+CAI data undergoes quarterly verification to ensure:
+
+CAI in Range: Score between 0.05 and 1.0
+LCSI in Range: Adjustment between 0 and 0.15
+Recent Update: Data updated within last 6 months
+Data Completeness: All required fields populated
+Countries Covered
+
+The CAI database currently includes 120+ countries across all regions:
+
+Africa: 35+ countries
+Asia: 30+ countries
+Europe: 25+ countries
+Americas: 20+ countries
+Oceania: 10+ countries
+How to Use CAI on The Nomad Network
+
+For Healthcare Providers
+
+Navigate to Global Pricing Navigator
+Select your service type
+Enter your Global Reference Price (home country rate)
+Search or select target country
+View CAI-adjusted recommended pricing
+For Consultants & Educators
+
+Access the CAI-FX Pricing Guide
+Choose service category
+Input base rate
+Receive regionally-appropriate pricing suggestions
+For Patients & Clients
+
+View transparent pricing adjusted for your location
+Understand how pricing reflects local economic conditions
+Access equitable healthcare and services globally
+Benefits of CAI-Based Pricing
+
+For Service Providers
+
+Expand global reach with appropriate pricing
+Build trust through transparent methodology
+Increase accessibility in emerging markets
+For Consumers
+
+Fair pricing based on local purchasing power
+Access to global expertise at affordable rates
+Transparent pricing methodology
+For the Platform
+
+Reduced payment friction
+Higher conversion rates across markets
+Sustainable cross-border transactions
+Update Schedule
+
+Activity
+
+Frequency
+
+CAI Score Recalculation
+
+Quarterly
+
+LCSI Adjustment Review
+
+Quarterly
+
+New Country Additions
+
+As needed
+
+Currency Rate Updates
+
+Real-time
+
+Technical Integration
+
+The CAI system is integrated throughout The Nomad Network platform:
+
+Global Pricing Navigator: Interactive pricing calculator
+Provider Service Management: Automatic price suggestions
+Wallet & Payments: CAI-aware transaction processing
+Analytics Dashboards: Regional pricing insights
+Disclaimer
+
+CAI scores are economic indicators designed to guide equitable pricing decisions. They do not constitute financial advice. Service providers retain full discretion over final pricing. Currency exchange rates are obtained from reliable financial data providers and updated in real-time.

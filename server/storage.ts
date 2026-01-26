@@ -243,6 +243,9 @@ export interface IStorage {
   // Static data (in-memory)
   getCareers(): Promise<Career[]>;
   getCareer(id: string): Promise<Career | undefined>;
+  getCareersByGrade(gradeBand: string): Promise<Career[]>;
+  getTrendingCareers(limit?: number): Promise<Career[]>;
+  getCareersByState(stateCode: string): Promise<Career[]>;
   getResources(): Promise<Resource[]>;
   getResource(id: string): Promise<Resource | undefined>;
   getAssessments(): Promise<Assessment[]>;
@@ -566,7 +569,7 @@ const seedCareers: Career[] = [
     description: "Design, develop, and maintain software applications. Work with cutting-edge technologies to solve complex problems.",
     salaryMin: 65000,
     salaryMax: 150000,
-    salaryMedian: 110000,
+    salaryMedian: 130160,
     educationRequired: "Bachelor's Degree",
     yearsExperience: "0-5 years",
     growthRate: "+25%",
@@ -577,6 +580,28 @@ const seedCareers: Career[] = [
       { type: "certification", description: "Complete coding bootcamp and earn industry certifications like AWS or Google Cloud.", duration: "3-6 months", cost: "$10,000-$20,000" },
       { type: "military", description: "Serve in IT roles in the military and transition to civilian tech careers.", duration: "4+ years", cost: "Free + Benefits" },
     ],
+    blsCode: "15-1252",
+    jobOutlook: "much_faster",
+    projectedGrowth: 25,
+    projectedOpenings: 153900,
+    demandLevel: "very_high",
+    appropriateGrades: ["middle_school", "high_school", "post_secondary"],
+    entryPointsForGrades: {
+      middle_school: "Explore coding games like Scratch, join coding clubs, or build simple websites",
+      high_school: "Take AP Computer Science, participate in hackathons, or start personal coding projects",
+      post_secondary: "Pursue CS degree or coding bootcamp, build portfolio, contribute to open source"
+    },
+    workEnvironment: "Most work in offices or remotely. Collaboration with teams is common.",
+    typicalEntryEducation: "Bachelor's degree",
+    onTheJobTraining: "None",
+    stateSalaryData: {
+      TX: { min: 75000, max: 160000, median: 125000, employment: 189500, demandLevel: "very_high" },
+      CA: { min: 90000, max: 200000, median: 155000, employment: 287400, demandLevel: "very_high" },
+      NY: { min: 80000, max: 175000, median: 140000, employment: 112300, demandLevel: "high" },
+      FL: { min: 65000, max: 140000, median: 110000, employment: 89200, demandLevel: "high" },
+      WA: { min: 95000, max: 210000, median: 165000, employment: 98700, demandLevel: "very_high" }
+    },
+    blsLastUpdated: "2024-09"
   },
   {
     id: "2",
@@ -585,10 +610,10 @@ const seedCareers: Career[] = [
     description: "Provide patient care, educate patients about health conditions, and support physicians in medical procedures.",
     salaryMin: 55000,
     salaryMax: 120000,
-    salaryMedian: 77000,
+    salaryMedian: 86070,
     educationRequired: "Associate's or Bachelor's Degree",
     yearsExperience: "0-3 years",
-    growthRate: "+12%",
+    growthRate: "+6%",
     skills: ["Patient Care", "Communication", "Critical Thinking", "Empathy", "Attention to Detail"],
     relatedCareers: ["Nurse Practitioner", "Physician Assistant", "Healthcare Administrator"],
     pathways: [
@@ -596,6 +621,27 @@ const seedCareers: Career[] = [
       { type: "trade", description: "Complete an ADN (Associate Degree in Nursing) at a community college.", duration: "2 years", cost: "$10,000-$30,000" },
       { type: "military", description: "Train as a military nurse and serve while gaining experience.", duration: "4+ years", cost: "Free + Benefits" },
     ],
+    blsCode: "29-1141",
+    jobOutlook: "faster_than_average",
+    projectedGrowth: 6,
+    projectedOpenings: 193100,
+    demandLevel: "very_high",
+    appropriateGrades: ["middle_school", "high_school", "post_secondary"],
+    entryPointsForGrades: {
+      middle_school: "Volunteer at hospitals, take health science classes, join health career clubs",
+      high_school: "Become a CNA, take anatomy/biology courses, shadow healthcare professionals",
+      post_secondary: "Enroll in nursing program, gain clinical experience, obtain RN license"
+    },
+    workEnvironment: "Hospitals, clinics, nursing homes. Often involves shift work and physical demands.",
+    typicalEntryEducation: "Bachelor's degree",
+    onTheJobTraining: "None",
+    stateSalaryData: {
+      TX: { min: 60000, max: 100000, median: 82000, employment: 223500, demandLevel: "very_high" },
+      CA: { min: 90000, max: 165000, median: 133000, employment: 325400, demandLevel: "very_high" },
+      NY: { min: 75000, max: 120000, median: 98000, employment: 195300, demandLevel: "high" },
+      FL: { min: 55000, max: 95000, median: 73000, employment: 198700, demandLevel: "very_high" }
+    },
+    blsLastUpdated: "2024-09"
   },
   {
     id: "3",
@@ -603,17 +649,36 @@ const seedCareers: Career[] = [
     category: "business",
     description: "Develop marketing strategies, manage campaigns, and analyze market trends to drive business growth.",
     salaryMin: 60000,
-    salaryMax: 140000,
-    salaryMedian: 95000,
+    salaryMax: 180000,
+    salaryMedian: 156580,
     educationRequired: "Bachelor's Degree",
     yearsExperience: "3-7 years",
-    growthRate: "+10%",
+    growthRate: "+8%",
     skills: ["Strategic Planning", "Data Analysis", "Creativity", "Leadership", "Communication"],
     relatedCareers: ["Brand Manager", "Digital Marketing Specialist", "Product Manager"],
     pathways: [
       { type: "college", description: "Earn a Bachelor's in Marketing, Business, or Communications.", duration: "4 years", cost: "$40,000-$200,000" },
       { type: "certification", description: "Gain experience through internships and earn digital marketing certifications.", duration: "1-2 years", cost: "$5,000-$15,000" },
     ],
+    blsCode: "11-2021",
+    jobOutlook: "faster_than_average",
+    projectedGrowth: 8,
+    projectedOpenings: 34000,
+    demandLevel: "high",
+    appropriateGrades: ["high_school", "post_secondary"],
+    entryPointsForGrades: {
+      high_school: "Join DECA/FBLA, manage social media for clubs, take business courses",
+      post_secondary: "Major in marketing, gain internship experience, build digital portfolio"
+    },
+    workEnvironment: "Office settings with some remote work. Fast-paced, deadline-driven.",
+    typicalEntryEducation: "Bachelor's degree",
+    onTheJobTraining: "None",
+    stateSalaryData: {
+      TX: { min: 80000, max: 170000, median: 145000, employment: 23400, demandLevel: "high" },
+      CA: { min: 95000, max: 220000, median: 175000, employment: 34200, demandLevel: "high" },
+      NY: { min: 90000, max: 200000, median: 165000, employment: 28100, demandLevel: "high" }
+    },
+    blsLastUpdated: "2024-09"
   },
   {
     id: "4",
@@ -622,16 +687,36 @@ const seedCareers: Career[] = [
     description: "Install, maintain, and repair electrical systems in residential, commercial, and industrial settings.",
     salaryMin: 40000,
     salaryMax: 100000,
-    salaryMedian: 60000,
+    salaryMedian: 61590,
     educationRequired: "High School + Apprenticeship",
     yearsExperience: "0-4 years",
-    growthRate: "+9%",
+    growthRate: "+6%",
     skills: ["Technical Skills", "Problem Solving", "Physical Stamina", "Safety Awareness", "Math"],
     relatedCareers: ["HVAC Technician", "Plumber", "Construction Manager"],
     pathways: [
       { type: "trade", description: "Complete a 4-5 year apprenticeship program combining classroom instruction with on-the-job training.", duration: "4-5 years", cost: "Paid training" },
       { type: "military", description: "Train as a military electrician and gain certifications.", duration: "4+ years", cost: "Free + Benefits" },
     ],
+    blsCode: "47-2111",
+    jobOutlook: "faster_than_average",
+    projectedGrowth: 6,
+    projectedOpenings: 73500,
+    demandLevel: "high",
+    appropriateGrades: ["middle_school", "high_school", "post_secondary"],
+    entryPointsForGrades: {
+      middle_school: "Take shop classes, learn basic circuits, explore maker spaces",
+      high_school: "Enroll in vocational programs, join SkillsUSA, get pre-apprenticeship training",
+      post_secondary: "Begin apprenticeship, attend trade school, obtain journeyman license"
+    },
+    workEnvironment: "Construction sites, homes, businesses. Physical work, often outdoors.",
+    typicalEntryEducation: "High school diploma",
+    onTheJobTraining: "Apprenticeship",
+    stateSalaryData: {
+      TX: { min: 45000, max: 90000, median: 58000, employment: 67200, demandLevel: "high" },
+      CA: { min: 55000, max: 120000, median: 78000, employment: 71300, demandLevel: "high" },
+      NY: { min: 50000, max: 110000, median: 82000, employment: 45800, demandLevel: "moderate" }
+    },
+    blsLastUpdated: "2024-09"
   },
   {
     id: "5",
@@ -639,8 +724,8 @@ const seedCareers: Career[] = [
     category: "creative",
     description: "Create visual content for brands, including logos, marketing materials, websites, and more.",
     salaryMin: 40000,
-    salaryMax: 90000,
-    salaryMedian: 55000,
+    salaryMax: 100000,
+    salaryMedian: 59970,
     educationRequired: "Bachelor's Degree or Portfolio",
     yearsExperience: "0-3 years",
     growthRate: "+3%",
@@ -650,6 +735,26 @@ const seedCareers: Career[] = [
       { type: "college", description: "Earn a Bachelor's in Graphic Design or Visual Arts.", duration: "4 years", cost: "$40,000-$180,000" },
       { type: "certification", description: "Build a portfolio through online courses and freelance work.", duration: "1-2 years", cost: "$2,000-$10,000" },
     ],
+    blsCode: "27-1024",
+    jobOutlook: "average",
+    projectedGrowth: 3,
+    projectedOpenings: 22800,
+    demandLevel: "moderate",
+    appropriateGrades: ["middle_school", "high_school", "post_secondary"],
+    entryPointsForGrades: {
+      middle_school: "Create digital art, take art classes, learn basic design software",
+      high_school: "Build portfolio, take AP Art, learn Adobe Creative Suite",
+      post_secondary: "Get design degree, do freelance work, specialize in UI/UX"
+    },
+    workEnvironment: "Studios, offices, or remote. Often deadline-driven project work.",
+    typicalEntryEducation: "Bachelor's degree",
+    onTheJobTraining: "None",
+    stateSalaryData: {
+      TX: { min: 42000, max: 85000, median: 58000, employment: 18900, demandLevel: "moderate" },
+      CA: { min: 50000, max: 110000, median: 72000, employment: 29100, demandLevel: "moderate" },
+      NY: { min: 48000, max: 100000, median: 68000, employment: 19800, demandLevel: "moderate" }
+    },
+    blsLastUpdated: "2024-09"
   },
   {
     id: "6",
@@ -657,18 +762,371 @@ const seedCareers: Career[] = [
     category: "legal",
     description: "Assist lawyers with legal research, document preparation, and case management.",
     salaryMin: 40000,
-    salaryMax: 75000,
-    salaryMedian: 56000,
+    salaryMax: 85000,
+    salaryMedian: 60970,
     educationRequired: "Associate's or Bachelor's Degree",
     yearsExperience: "0-3 years",
-    growthRate: "+12%",
+    growthRate: "+4%",
     skills: ["Legal Research", "Writing", "Attention to Detail", "Organization", "Communication"],
     relatedCareers: ["Legal Secretary", "Court Reporter", "Lawyer"],
     pathways: [
       { type: "college", description: "Complete a paralegal certificate or associate's degree program.", duration: "1-2 years", cost: "$5,000-$30,000" },
       { type: "certification", description: "Earn a paralegal certification from an accredited program.", duration: "6 months - 1 year", cost: "$3,000-$10,000" },
     ],
+    blsCode: "23-2011",
+    jobOutlook: "average",
+    projectedGrowth: 4,
+    projectedOpenings: 36400,
+    demandLevel: "moderate",
+    appropriateGrades: ["high_school", "post_secondary"],
+    entryPointsForGrades: {
+      high_school: "Join mock trial, take legal studies courses, develop research skills",
+      post_secondary: "Complete paralegal program, gain legal internship, obtain certification"
+    },
+    workEnvironment: "Law firms, corporate legal departments. Office-based with regular hours.",
+    typicalEntryEducation: "Associate's degree",
+    onTheJobTraining: "Short-term on-the-job training",
+    stateSalaryData: {
+      TX: { min: 42000, max: 75000, median: 56000, employment: 21200, demandLevel: "moderate" },
+      CA: { min: 50000, max: 95000, median: 68000, employment: 28100, demandLevel: "moderate" },
+      NY: { min: 48000, max: 90000, median: 65000, employment: 19300, demandLevel: "moderate" }
+    },
+    blsLastUpdated: "2024-09"
   },
+  {
+    id: "7",
+    title: "Data Scientist",
+    category: "technology",
+    description: "Analyze complex data to help organizations make better decisions. Use machine learning and statistics.",
+    salaryMin: 80000,
+    salaryMax: 180000,
+    salaryMedian: 108020,
+    educationRequired: "Bachelor's or Master's Degree",
+    yearsExperience: "0-5 years",
+    growthRate: "+36%",
+    skills: ["Python/R Programming", "Machine Learning", "Statistics", "Data Visualization", "SQL"],
+    relatedCareers: ["Data Analyst", "Machine Learning Engineer", "Business Intelligence Analyst"],
+    pathways: [
+      { type: "college", description: "Earn a degree in Data Science, Statistics, or Computer Science.", duration: "4-6 years", cost: "$50,000-$250,000" },
+      { type: "certification", description: "Complete data science bootcamp and earn industry certifications.", duration: "6-12 months", cost: "$15,000-$30,000" },
+    ],
+    blsCode: "15-2051",
+    jobOutlook: "much_faster",
+    projectedGrowth: 36,
+    projectedOpenings: 17700,
+    demandLevel: "very_high",
+    appropriateGrades: ["high_school", "post_secondary"],
+    entryPointsForGrades: {
+      high_school: "Excel in math/statistics, learn Python basics, participate in data competitions",
+      post_secondary: "Major in data science or statistics, build portfolio of projects, get internships"
+    },
+    workEnvironment: "Office or remote. Project-based work with cross-functional teams.",
+    typicalEntryEducation: "Bachelor's degree",
+    onTheJobTraining: "None",
+    stateSalaryData: {
+      TX: { min: 85000, max: 165000, median: 120000, employment: 12400, demandLevel: "very_high" },
+      CA: { min: 100000, max: 200000, median: 150000, employment: 28900, demandLevel: "very_high" },
+      WA: { min: 95000, max: 190000, median: 145000, employment: 8700, demandLevel: "very_high" }
+    },
+    blsLastUpdated: "2024-09"
+  },
+  {
+    id: "8",
+    title: "Wind Turbine Technician",
+    category: "trades",
+    description: "Install, maintain, and repair wind turbines. Work at great heights in renewable energy sector.",
+    salaryMin: 45000,
+    salaryMax: 80000,
+    salaryMedian: 61770,
+    educationRequired: "Technical Certificate",
+    yearsExperience: "0-2 years",
+    growthRate: "+45%",
+    skills: ["Mechanical Skills", "Electrical Knowledge", "Physical Fitness", "Problem Solving", "Safety"],
+    relatedCareers: ["Solar Panel Installer", "Electrical Technician", "Maintenance Technician"],
+    pathways: [
+      { type: "trade", description: "Complete wind energy technology certificate program.", duration: "1-2 years", cost: "$5,000-$15,000" },
+      { type: "certification", description: "Earn technical certifications and safety credentials.", duration: "6-12 months", cost: "$3,000-$8,000" },
+    ],
+    blsCode: "49-9081",
+    jobOutlook: "much_faster",
+    projectedGrowth: 45,
+    projectedOpenings: 1400,
+    demandLevel: "high",
+    appropriateGrades: ["high_school", "post_secondary"],
+    entryPointsForGrades: {
+      high_school: "Take physics and shop classes, learn about renewable energy, build physical fitness",
+      post_secondary: "Enroll in wind technician program, obtain safety certifications, gain field experience"
+    },
+    workEnvironment: "Outdoor work at wind farms. Heights, various weather conditions.",
+    typicalEntryEducation: "Postsecondary nondegree award",
+    onTheJobTraining: "Long-term on-the-job training",
+    stateSalaryData: {
+      TX: { min: 50000, max: 85000, median: 65000, employment: 4200, demandLevel: "very_high" },
+      IA: { min: 48000, max: 78000, median: 60000, employment: 1800, demandLevel: "high" },
+      OK: { min: 45000, max: 75000, median: 58000, employment: 1500, demandLevel: "high" }
+    },
+    blsLastUpdated: "2024-09"
+  },
+  {
+    id: "9",
+    title: "Physician Assistant",
+    category: "healthcare",
+    description: "Diagnose illnesses, develop treatment plans, and prescribe medications under physician supervision.",
+    salaryMin: 100000,
+    salaryMax: 180000,
+    salaryMedian: 130000,
+    educationRequired: "Master's Degree",
+    yearsExperience: "0-3 years",
+    growthRate: "+28%",
+    skills: ["Medical Knowledge", "Patient Care", "Critical Thinking", "Communication", "Empathy"],
+    relatedCareers: ["Nurse Practitioner", "Physician", "Healthcare Administrator"],
+    pathways: [
+      { type: "college", description: "Complete Bachelor's degree then PA Master's program.", duration: "6-7 years", cost: "$100,000-$300,000" },
+    ],
+    blsCode: "29-1071",
+    jobOutlook: "much_faster",
+    projectedGrowth: 28,
+    projectedOpenings: 14100,
+    demandLevel: "very_high",
+    appropriateGrades: ["high_school", "post_secondary"],
+    entryPointsForGrades: {
+      high_school: "Excel in sciences, volunteer in healthcare, gain patient care experience",
+      post_secondary: "Complete pre-PA requirements, work as medical assistant or EMT, apply to PA programs"
+    },
+    workEnvironment: "Hospitals, clinics, specialty practices. May include night/weekend shifts.",
+    typicalEntryEducation: "Master's degree",
+    onTheJobTraining: "None",
+    stateSalaryData: {
+      TX: { min: 105000, max: 160000, median: 125000, employment: 12800, demandLevel: "very_high" },
+      CA: { min: 120000, max: 190000, median: 150000, employment: 16200, demandLevel: "very_high" },
+      NY: { min: 115000, max: 175000, median: 140000, employment: 11900, demandLevel: "high" }
+    },
+    blsLastUpdated: "2024-09"
+  },
+  {
+    id: "10",
+    title: "Cybersecurity Analyst",
+    category: "technology",
+    description: "Protect computer systems and networks from cyber threats. Monitor security and respond to incidents.",
+    salaryMin: 70000,
+    salaryMax: 160000,
+    salaryMedian: 120360,
+    educationRequired: "Bachelor's Degree",
+    yearsExperience: "0-5 years",
+    growthRate: "+33%",
+    skills: ["Network Security", "Threat Analysis", "Security Tools", "Problem Solving", "Communication"],
+    relatedCareers: ["Security Engineer", "Penetration Tester", "Security Architect"],
+    pathways: [
+      { type: "college", description: "Earn a degree in Cybersecurity, Computer Science, or IT.", duration: "4 years", cost: "$40,000-$200,000" },
+      { type: "certification", description: "Earn security certifications like CompTIA Security+, CISSP.", duration: "6-12 months", cost: "$5,000-$15,000" },
+      { type: "military", description: "Serve in military cyber operations and transition to civilian roles.", duration: "4+ years", cost: "Free + Benefits" },
+    ],
+    blsCode: "15-1212",
+    jobOutlook: "much_faster",
+    projectedGrowth: 33,
+    projectedOpenings: 16800,
+    demandLevel: "very_high",
+    appropriateGrades: ["middle_school", "high_school", "post_secondary"],
+    entryPointsForGrades: {
+      middle_school: "Learn about online safety, explore coding, participate in cyber competitions",
+      high_school: "Take cybersecurity courses, join CyberPatriot, learn networking basics",
+      post_secondary: "Get cybersecurity degree, earn certifications, participate in CTF competitions"
+    },
+    workEnvironment: "Office or remote. May include on-call responsibilities for security incidents.",
+    typicalEntryEducation: "Bachelor's degree",
+    onTheJobTraining: "None",
+    stateSalaryData: {
+      TX: { min: 80000, max: 155000, median: 115000, employment: 24600, demandLevel: "very_high" },
+      CA: { min: 95000, max: 180000, median: 140000, employment: 31200, demandLevel: "very_high" },
+      VA: { min: 90000, max: 170000, median: 135000, employment: 28900, demandLevel: "very_high" }
+    },
+    blsLastUpdated: "2024-09"
+  },
+  {
+    id: "11",
+    title: "Solar Photovoltaic Installer",
+    category: "trades",
+    description: "Install and maintain solar panel systems on rooftops and other structures.",
+    salaryMin: 35000,
+    salaryMax: 65000,
+    salaryMedian: 47670,
+    educationRequired: "High School + Training",
+    yearsExperience: "0-2 years",
+    growthRate: "+22%",
+    skills: ["Electrical Knowledge", "Physical Fitness", "Safety Awareness", "Technical Skills", "Problem Solving"],
+    relatedCareers: ["Electrician", "Wind Turbine Technician", "Construction Worker"],
+    pathways: [
+      { type: "trade", description: "Complete solar installation training program.", duration: "6-12 months", cost: "$3,000-$10,000" },
+      { type: "certification", description: "Earn NABCEP certification for solar installation.", duration: "3-6 months", cost: "$2,000-$5,000" },
+    ],
+    blsCode: "47-2231",
+    jobOutlook: "much_faster",
+    projectedGrowth: 22,
+    projectedOpenings: 3500,
+    demandLevel: "high",
+    appropriateGrades: ["high_school", "post_secondary"],
+    entryPointsForGrades: {
+      high_school: "Learn basic electrical concepts, take vocational courses, develop physical fitness",
+      post_secondary: "Complete solar training program, earn certifications, gain field experience"
+    },
+    workEnvironment: "Outdoor work on rooftops. Physical labor in various weather conditions.",
+    typicalEntryEducation: "High school diploma",
+    onTheJobTraining: "Moderate-term on-the-job training",
+    stateSalaryData: {
+      CA: { min: 45000, max: 75000, median: 55000, employment: 12800, demandLevel: "very_high" },
+      AZ: { min: 38000, max: 60000, median: 48000, employment: 3200, demandLevel: "high" },
+      TX: { min: 36000, max: 58000, median: 46000, employment: 4500, demandLevel: "high" }
+    },
+    blsLastUpdated: "2024-09"
+  },
+  {
+    id: "12",
+    title: "Elementary School Teacher",
+    category: "education",
+    description: "Teach students in grades K-5 foundational skills in reading, writing, math, and other subjects.",
+    salaryMin: 40000,
+    salaryMax: 80000,
+    salaryMedian: 61690,
+    educationRequired: "Bachelor's Degree + License",
+    yearsExperience: "0-3 years",
+    growthRate: "+1%",
+    skills: ["Classroom Management", "Communication", "Patience", "Creativity", "Organization"],
+    relatedCareers: ["Special Education Teacher", "School Counselor", "Principal"],
+    pathways: [
+      { type: "college", description: "Earn a Bachelor's in Elementary Education and obtain teaching license.", duration: "4 years", cost: "$40,000-$150,000" },
+      { type: "certification", description: "Complete alternative certification program after bachelor's degree.", duration: "1-2 years", cost: "$5,000-$15,000" },
+    ],
+    blsCode: "25-2021",
+    jobOutlook: "little_change",
+    projectedGrowth: 1,
+    projectedOpenings: 107100,
+    demandLevel: "high",
+    appropriateGrades: ["high_school", "post_secondary"],
+    entryPointsForGrades: {
+      high_school: "Tutor younger students, volunteer at schools, take education courses",
+      post_secondary: "Major in education, complete student teaching, obtain certification"
+    },
+    workEnvironment: "Schools. Regular school-year schedule with summers off.",
+    typicalEntryEducation: "Bachelor's degree",
+    onTheJobTraining: "Internship/residency",
+    stateSalaryData: {
+      TX: { min: 45000, max: 65000, median: 55000, employment: 178500, demandLevel: "high" },
+      CA: { min: 55000, max: 95000, median: 75000, employment: 156200, demandLevel: "moderate" },
+      NY: { min: 50000, max: 90000, median: 70000, employment: 89300, demandLevel: "moderate" }
+    },
+    blsLastUpdated: "2024-09"
+  },
+  {
+    id: "13",
+    title: "Physical Therapist",
+    category: "healthcare",
+    description: "Help patients recover from injuries and improve movement through exercises and treatments.",
+    salaryMin: 75000,
+    salaryMax: 130000,
+    salaryMedian: 99710,
+    educationRequired: "Doctoral Degree (DPT)",
+    yearsExperience: "0-3 years",
+    growthRate: "+15%",
+    skills: ["Anatomy Knowledge", "Patient Care", "Communication", "Physical Stamina", "Problem Solving"],
+    relatedCareers: ["Occupational Therapist", "Athletic Trainer", "Chiropractor"],
+    pathways: [
+      { type: "college", description: "Complete Bachelor's degree then Doctor of Physical Therapy (DPT) program.", duration: "7 years", cost: "$150,000-$350,000" },
+    ],
+    blsCode: "29-1123",
+    jobOutlook: "much_faster",
+    projectedGrowth: 15,
+    projectedOpenings: 12800,
+    demandLevel: "high",
+    appropriateGrades: ["high_school", "post_secondary"],
+    entryPointsForGrades: {
+      high_school: "Excel in biology and anatomy, volunteer in PT clinics, play sports",
+      post_secondary: "Complete pre-PT requirements, shadow physical therapists, apply to DPT programs"
+    },
+    workEnvironment: "Hospitals, clinics, sports facilities. Active work requiring physical stamina.",
+    typicalEntryEducation: "Doctoral or professional degree",
+    onTheJobTraining: "None",
+    stateSalaryData: {
+      TX: { min: 80000, max: 120000, median: 95000, employment: 18900, demandLevel: "high" },
+      CA: { min: 95000, max: 145000, median: 115000, employment: 22100, demandLevel: "high" },
+      FL: { min: 75000, max: 110000, median: 90000, employment: 16800, demandLevel: "high" }
+    },
+    blsLastUpdated: "2024-09"
+  },
+  {
+    id: "14",
+    title: "Veterinarian",
+    category: "healthcare",
+    description: "Diagnose and treat animals, perform surgeries, and provide preventive care.",
+    salaryMin: 70000,
+    salaryMax: 180000,
+    salaryMedian: 119100,
+    educationRequired: "Doctoral Degree (DVM)",
+    yearsExperience: "0-3 years",
+    growthRate: "+19%",
+    skills: ["Animal Care", "Medical Knowledge", "Surgery Skills", "Communication", "Problem Solving"],
+    relatedCareers: ["Veterinary Technician", "Animal Scientist", "Zoologist"],
+    pathways: [
+      { type: "college", description: "Complete Bachelor's degree then Doctor of Veterinary Medicine (DVM) program.", duration: "8 years", cost: "$200,000-$400,000" },
+    ],
+    blsCode: "29-1131",
+    jobOutlook: "much_faster",
+    projectedGrowth: 19,
+    projectedOpenings: 4600,
+    demandLevel: "high",
+    appropriateGrades: ["elementary", "middle_school", "high_school", "post_secondary"],
+    entryPointsForGrades: {
+      elementary: "Learn about animals, visit zoos and animal shelters, read about animal care",
+      middle_school: "Volunteer at animal shelters, learn animal anatomy, join 4-H clubs",
+      high_school: "Gain hands-on experience with animals, excel in biology and chemistry, shadow vets",
+      post_secondary: "Complete pre-vet requirements, gain clinical experience, apply to vet schools"
+    },
+    workEnvironment: "Veterinary clinics, animal hospitals. May include emergency and weekend work.",
+    typicalEntryEducation: "Doctoral or professional degree",
+    onTheJobTraining: "None",
+    stateSalaryData: {
+      TX: { min: 80000, max: 150000, median: 110000, employment: 5800, demandLevel: "high" },
+      CA: { min: 100000, max: 190000, median: 140000, employment: 7200, demandLevel: "high" },
+      FL: { min: 75000, max: 140000, median: 105000, employment: 4900, demandLevel: "moderate" }
+    },
+    blsLastUpdated: "2024-09"
+  },
+  {
+    id: "15",
+    title: "Construction Manager",
+    category: "trades",
+    description: "Plan, coordinate, and oversee construction projects from start to finish.",
+    salaryMin: 60000,
+    salaryMax: 150000,
+    salaryMedian: 104900,
+    educationRequired: "Bachelor's Degree or Experience",
+    yearsExperience: "5+ years",
+    growthRate: "+5%",
+    skills: ["Project Management", "Leadership", "Budgeting", "Communication", "Problem Solving"],
+    relatedCareers: ["Civil Engineer", "Architect", "General Contractor"],
+    pathways: [
+      { type: "college", description: "Earn a degree in Construction Management or Civil Engineering.", duration: "4 years", cost: "$40,000-$180,000" },
+      { type: "trade", description: "Advance through construction trades and gain management experience.", duration: "10+ years", cost: "On-the-job experience" },
+    ],
+    blsCode: "11-9021",
+    jobOutlook: "faster_than_average",
+    projectedGrowth: 5,
+    projectedOpenings: 45100,
+    demandLevel: "high",
+    appropriateGrades: ["high_school", "post_secondary"],
+    entryPointsForGrades: {
+      high_school: "Learn trades skills, take construction technology courses, work summer construction jobs",
+      post_secondary: "Pursue construction management degree, gain field experience, obtain certifications"
+    },
+    workEnvironment: "Construction sites and offices. Project-based work with travel.",
+    typicalEntryEducation: "Bachelor's degree",
+    onTheJobTraining: "Moderate-term on-the-job training",
+    stateSalaryData: {
+      TX: { min: 70000, max: 140000, median: 100000, employment: 28900, demandLevel: "high" },
+      CA: { min: 85000, max: 170000, median: 125000, employment: 32100, demandLevel: "high" },
+      FL: { min: 65000, max: 130000, median: 95000, employment: 21500, demandLevel: "high" }
+    },
+    blsLastUpdated: "2024-09"
+  }
 ];
 
 const seedResources: Resource[] = [
@@ -1155,6 +1613,45 @@ export class DatabaseStorage implements IStorage {
 
   async getCareer(id: string): Promise<Career | undefined> {
     return seedCareers.find(c => c.id === id);
+  }
+
+  async getCareersByGrade(gradeBand: string): Promise<Career[]> {
+    return seedCareers.filter(c => 
+      c.appropriateGrades?.includes(gradeBand as any) ?? true
+    );
+  }
+
+  async getTrendingCareers(limit: number = 10): Promise<Career[]> {
+    // Sort by growth rate and demand level
+    const outlookOrder = { "much_faster": 5, "faster_than_average": 4, "average": 3, "little_change": 2, "declining": 1 };
+    const demandOrder = { "very_high": 4, "high": 3, "moderate": 2, "low": 1 };
+    
+    return [...seedCareers]
+      .sort((a, b) => {
+        const aOutlook = outlookOrder[a.jobOutlook || "average"] || 3;
+        const bOutlook = outlookOrder[b.jobOutlook || "average"] || 3;
+        const aDemand = demandOrder[a.demandLevel || "moderate"] || 2;
+        const bDemand = demandOrder[b.demandLevel || "moderate"] || 2;
+        
+        // Primary sort by outlook, secondary by demand
+        if (bOutlook !== aOutlook) return bOutlook - aOutlook;
+        return bDemand - aDemand;
+      })
+      .slice(0, limit);
+  }
+
+  async getCareersByState(stateCode: string): Promise<Career[]> {
+    // Filter careers that have state-specific data for the given state
+    return seedCareers.filter(c => 
+      c.stateSalaryData && stateCode in c.stateSalaryData
+    ).map(c => ({
+      ...c,
+      // Override national salary data with state-specific data
+      salaryMin: c.stateSalaryData![stateCode].min,
+      salaryMax: c.stateSalaryData![stateCode].max,
+      salaryMedian: c.stateSalaryData![stateCode].median,
+      demandLevel: c.stateSalaryData![stateCode].demandLevel || c.demandLevel,
+    }));
   }
 
   // Static data - resources

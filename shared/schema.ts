@@ -205,6 +205,14 @@ export const assessmentResultSchema = z.object({
 
 export type AssessmentResult = z.infer<typeof assessmentResultSchema>;
 
+// Grade Level Types for Career Recommendations
+export const gradeLevelBand = z.enum(["elementary", "middle_school", "high_school", "post_secondary"]);
+export type GradeLevelBand = z.infer<typeof gradeLevelBand>;
+
+// Job Outlook Categories based on BLS projections
+export const jobOutlook = z.enum(["declining", "little_change", "average", "faster_than_average", "much_faster"]);
+export type JobOutlook = z.infer<typeof jobOutlook>;
+
 // Career Pathway Schema (KNOW - Strategy & Resources)
 export const careerSchema = z.object({
   id: z.string(),
@@ -225,6 +233,28 @@ export const careerSchema = z.object({
     duration: z.string(),
     cost: z.string(),
   })),
+  // BLS and Market Data
+  blsCode: z.string().optional(), // BLS Standard Occupational Classification (SOC) code
+  jobOutlook: jobOutlook.optional(), // BLS job outlook category
+  projectedGrowth: z.number().optional(), // Projected employment change percentage (2023-2033)
+  projectedOpenings: z.number().optional(), // Annual job openings
+  demandLevel: z.enum(["low", "moderate", "high", "very_high"]).optional(),
+  // Grade-appropriate recommendations
+  appropriateGrades: z.array(gradeLevelBand).optional(), // Which grade bands this career is appropriate for
+  entryPointsForGrades: z.record(z.string(), z.string()).optional(), // Grade-specific intro activities
+  // State-specific data
+  stateSalaryData: z.record(z.string(), z.object({
+    min: z.number(),
+    max: z.number(),
+    median: z.number(),
+    employment: z.number().optional(),
+    demandLevel: z.enum(["low", "moderate", "high", "very_high"]).optional(),
+  })).optional(),
+  // Additional BLS data
+  workEnvironment: z.string().optional(),
+  typicalEntryEducation: z.string().optional(),
+  onTheJobTraining: z.string().optional(),
+  blsLastUpdated: z.string().optional(),
 });
 
 export type Career = z.infer<typeof careerSchema>;
