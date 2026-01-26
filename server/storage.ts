@@ -167,9 +167,12 @@ import {
   type InsertStudentJourneyMilestone,
   type StudentJourneyActivity,
   type InsertStudentJourneyActivity,
+  type StudentJourneyEntry,
+  type InsertStudentJourneyEntry,
   studentJourneyProgress,
   studentJourneyMilestones,
   studentJourneyActivities,
+  studentJourneyEntries,
   type LessonTemplate,
   type InsertLessonTemplate,
   lessonTemplates,
@@ -527,6 +530,12 @@ export interface IStorage {
   createStudentJourneyProgress(progress: InsertStudentJourneyProgress): Promise<StudentJourneyProgress>;
   updateStudentJourneyProgress(id: string, updates: Partial<StudentJourneyProgress>): Promise<StudentJourneyProgress | undefined>;
   deleteStudentJourneyProgress(id: string): Promise<boolean>;
+  
+  // Student Journey Entries (Timeline/Activity Log)
+  getStudentJourneyEntries(userId: string, limit?: number): Promise<StudentJourneyEntry[]>;
+  getStudentJourneyEntriesByPillar(userId: string, pillar: string): Promise<StudentJourneyEntry[]>;
+  createStudentJourneyEntry(entry: InsertStudentJourneyEntry): Promise<StudentJourneyEntry>;
+  deleteStudentJourneyEntry(id: string): Promise<boolean>;
   
   // Student Journey Milestones
   getStudentJourneyMilestones(journeyProgressId: string): Promise<StudentJourneyMilestone[]>;
@@ -3672,6 +3681,33 @@ export class DatabaseStorage implements IStorage {
   async createStudentJourneyActivity(activity: InsertStudentJourneyActivity): Promise<StudentJourneyActivity> {
     const [created] = await db.insert(studentJourneyActivities).values(activity as any).returning();
     return created;
+  }
+
+  // Student Journey Entries (Timeline/Activity Log for individual students)
+  async getStudentJourneyEntries(userId: string, limit: number = 50): Promise<StudentJourneyEntry[]> {
+    return await db.select().from(studentJourneyEntries)
+      .where(eq(studentJourneyEntries.userId, userId))
+      .orderBy(desc(studentJourneyEntries.createdAt))
+      .limit(limit);
+  }
+
+  async getStudentJourneyEntriesByPillar(userId: string, pillar: string): Promise<StudentJourneyEntry[]> {
+    return await db.select().from(studentJourneyEntries)
+      .where(and(
+        eq(studentJourneyEntries.userId, userId),
+        eq(studentJourneyEntries.bkdPillar, pillar)
+      ))
+      .orderBy(desc(studentJourneyEntries.createdAt));
+  }
+
+  async createStudentJourneyEntry(entry: InsertStudentJourneyEntry): Promise<StudentJourneyEntry> {
+    const [created] = await db.insert(studentJourneyEntries).values(entry as any).returning();
+    return created;
+  }
+
+  async deleteStudentJourneyEntry(id: string): Promise<boolean> {
+    const result = await db.delete(studentJourneyEntries).where(eq(studentJourneyEntries.id, id));
+    return (result.rowCount ?? 0) > 0;
   }
 
   // ================================

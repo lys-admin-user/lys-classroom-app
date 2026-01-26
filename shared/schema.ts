@@ -440,6 +440,30 @@ export const insertSelfDiscoveryResultSchema = createInsertSchema(selfDiscoveryR
 export type InsertSelfDiscoveryResult = z.infer<typeof insertSelfDiscoveryResultSchema>;
 export type SelfDiscoveryResult = typeof selfDiscoveryResults.$inferSelect;
 
+// Student Journey - Tracks individual Be-Know-Do progress over time
+export const studentJourneyEntries = pgTable("student_journey_entries", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull(),
+  entryType: text("entry_type").notNull(), // 'assessment', 'goal_completed', 'milestone', 'reflection', 'career_exploration', 'skill_gained'
+  bkdPillar: text("bkd_pillar").notNull(), // 'be', 'know', 'do'
+  title: text("title").notNull(),
+  description: text("description"),
+  pointsEarned: integer("points_earned").default(0),
+  metadata: jsonb("metadata").$type<{
+    assessmentId?: string;
+    goalId?: string;
+    careerId?: string;
+    skillName?: string;
+    reflectionPrompt?: string;
+    linkedStandards?: string[];
+  }>(),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertStudentJourneyEntrySchema = createInsertSchema(studentJourneyEntries).omit({ id: true, createdAt: true });
+export type InsertStudentJourneyEntry = z.infer<typeof insertStudentJourneyEntrySchema>;
+export type StudentJourneyEntry = typeof studentJourneyEntries.$inferSelect;
+
 // Saved Careers (for students to bookmark careers they're interested in)
 export const savedCareers = pgTable("saved_careers", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),

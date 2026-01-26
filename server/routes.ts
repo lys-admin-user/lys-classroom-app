@@ -11,6 +11,7 @@ import {
   users, 
   insertFeatureFlagSchema, 
   insertEmailTemplateSchema, 
+  insertStudentJourneyEntrySchema,
   type Lesson, 
   type Goal,
   type User,
@@ -469,11 +470,34 @@ export async function registerRoutes(
         }));
       }
       
+      // Check if status is being set to completed for journey entry creation
+      const isCompletingGoal = validated.status === "completed";
+      
+      // updateGoal returns null if not found or not authorized (includes user check)
       const updated = await storage.updateGoal(id, updates, userId);
       if (!updated) {
         res.status(404).json({ error: "Goal not found or not authorized" });
         return;
       }
+      
+      // If goal was just marked completed via this update, create a journey entry
+      // We check isCompletingGoal from the request rather than comparing with beforeGoal
+      // to avoid pre-authorization data access
+      if (userId && isCompletingGoal && updated.status === "completed") {
+        const bkdPillar = (updated.bkdPillar as "be" | "know" | "do") || "do";
+        await storage.createStudentJourneyEntry({
+          userId,
+          entryType: "goal_completed",
+          bkdPillar,
+          title: `Completed Goal: ${updated.title}`,
+          description: updated.description || `Achieved a ${bkdPillar.toUpperCase()} goal`,
+          pointsEarned: 10,
+          metadata: {
+            goalId: updated.id,
+          },
+        });
+      }
+      
       res.json(updated);
     } catch (error) {
       if (error instanceof z.ZodError) {
@@ -1224,6 +1248,19 @@ export async function registerRoutes(
         metadata: { beScore, knowScore, doScore, strengths, growthAreas },
       });
       
+      // Also create a journey entry for the timeline
+      await storage.createStudentJourneyEntry({
+        userId,
+        entryType: "assessment",
+        bkdPillar: "be",
+        title: "Completed Self-Discovery Assessment",
+        description: `Discovered strengths in ${(strengths || []).slice(0, 2).join(", ") || "various areas"}. Scores: Be ${beScore}%, Know ${knowScore}%, Do ${doScore}%`,
+        pointsEarned: Math.round(overallScore / 10),
+        metadata: {
+          assessmentId: result.id,
+        },
+      });
+      
       res.json(result);
     } catch (error) {
       console.error("Save self-discovery result error:", error);
@@ -1249,6 +1286,20 @@ export async function registerRoutes(
         ...req.body,
         userId,
       });
+      
+      // Create a journey entry for career exploration
+      await storage.createStudentJourneyEntry({
+        userId,
+        entryType: "career_exploration",
+        bkdPillar: "know",
+        title: `Saved Career: ${req.body.careerTitle || "New Career"}`,
+        description: req.body.careerCategory ? `Exploring ${req.body.careerCategory} careers` : "Added to career exploration list",
+        pointsEarned: 2,
+        metadata: {
+          careerId: career.id,
+        },
+      });
+      
       res.json(career);
     } catch (error) {
       console.error("Save career error:", error);
@@ -5782,6 +5833,199 @@ export async function registerRoutes(
     } catch (error) {
       console.error("Failed to record assessment:", error);
       res.status(500).json({ error: "Failed to record assessment" });
+    }
+  });
+
+  // ================================
+  // Student Journey Entries (User-specific Timeline)
+  // ================================
+  
+  // Query param validation schemas
+  const entriesQuerySchema = z.object({
+    limit: z.string().optional().transform(val => {
+      const parsed = parseInt(val || "50", 10);
+      return isNaN(parsed) || parsed < 1 ? 50 : Math.min(parsed, 200);
+    }),
+  });
+  
+  const pillarParamSchema = z.enum(["be", "know", "do"]);
+
+  // Get current user's journey entries (timeline)
+  app.get("/api/my-journey/entries", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user?.claims?.sub;
+      const queryResult = entriesQuerySchema.safeParse(req.query);
+      const limit = queryResult.success ? queryResult.data.limit : 50;
+      const entries = await storage.getStudentJourneyEntries(userId, limit);
+      res.json(entries);
+    } catch (error) {
+      console.error("Failed to fetch journey entries:", error);
+      res.status(500).json({ error: "Failed to fetch journey entries" });
+    }
+  });
+
+  // Get current user's journey entries by pillar
+  app.get("/api/my-journey/entries/:pillar", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user?.claims?.sub;
+      const pillarResult = pillarParamSchema.safeParse(req.params.pillar);
+      
+      if (!pillarResult.success) {
+        res.status(400).json({ error: "Invalid pillar. Must be 'be', 'know', or 'do'" });
+        return;
+      }
+      
+      const entries = await storage.getStudentJourneyEntriesByPillar(userId, pillarResult.data);
+      res.json(entries);
+    } catch (error) {
+      console.error("Failed to fetch journey entries by pillar:", error);
+      res.status(500).json({ error: "Failed to fetch journey entries" });
+    }
+  });
+
+  // Validation schema for creating journey entries via API
+  const createJourneyEntrySchema = insertStudentJourneyEntrySchema.omit({ userId: true }).extend({
+    entryType: z.enum(["assessment", "goal_completed", "milestone", "reflection", "career_exploration", "skill_gained"]),
+    bkdPillar: z.enum(["be", "know", "do"]),
+    title: z.string().min(1).max(500),
+    description: z.string().max(2000).nullable().optional(),
+    pointsEarned: z.number().int().min(0).max(1000).optional().default(0),
+    metadata: z.record(z.any()).nullable().optional(),
+  });
+
+  // Add a journey entry for the current user
+  app.post("/api/my-journey/entries", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user?.claims?.sub;
+      
+      // Validate request body using Zod schema
+      const parseResult = createJourneyEntrySchema.safeParse(req.body);
+      if (!parseResult.success) {
+        res.status(400).json({ error: "Validation failed", details: parseResult.error.flatten() });
+        return;
+      }
+      
+      const { entryType, bkdPillar, title, description, pointsEarned, metadata } = parseResult.data;
+      
+      const entry = await storage.createStudentJourneyEntry({
+        userId,
+        entryType,
+        bkdPillar,
+        title,
+        description: description || null,
+        pointsEarned: pointsEarned || 0,
+        metadata: metadata || null,
+      });
+      
+      // Update the user's journey progress scores
+      const progress = await storage.getStudentJourneyProgressByUserId(userId);
+      if (progress && pointsEarned) {
+        const updates: any = { lastActivityDate: new Date() };
+        
+        // Add points to the appropriate pillar
+        if (bkdPillar === "be") updates.beScore = Math.min(100, (progress.beScore || 0) + pointsEarned);
+        if (bkdPillar === "know") updates.knowScore = Math.min(100, (progress.knowScore || 0) + pointsEarned);
+        if (bkdPillar === "do") updates.doScore = Math.min(100, (progress.doScore || 0) + pointsEarned);
+        
+        // Recalculate overall score
+        const be = updates.beScore ?? progress.beScore ?? 0;
+        const know = updates.knowScore ?? progress.knowScore ?? 0;
+        const doScore = updates.doScore ?? progress.doScore ?? 0;
+        updates.overallScore = Math.round((be + know + doScore) / 3);
+        
+        await storage.updateStudentJourneyProgress(progress.id, updates);
+      }
+      
+      res.status(201).json(entry);
+    } catch (error) {
+      console.error("Failed to create journey entry:", error);
+      res.status(500).json({ error: "Failed to create journey entry" });
+    }
+  });
+
+  // Delete a journey entry
+  app.delete("/api/my-journey/entries/:id", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user?.claims?.sub;
+      const { id } = req.params;
+      
+      // Verify ownership by checking the entry belongs to user
+      const entries = await storage.getStudentJourneyEntries(userId, 1000);
+      const entry = entries.find(e => e.id === id);
+      
+      if (!entry) {
+        res.status(404).json({ error: "Entry not found or access denied" });
+        return;
+      }
+      
+      const deleted = await storage.deleteStudentJourneyEntry(id);
+      res.json({ deleted });
+    } catch (error) {
+      console.error("Failed to delete journey entry:", error);
+      res.status(500).json({ error: "Failed to delete journey entry" });
+    }
+  });
+
+  // Get comprehensive journey summary for dashboard
+  app.get("/api/my-journey/summary", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user?.claims?.sub;
+      
+      // Get journey progress
+      let progress = await storage.getStudentJourneyProgressByUserId(userId);
+      
+      // Auto-create if doesn't exist
+      if (!progress) {
+        progress = await storage.createStudentJourneyProgress({
+          studentId: userId,
+          educatorUserId: userId,
+          organizationId: null,
+          beScore: 0,
+          knowScore: 0,
+          doScore: 0,
+          overallScore: 0,
+          totalAssessmentsCompleted: 0,
+          totalMilestonesAchieved: 0,
+          currentFocus: "be",
+          savedCareerIds: [],
+          latestAssessmentResults: null,
+        });
+      }
+      
+      // Get entries count by pillar
+      const beEntries = await storage.getStudentJourneyEntriesByPillar(userId, "be");
+      const knowEntries = await storage.getStudentJourneyEntriesByPillar(userId, "know");
+      const doEntries = await storage.getStudentJourneyEntriesByPillar(userId, "do");
+      
+      // Get recent entries
+      const recentEntries = await storage.getStudentJourneyEntries(userId, 10);
+      
+      // Get milestones
+      const milestones = await storage.getStudentJourneyMilestones(progress.id);
+      
+      // Get saved careers
+      const savedCareers = await storage.getSavedCareers(userId);
+      
+      // Get self-discovery results
+      const assessments = await storage.getSelfDiscoveryResults(userId);
+      
+      res.json({
+        progress,
+        entryCounts: {
+          be: beEntries.length,
+          know: knowEntries.length,
+          do: doEntries.length,
+          total: beEntries.length + knowEntries.length + doEntries.length,
+        },
+        recentEntries,
+        milestones,
+        savedCareers,
+        assessmentCount: assessments.length,
+        latestAssessment: assessments[0] || null,
+      });
+    } catch (error) {
+      console.error("Failed to fetch journey summary:", error);
+      res.status(500).json({ error: "Failed to fetch journey summary" });
     }
   });
 

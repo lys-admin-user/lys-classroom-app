@@ -42,7 +42,7 @@ import {
   FolderOpen,
   ExternalLink
 } from "lucide-react";
-import type { StudentJourneyProgress, StudentJourneyMilestone, StudentJourneyActivity, Career } from "@shared/schema";
+import type { StudentJourneyProgress, StudentJourneyMilestone, StudentJourneyActivity, StudentJourneyEntry, Career } from "@shared/schema";
 
 interface JourneyData {
   progress: StudentJourneyProgress;
@@ -572,6 +572,56 @@ function ActivityItem({ activity }: { activity: StudentJourneyActivity }) {
   );
 }
 
+function JourneyEntryItem({ entry }: { entry: StudentJourneyEntry }) {
+  const config = entry.bkdPillar ? categoryConfig[entry.bkdPillar as keyof typeof categoryConfig] : null;
+  
+  const entryTypeConfig: Record<string, { icon: typeof BookOpen; label: string }> = {
+    assessment: { icon: Sparkles, label: "Assessment" },
+    goal_completed: { icon: Trophy, label: "Goal Completed" },
+    milestone: { icon: Star, label: "Milestone" },
+    reflection: { icon: PenLine, label: "Reflection" },
+    career_exploration: { icon: Briefcase, label: "Career Saved" },
+    skill_gained: { icon: GraduationCap, label: "Skill Gained" },
+  };
+  
+  const typeInfo = entryTypeConfig[entry.entryType] || { icon: Circle, label: "Activity" };
+  const TypeIcon = typeInfo.icon;
+  
+  return (
+    <div className="relative flex gap-3" data-testid={`journey-entry-${entry.id}`}>
+      <div className="flex flex-col items-center">
+        <div className={`p-2 rounded-full ${config?.bgColor || "bg-muted"} z-10`}>
+          <TypeIcon className="w-4 h-4 text-white" />
+        </div>
+        <div className="flex-1 w-0.5 bg-muted/50 my-1" />
+      </div>
+      <div className="flex-1 pb-4">
+        <div className="flex items-start justify-between gap-2 flex-wrap">
+          <div>
+            <p className="font-medium text-sm">{entry.title}</p>
+            <Badge variant="outline" className={`text-xs mt-1 ${config?.color || ""}`}>
+              {config?.label || "Activity"} - {typeInfo.label}
+            </Badge>
+          </div>
+          <div className="flex flex-col items-end gap-1">
+            {(entry.pointsEarned ?? 0) > 0 && (
+              <Badge variant="secondary" className="text-xs">
+                +{entry.pointsEarned} pts
+              </Badge>
+            )}
+            <span className="text-xs text-muted-foreground">
+              {entry.createdAt ? new Date(entry.createdAt).toLocaleDateString() : "Today"}
+            </span>
+          </div>
+        </div>
+        {entry.description && (
+          <p className="text-sm text-muted-foreground mt-2">{entry.description}</p>
+        )}
+      </div>
+    </div>
+  );
+}
+
 export default function MyJourney() {
   const { user, isAuthenticated } = useAuth();
   const { toast } = useToast();
@@ -589,6 +639,11 @@ export default function MyJourney() {
 
   const { data: savedCareers = [] } = useQuery<Career[]>({
     queryKey: ["/api/careers/saved"],
+    enabled: isAuthenticated,
+  });
+
+  const { data: journeyEntries = [] } = useQuery<StudentJourneyEntry[]>({
+    queryKey: ["/api/my-journey/entries"],
     enabled: isAuthenticated,
   });
 
@@ -944,37 +999,74 @@ export default function MyJourney() {
         </TabsContent>
 
         <TabsContent value="activities">
-          <Card>
-            <CardHeader>
-              <CardTitle className="font-oswald">Recent Activity</CardTitle>
-              <CardDescription className="font-roboto">Your journey timeline</CardDescription>
-            </CardHeader>
-            <CardContent>
-              {activities.length === 0 ? (
-                <div className="text-center py-12">
-                  <Clock className="w-12 h-12 mx-auto text-muted-foreground mb-4" />
-                  <h3 className="font-medium mb-2 font-oswald">No activities yet</h3>
-                  <p className="text-sm text-muted-foreground mb-4 font-roboto">
-                    Complete assessments and milestones to build your activity history
-                  </p>
-                  <Button variant="outline" asChild data-testid="button-start-discovery">
-                    <Link href="/self-discovery">
-                      <ArrowRight className="w-4 h-4 mr-2" />
-                      Start with Self-Discovery
-                    </Link>
-                  </Button>
-                </div>
-              ) : (
-                <ScrollArea className="h-[400px]">
-                  <div className="space-y-3">
-                    {activities.map((activity) => (
-                      <ActivityItem key={activity.id} activity={activity} />
-                    ))}
+          <div className="grid gap-6 lg:grid-cols-2">
+            <Card>
+              <CardHeader>
+                <CardTitle className="font-oswald flex items-center gap-2">
+                  <TrendingUp className="w-5 h-5 text-lys-teal" />
+                  Journey Timeline
+                </CardTitle>
+                <CardDescription className="font-roboto">Your Be-Know-Do progress over time</CardDescription>
+              </CardHeader>
+              <CardContent>
+                {journeyEntries.length === 0 ? (
+                  <div className="text-center py-8">
+                    <Calendar className="w-10 h-10 mx-auto text-muted-foreground mb-3" />
+                    <h3 className="font-medium mb-2 font-oswald">No journey entries yet</h3>
+                    <p className="text-sm text-muted-foreground mb-4 font-roboto">
+                      Complete assessments, set goals, and explore careers to build your timeline
+                    </p>
+                    <Button variant="outline" size="sm" asChild data-testid="button-start-journey">
+                      <Link href="/self-discovery">
+                        <Sparkles className="w-4 h-4 mr-2" />
+                        Take Self-Discovery
+                      </Link>
+                    </Button>
                   </div>
-                </ScrollArea>
-              )}
-            </CardContent>
-          </Card>
+                ) : (
+                  <ScrollArea className="h-[350px]">
+                    <div className="pr-4">
+                      {journeyEntries.map((entry) => (
+                        <JourneyEntryItem key={entry.id} entry={entry} />
+                      ))}
+                    </div>
+                  </ScrollArea>
+                )}
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle className="font-oswald">Recent Activity</CardTitle>
+                <CardDescription className="font-roboto">Detailed activity log</CardDescription>
+              </CardHeader>
+              <CardContent>
+                {activities.length === 0 ? (
+                  <div className="text-center py-8">
+                    <Clock className="w-10 h-10 mx-auto text-muted-foreground mb-3" />
+                    <h3 className="font-medium mb-2 font-oswald">No activities yet</h3>
+                    <p className="text-sm text-muted-foreground mb-4 font-roboto">
+                      Complete assessments and milestones to build your activity history
+                    </p>
+                    <Button variant="outline" size="sm" asChild data-testid="button-start-discovery">
+                      <Link href="/self-discovery">
+                        <ArrowRight className="w-4 h-4 mr-2" />
+                        Start with Self-Discovery
+                      </Link>
+                    </Button>
+                  </div>
+                ) : (
+                  <ScrollArea className="h-[350px]">
+                    <div className="space-y-3">
+                      {activities.map((activity) => (
+                        <ActivityItem key={activity.id} activity={activity} />
+                      ))}
+                    </div>
+                  </ScrollArea>
+                )}
+              </CardContent>
+            </Card>
+          </div>
         </TabsContent>
 
         <TabsContent value="portfolio">
