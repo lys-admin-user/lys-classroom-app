@@ -158,6 +158,22 @@ export default function ProfessionalDevelopment() {
   const lowSkills = skills.filter(s => s.proficiencyLevel < 3);
   const activeProgress = progress.filter(p => p.status === "in_progress");
   const completedProgress = progress.filter(p => p.status === "completed");
+  
+  // Calculate skill gap analysis
+  const skillGapAnalysis = skills.map(s => {
+    const targetLevel = Math.min(s.proficiencyLevel + 2, 5);
+    const gap = targetLevel - s.proficiencyLevel;
+    return { ...s, targetLevel, gap };
+  }).sort((a, b) => b.gap - a.gap);
+  
+  // Match recommendations to goals
+  const getMatchingGoals = (rec: PDRecommendation) => {
+    if (!rec.relatedGoalIds || rec.relatedGoalIds.length === 0) return [];
+    return goals.filter(g => rec.relatedGoalIds?.includes(g.id));
+  };
+
+  // Priority labels
+  const priorityLabels = ["", "Critical", "High", "Medium", "Low", "Optional"];
 
   return (
     <div className="min-h-screen bg-background">
@@ -240,6 +256,57 @@ export default function ProfessionalDevelopment() {
               </Card>
             </div>
 
+            {/* Skill Gap Analysis Section */}
+            {skillGapAnalysis.length > 0 && (
+              <Card>
+                <CardHeader>
+                  <CardTitle className="font-oswald flex items-center gap-2">
+                    <TrendingUp className="h-5 w-5 text-lys-teal" />
+                    Skill Gap Analysis
+                  </CardTitle>
+                  <CardDescription>
+                    Based on your current skills and career goals, here are your priority development areas.
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-3">
+                    {skillGapAnalysis.slice(0, 4).map((skill, index) => (
+                      <div key={skill.id} className="flex items-center gap-4 p-3 bg-muted/30 rounded-lg">
+                        <Badge 
+                          variant={index === 0 ? "default" : "secondary"} 
+                          className={`w-8 h-8 rounded-full flex items-center justify-center p-0 ${index === 0 ? "bg-lys-red" : ""}`}
+                        >
+                          {index + 1}
+                        </Badge>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 mb-1">
+                            <p className="font-medium truncate">{skill.skillName}</p>
+                            <Badge variant="outline" className="text-xs shrink-0">
+                              {skillCategories.find(c => c.value === skill.category)?.label || skill.category}
+                            </Badge>
+                          </div>
+                          <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                            <span>Current: Level {skill.proficiencyLevel}/5</span>
+                            <ChevronRight className="h-3 w-3" />
+                            <span className="text-lys-teal font-medium">Target: Level {skill.targetLevel}/5</span>
+                          </div>
+                        </div>
+                        <div className="text-right shrink-0">
+                          <p className="text-sm font-semibold text-lys-red">+{skill.gap} levels</p>
+                          <p className="text-xs text-muted-foreground">to develop</p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                  {skillGapAnalysis.length > 4 && (
+                    <p className="text-sm text-muted-foreground mt-3 text-center">
+                      +{skillGapAnalysis.length - 4} more skills to develop
+                    </p>
+                  )}
+                </CardContent>
+              </Card>
+            )}
+
             <Card>
               <CardHeader>
                 <CardTitle className="font-oswald flex items-center gap-2">
@@ -247,29 +314,52 @@ export default function ProfessionalDevelopment() {
                   AI-Powered Recommendations
                 </CardTitle>
                 <CardDescription>
-                  Get personalized professional development suggestions based on your goals and skills.
+                  Get personalized professional development suggestions based on your career goals and identified skill gaps.
                 </CardDescription>
               </CardHeader>
               <CardContent>
-                <Button 
-                  onClick={() => generateRecsMutation.mutate()}
-                  disabled={generateRecsMutation.isPending}
-                  className="bg-lys-red hover:bg-lys-red/90 text-white gap-2"
-                  data-testid="button-generate-recommendations"
-                >
-                  {generateRecsMutation.isPending ? (
-                    <>Analyzing your profile...</>
-                  ) : (
-                    <>
-                      <Sparkles className="h-4 w-4" />
-                      Generate Recommendations
-                    </>
-                  )}
-                </Button>
+                <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4">
+                  <Button 
+                    onClick={() => generateRecsMutation.mutate()}
+                    disabled={generateRecsMutation.isPending}
+                    className="bg-lys-red hover:bg-lys-red/90 text-white gap-2"
+                    data-testid="button-generate-recommendations"
+                  >
+                    {generateRecsMutation.isPending ? (
+                      <>Analyzing your profile...</>
+                    ) : (
+                      <>
+                        <Sparkles className="h-4 w-4" />
+                        Generate Recommendations
+                      </>
+                    )}
+                  </Button>
+                  <div className="text-sm text-muted-foreground">
+                    {goals.length > 0 && skills.length > 0 ? (
+                      <p>Ready to analyze {goals.length} career goal{goals.length !== 1 ? "s" : ""} and {skills.length} skill{skills.length !== 1 ? "s" : ""}.</p>
+                    ) : goals.length === 0 && skills.length === 0 ? (
+                      <p>Add career goals and skills first for personalized recommendations.</p>
+                    ) : goals.length === 0 ? (
+                      <p>Add career goals for better recommendations.</p>
+                    ) : (
+                      <p>Add skills for comprehensive gap analysis.</p>
+                    )}
+                  </div>
+                </div>
                 {recommendations.length > 0 && (
-                  <p className="text-sm text-muted-foreground mt-2">
-                    You have {recommendations.length} recommendations waiting for you.
-                  </p>
+                  <div className="mt-4 p-3 bg-muted/30 rounded-lg">
+                    <p className="text-sm font-medium">
+                      You have {recommendations.length} personalized recommendation{recommendations.length !== 1 ? "s" : ""} ready.
+                    </p>
+                    <Button 
+                      variant="ghost" 
+                      className="p-0 h-auto text-lys-teal hover:text-lys-teal/80"
+                      onClick={() => setActiveTab("recommendations")}
+                    >
+                      View recommendations
+                      <ChevronRight className="h-4 w-4 ml-1" />
+                    </Button>
+                  </div>
                 )}
               </CardContent>
             </Card>
@@ -707,6 +797,30 @@ export default function ProfessionalDevelopment() {
                           <div className="flex items-start gap-2 text-xs text-muted-foreground bg-muted/50 rounded-md p-2 mb-3">
                             <Zap className="h-4 w-4 shrink-0 mt-0.5 text-lys-yellow" />
                             <span>{rec.reason}</span>
+                          </div>
+                        )}
+                        {/* Skill Gaps Being Addressed */}
+                        {rec.skillGaps && rec.skillGaps.length > 0 && (
+                          <div className="mb-3">
+                            <p className="text-xs font-medium text-muted-foreground mb-1">Skills this develops:</p>
+                            <div className="flex flex-wrap gap-1">
+                              {rec.skillGaps.map((gap, i) => (
+                                <Badge key={i} variant="secondary" className="text-xs">
+                                  {String(gap).replace(/_/g, " ")}
+                                </Badge>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                        {/* Priority Indicator */}
+                        {rec.priority && rec.priority <= 3 && (
+                          <div className="flex items-center gap-2 mb-3">
+                            <div className={`flex items-center gap-1 text-xs ${rec.priority === 1 ? "text-lys-red" : rec.priority === 2 ? "text-lys-yellow" : "text-lys-teal"}`}>
+                              {[...Array(4 - rec.priority)].map((_, i) => (
+                                <Star key={i} className="h-3 w-3 fill-current" />
+                              ))}
+                              <span className="ml-1 font-medium">{priorityLabels[rec.priority]} Priority</span>
+                            </div>
                           </div>
                         )}
                         <div className="flex items-center justify-between gap-2">
