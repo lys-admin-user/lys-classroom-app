@@ -15,11 +15,32 @@ import { useToast } from "@/hooks/use-toast";
 import type { StandardsJurisdiction } from "@shared/schema";
 
 const LANGUAGES = [
+  // Top 25 most spoken languages in the world
   { code: "en", name: "English" },
+  { code: "zh", name: "Chinese (Mandarin)" },
+  { code: "hi", name: "Hindi" },
   { code: "es", name: "Spanish" },
-  { code: "fr", name: "French" },
+  { code: "ar", name: "Arabic" },
+  { code: "bn", name: "Bengali" },
+  { code: "pt", name: "Portuguese" },
+  { code: "ru", name: "Russian" },
+  { code: "ja", name: "Japanese" },
+  { code: "pa", name: "Punjabi" },
   { code: "de", name: "German" },
-  { code: "zh", name: "Chinese" },
+  { code: "jv", name: "Javanese" },
+  { code: "ko", name: "Korean" },
+  { code: "fr", name: "French" },
+  { code: "te", name: "Telugu" },
+  { code: "mr", name: "Marathi" },
+  { code: "tr", name: "Turkish" },
+  { code: "ta", name: "Tamil" },
+  { code: "vi", name: "Vietnamese" },
+  { code: "ur", name: "Urdu" },
+  { code: "it", name: "Italian" },
+  { code: "th", name: "Thai" },
+  { code: "gu", name: "Gujarati" },
+  { code: "pl", name: "Polish" },
+  { code: "uk", name: "Ukrainian" },
 ];
 
 const COUNTRIES = [
