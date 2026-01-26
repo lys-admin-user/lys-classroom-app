@@ -527,15 +527,23 @@ export default function Onboarding() {
                     <Label className="font-oswald">State/Jurisdiction (for standards)</Label>
                     <Select value={stateValue} onValueChange={setStateValue}>
                       <SelectTrigger className="mt-2" data-testid="select-state">
-                        <SelectValue placeholder="Select state" />
+                        <SelectValue placeholder="Select state/region" />
                       </SelectTrigger>
-                      <SelectContent>
-                        {jurisdictions?.filter(j => j.country === country).map((j) => (
-                          <SelectItem key={j.id} value={j.abbreviation}>{j.name}</SelectItem>
-                        ))}
-                        {(!jurisdictions || jurisdictions.filter(j => j.country === country).length === 0) && (
-                          <SelectItem value="other">Other</SelectItem>
-                        )}
+                      <SelectContent className="max-h-[300px]">
+                        {(() => {
+                          const countryName = COUNTRIES.find(c => c.code === country)?.name || country;
+                          const matchingJurisdictions = jurisdictions?.filter(j => 
+                            j.country === countryName || j.country === country
+                          ) || [];
+                          
+                          if (matchingJurisdictions.length > 0) {
+                            return matchingJurisdictions.map((j) => (
+                              <SelectItem key={j.id} value={j.abbreviation}>{j.name}</SelectItem>
+                            ));
+                          }
+                          
+                          return <SelectItem value="other">Other / Not Listed</SelectItem>;
+                        })()}
                       </SelectContent>
                     </Select>
                     <p className="text-xs text-muted-foreground mt-1">
