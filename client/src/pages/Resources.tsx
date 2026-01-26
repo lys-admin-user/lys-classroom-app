@@ -427,6 +427,22 @@ export default function Resources() {
                   </div>
                 )}
 
+                {/* External Link Disclaimer */}
+                {selectedResource.url && !selectedResource.url.includes("ladderingyoursuccess.com") && (
+                  <div className="p-3 rounded-md bg-amber-50 dark:bg-amber-950 border border-amber-200 dark:border-amber-800">
+                    <div className="flex items-start gap-2">
+                      <AlertCircle className="h-4 w-4 text-amber-600 mt-0.5 flex-shrink-0" />
+                      <div className="text-sm">
+                        <p className="font-medium text-amber-800 dark:text-amber-300">External Resource</p>
+                        <p className="text-amber-700 dark:text-amber-400 text-xs mt-1">
+                          This link will take you to an external website not operated by Laddering Your Success. 
+                          We are not responsible for the content, privacy policies, or practices of third-party sites.
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
                 <Separator />
 
                 {/* Action buttons */}
