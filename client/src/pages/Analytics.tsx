@@ -22,8 +22,11 @@ import {
   ChevronLeft,
   ChevronRight,
   School,
-  User
+  User,
+  Database,
+  ArrowRight
 } from "lucide-react";
+import { Link } from "wouter";
 import type { Lesson, Goal } from "@shared/schema";
 import { useAuth } from "@/hooks/use-auth";
 import { 
@@ -1168,6 +1171,31 @@ function CampusOverview({ data, campusStandardsData, campusBkdPieData, onTeacher
           </CardContent>
         </Card>
       </div>
+
+      {/* SIS Integration Quick Access */}
+      <Card className="bg-gradient-to-r from-lys-teal/5 to-lys-teal/10 border-lys-teal/20">
+        <CardContent className="pt-6">
+          <div className="flex items-center justify-between gap-4 flex-wrap">
+            <div className="flex items-center gap-4">
+              <div className="w-12 h-12 rounded-md bg-lys-teal/20 flex items-center justify-center">
+                <Database className="h-6 w-6 text-lys-teal" />
+              </div>
+              <div>
+                <p className="font-oswald text-lg font-semibold">SIS Integration</p>
+                <p className="text-sm text-muted-foreground font-roboto">
+                  Connect to Clever, PowerSchool, Canvas, and more to import student rosters and course data
+                </p>
+              </div>
+            </div>
+            <Link href="/sis-integration">
+              <Button className="bg-lys-teal hover:bg-lys-teal/90 text-white gap-2" data-testid="button-sis-integration">
+                Manage Connections
+                <ArrowRight className="h-4 w-4" />
+              </Button>
+            </Link>
+          </div>
+        </CardContent>
+      </Card>
 
       {/* Weekly Comparison */}
       <div className="grid sm:grid-cols-2 gap-4">
