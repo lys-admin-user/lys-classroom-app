@@ -1,10 +1,11 @@
 import { Link, useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
 import { ThemeToggle } from "./ThemeToggle";
-import { Menu, X, Sparkles, LogIn, LogOut, BookOpen, User, BarChart3, Award, Database, Users, Library, Briefcase, Settings, CreditCard, Map } from "lucide-react";
-import { useState } from "react";
+import { LogIn, LogOut, Settings, CreditCard } from "lucide-react";
 import { useAuth } from "@/hooks/use-auth";
+import { SidebarTrigger, useSidebar } from "@/components/ui/sidebar";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Separator } from "@/components/ui/separator";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -12,21 +13,48 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import {
+  Breadcrumb,
+  BreadcrumbItem,
+  BreadcrumbList,
+  BreadcrumbPage,
+} from "@/components/ui/breadcrumb";
 
-const navLinks = [
-  { href: "/", label: "Dashboard" },
-  { href: "/my-journey", label: "My Journey" },
-  { href: "/lesson-generator", label: "AI Lessons" },
-  { href: "/self-discovery", label: "Self Discovery" },
-  { href: "/careers", label: "KNOW Paths" },
-  { href: "/action-plans", label: "DO Plans" },
-  { href: "/resources", label: "Resources" },
-];
+const routeLabels: Record<string, string> = {
+  "/": "Dashboard",
+  "/my-journey": "My Journey",
+  "/lesson-generator": "AI Lesson Generator",
+  "/self-discovery": "Self Discovery",
+  "/careers": "Career Explorer",
+  "/action-plans": "Action Plans",
+  "/resources": "Resources",
+  "/my-lessons": "My Lessons",
+  "/settings": "Settings",
+  "/analytics": "Analytics",
+  "/scope-sequence": "Scope & Sequence",
+  "/educator-influence": "Educator Influence",
+  "/admin/standards": "Standards Admin",
+  "/pricing": "Plans & Pricing",
+  "/onboarding": "Onboarding",
+  "/assignments": "Assignments",
+  "/collaboration": "Collaboration",
+  "/resource-library": "Resource Library",
+  "/admin": "Campus Admin",
+  "/system-admin": "System Admin",
+  "/parent-portal": "Parent Portal",
+  "/milestones": "Milestones",
+  "/classroom": "Classroom",
+  "/professional-development": "Professional Development",
+  "/portfolio": "My Portfolio",
+  "/assessments": "Assessments",
+  "/sis-integration": "SIS Integration",
+};
 
 export function Header() {
   const [location] = useLocation();
-  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const { user, isLoading, isAuthenticated } = useAuth();
+  const { state } = useSidebar();
+  const isCollapsed = state === "collapsed";
 
   const getInitials = () => {
     if (user?.firstName && user?.lastName) {
@@ -38,272 +66,109 @@ export function Header() {
     return "U";
   };
 
+  const getPageTitle = () => {
+    if (routeLabels[location]) return routeLabels[location];
+    if (location.startsWith("/scope/")) return "Scope Editor";
+    if (location.startsWith("/student-journey/")) return "Student Journey";
+    if (location.startsWith("/student-dashboard/")) return "Student Dashboard";
+    if (location.startsWith("/collaboration/")) return "Collaboration";
+    if (location.startsWith("/shared/")) return "Shared Lesson";
+    if (location.startsWith("/p/")) return "Portfolio";
+    return "LYS";
+  };
+
   return (
-    <header className="sticky top-0 z-50 bg-background/95 backdrop-blur border-b border-border">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6">
-        <div className="flex items-center justify-between h-16 gap-4">
-          <Link href="/" className="flex items-center gap-2 flex-shrink-0">
-            <div className="flex items-center">
-              <span className="font-marker text-2xl text-lys-red">L</span>
-              <div className="w-4 h-6 flex flex-col justify-center mx-0.5">
-                <div className="w-3 h-0.5 bg-lys-yellow rounded-full mb-0.5"></div>
-                <div className="w-3 h-0.5 bg-lys-yellow rounded-full mb-0.5"></div>
-                <div className="w-3 h-0.5 bg-lys-yellow rounded-full"></div>
-              </div>
-              <span className="font-marker text-2xl text-lys-red">S</span>
+    <header className="sticky top-0 z-40 flex h-14 shrink-0 items-center gap-2 border-b bg-background/95 backdrop-blur px-4">
+      <SidebarTrigger className="-ml-1" data-testid="button-sidebar-toggle" />
+      <Separator orientation="vertical" className="mr-2 h-4" />
+      
+      {isCollapsed && (
+        <>
+          <Link href="/" className="flex items-center gap-1 mr-2">
+            <span className="font-marker text-xl text-lys-red">L</span>
+            <div className="w-3 h-5 flex flex-col justify-center mx-0.5">
+              <div className="w-2 h-0.5 bg-lys-yellow rounded-full mb-0.5"></div>
+              <div className="w-2 h-0.5 bg-lys-yellow rounded-full mb-0.5"></div>
+              <div className="w-2 h-0.5 bg-lys-yellow rounded-full"></div>
             </div>
-            <span className="hidden sm:block font-oswald text-sm text-muted-foreground font-medium">
-              Laddering Your Success
-            </span>
+            <span className="font-marker text-xl text-lys-red">S</span>
           </Link>
+          <Separator orientation="vertical" className="mr-2 h-4" />
+        </>
+      )}
+      
+      <Breadcrumb>
+        <BreadcrumbList>
+          <BreadcrumbItem>
+            <BreadcrumbPage className="font-oswald text-base">
+              {getPageTitle()}
+            </BreadcrumbPage>
+          </BreadcrumbItem>
+        </BreadcrumbList>
+      </Breadcrumb>
 
-          <nav className="hidden lg:flex items-center gap-1">
-            {navLinks.map((link) => (
-              <Link key={link.href} href={link.href}>
-                <Button
-                  variant={location === link.href ? "secondary" : "ghost"}
-                  size="sm"
-                  className="font-roboto"
-                  data-testid={`nav-${link.label.toLowerCase().replace(/\s/g, '-')}`}
-                >
-                  {link.label}
-                </Button>
-              </Link>
-            ))}
-            {isAuthenticated && (
-              <>
-                <Link href="/scope-sequence">
-                  <Button
-                    variant={location === "/scope-sequence" || location.startsWith("/scope/") ? "secondary" : "ghost"}
-                    size="sm"
-                    className="font-roboto"
-                    data-testid="nav-scope-sequence"
-                  >
-                    Scope & Sequence
-                  </Button>
-                </Link>
-                <Link href="/my-lessons">
-                  <Button
-                    variant={location === "/my-lessons" || location === "/templates" ? "secondary" : "ghost"}
-                    size="sm"
-                    className="font-roboto"
-                    data-testid="nav-my-lessons"
-                  >
-                    My Lessons
-                  </Button>
-                </Link>
-                <Link href="/analytics">
-                  <Button
-                    variant={location === "/analytics" ? "secondary" : "ghost"}
-                    size="sm"
-                    className="font-roboto"
-                    data-testid="nav-analytics"
-                  >
-                    Analytics
-                  </Button>
-                </Link>
-              </>
-            )}
-          </nav>
-
-          <div className="flex items-center gap-2">
-            <ThemeToggle />
-            
-            {isLoading ? (
-              <div className="w-9 h-9 rounded-full bg-muted animate-pulse" />
-            ) : isAuthenticated ? (
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button variant="ghost" size="icon" className="rounded-full" data-testid="button-user-menu">
-                    <Avatar className="h-8 w-8">
-                      <AvatarImage src={user?.profileImageUrl || undefined} />
-                      <AvatarFallback className="bg-lys-teal text-white font-oswald text-sm">
-                        {getInitials()}
-                      </AvatarFallback>
-                    </Avatar>
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end" className="w-56">
-                  <div className="px-2 py-1.5">
-                    <p className="text-sm font-medium">
-                      {user?.firstName} {user?.lastName}
-                    </p>
-                    <p className="text-xs text-muted-foreground truncate">{user?.email}</p>
-                  </div>
-                  <DropdownMenuSeparator />
-                  <Link href="/settings">
-                    <DropdownMenuItem className="cursor-pointer" data-testid="menu-settings">
-                      <Settings className="mr-2 h-4 w-4" />
-                      Profile & Settings
-                    </DropdownMenuItem>
-                  </Link>
-                  <Link href="/pricing">
-                    <DropdownMenuItem className="cursor-pointer" data-testid="menu-billing">
-                      <CreditCard className="mr-2 h-4 w-4" />
-                      Plans & Billing
-                    </DropdownMenuItem>
-                  </Link>
-                  <DropdownMenuSeparator />
-                  <Link href="/my-lessons">
-                    <DropdownMenuItem className="cursor-pointer" data-testid="menu-my-lessons">
-                      <BookOpen className="mr-2 h-4 w-4" />
-                      My Lessons
-                    </DropdownMenuItem>
-                  </Link>
-                  <Link href="/analytics">
-                    <DropdownMenuItem className="cursor-pointer" data-testid="menu-analytics">
-                      <BarChart3 className="mr-2 h-4 w-4" />
-                      Analytics
-                    </DropdownMenuItem>
-                  </Link>
-                  <Link href="/educator-influence">
-                    <DropdownMenuItem className="cursor-pointer" data-testid="menu-educator-influence">
-                      <Award className="mr-2 h-4 w-4" />
-                      Educator Influence
-                    </DropdownMenuItem>
-                  </Link>
-                  <Link href="/parent-portal">
-                    <DropdownMenuItem className="cursor-pointer" data-testid="menu-parent-portal">
-                      <Users className="mr-2 h-4 w-4" />
-                      Parent Portal
-                    </DropdownMenuItem>
-                  </Link>
-                  <Link href="/admin/standards">
-                    <DropdownMenuItem className="cursor-pointer" data-testid="menu-standards-admin">
-                      <Database className="mr-2 h-4 w-4" />
-                      Standards Admin
-                    </DropdownMenuItem>
-                  </Link>
-                  <DropdownMenuSeparator />
-                  <DropdownMenuItem 
-                    className="cursor-pointer text-destructive"
-                    onClick={() => window.location.href = "/api/logout"}
-                    data-testid="button-logout"
-                  >
-                    <LogOut className="mr-2 h-4 w-4" />
-                    Log Out
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
-            ) : (
-              <Button
-                className="hidden sm:flex bg-lys-red hover:bg-lys-red/90 text-white font-oswald gap-2"
-                onClick={() => window.location.href = "/api/login"}
-                data-testid="button-login"
-              >
-                <LogIn className="h-4 w-4" />
-                Sign In
+      <div className="ml-auto flex items-center gap-2">
+        <ThemeToggle />
+        
+        {isLoading ? (
+          <div className="w-9 h-9 rounded-full bg-muted animate-pulse" />
+        ) : isAuthenticated ? (
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="ghost" size="icon" className="rounded-full" data-testid="button-user-menu">
+                <Avatar className="h-8 w-8">
+                  <AvatarImage src={user?.profileImageUrl || undefined} />
+                  <AvatarFallback className="bg-lys-teal text-white font-oswald text-sm">
+                    {getInitials()}
+                  </AvatarFallback>
+                </Avatar>
               </Button>
-            )}
-
-            <Button
-              variant="ghost"
-              size="icon"
-              className="lg:hidden"
-              onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-              data-testid="button-mobile-menu"
-            >
-              {mobileMenuOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
-            </Button>
-          </div>
-        </div>
-
-        {mobileMenuOpen && (
-          <nav className="lg:hidden py-4 border-t border-border">
-            <div className="flex flex-col gap-2">
-              {navLinks.map((link) => (
-                <Link key={link.href} href={link.href}>
-                  <Button
-                    variant={location === link.href ? "secondary" : "ghost"}
-                    className="w-full justify-start font-roboto"
-                    onClick={() => setMobileMenuOpen(false)}
-                    data-testid={`mobile-nav-${link.label.toLowerCase().replace(/\s/g, '-')}`}
-                  >
-                    {link.label}
-                  </Button>
-                </Link>
-              ))}
-              {isAuthenticated && (
-                <>
-                  <Link href="/scope-sequence">
-                    <Button
-                      variant={location === "/scope-sequence" || location.startsWith("/scope/") ? "secondary" : "ghost"}
-                      className="w-full justify-start font-roboto"
-                      onClick={() => setMobileMenuOpen(false)}
-                      data-testid="mobile-nav-scope-sequence"
-                    >
-                      <BookOpen className="mr-2 h-4 w-4" />
-                      Scope & Sequence
-                    </Button>
-                  </Link>
-                  <Link href="/my-lessons">
-                    <Button
-                      variant={location === "/my-lessons" ? "secondary" : "ghost"}
-                      className="w-full justify-start font-roboto"
-                      onClick={() => setMobileMenuOpen(false)}
-                      data-testid="mobile-nav-my-lessons"
-                    >
-                      <BookOpen className="mr-2 h-4 w-4" />
-                      My Lessons
-                    </Button>
-                  </Link>
-                  <Link href="/analytics">
-                    <Button
-                      variant={location === "/analytics" ? "secondary" : "ghost"}
-                      className="w-full justify-start font-roboto"
-                      onClick={() => setMobileMenuOpen(false)}
-                      data-testid="mobile-nav-analytics"
-                    >
-                      <BarChart3 className="mr-2 h-4 w-4" />
-                      Analytics
-                    </Button>
-                  </Link>
-                  <Link href="/educator-influence">
-                    <Button
-                      variant={location === "/educator-influence" ? "secondary" : "ghost"}
-                      className="w-full justify-start font-roboto"
-                      onClick={() => setMobileMenuOpen(false)}
-                      data-testid="mobile-nav-educator-influence"
-                    >
-                      <Award className="mr-2 h-4 w-4" />
-                      Educator Influence
-                    </Button>
-                  </Link>
-                  <Link href="/parent-portal">
-                    <Button
-                      variant={location === "/parent-portal" ? "secondary" : "ghost"}
-                      className="w-full justify-start font-roboto"
-                      onClick={() => setMobileMenuOpen(false)}
-                      data-testid="mobile-nav-parent-portal"
-                    >
-                      <Users className="mr-2 h-4 w-4" />
-                      Parent Portal
-                    </Button>
-                  </Link>
-                </>
-              )}
-              {isAuthenticated ? (
-                <Button
-                  variant="outline"
-                  className="mt-2"
-                  onClick={() => window.location.href = "/api/logout"}
-                  data-testid="mobile-button-logout"
-                >
-                  <LogOut className="mr-2 h-4 w-4" />
-                  Log Out
-                </Button>
-              ) : (
-                <Button
-                  className="bg-lys-red hover:bg-lys-red/90 text-white font-oswald gap-2 mt-2"
-                  onClick={() => window.location.href = "/api/login"}
-                  data-testid="mobile-button-login"
-                >
-                  <LogIn className="h-4 w-4" />
-                  Sign In Free
-                </Button>
-              )}
-            </div>
-          </nav>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-56">
+              <div className="px-2 py-1.5">
+                <p className="text-sm font-medium">
+                  {user?.firstName} {user?.lastName}
+                </p>
+                <p className="text-xs text-muted-foreground truncate">{user?.email}</p>
+                {user?.role && (
+                  <p className="text-xs text-muted-foreground capitalize mt-0.5">
+                    {user.role.replace('_', ' ')}
+                  </p>
+                )}
+              </div>
+              <DropdownMenuSeparator />
+              <Link href="/settings">
+                <DropdownMenuItem className="cursor-pointer" data-testid="menu-settings">
+                  <Settings className="mr-2 h-4 w-4" />
+                  Profile & Settings
+                </DropdownMenuItem>
+              </Link>
+              <Link href="/pricing">
+                <DropdownMenuItem className="cursor-pointer" data-testid="menu-billing">
+                  <CreditCard className="mr-2 h-4 w-4" />
+                  Plans & Billing
+                </DropdownMenuItem>
+              </Link>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem 
+                className="cursor-pointer text-destructive"
+                onClick={() => window.location.href = "/api/logout"}
+                data-testid="button-logout"
+              >
+                <LogOut className="mr-2 h-4 w-4" />
+                Log Out
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        ) : (
+          <Button
+            className="bg-lys-red hover:bg-lys-red/90 text-white font-oswald gap-2"
+            onClick={() => window.location.href = "/api/login"}
+            data-testid="button-login"
+          >
+            <LogIn className="h-4 w-4" />
+            Sign In
+          </Button>
         )}
       </div>
     </header>

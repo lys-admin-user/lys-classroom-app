@@ -3,6 +3,8 @@ import { queryClient } from "./lib/queryClient";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
+import { SidebarProvider, SidebarInset, SidebarTrigger } from "@/components/ui/sidebar";
+import { AppSidebar } from "@/components/AppSidebar";
 import { Header } from "@/components/Header";
 import { Footer } from "@/components/Footer";
 import { OnboardingReminderBanner } from "@/components/OnboardingReminderBanner";
@@ -128,18 +130,28 @@ function Router() {
 }
 
 function App() {
+  const sidebarStyle = {
+    "--sidebar-width": "16rem",
+    "--sidebar-width-icon": "3.5rem",
+  };
+
   return (
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>
         <OnboardingGuard>
-          <div className="flex flex-col min-h-screen">
-            <OnboardingReminderBanner />
-            <Header />
-            <main className="flex-1">
-              <Router />
-            </main>
-            <Footer />
-          </div>
+          <SidebarProvider style={sidebarStyle as React.CSSProperties}>
+            <div className="flex min-h-screen w-full">
+              <AppSidebar />
+              <SidebarInset className="flex flex-col flex-1">
+                <OnboardingReminderBanner />
+                <Header />
+                <main className="flex-1 overflow-auto">
+                  <Router />
+                </main>
+                <Footer />
+              </SidebarInset>
+            </div>
+          </SidebarProvider>
         </OnboardingGuard>
         <Toaster />
       </TooltipProvider>
