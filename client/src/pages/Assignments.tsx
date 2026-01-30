@@ -210,11 +210,16 @@ export default function Assignments() {
   const generateMutation = useMutation({
     mutationFn: (data: any) => apiRequest("POST", "/api/assignments/generate", data),
     onSuccess: (response: any) => {
+      console.log("[Assignment Generate] Response from server:", response);
+      console.log("[Assignment Generate] Response worksheet:", response.worksheet);
+      
       // Auto-populate title with lesson name
       const updatedData = {
         ...response,
         title: selectedLesson?.title || response.title,
       };
+      console.log("[Assignment Generate] Updated data:", updatedData);
+      console.log("[Assignment Generate] Updated data worksheet:", updatedData.worksheet);
       setGeneratedAssignment(updatedData);
       
       // Auto-populate worksheet header from user profile and selected class
