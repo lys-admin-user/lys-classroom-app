@@ -3349,6 +3349,175 @@ export async function registerRoutes(
     }
   });
 
+  // ================================
+  // Organization Hierarchy Endpoints
+  // ================================
+
+  // Valid organization types for validation
+  const validOrgTypes = ["country", "state", "jurisdiction", "district", "school", "campus", "university", "other"];
+
+  // Get organizations by type (country, state, district, school, etc.)
+  // Only returns orgs the user has access to
+  app.get("/api/organizations/by-type/:type", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user?.claims?.sub;
+      const { type } = req.params;
+      
+      // Validate type against allowed values
+      if (!validOrgTypes.includes(type)) {
+        res.status(400).json({ error: "Invalid organization type" });
+        return;
+      }
+      
+      // Get user's org memberships
+      const userMemberships = await storage.getUserOrganizations(userId);
+      const isSiteAdminUser = await storage.isSiteAdmin(userId);
+      
+      const allOrgs = await storage.getOrganizationsByType(type);
+      
+      // Site admins can see all, others only see orgs they're members of or descendants of
+      if (isSiteAdminUser) {
+        res.json(allOrgs);
+        return;
+      }
+      
+      // Filter to only orgs user has access to
+      const userOrgIds = new Set(userMemberships.map(m => m.organizationId));
+      const accessibleOrgs = allOrgs.filter(org => userOrgIds.has(org.id));
+      res.json(accessibleOrgs);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch organizations by type" });
+    }
+  });
+
+  // Get full hierarchy for an organization (ancestors up to root)
+  // Requires membership in the org or site admin
+  app.get("/api/organizations/:orgId/hierarchy", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user?.claims?.sub;
+      const { orgId } = req.params;
+      
+      // Check access
+      const membership = await storage.getOrgMembership(orgId, userId);
+      const isSiteAdminUser = await storage.isSiteAdmin(userId);
+      
+      if (!membership && !isSiteAdminUser) {
+        res.status(403).json({ error: "Access denied" });
+        return;
+      }
+      
+      const hierarchy = await storage.getOrganizationHierarchy(orgId);
+      res.json({
+        hierarchy,
+        levels: hierarchy.map(h => ({ id: h.id, name: h.name, type: h.type }))
+      });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch organization hierarchy" });
+    }
+  });
+
+  // Get all descendants of an organization
+  // Requires membership in the org or site admin
+  app.get("/api/organizations/:orgId/descendants", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user?.claims?.sub;
+      const { orgId } = req.params;
+      
+      // Check access
+      const membership = await storage.getOrgMembership(orgId, userId);
+      const isSiteAdminUser = await storage.isSiteAdmin(userId);
+      
+      if (!membership && !isSiteAdminUser) {
+        res.status(403).json({ error: "Access denied" });
+        return;
+      }
+      
+      const descendants = await storage.getAllDescendants(orgId);
+      res.json(descendants);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch organization descendants" });
+    }
+  });
+
+  // Get all schools/campuses under an organization
+  // Requires membership in the org or site admin
+  app.get("/api/organizations/:orgId/schools", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user?.claims?.sub;
+      const { orgId } = req.params;
+      
+      // Check access
+      const membership = await storage.getOrgMembership(orgId, userId);
+      const isSiteAdminUser = await storage.isSiteAdmin(userId);
+      
+      if (!membership && !isSiteAdminUser) {
+        res.status(403).json({ error: "Access denied" });
+        return;
+      }
+      
+      const schools = await storage.getSchoolsInHierarchy(orgId);
+      res.json(schools);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch schools in hierarchy" });
+    }
+  });
+
+  // Validate if a student can be enrolled in a class
+  app.post("/api/enrollment/validate", isAuthenticated, async (req: any, res) => {
+    try {
+      const { studentId, classId } = req.body;
+      if (!studentId || !classId) {
+        res.status(400).json({ error: "studentId and classId are required" });
+        return;
+      }
+      const result = await storage.validateEnrollment(studentId, classId);
+      res.json(result);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to validate enrollment" });
+    }
+  });
+
+  // Enroll a student in a class with validation
+  app.post("/api/classes/:classId/enroll", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user?.claims?.sub;
+      const { classId } = req.params;
+      const { studentId } = req.body;
+      
+      if (!studentId) {
+        res.status(400).json({ error: "studentId is required" });
+        return;
+      }
+
+      // Validate enrollment
+      const validation = await storage.validateEnrollment(studentId, classId);
+      if (!validation.valid) {
+        res.status(400).json({ error: validation.reason });
+        return;
+      }
+
+      // Check if already enrolled
+      const existing = await storage.getClassStudent(classId, studentId);
+      if (existing) {
+        res.status(400).json({ error: "Student is already enrolled in this class" });
+        return;
+      }
+
+      // Enroll the student
+      const enrollment = await storage.enrollStudent({
+        classId,
+        studentId,
+        enrolledBy: userId,
+        status: "enrolled"
+      });
+
+      res.status(201).json(enrollment);
+    } catch (error) {
+      console.error("Error enrolling student:", error);
+      res.status(500).json({ error: "Failed to enroll student" });
+    }
+  });
+
   // Entity sharing between organizations
   const entityShareBodySchema = z.object({
     entityType: z.enum(["class", "student", "assignment", "lesson", "scope_sequence"]),

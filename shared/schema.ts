@@ -839,15 +839,18 @@ export const accommodationLabels: Record<AccommodationType, string> = {
 };
 
 // Classes Table (educator's classes)
+// Classes should belong to a school/campus organization for proper hierarchy
 export const classes = pgTable("classes", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   userId: varchar("user_id").notNull(),
-  organizationId: varchar("organization_id"),
+  organizationId: varchar("organization_id"), // Should be a school/campus type org - required for hierarchy
   name: text("name").notNull(),
   subject: text("subject"),
   gradeLevel: text("grade_level"),
   period: text("period"),
+  room: text("room"), // Physical or virtual room location
   schoolYear: text("school_year"),
+  term: text("term"), // semester, quarter, trimester, etc.
   maxStudents: integer("max_students").default(35).notNull(),
   isActive: boolean("is_active").default(true),
   createdAt: timestamp("created_at").defaultNow(),
@@ -859,14 +862,19 @@ export type InsertClass = z.infer<typeof insertClassSchema>;
 export type Class = typeof classes.$inferSelect;
 
 // Students Table
+// Students should belong to a school/campus organization for proper hierarchy
 export const students = pgTable("students", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  userId: varchar("user_id").notNull(),
-  organizationId: varchar("organization_id"),
+  userId: varchar("user_id").notNull(), // Links to users table for login
+  organizationId: varchar("organization_id"), // School/campus where student is enrolled - required for hierarchy
   firstName: text("first_name").notNull(),
   lastName: text("last_name").notNull(),
-  studentId: text("student_id"),
+  studentId: text("student_id"), // School-assigned student ID
+  email: text("email"),
   gradeLevel: text("grade_level"),
+  birthDate: timestamp("birth_date"),
+  enrollmentDate: timestamp("enrollment_date").defaultNow(),
+  status: text("status").default("active"), // active, inactive, graduated, transferred
   accommodations: jsonb("accommodations").$type<{
     type: AccommodationType;
     description: string;
@@ -881,12 +889,16 @@ export const insertStudentSchema = createInsertSchema(students).omit({ id: true,
 export type InsertStudent = z.infer<typeof insertStudentSchema>;
 export type Student = typeof students.$inferSelect;
 
-// Class-Student Junction Table
+// Class-Student Junction Table - Enrollment records
 export const classStudents = pgTable("class_students", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   classId: varchar("class_id").notNull(),
   studentId: varchar("student_id").notNull(),
+  enrolledBy: varchar("enrolled_by"), // User ID of who enrolled the student
   enrolledAt: timestamp("enrolled_at").defaultNow(),
+  droppedAt: timestamp("dropped_at"),
+  status: text("status").default("enrolled"), // enrolled, dropped, completed
+  finalGrade: text("final_grade"),
 });
 
 export const insertClassStudentSchema = createInsertSchema(classStudents).omit({ id: true, enrolledAt: true });

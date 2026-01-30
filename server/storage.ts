@@ -379,7 +379,9 @@ export interface IStorage {
   deleteStudent(id: string, userId: string): Promise<boolean>;
 
   getClassStudents(classId: string): Promise<Student[]>;
+  getClassStudent(classId: string, studentId: string): Promise<ClassStudent | undefined>;
   addStudentToClass(classId: string, studentId: string): Promise<ClassStudent>;
+  enrollStudent(enrollment: InsertClassStudent): Promise<ClassStudent>;
   removeStudentFromClass(classId: string, studentId: string): Promise<boolean>;
 
   getStudentGroups(userId: string): Promise<StudentGroup[]>;
@@ -417,9 +419,14 @@ export interface IStorage {
   getOrganization(id: string): Promise<Organization | undefined>;
   getOrganizationBySlug(slug: string): Promise<Organization | undefined>;
   getChildOrganizations(parentId: string): Promise<Organization[]>;
+  getOrganizationsByType(type: string): Promise<Organization[]>;
+  getOrganizationHierarchy(orgId: string): Promise<Organization[]>; // Returns ancestors from org up to root
+  getAllDescendants(orgId: string): Promise<Organization[]>; // Returns all descendants recursively
+  getSchoolsInHierarchy(orgId: string): Promise<Organization[]>; // Get all schools under an org
   createOrganization(org: InsertOrganization): Promise<Organization>;
   updateOrganization(id: string, updates: Partial<Organization>): Promise<Organization | undefined>;
   deleteOrganization(id: string): Promise<boolean>;
+  validateEnrollment(studentId: string, classId: string): Promise<{ valid: boolean; reason?: string }>;
   
   // Organization Memberships
   getOrganizationMembers(orgId: string): Promise<OrgMembership[]>;
@@ -2481,7 +2488,7 @@ export class DatabaseStorage implements IStorage {
       const standardGrade = standard.gradeLevel.toLowerCase();
       
       // Check for exact match or range overlap
-      for (const grade of expandedGrades) {
+      for (const grade of Array.from(expandedGrades)) {
         const g = grade.toLowerCase();
         if (standardGrade === g) return true;
         if (standardGrade.includes(g)) return true;
@@ -2774,6 +2781,12 @@ export class DatabaseStorage implements IStorage {
     return result;
   }
 
+  async getClassStudent(classId: string, studentId: string): Promise<ClassStudent | undefined> {
+    const [result] = await db.select().from(classStudents)
+      .where(and(eq(classStudents.classId, classId), eq(classStudents.studentId, studentId)));
+    return result || undefined;
+  }
+
   async addStudentToClass(classId: string, studentId: string): Promise<ClassStudent> {
     const classData = await this.getClass(classId);
     if (!classData) {
@@ -2789,6 +2802,25 @@ export class DatabaseStorage implements IStorage {
     
     const [created] = await db.insert(classStudents)
       .values({ classId, studentId } as any)
+      .returning();
+    return created;
+  }
+
+  async enrollStudent(enrollment: InsertClassStudent): Promise<ClassStudent> {
+    const classData = await this.getClass(enrollment.classId);
+    if (!classData) {
+      throw new Error("Class not found");
+    }
+    
+    const currentStudents = await this.getClassStudents(enrollment.classId);
+    const maxStudents = classData.maxStudents || 35;
+    
+    if (currentStudents.length >= maxStudents) {
+      throw new Error(`Class has reached maximum capacity of ${maxStudents} students`);
+    }
+    
+    const [created] = await db.insert(classStudents)
+      .values(enrollment as any)
       .returning();
     return created;
   }
@@ -3233,6 +3265,117 @@ export class DatabaseStorage implements IStorage {
 
   async getChildOrganizations(parentId: string): Promise<Organization[]> {
     return db.select().from(organizations).where(eq(organizations.parentOrganizationId, parentId));
+  }
+
+  async getOrganizationsByType(type: string): Promise<Organization[]> {
+    return db.select().from(organizations).where(eq(organizations.type, type as any));
+  }
+
+  // Get the full hierarchy from an organization up to the root (country)
+  async getOrganizationHierarchy(orgId: string): Promise<Organization[]> {
+    const hierarchy: Organization[] = [];
+    let currentId: string | null = orgId;
+    
+    while (currentId) {
+      const org = await this.getOrganization(currentId);
+      if (!org) break;
+      hierarchy.push(org);
+      currentId = org.parentOrganizationId || null;
+    }
+    
+    return hierarchy; // Returns [current, parent, grandparent, ..., root]
+  }
+
+  // Get all descendants of an organization recursively
+  async getAllDescendants(orgId: string): Promise<Organization[]> {
+    const descendants: Organization[] = [];
+    const queue: string[] = [orgId];
+    
+    while (queue.length > 0) {
+      const currentId = queue.shift()!;
+      const children = await this.getChildOrganizations(currentId);
+      descendants.push(...children);
+      queue.push(...children.map(c => c.id));
+    }
+    
+    return descendants;
+  }
+
+  // Get all schools/campuses under an organization
+  async getSchoolsInHierarchy(orgId: string): Promise<Organization[]> {
+    const org = await this.getOrganization(orgId);
+    if (!org) return [];
+    
+    // If the org itself is a school/campus, return it
+    if (org.type === 'school' || org.type === 'campus') {
+      return [org];
+    }
+    
+    // Otherwise, get all descendants and filter for schools/campuses
+    const descendants = await this.getAllDescendants(orgId);
+    return descendants.filter(d => d.type === 'school' || d.type === 'campus');
+  }
+
+  // Validate that a student can be enrolled in a class
+  // Enforces: Student and Class must belong to the same school/campus organization
+  async validateEnrollment(studentId: string, classId: string): Promise<{ valid: boolean; reason?: string }> {
+    const student = await this.getStudent(studentId);
+    if (!student) {
+      return { valid: false, reason: 'Student not found' };
+    }
+
+    const classData = await this.getClass(classId);
+    if (!classData) {
+      return { valid: false, reason: 'Class not found' };
+    }
+
+    // Check if student has an organization
+    if (!student.organizationId) {
+      return { valid: false, reason: 'Student must be assigned to a school before enrollment' };
+    }
+
+    // Check if class has an organization (required for proper hierarchy)
+    if (!classData.organizationId) {
+      return { valid: false, reason: 'Class must be assigned to a school before students can enroll' };
+    }
+
+    // Verify the class organization is a valid container type (school, campus, university)
+    const classOrg = await this.getOrganization(classData.organizationId);
+    if (!classOrg) {
+      return { valid: false, reason: 'Class organization not found' };
+    }
+    
+    const validClassContainerTypes = ['school', 'campus', 'university'];
+    if (!validClassContainerTypes.includes(classOrg.type || '')) {
+      return { valid: false, reason: 'Class must belong to a school, campus, or university organization' };
+    }
+
+    // Check if student's organization matches the class organization (same school)
+    if (student.organizationId === classData.organizationId) {
+      return { valid: true };
+    }
+
+    // Check if student's org is within the class org's hierarchy
+    // This allows a student at a campus to enroll in a class at the parent school
+    const studentHierarchy = await this.getOrganizationHierarchy(student.organizationId);
+    const classOrgInHierarchy = studentHierarchy.some(org => org.id === classData.organizationId);
+    
+    if (classOrgInHierarchy) {
+      return { valid: true };
+    }
+
+    // Also check reverse - student's school is a parent of the class's school
+    const classHierarchy = await this.getOrganizationHierarchy(classData.organizationId);
+    const studentOrgInClassHierarchy = classHierarchy.some(org => org.id === student.organizationId);
+    
+    if (studentOrgInClassHierarchy) {
+      return { valid: true };
+    }
+
+    return { 
+      valid: false, 
+      reason: 'Student must be enrolled in the same school or a related school as the class' 
+    };
   }
 
   async createOrganization(org: InsertOrganization): Promise<Organization> {

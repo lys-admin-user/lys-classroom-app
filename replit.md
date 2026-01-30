@@ -1,7 +1,7 @@
 # LYS Educational Platform
 
 ## Overview
-LYS (Laddering Your Success) is an AI-powered educational platform designed to empower educators and students through the "Be-Know-Do" methodology. It offers AI lesson planning, self-discovery assessments, career exploration, goal tracking, and educational resources. The platform's vision is to foster identity-based learning, bridging the gap between academic preparation and real-world success, thereby enhancing market potential for comprehensive educational tools.
+LYS (Laddering Your Success) is an AI-powered educational platform designed to empower educators and students using the "Be-Know-Do" methodology. It offers AI lesson planning, self-discovery assessments, career exploration, goal tracking, and educational resources. The platform aims to foster identity-based learning, bridging academic preparation with real-world success, and enhancing the market potential for comprehensive educational tools.
 
 ## User Preferences
 Preferred communication style: Simple, everyday language.
@@ -9,62 +9,40 @@ Preferred communication style: Simple, everyday language.
 ## System Architecture
 
 ### UI/UX Decisions
--   **Design System**: Tailwind CSS with custom design tokens (Primary Red #EE4E23, Warm Yellow #F8D842, Dark Teal #016371).
+-   **Design System**: Tailwind CSS with custom design tokens (Primary Red, Warm Yellow, Dark Teal).
 -   **UI Components**: shadcn/ui library built on Radix UI primitives.
 -   **Typography**: Custom font stack featuring Permanent Marker (headers), Oswald (subheaders), and Roboto (body text).
 
 ### Technical Implementations
--   **Frontend**: React 18 with TypeScript, Wouter for routing, TanStack React Query for server state management, and Vite as the build tool.
+-   **Frontend**: React 18 with TypeScript, Wouter for routing, TanStack React Query for server state management, and Vite.
 -   **Backend**: Express.js with TypeScript, RESTful JSON API (`/api` prefix), and Zod for validation.
--   **Data Layer**: PostgreSQL database managed by Drizzle ORM. All schemas and Zod validation are in `shared/schema.ts`, with shared types accessible via `@shared/*` alias.
--   **Authentication**: Replit Auth supporting Google, GitHub, and email login, with `express-session` and PostgreSQL for session storage.
--   **Security**: Robust input validation using Zod, ownership checks for data modification, and server-side regeneration of critical IDs (e.g., milestone IDs) to prevent injection attacks.
--   **Monorepo Structure**: `/client` for frontend, `/server` for backend, and `/shared` for common code.
--   **AI Integration**: Utilizes OpenAI API for AI-driven features like lesson plan generation, with a fallback to mock data if the API key is unavailable.
--   **Real-Time Collaboration**: WebSocket server for features like live cursor positions, presence tracking, and chat in collaboration sessions.
--   **Multi-Tenancy**: Supports organizations (School, District, University) with role-based access control (Owner, Admin, Member) and an invitation system.
--   **Automated Standards Ingestion**: A three-tier system for importing educational standards:
-    1.  **CSP API**: Integration with `api.commonstandardsproject.com` for official standards.
-    2.  **(Future) CASE Protocol**: Planned integration for competency exchange.
-    3.  **LLM Extraction**: AI (OpenAI) powered extraction from documents, with a staging queue for human review and approval. Change detection via source URL checksums.
+-   **Data Layer**: PostgreSQL database managed by Drizzle ORM, with shared schemas and types.
+-   **Authentication**: Replit Auth (Google, GitHub, email) with `express-session` and PostgreSQL for session storage.
+-   **Security**: Input validation (Zod), ownership checks, and server-side regeneration of critical IDs.
+-   **Monorepo Structure**: `/client` (frontend), `/server` (backend), and `/shared` (common code).
+-   **AI Integration**: OpenAI API for AI-driven features, with mock data fallback.
+-   **Real-Time Collaboration**: WebSocket server for live cursor positions, presence, and chat.
+-   **Multi-Tenancy**: Supports organizations (School, District, University) with role-based access control and an invitation system.
+-   **Automated Standards Ingestion**: Three-tier system for importing educational standards: CSP API, planned CASE Protocol integration, and LLM extraction with human review.
 
 ### Feature Specifications
 -   **Be-Know-Do Framework**: Integrates self-discovery assessments (BE), career exploration (KNOW), and goal setting with milestones (DO).
--   **Scope & Sequence Builder**: A tool for educators to plan curricula, allowing creation from scratch or import from documents with AI-powered unit extraction. Includes unit management and campus admin oversight.
--   **Self-Discovery Module**: A 9-question assessment that evaluates Be-Know-Do competencies and links to career exploration.
--   **Career Exploration**: Detailed career information, including pathways and requirements, with the ability for users to save careers.
--   **Educator Influence & Affiliate System**: Unique referral codes, social sharing, and a point-based reward system for educators based on views, shares, and signups.
--   **Real-Time Collaboration**: Enables co-creation of lesson plans with invite codes, role differentiation, live chat, and edit history.
--   **Shared Resource Library**: A community platform for educators to share resources (lesson plans, worksheets) with visibility controls, categorization, and engagement tracking.
--   **Educational Standards System**: Lesson generator incorporates legally-compliant, hierarchical educational standards (e.g., US TEKS, CCSS) and a professional lesson plan format.
--   **Student Digital Portfolio**: Students can create and manage a professional portfolio to showcase completed assignments, projects, and achievements. Features include:
-    -   Portfolio profile with bio, skills, education, and contact info
-    -   Add/remove/reorder portfolio items (assignments, projects, certificates, achievements, reflections)
-    -   Multiple theme options (professional, creative, minimal, academic)
-    -   Privacy controls (private, unlisted, public)
-    -   Shareable links for colleges, employers, and scholarship committees
-    -   Social sharing integration (LinkedIn, Handshake recommendations)
-    -   PDF download for applications
-    -   View count analytics
--   **One-Click Template Library**: Educators can save lesson plans as reusable templates and browse community-shared templates for quick lesson creation.
+-   **Scope & Sequence Builder**: Tool for educators to plan curricula, create from scratch or import with AI unit extraction.
+-   **Self-Discovery Module**: 9-question assessment linking to career exploration.
+-   **Career Exploration**: Detailed career information with saving capabilities.
+-   **Educator Influence & Affiliate System**: Referral codes, social sharing, and point-based rewards for educators.
+-   **Real-Time Collaboration**: Co-creation of lesson plans with invite codes, role differentiation, chat, and edit history.
+-   **Shared Resource Library**: Community platform for educators to share resources.
+-   **Educational Standards System**: Lesson generator incorporates legally-compliant, hierarchical standards.
+-   **Student Digital Portfolio**: Students can create and manage portfolios with customizable themes, privacy controls, shareable links, social sharing, PDF download, and analytics.
+-   **One-Click Template Library**: Educators can save and browse community-shared lesson plan templates.
 
-### LYS V3.0 Global Architecture (December 2024)
--   **Global Authority Tree**: Polymorphic hierarchy supporting worldwide educational governance systems with five levels (supranational, national, regional/state, local/district, school) and three model types:
-    -   `bottom_heavy`: US-style with strong local control (TEA, school districts)
-    -   `top_down_unitary`: African/Asian centralized national curriculum
-    -   `federal_hybrid`: EU/Canadian mixed federal-state jurisdiction
--   **LYS Milestone Engine**: Separate from goals table, tracking Being/Knowing/Doing progress with:
-    -   Three categories (being, knowing, doing) mapping to Be-Know-Do framework
-    -   Gatekeeper logic for blocking milestones (hard deadlines, prerequisites)
-    -   Regional multipliers for gamification weighting
-    -   Alternative pathway support for flexible progression
--   **Workforce Trends Integration**: Weekly automated sync with BLS Occupational Outlook Handbook data for career alignment
-    -   Automatic weekly sync scheduler runs in background
-    -   Fetches data from BLS Employment Projections and OEWS wage statistics
-    -   Updates career salary, job outlook, and growth projections
-    -   Admin dashboard at System Admin > Data Sync for monitoring and manual triggers
-    -   Sync history tracking with status, processed counts, and error logs
--   **Alignment Matrix**: Regional gamification weights connecting authorities to workforce data
+### Global Architecture
+-   **Educational Hierarchy**: Structured organization of students and classes (Country > State/Jurisdiction > District > School/Campus > Class > Student) with validation.
+-   **Global Authority Tree**: Polymorphic hierarchy supporting various educational governance systems (bottom_heavy, top_down_unitary, federal_hybrid).
+-   **LYS Milestone Engine**: Tracks Being/Knowing/Doing progress with gatekeeper logic, regional multipliers, and alternative pathways.
+-   **Workforce Trends Integration**: Weekly automated sync with BLS Occupational Outlook Handbook data for career alignment, salary, and job outlook.
+-   **Alignment Matrix**: Connects regional gamification weights to workforce data.
 
 ## External Dependencies
 
@@ -72,124 +50,32 @@ Preferred communication style: Simple, everyday language.
 -   **OpenAI API**: For AI lesson plan generation and LLM-powered standards extraction.
 
 ### Database
--   **PostgreSQL**: Primary data store for all application data, user information, and session management.
+-   **PostgreSQL**: Primary data store.
 
 ### Key NPM Packages
 -   **UI**: `shadcn/ui`, `@radix-ui/react-primitives`.
--   **Forms**: `react-hook-form`, `@hookform/resolvers` (for Zod).
+-   **Forms**: `react-hook-form`, `@hookform/resolvers`.
 -   **Date Handling**: `date-fns`.
 -   **Session Management**: `express-session`, `connect-pg-simple`.
 -   **Icons**: `lucide-react`, `react-icons`.
 
-### Development Tools
--   **TypeScript**: Used across the stack with strict mode.
--   **Vite**: Frontend build tool.
--   **esbuild**: Server bundling.
-
-### Payment Integration (Pending)
--   **Demo Mode**: Currently the platform operates in demo mode for tier upgrades. Users can simulate upgrading to Pro or Campus tiers via `/api/subscription/demo-upgrade`.
--   **Future**: When ready for production payments, connect Stripe via Replit's Stripe connector integration. The user fields `stripeCustomerId`, `stripeSubscriptionId`, and `subscriptionStatus` are ready in the database schema.
+### Payment Integration
+-   **Demo Mode**: Simulation of tier upgrades.
+-   **Future**: Stripe integration via Replit's Stripe connector.
 
 ### Country Affordability Index (CAI) Global Pricing
--   **Purpose**: Enables equitable, cross-border pricing based on local purchasing power rather than simple currency conversion.
--   **CAI Score**: Each country receives a score from 0.05-1.0 based on:
-    -   GDP per Capita (PPP) - 35%
-    -   Median Monthly Income - 25%
-    -   Out-of-Pocket Healthcare Spend - 20%
-    -   Urban Cost-of-Living Index - 20%
--   **LCSI (Local Cost-of-Services Index)**: Additional adjustment factor (0-0.15) for regional variations.
--   **Pricing Formula**: `Adjusted Price = Global Reference Price × (CAI Score + LCSI Adjustment)`
--   **Income Level Categories**:
-    -   High Income: CAI 0.70-1.0 (USA, Germany, Australia, etc.)
-    -   Upper-Middle: CAI 0.40-0.69 (Brazil, Mexico, China, etc.)
-    -   Lower-Middle: CAI 0.20-0.39 (India, Nigeria, Philippines, etc.)
-    -   Low Income: CAI 0.05-0.19 (Ethiopia, DR Congo, etc.)
--   **Coverage**: 120+ countries across all regions
--   **API Endpoints**:
-    -   `GET /api/cai/countries` - All countries with CAI data
-    -   `GET /api/cai/countries/:code` - Single country by ISO code
-    -   `GET /api/cai/pricing/:countryCode` - Adjusted pricing for country
--   **UI**: Pricing page includes country selector with transparent pricing breakdown
-
-## Onboarding Flow
--   New users are automatically redirected to `/onboarding` if they haven't completed the onboarding wizard.
--   Onboarding collects: role (student/educator/campus_admin), primary goals, interests, language, and location preferences.
--   **Educator Grade Level Selection**: Educators select grade levels during onboarding (K-5, 6-8, 9-12, Post-Secondary) to filter educational standards.
--   Exempt paths from onboarding redirect: `/onboarding`, `/pricing`, `/shared/*`
-
-## External Integrations
+-   **Purpose**: Equitable, cross-border pricing based on local purchasing power using GDP per Capita, Monthly Income, Healthcare Spend, and Cost-of-Living Index.
+-   **Formula**: `Adjusted Price = Global Reference Price × (CAI Score + LCSI Adjustment)`.
+-   **Coverage**: 120+ countries.
 
 ### HubSpot CRM Integration
--   **Service File**: `server/services/hubspotService.ts`
--   **Connection**: Uses Replit's HubSpot connector with OAuth and automatic token refresh
--   **Capabilities**:
-    -   Create/update contacts with LYS user data
-    -   Create/update companies for organizations
-    -   Create deals for subscription upgrades
-    -   Sync users automatically to HubSpot CRM
--   **API Endpoints**:
-    -   `GET /api/integrations/hubspot/status` - Check connection status
-    -   `GET /api/integrations/hubspot/contacts` - List contacts (admin only)
-    -   `GET /api/integrations/hubspot/companies` - List companies (admin only)
-    -   `POST /api/integrations/hubspot/sync-user` - Sync current user to HubSpot
-    -   `POST /api/integrations/hubspot/create-contact` - Create contact (admin only)
-    -   `POST /api/integrations/hubspot/create-company` - Create company (admin only)
-    -   `POST /api/integrations/hubspot/create-deal` - Create deal (admin only)
+-   **Connection**: Uses Replit's HubSpot connector.
+-   **Capabilities**: Create/update contacts, companies, deals, and sync users.
 
 ### WordPress Integration
--   **Service File**: `server/services/wordpressService.ts`
--   **Integration Methods**:
-    -   **Iframe Embeds**: Embed LYS widgets in WordPress via iframe
-    -   **Shortcodes**: WordPress shortcode support for easy integration
-    -   **oEmbed**: Standard oEmbed protocol for auto-embedding
-    -   **REST API**: Two-way data exchange between platforms
-    -   **Lesson Sync**: Push lesson plans to WordPress as draft posts
--   **WordPress Shortcodes**:
-    -   `[lys_lesson_generator]` - Embed lesson generator
-    -   `[lys_career_explorer]` - Embed career explorer
-    -   `[lys_self_discovery]` - Embed self-discovery assessment
-    -   `[lys_pricing]` - Embed pricing calculator with CAI
--   **API Endpoints**:
-    -   `GET /api/integrations/wordpress/status` - Integration status and features
-    -   `GET /api/integrations/wordpress/embed-code` - Generate embed code
-    -   `GET /api/integrations/wordpress/shortcode-instructions` - Get WordPress plugin code
-    -   `GET /api/oembed` - oEmbed endpoint for WordPress auto-discovery
-    -   `POST /api/integrations/wordpress/sync-lesson` - Sync lesson plan to WordPress
+-   **Methods**: Iframe Embeds, Shortcodes, oEmbed, REST API.
+-   **Features**: Sync lesson plans to WordPress as draft posts, embed LYS widgets.
 
 ### SIS (Student Information System) Integration
--   **Service File**: `server/services/sisService.ts`
--   **Supported Providers**:
-    -   **Clever**: Most popular rostering platform (OAuth 2.0, SSO, 100,000+ schools)
-    -   **PowerSchool**: Leading K-12 SIS with OneRoster support
-    -   **Canvas LMS**: Learning management system by Instructure
-    -   **Infinite Campus**: Cloud-based student information system
-    -   **Skyward**: K-12 school administration software
-    -   **OneRoster**: Industry standard API for interoperability
--   **Features**:
-    -   OAuth authentication flow for supported providers
-    -   Manual API token configuration for all providers
-    -   Student roster import and sync
-    -   Course/section import and sync
-    -   Sync history tracking with success/failure counts
-    -   Configurable sync settings (students, teachers, courses, grades, attendance)
-    -   Role-based access (educators and campus_admin only)
--   **Database Tables**:
-    -   `sis_connections` - Provider connections with encrypted tokens
-    -   `sis_sync_history` - Track sync operations and results
-    -   `sis_students` - Imported student data from SIS
-    -   `sis_courses` - Imported course/section data from SIS
--   **API Endpoints**:
-    -   `GET /api/integrations/sis/providers` - List available SIS providers
-    -   `GET /api/integrations/sis/connections` - Get user's SIS connections
-    -   `GET /api/integrations/sis/connections/org/:orgId` - Get organization's connections (admin)
-    -   `POST /api/integrations/sis/connections` - Create new SIS connection
-    -   `PATCH /api/integrations/sis/connections/:id` - Update connection settings
-    -   `DELETE /api/integrations/sis/connections/:id` - Delete connection
-    -   `POST /api/integrations/sis/connections/:id/test` - Test connection
-    -   `POST /api/integrations/sis/connections/:id/sync` - Sync data from SIS
-    -   `GET /api/integrations/sis/connections/:id/history` - Get sync history
-    -   `GET /api/integrations/sis/connections/:id/students` - Get synced students
-    -   `GET /api/integrations/sis/connections/:id/courses` - Get synced courses
-    -   `POST /api/integrations/sis/oauth/initiate` - Start OAuth flow
-    -   `GET /api/integrations/sis/oauth/clever/callback` - Clever OAuth callback
--   **UI Page**: `/sis-integration` - Educator interface for managing SIS connections
+-   **Supported Providers**: Clever, PowerSchool, Canvas LMS, Infinite Campus, Skyward, OneRoster.
+-   **Features**: OAuth authentication, manual API token configuration, student/course import and sync, sync history tracking, configurable settings, role-based access.

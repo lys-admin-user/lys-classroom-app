@@ -99,10 +99,24 @@ export type InsertEducatorProfile = z.infer<typeof insertEducatorProfileSchema>;
 export type EducatorProfile = typeof educatorProfiles.$inferSelect;
 
 // Organization types for multi-tenant support
-export type OrganizationType = "school" | "district" | "university" | "other";
+// Hierarchy: country > state/jurisdiction > district > school/campus > (classes)
+export type OrganizationType = "country" | "state" | "jurisdiction" | "district" | "school" | "campus" | "university" | "other";
 export type OrganizationStatus = "active" | "suspended" | "pending";
 
-// Organizations table - represents schools, districts, or other educational entities
+// Organization hierarchy levels (ordered from top to bottom)
+export const organizationHierarchyLevels: OrganizationType[] = ["country", "state", "jurisdiction", "district", "school", "campus", "university"];
+
+// Types that can directly contain classes and students
+export const classContainerTypes: OrganizationType[] = ["school", "campus", "university"];
+
+// Governance models for global authority tree
+// bottom_heavy: US-style with strong local control (TEA, school districts)
+// top_down_unitary: African/Asian centralized national curriculum
+// federal_hybrid: EU/Canadian mixed federal-state jurisdiction
+export type GovernanceModel = "bottom_heavy" | "top_down_unitary" | "federal_hybrid";
+
+// Organizations table - represents educational entities at various levels
+// Hierarchy: country > state/jurisdiction > district > school/campus
 export const organizations = pgTable("organizations", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   name: varchar("name").notNull(),
@@ -110,6 +124,13 @@ export const organizations = pgTable("organizations", {
   type: varchar("type").default("school").$type<OrganizationType>(),
   status: varchar("status").default("active").$type<OrganizationStatus>(),
   parentOrganizationId: varchar("parent_organization_id"),
+  
+  // Governance model (primarily for country-level orgs)
+  governanceModel: varchar("governance_model").$type<GovernanceModel>(),
+  
+  // ISO country code for international support
+  countryCode: varchar("country_code"),
+  
   domain: varchar("domain"),
   logoUrl: varchar("logo_url"),
   address: varchar("address"),
@@ -126,6 +147,8 @@ export const organizations = pgTable("organizations", {
     requireEmailDomain?: boolean;
     defaultUserRole?: UserRole;
     features?: string[];
+    curriculumAuthority?: string;
+    standardsBody?: string;
   }>(),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
