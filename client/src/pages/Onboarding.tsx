@@ -125,15 +125,27 @@ const PRIMARY_GOALS = [
   { id: "curriculum", label: "Build scope & sequence", icon: BookMarked },
 ];
 
-const INTERESTS = [
-  { id: "self-discovery", label: "Self-Discovery Assessments" },
-  { id: "career-exploration", label: "Career Exploration" },
-  { id: "action-plans", label: "Goal Setting & Action Plans" },
-  { id: "ai-lessons", label: "AI Lesson Generator" },
-  { id: "scope-sequence", label: "Scope & Sequence Builder" },
-  { id: "resources", label: "Educational Resources" },
-  { id: "analytics", label: "Progress Analytics" },
-];
+// Interests are now auto-derived from role and primary goal to streamline onboarding
+const getAutoInterests = (role: string, primaryGoal: string): string[] => {
+  const interests: string[] = [];
+  
+  // Role-based interests
+  if (role === "student") {
+    interests.push("self-discovery", "career-exploration", "action-plans", "resources");
+  } else if (role === "educator" || role === "homeschool_parent") {
+    interests.push("ai-lessons", "scope-sequence", "analytics", "resources");
+  } else if (role === "campus_admin") {
+    interests.push("scope-sequence", "analytics", "ai-lessons");
+  }
+  
+  // Goal-based additions
+  if (primaryGoal === "discover") interests.push("self-discovery", "career-exploration");
+  if (primaryGoal === "career") interests.push("career-exploration", "action-plans");
+  if (primaryGoal === "lessons") interests.push("ai-lessons", "resources");
+  if (primaryGoal === "curriculum") interests.push("scope-sequence", "analytics");
+  
+  return [...new Set(interests)];
+};
 
 const GRADE_LEVELS = [
   { id: "K", label: "Kindergarten", band: "elementary" },
@@ -159,7 +171,7 @@ const GRADE_BANDS = [
   { id: "post_secondary", label: "Post-Secondary" },
 ];
 
-type StepKey = "role" | "classes" | "goals" | "location" | "complete";
+type StepKey = "role" | "classes" | "goals" | "location";
 
 export default function Onboarding() {
   const [, setLocation] = useLocation();
@@ -168,7 +180,6 @@ export default function Onboarding() {
   const [role, setRole] = useState<string>("");
   const [selectedGradeLevels, setSelectedGradeLevels] = useState<string[]>([]);
   const [primaryGoal, setPrimaryGoal] = useState<string>("");
-  const [interests, setInterests] = useState<string[]>([]);
   const [language, setLanguage] = useState("en");
   const [country, setCountry] = useState("");
   const [stateValue, setStateValue] = useState("");
@@ -261,21 +272,14 @@ export default function Onboarding() {
   };
 
   const getRecommendedFeatures = () => {
-    const features: string[] = [];
-    if (role === "student") {
-      features.push("self-discovery", "career-exploration", "action-plans", "resources");
-    } else if (role === "educator") {
-      features.push("ai-lessons", "scope-sequence", "analytics", "resources");
-    } else if (role === "campus_admin") {
-      features.push("scope-sequence", "analytics", "ai-lessons");
-    }
-    return [...new Set([...features, ...interests])];
+    return getAutoInterests(role, primaryGoal);
   };
 
   const handleComplete = () => {
+    const autoInterests = getAutoInterests(role, primaryGoal);
     const needsAnalysis = {
       primaryGoal,
-      interests,
+      interests: autoInterests,
       experienceLevel: "beginner",
       recommendedFeatures: getRecommendedFeatures(),
     };
@@ -300,14 +304,12 @@ export default function Onboarding() {
         { key: "role", label: "Your Role" },
         { key: "classes", label: "Your Classes" },
         { key: "goals", label: "Your Goals" },
-        { key: "location", label: "Location & Standards" },
-        { key: "complete", label: "Get Started" },
+        { key: "location", label: "Get Started" },
       ]
     : [
         { key: "role", label: "Your Role" },
         { key: "goals", label: "Your Goals" },
-        { key: "location", label: "Location & Standards" },
-        { key: "complete", label: "Get Started" },
+        { key: "location", label: "Get Started" },
       ];
 
   const currentStepIndex = steps.findIndex(s => s.key === step);
@@ -493,7 +495,10 @@ export default function Onboarding() {
             <div className="space-y-6">
               <div>
                 <Label className="text-lg font-oswald">What's your primary goal?</Label>
-                <RadioGroup value={primaryGoal} onValueChange={setPrimaryGoal} className="grid gap-3 mt-4">
+                <p className="text-sm text-muted-foreground mt-1 mb-4">
+                  We'll personalize your experience based on your selection
+                </p>
+                <RadioGroup value={primaryGoal} onValueChange={setPrimaryGoal} className="grid gap-3">
                   {PRIMARY_GOALS.map((goal) => (
                     <div 
                       key={goal.id}
@@ -507,29 +512,6 @@ export default function Onboarding() {
                     </div>
                   ))}
                 </RadioGroup>
-              </div>
-
-              <div>
-                <Label className="text-base font-oswald mb-3 block">What else interests you? (optional)</Label>
-                <div className="grid grid-cols-2 gap-2">
-                  {INTERESTS.map((interest) => (
-                    <div key={interest.id} className="flex items-center gap-2">
-                      <Checkbox
-                        id={interest.id}
-                        checked={interests.includes(interest.id)}
-                        onCheckedChange={(checked) => {
-                          if (checked) {
-                            setInterests([...interests, interest.id]);
-                          } else {
-                            setInterests(interests.filter(i => i !== interest.id));
-                          }
-                        }}
-                        data-testid={`interest-${interest.id}`}
-                      />
-                      <Label htmlFor={interest.id} className="text-sm cursor-pointer">{interest.label}</Label>
-                    </div>
-                  ))}
-                </div>
               </div>
             </div>
           )}
@@ -672,30 +654,6 @@ export default function Onboarding() {
             </div>
           )}
 
-          {step === "complete" && (
-            <div className="space-y-6 text-center py-8">
-              <div className="mx-auto w-16 h-16 rounded-full bg-lys-teal/10 flex items-center justify-center">
-                <Sparkles className="h-8 w-8 text-lys-teal" />
-              </div>
-              <div>
-                <h3 className="text-xl font-oswald text-foreground mb-2">You're all set!</h3>
-                <p className="text-muted-foreground">
-                  Based on your answers, we recommend starting with:
-                </p>
-              </div>
-              <div className="p-4 rounded-md bg-muted">
-                <p className="font-medium text-foreground">
-                  {primaryGoal === "discover" && "Self-Discovery Assessments"}
-                  {primaryGoal === "career" && "Career Exploration"}
-                  {primaryGoal === "lessons" && "AI Lesson Generator"}
-                  {primaryGoal === "curriculum" && "Scope & Sequence Builder"}
-                </p>
-                <p className="text-sm text-muted-foreground mt-1">
-                  We'll take you there after you click "Get Started"
-                </p>
-              </div>
-            </div>
-          )}
         </CardContent>
 
         <CardFooter className="flex flex-col gap-4">
@@ -710,10 +668,10 @@ export default function Onboarding() {
               Back
             </Button>
 
-            {step === "complete" ? (
+            {step === "location" ? (
               <Button
                 onClick={handleComplete}
-                disabled={completeMutation.isPending}
+                disabled={!canProceed() || completeMutation.isPending}
                 data-testid="button-get-started"
               >
                 {completeMutation.isPending ? "Setting up..." : "Get Started"}
@@ -736,7 +694,7 @@ export default function Onboarding() {
             size="sm"
             onClick={handleSkip}
             disabled={skipMutation.isPending}
-            className="text-muted-foreground hover:text-foreground"
+            className="text-muted-foreground"
             data-testid="button-skip-onboarding"
           >
             {skipMutation.isPending ? "Skipping..." : "Skip for now and explore"}
