@@ -14,7 +14,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
-import { Sparkles, FileText, Users, UserPlus, AlertTriangle, Check, Clock, BookOpen, Target, Compass, Lightbulb, Lock, GraduationCap, Copy, Printer, Pencil, Trash2, Plus, CheckCircle, Play, Search, RefreshCw, Star, ArrowRight, HelpCircle, ScrollText, Heart } from "lucide-react";
+import { Sparkles, FileText, Users, UserPlus, AlertTriangle, Check, Clock, BookOpen, Target, Compass, Lightbulb, Lock, GraduationCap, Copy, Printer, Pencil, Trash2, Plus, CheckCircle, Play, Search, RefreshCw, Star, ArrowRight, HelpCircle, ScrollText, Heart, ChevronDown, ChevronRight, Eye, EyeOff, BarChart3 } from "lucide-react";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/use-auth";
@@ -95,6 +95,8 @@ export default function Assignments() {
   const isPaidUser = user?.tier === "pro" || user?.tier === "campus";
   const [isEditing, setIsEditing] = useState(false);
   const [selectedClassId, setSelectedClassId] = useState<string>("");
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [expandedQuestionDetails, setExpandedQuestionDetails] = useState<Set<number>>(new Set());
   
   // Worksheet header fields - auto-populated from lesson, user, and class data
   const [worksheetHeader, setWorksheetHeader] = useState({
@@ -165,6 +167,36 @@ export default function Assignments() {
         [key]: !generatedAssignment.accommodationChecklist[key],
       },
     });
+  };
+
+  const toggleQuestionDetails = (index: number) => {
+    setExpandedQuestionDetails(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(index)) {
+        newSet.delete(index);
+      } else {
+        newSet.add(index);
+      }
+      return newSet;
+    });
+  };
+
+  const getQuestionTypeCounts = () => {
+    if (!generatedAssignment?.questions) return {};
+    return (generatedAssignment.questions as any[]).reduce((acc: any, q: any) => {
+      const type = q.type || "unknown";
+      acc[type] = (acc[type] || 0) + 1;
+      return acc;
+    }, {});
+  };
+
+  const getBkdCounts = () => {
+    if (!generatedAssignment?.questions) return { be: 0, know: 0, do: 0 };
+    return (generatedAssignment.questions as any[]).reduce((acc: any, q: any) => {
+      const focus = q.bkdFocus || "know";
+      acc[focus] = (acc[focus] || 0) + 1;
+      return acc;
+    }, { be: 0, know: 0, do: 0 });
   };
 
   const updateInstructions = (value: string) => {
@@ -677,6 +709,67 @@ export default function Assignments() {
                   </div>
                 </div>
 
+                {/* Progress Summary Bar */}
+                <Card className="print:hidden">
+                  <CardContent className="py-3 px-4">
+                    <div className="flex items-center justify-between gap-4 flex-wrap">
+                      <div className="flex items-center gap-6">
+                        <div className="flex items-center gap-2">
+                          <BarChart3 className="h-4 w-4 text-muted-foreground" />
+                          <span className="text-sm font-medium">{(generatedAssignment.questions || []).length} Questions</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <Target className="h-4 w-4 text-muted-foreground" />
+                          <span className="text-sm font-medium">{generatedAssignment.totalPoints} Points</span>
+                        </div>
+                        <Separator orientation="vertical" className="h-6" />
+                        <div className="flex items-center gap-3">
+                          {(() => {
+                            const counts = getBkdCounts();
+                            return (
+                              <>
+                                <div className="flex items-center gap-1">
+                                  <Heart className="h-3.5 w-3.5 text-lys-red" />
+                                  <span className="text-xs">{counts.be} BE</span>
+                                </div>
+                                <div className="flex items-center gap-1">
+                                  <Lightbulb className="h-3.5 w-3.5 text-lys-yellow" />
+                                  <span className="text-xs">{counts.know} KNOW</span>
+                                </div>
+                                <div className="flex items-center gap-1">
+                                  <Target className="h-3.5 w-3.5 text-lys-teal" />
+                                  <span className="text-xs">{counts.do} DO</span>
+                                </div>
+                              </>
+                            );
+                          })()}
+                        </div>
+                      </div>
+                      {generatedAssignment.worksheet && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
+                          className="text-xs"
+                          data-testid="button-toggle-sidebar"
+                        >
+                          {sidebarCollapsed ? (
+                            <>
+                              <Eye className="h-4 w-4 mr-1" />
+                              Show Lesson Info
+                            </>
+                          ) : (
+                            <>
+                              <EyeOff className="h-4 w-4 mr-1" />
+                              Hide Lesson Info
+                            </>
+                          )}
+                        </Button>
+                      )}
+                    </div>
+                  </CardContent>
+                </Card>
+
                 <Card id="generated-assignment" className="print:shadow-none print:border-2 print:border-black">
                   <CardContent className="p-6 print:p-4">
                     <div className="border-b-2 border-foreground pb-4 mb-4">
@@ -729,211 +822,300 @@ export default function Assignments() {
 
                     {/* Worksheet Layout with Sidebar */}
                     <div className="flex flex-col md:flex-row gap-4">
-                      {/* Left Sidebar - Lesson Metadata */}
+                      {/* Left Sidebar - Lesson Metadata - Always visible in print */}
                       {generatedAssignment.worksheet && (
-                        <div className="md:w-1/3 border-r md:pr-4 space-y-4 print:w-1/3">
-                          <div className="space-y-3 text-sm">
-                            <div className="border-b pb-2">
-                              <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Course</Label>
+                        <div className={`md:w-1/3 border-r md:pr-4 space-y-3 print:w-1/3 print:block ${sidebarCollapsed ? "hidden md:hidden print:block" : ""}`}>
+                          {/* Course & Unit Card */}
+                          <Card className="bg-muted/30">
+                            <CardContent className="p-3 space-y-3">
+                              <div>
+                                <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Course</Label>
+                                {isEditing ? (
+                                  <Input value={generatedAssignment.worksheet.course} onChange={(e) => updateWorksheetField("course", e.target.value)} className="text-sm mt-1" data-testid="input-edit-course" />
+                                ) : (
+                                  <p className="mt-1 font-medium text-sm">{generatedAssignment.worksheet.course}</p>
+                                )}
+                              </div>
+                              <Separator />
+                              <div>
+                                <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Unit</Label>
+                                {isEditing ? (
+                                  <Input value={generatedAssignment.worksheet.unit} onChange={(e) => updateWorksheetField("unit", e.target.value)} className="text-sm mt-1" data-testid="input-edit-unit" />
+                                ) : (
+                                  <p className="mt-1 font-medium text-sm">{generatedAssignment.worksheet.unit}</p>
+                                )}
+                              </div>
+                            </CardContent>
+                          </Card>
+                          
+                          {/* Objectives Card */}
+                          <Card className="bg-muted/30">
+                            <CardContent className="p-3 space-y-3">
+                              <div>
+                                <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Content Objective (TEKS)</Label>
+                                {isEditing ? (
+                                  <Textarea value={generatedAssignment.worksheet.contentObjective} onChange={(e) => updateWorksheetField("contentObjective", e.target.value)} className="text-sm min-h-[50px] mt-1" data-testid="input-edit-content-objective" />
+                                ) : (
+                                  <p className="mt-1 text-sm">{generatedAssignment.worksheet.contentObjective}</p>
+                                )}
+                              </div>
+                              <Separator />
+                              <div>
+                                <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Lesson Objective</Label>
+                                {isEditing ? (
+                                  <Textarea value={generatedAssignment.worksheet.lessonObjective} onChange={(e) => updateWorksheetField("lessonObjective", e.target.value)} className="text-sm min-h-[50px] mt-1" data-testid="input-edit-lesson-objective" />
+                                ) : (
+                                  <p className="mt-1 text-sm">{generatedAssignment.worksheet.lessonObjective}</p>
+                                )}
+                              </div>
+                            </CardContent>
+                          </Card>
+                          
+                          {/* LYS Methodology Card - Brand Colors */}
+                          <Card className="border-2 border-primary/20 overflow-hidden">
+                            <CardHeader className="py-2 px-3 bg-primary/10">
+                              <CardTitle className="text-sm font-oswald flex items-center gap-2">
+                                <Target className="h-4 w-4" />
+                                LYS Methodology
+                              </CardTitle>
+                            </CardHeader>
+                            <CardContent className="p-0">
                               {isEditing ? (
-                                <Input value={generatedAssignment.worksheet.course} onChange={(e) => updateWorksheetField("course", e.target.value)} className="text-sm mt-1" data-testid="input-edit-course" />
-                              ) : (
-                                <p className="mt-1 font-medium">{generatedAssignment.worksheet.course}</p>
-                              )}
-                            </div>
-                            
-                            <div className="border-b pb-2">
-                              <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Unit</Label>
-                              {isEditing ? (
-                                <Input value={generatedAssignment.worksheet.unit} onChange={(e) => updateWorksheetField("unit", e.target.value)} className="text-sm mt-1" data-testid="input-edit-unit" />
-                              ) : (
-                                <p className="mt-1 font-medium">{generatedAssignment.worksheet.unit}</p>
-                              )}
-                            </div>
-                            
-                            <div className="border-b pb-2">
-                              <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Content Objective (TEKS)</Label>
-                              {isEditing ? (
-                                <Textarea value={generatedAssignment.worksheet.contentObjective} onChange={(e) => updateWorksheetField("contentObjective", e.target.value)} className="text-sm min-h-[60px] mt-1" data-testid="input-edit-content-objective" />
-                              ) : (
-                                <p className="mt-1">{generatedAssignment.worksheet.contentObjective}</p>
-                              )}
-                            </div>
-                            
-                            <div className="border-b pb-2">
-                              <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Lesson Objective</Label>
-                              {isEditing ? (
-                                <Textarea value={generatedAssignment.worksheet.lessonObjective} onChange={(e) => updateWorksheetField("lessonObjective", e.target.value)} className="text-sm min-h-[60px] mt-1" data-testid="input-edit-lesson-objective" />
-                              ) : (
-                                <p className="mt-1">{generatedAssignment.worksheet.lessonObjective}</p>
-                              )}
-                            </div>
-                            
-                            <div className="border-b pb-2">
-                              <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">LYS Methodology</Label>
-                              {isEditing ? (
-                                <div className="space-y-2 mt-1">
+                                <div className="p-3 space-y-2">
                                   <div>
-                                    <Label className="text-xs">BE:</Label>
+                                    <Label className="text-xs font-semibold text-lys-red">BE:</Label>
                                     <Input value={generatedAssignment.worksheet.lysMethodology?.be || ""} onChange={(e) => updateLysMethodology("be", e.target.value)} className="text-sm mt-1" data-testid="input-edit-be" />
                                   </div>
                                   <div>
-                                    <Label className="text-xs">KNOW:</Label>
+                                    <Label className="text-xs font-semibold text-lys-yellow">KNOW:</Label>
                                     <Input value={generatedAssignment.worksheet.lysMethodology?.know || ""} onChange={(e) => updateLysMethodology("know", e.target.value)} className="text-sm mt-1" data-testid="input-edit-know" />
                                   </div>
                                   <div>
-                                    <Label className="text-xs">DO:</Label>
+                                    <Label className="text-xs font-semibold text-lys-teal">DO:</Label>
                                     <Input value={generatedAssignment.worksheet.lysMethodology?.do || ""} onChange={(e) => updateLysMethodology("do", e.target.value)} className="text-sm mt-1" data-testid="input-edit-do" />
                                   </div>
                                 </div>
                               ) : (
-                                <div className="space-y-1 mt-1">
-                                  <p><strong className="text-lys-red">BE:</strong> {generatedAssignment.worksheet.lysMethodology?.be}</p>
-                                  <p><strong className="text-lys-yellow">KNOW:</strong> {generatedAssignment.worksheet.lysMethodology?.know}</p>
-                                  <p><strong className="text-lys-teal">DO:</strong> {generatedAssignment.worksheet.lysMethodology?.do}</p>
+                                <div className="divide-y">
+                                  <div className="p-3 bg-red-50 dark:bg-red-950/30 border-l-4 border-lys-red">
+                                    <div className="flex items-center gap-2 mb-1">
+                                      <Heart className="h-3.5 w-3.5 text-lys-red" />
+                                      <span className="text-xs font-bold text-lys-red uppercase tracking-wide">BE</span>
+                                    </div>
+                                    <p className="text-sm text-foreground">{generatedAssignment.worksheet.lysMethodology?.be}</p>
+                                  </div>
+                                  <div className="p-3 bg-yellow-50 dark:bg-yellow-950/30 border-l-4 border-lys-yellow">
+                                    <div className="flex items-center gap-2 mb-1">
+                                      <Lightbulb className="h-3.5 w-3.5 text-lys-yellow" />
+                                      <span className="text-xs font-bold text-lys-yellow uppercase tracking-wide">KNOW</span>
+                                    </div>
+                                    <p className="text-sm text-foreground">{generatedAssignment.worksheet.lysMethodology?.know}</p>
+                                  </div>
+                                  <div className="p-3 bg-teal-50 dark:bg-teal-950/30 border-l-4 border-lys-teal">
+                                    <div className="flex items-center gap-2 mb-1">
+                                      <Target className="h-3.5 w-3.5 text-lys-teal" />
+                                      <span className="text-xs font-bold text-lys-teal uppercase tracking-wide">DO</span>
+                                    </div>
+                                    <p className="text-sm text-foreground">{generatedAssignment.worksheet.lysMethodology?.do}</p>
+                                  </div>
                                 </div>
                               )}
-                            </div>
-                            
-                            <div className="border-b pb-2">
-                              <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Essential Questions</Label>
-                              {isEditing ? (
-                                <Textarea value={generatedAssignment.worksheet.essentialQuestions} onChange={(e) => updateWorksheetField("essentialQuestions", e.target.value)} className="mt-1 text-sm min-h-[60px]" data-testid="input-edit-essential-questions" />
-                              ) : (
-                                <p className="mt-1">{generatedAssignment.worksheet.essentialQuestions}</p>
-                              )}
-                            </div>
-                            
-                            <div>
-                              <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Lesson Close</Label>
-                              {isEditing ? (
-                                <Textarea value={generatedAssignment.worksheet.lessonClose} onChange={(e) => updateWorksheetField("lessonClose", e.target.value)} className="mt-1 text-sm min-h-[60px]" data-testid="input-edit-lesson-close" />
-                              ) : (
-                                <p className="mt-1">{generatedAssignment.worksheet.lessonClose}</p>
-                              )}
-                            </div>
-                          </div>
+                            </CardContent>
+                          </Card>
+                          
+                          {/* Essential Questions & Lesson Close */}
+                          <Card className="bg-muted/30">
+                            <CardContent className="p-3 space-y-3">
+                              <div>
+                                <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Essential Questions</Label>
+                                {isEditing ? (
+                                  <Textarea value={generatedAssignment.worksheet.essentialQuestions} onChange={(e) => updateWorksheetField("essentialQuestions", e.target.value)} className="mt-1 text-sm min-h-[50px]" data-testid="input-edit-essential-questions" />
+                                ) : (
+                                  <p className="mt-1 text-sm italic">{generatedAssignment.worksheet.essentialQuestions}</p>
+                                )}
+                              </div>
+                              <Separator />
+                              <div>
+                                <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Lesson Close</Label>
+                                {isEditing ? (
+                                  <Textarea value={generatedAssignment.worksheet.lessonClose} onChange={(e) => updateWorksheetField("lessonClose", e.target.value)} className="mt-1 text-sm min-h-[50px]" data-testid="input-edit-lesson-close" />
+                                ) : (
+                                  <p className="mt-1 text-sm">{generatedAssignment.worksheet.lessonClose}</p>
+                                )}
+                              </div>
+                            </CardContent>
+                          </Card>
                         </div>
                       )}
 
                       {/* Right Main Content - Questions */}
-                      <div className={`${generatedAssignment.worksheet ? "md:w-2/3" : "w-full"} print:w-2/3`}>
-                        <div className="mb-4 p-3 bg-muted print:bg-gray-50 rounded-md">
-                          <Label className="text-xs font-semibold">Assignment Instructions</Label>
-                          {isEditing ? (
-                            <Textarea value={generatedAssignment.instructions} onChange={(e) => updateInstructions(e.target.value)} className="mt-1 min-h-[60px]" data-testid="input-edit-instructions" />
-                          ) : (
-                            <p className="mt-1">{generatedAssignment.instructions}</p>
-                          )}
-                        </div>
+                      <div className={`${generatedAssignment.worksheet && !sidebarCollapsed ? "md:w-2/3" : generatedAssignment.worksheet ? "w-full md:w-full print:w-2/3" : "w-full"} print:w-2/3`}>
+                        {/* Instructions Card */}
+                        <Card className="mb-4 bg-primary/5 border-primary/20">
+                          <CardContent className="py-3 px-4">
+                            <div className="flex items-center gap-2 mb-2">
+                              <FileText className="h-4 w-4 text-primary" />
+                              <Label className="text-xs font-semibold uppercase tracking-wide">Assignment Instructions</Label>
+                            </div>
+                            {isEditing ? (
+                              <Textarea value={generatedAssignment.instructions} onChange={(e) => updateInstructions(e.target.value)} className="min-h-[60px]" data-testid="input-edit-instructions" />
+                            ) : (
+                              <p className="text-sm">{generatedAssignment.instructions || "Complete all questions below. Show your work where applicable."}</p>
+                            )}
+                          </CardContent>
+                        </Card>
 
-                        <Separator className="my-4" />
-
-                        <div className="space-y-4">
-                      {(generatedAssignment.questions || []).map((q: any, i: number) => (
-                        <div key={q.id || i} className="p-4 border rounded-md print:break-inside-avoid">
-                          <div className="flex items-start gap-3">
-                            <span className="font-oswald text-lg text-muted-foreground">{i + 1}.</span>
-                            <div className="flex-1">
-                              <div className="flex items-center justify-between gap-2 mb-2 flex-wrap print:hidden">
-                                <div className="flex items-center gap-2 flex-wrap">
-                                  {getBkdIcon(q.bkdFocus)}
-                                  <Badge variant="outline">{(q.type || "").replace("_", " ")}</Badge>
-                                  {q.bloomsLevel && (
-                                    <Badge variant="secondary" className="text-xs capitalize">{q.bloomsLevel}</Badge>
-                                  )}
-                                  {q.depthOfKnowledge && (
-                                    <Badge variant="secondary" className="text-xs">DOK {q.depthOfKnowledge}</Badge>
-                                  )}
-                                  {isEditing ? (
-                                    <Input 
-                                      type="number" 
-                                      value={q.points} 
-                                      onChange={(e) => updateQuestion(i, "points", parseInt(e.target.value) || 0)} 
-                                      className="w-16 h-7 text-xs"
-                                      data-testid={`input-edit-points-${i}`}
-                                    />
-                                  ) : (
-                                    <Badge>{q.points} pts</Badge>
-                                  )}
-                                </div>
-                                {isEditing && (
-                                  <Button variant="ghost" size="icon" onClick={() => deleteQuestion(i)} className="h-7 w-7" data-testid={`button-delete-question-${i}`}>
-                                    <Trash2 className="h-4 w-4 text-destructive" />
-                                  </Button>
-                                )}
-                              </div>
-                              {/* Stimulus - context/scenario presented first */}
-                              {q.stimulus && (
-                                <div className="mb-2 p-2 bg-muted/50 rounded text-sm italic print:bg-gray-50">
-                                  {isEditing ? (
-                                    <Textarea 
-                                      value={q.stimulus} 
-                                      onChange={(e) => updateQuestion(i, "stimulus", e.target.value)} 
-                                      className="min-h-[40px] text-sm italic"
-                                      placeholder="Context or scenario for the question..."
-                                      data-testid={`input-edit-stimulus-${i}`}
-                                    />
-                                  ) : (
-                                    q.stimulus
-                                  )}
-                                </div>
-                              )}
-                              {isEditing ? (
-                                <Textarea value={q.question} onChange={(e) => updateQuestion(i, "question", e.target.value)} className="font-medium min-h-[60px]" data-testid={`input-edit-question-${i}`} />
-                              ) : (
-                                <p className="font-medium">{q.question}</p>
-                              )}
-                              {q.options && (
-                                <ul className="mt-2 space-y-1">
-                                  {q.options.map((opt: string, oi: number) => {
-                                    const isCorrect = q.rubric?.correctAnswer === opt;
-                                    const distractor = q.rubric?.distractors?.find((d: any) => d.option === opt);
-                                    return (
-                                      <li key={oi} className="text-sm">
+                        <div className="space-y-3">
+                          {(generatedAssignment.questions || []).map((q: any, i: number) => {
+                            const isDetailsExpanded = expandedQuestionDetails.has(i);
+                            const bkdColor = q.bkdFocus === "be" ? "border-l-lys-red" : q.bkdFocus === "do" ? "border-l-lys-teal" : "border-l-lys-yellow";
+                            
+                            return (
+                              <Card key={q.id || i} className={`border-l-4 ${bkdColor} print:break-inside-avoid`}>
+                                <CardContent className="py-3 px-4">
+                                  <div className="flex items-start gap-3">
+                                    <div className="flex flex-col items-center gap-1">
+                                      <span className="font-oswald text-lg text-primary font-bold">{i + 1}</span>
+                                      <Badge variant="secondary" className="text-xs">{q.points}pt</Badge>
+                                    </div>
+                                    <div className="flex-1 min-w-0">
+                                      {/* Compact header with essential info */}
+                                      <div className="flex items-center justify-between gap-2 mb-2 flex-wrap print:hidden">
                                         <div className="flex items-center gap-2">
-                                          <span className={`w-5 h-5 rounded-full border flex items-center justify-center text-xs ${isCorrect ? "border-green-500 text-green-600 font-semibold print:hidden" : ""}`}>
-                                            {String.fromCharCode(65 + oi)}
-                                          </span>
-                                          {isEditing ? (
-                                            <Input value={opt} onChange={(e) => updateQuestionOption(i, oi, e.target.value)} className="flex-1 h-7 text-sm" data-testid={`input-edit-option-${i}-${oi}`} />
-                                          ) : opt}
-                                          {isCorrect && !isEditing && (
-                                            <Badge variant="outline" className="text-green-600 border-green-500 print:hidden">Correct</Badge>
+                                          {getBkdIcon(q.bkdFocus)}
+                                          <Badge variant="outline" className="capitalize">{(q.type || "").replace("_", " ")}</Badge>
+                                          {/* Collapsible details toggle */}
+                                          {(q.bloomsLevel || q.depthOfKnowledge) && (
+                                            <Button 
+                                              variant="ghost" 
+                                              size="sm"
+                                              onClick={() => toggleQuestionDetails(i)}
+                                              aria-expanded={isDetailsExpanded}
+                                              data-testid={`button-toggle-details-${i}`}
+                                            >
+                                              {isDetailsExpanded ? (
+                                                <><ChevronDown className="h-3 w-3 mr-1" /> Less</>
+                                              ) : (
+                                                <><ChevronRight className="h-3 w-3 mr-1" /> More</>
+                                              )}
+                                            </Button>
                                           )}
                                         </div>
-                                        {/* Show distractor feedback for educators (hidden in print) */}
-                                        {distractor?.feedback && !isEditing && (
-                                          <p className="ml-7 mt-1 text-xs text-muted-foreground italic print:hidden">
-                                            Feedback: {distractor.feedback}
-                                          </p>
-                                        )}
-                                      </li>
-                                    );
-                                  })}
-                                </ul>
-                              )}
-                              {/* Rubric for open-ended questions */}
-                              {q.rubric?.partialCreditRules && q.rubric.partialCreditRules.length > 0 && !isEditing && (
-                                <div className="mt-3 p-2 bg-muted/30 rounded text-xs print:hidden">
-                                  <p className="font-semibold mb-1">Grading Rubric:</p>
-                                  <ul className="space-y-1">
-                                    {q.rubric.partialCreditRules.map((rule: any, ri: number) => (
-                                      <li key={ri} className="flex justify-between">
-                                        <span>{rule.condition}</span>
-                                        <Badge variant="secondary" className="text-xs">{rule.points} pts</Badge>
-                                      </li>
-                                    ))}
-                                  </ul>
-                                </div>
-                              )}
-                              {!q.options && q.type !== "multiple_choice" && q.type !== "true_false" && (
-                                <div className="mt-3 border-b border-muted-foreground/30 min-h-[60px] print:min-h-[80px]"></div>
-                              )}
-                            </div>
-                          </div>
-                        </div>
-                      ))}
+                                        <div className="flex items-center gap-2">
+                                          {isEditing && (
+                                            <>
+                                              <Input 
+                                                type="number" 
+                                                value={q.points} 
+                                                onChange={(e) => updateQuestion(i, "points", parseInt(e.target.value) || 0)} 
+                                                className="w-16 h-7 text-xs"
+                                                data-testid={`input-edit-points-${i}`}
+                                              />
+                                              <Button variant="ghost" size="icon" onClick={() => deleteQuestion(i)} className="h-7 w-7" data-testid={`button-delete-question-${i}`}>
+                                                <Trash2 className="h-4 w-4 text-destructive" />
+                                              </Button>
+                                            </>
+                                          )}
+                                        </div>
+                                      </div>
+                                      
+                                      {/* Expanded details */}
+                                      {isDetailsExpanded && (
+                                        <div className="flex gap-2 mb-2 print:hidden">
+                                          {q.bloomsLevel && (
+                                            <Badge variant="secondary" className="text-xs capitalize">Bloom's: {q.bloomsLevel}</Badge>
+                                          )}
+                                          {q.depthOfKnowledge && (
+                                            <Badge variant="secondary" className="text-xs">DOK Level {q.depthOfKnowledge}</Badge>
+                                          )}
+                                        </div>
+                                      )}
+                                      
+                                      {/* Stimulus */}
+                                      {q.stimulus && (
+                                        <div className="mb-2 p-2 bg-muted/50 rounded-md text-sm italic border-l-2 border-muted-foreground/20 print:bg-gray-50">
+                                          {isEditing ? (
+                                            <Textarea 
+                                              value={q.stimulus} 
+                                              onChange={(e) => updateQuestion(i, "stimulus", e.target.value)} 
+                                              className="min-h-[40px] text-sm italic"
+                                              placeholder="Context or scenario..."
+                                              data-testid={`input-edit-stimulus-${i}`}
+                                            />
+                                          ) : (
+                                            q.stimulus
+                                          )}
+                                        </div>
+                                      )}
+                                      
+                                      {/* Question */}
+                                      {isEditing ? (
+                                        <Textarea value={q.question} onChange={(e) => updateQuestion(i, "question", e.target.value)} className="font-medium min-h-[60px]" data-testid={`input-edit-question-${i}`} />
+                                      ) : (
+                                        <p className="font-medium text-sm">{q.question}</p>
+                                      )}
+                                      
+                                      {/* Multiple choice options */}
+                                      {q.options && (
+                                        <ul className="mt-3 space-y-2">
+                                          {q.options.map((opt: string, oi: number) => {
+                                            const isCorrect = q.rubric?.correctAnswer === opt;
+                                            const distractor = q.rubric?.distractors?.find((d: any) => d.option === opt);
+                                            return (
+                                              <li key={oi} className="text-sm">
+                                                <div className={`flex items-center gap-2 p-2 rounded-md ${isCorrect && !isEditing ? "bg-green-50 dark:bg-green-950/30" : "bg-muted/30"}`}>
+                                                  <span className={`w-6 h-6 rounded-full border-2 flex items-center justify-center text-xs font-semibold ${isCorrect ? "border-green-500 bg-green-500 text-white print:border-foreground print:bg-transparent print:text-foreground" : "border-muted-foreground/30"}`}>
+                                                    {String.fromCharCode(65 + oi)}
+                                                  </span>
+                                                  {isEditing ? (
+                                                    <Input value={opt} onChange={(e) => updateQuestionOption(i, oi, e.target.value)} className="flex-1 h-7 text-sm" data-testid={`input-edit-option-${i}-${oi}`} />
+                                                  ) : (
+                                                    <span className="flex-1">{opt}</span>
+                                                  )}
+                                                  {isCorrect && !isEditing && (
+                                                    <CheckCircle className="h-4 w-4 text-green-600 print:hidden" />
+                                                  )}
+                                                </div>
+                                                {distractor?.feedback && !isEditing && isDetailsExpanded && (
+                                                  <p className="ml-8 mt-1 text-xs text-muted-foreground italic print:hidden">
+                                                    {distractor.feedback}
+                                                  </p>
+                                                )}
+                                              </li>
+                                            );
+                                          })}
+                                        </ul>
+                                      )}
+                                      
+                                      {/* Rubric for open-ended questions - collapsible */}
+                                      {q.rubric?.partialCreditRules && q.rubric.partialCreditRules.length > 0 && !isEditing && isDetailsExpanded && (
+                                        <Card className="mt-3 bg-muted/30 print:hidden">
+                                          <CardContent className="p-3">
+                                            <p className="font-semibold text-xs mb-2 uppercase tracking-wide">Grading Rubric</p>
+                                            <div className="space-y-1">
+                                              {q.rubric.partialCreditRules.map((rule: any, ri: number) => (
+                                                <div key={ri} className="flex justify-between text-xs">
+                                                  <span>{rule.condition}</span>
+                                                  <Badge variant="secondary" className="text-xs">{rule.points} pts</Badge>
+                                                </div>
+                                              ))}
+                                            </div>
+                                          </CardContent>
+                                        </Card>
+                                      )}
+                                      
+                                      {/* Answer space for open-ended */}
+                                      {!q.options && q.type !== "multiple_choice" && q.type !== "true_false" && (
+                                        <div className="mt-3 border-2 border-dashed border-muted-foreground/20 rounded-md min-h-[60px] print:min-h-[100px] flex items-center justify-center">
+                                          <span className="text-xs text-muted-foreground print:hidden">Answer space</span>
+                                        </div>
+                                      )}
+                                    </div>
+                                  </div>
+                                </CardContent>
+                              </Card>
+                            );
+                          })}
                         </div>
 
                         {/* Project Phases Display - Low Floor High Ceiling */}
