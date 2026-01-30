@@ -267,6 +267,7 @@ export interface IStorage {
   getTrendingCareers(limit?: number): Promise<Career[]>;
   getCareersByState(stateCode: string): Promise<Career[]>;
   updateCareerFromBls(blsCode: string, updates: Partial<Career>): Promise<Career | undefined>;
+  getRecommendedCareers(beScore: number, knowScore: number, doScore: number, limit?: number): Promise<{ career: Career; matchScore: number; matchReasons: string[] }[]>;
   getResources(): Promise<Resource[]>;
   getResource(id: string): Promise<Resource | undefined>;
   getAssessments(): Promise<Assessment[]>;
@@ -642,6 +643,13 @@ let seedCareers: Career[] = [
       { type: "certification", description: "Complete coding bootcamp and earn industry certifications like AWS or Google Cloud.", duration: "3-6 months", cost: "$10,000-$20,000" },
       { type: "military", description: "Serve in IT roles in the military and transition to civilian tech careers.", duration: "4+ years", cost: "Free + Benefits" },
     ],
+    bkdAlignment: {
+      be: 45,
+      know: 85,
+      do: 90,
+      primaryPillar: "do",
+      careerPersonality: "Analytical problem-solver who enjoys building things and continuous learning"
+    },
     blsCode: "15-1252",
     jobOutlook: "much_faster",
     projectedGrowth: 25,
@@ -683,6 +691,13 @@ let seedCareers: Career[] = [
       { type: "trade", description: "Complete an ADN (Associate Degree in Nursing) at a community college.", duration: "2 years", cost: "$10,000-$30,000" },
       { type: "military", description: "Train as a military nurse and serve while gaining experience.", duration: "4+ years", cost: "Free + Benefits" },
     ],
+    bkdAlignment: {
+      be: 85,
+      know: 75,
+      do: 80,
+      primaryPillar: "be",
+      careerPersonality: "Compassionate caregiver with strong empathy and dedication to helping others"
+    },
     blsCode: "29-1141",
     jobOutlook: "faster_than_average",
     projectedGrowth: 6,
@@ -722,6 +737,13 @@ let seedCareers: Career[] = [
       { type: "college", description: "Earn a Bachelor's in Marketing, Business, or Communications.", duration: "4 years", cost: "$40,000-$200,000" },
       { type: "certification", description: "Gain experience through internships and earn digital marketing certifications.", duration: "1-2 years", cost: "$5,000-$15,000" },
     ],
+    bkdAlignment: {
+      be: 60,
+      know: 70,
+      do: 85,
+      primaryPillar: "do",
+      careerPersonality: "Creative strategist who thrives on influencing outcomes and driving results"
+    },
     blsCode: "11-2021",
     jobOutlook: "faster_than_average",
     projectedGrowth: 8,
@@ -759,6 +781,13 @@ let seedCareers: Career[] = [
       { type: "trade", description: "Complete a 4-5 year apprenticeship program combining classroom instruction with on-the-job training.", duration: "4-5 years", cost: "Paid training" },
       { type: "military", description: "Train as a military electrician and gain certifications.", duration: "4+ years", cost: "Free + Benefits" },
     ],
+    bkdAlignment: {
+      be: 50,
+      know: 65,
+      do: 95,
+      primaryPillar: "do",
+      careerPersonality: "Hands-on problem solver who takes pride in practical, tangible work"
+    },
     blsCode: "47-2111",
     jobOutlook: "faster_than_average",
     projectedGrowth: 6,
@@ -797,6 +826,13 @@ let seedCareers: Career[] = [
       { type: "college", description: "Earn a Bachelor's in Graphic Design or Visual Arts.", duration: "4 years", cost: "$40,000-$180,000" },
       { type: "certification", description: "Build a portfolio through online courses and freelance work.", duration: "1-2 years", cost: "$2,000-$10,000" },
     ],
+    bkdAlignment: {
+      be: 80,
+      know: 60,
+      do: 85,
+      primaryPillar: "be",
+      careerPersonality: "Creative visionary who expresses identity through visual storytelling"
+    },
     blsCode: "27-1024",
     jobOutlook: "average",
     projectedGrowth: 3,
@@ -835,6 +871,13 @@ let seedCareers: Career[] = [
       { type: "college", description: "Complete a paralegal certificate or associate's degree program.", duration: "1-2 years", cost: "$5,000-$30,000" },
       { type: "certification", description: "Earn a paralegal certification from an accredited program.", duration: "6 months - 1 year", cost: "$3,000-$10,000" },
     ],
+    bkdAlignment: {
+      be: 55,
+      know: 90,
+      do: 70,
+      primaryPillar: "know",
+      careerPersonality: "Detail-oriented researcher who excels in organization and information gathering"
+    },
     blsCode: "23-2011",
     jobOutlook: "average",
     projectedGrowth: 4,
@@ -872,6 +915,13 @@ let seedCareers: Career[] = [
       { type: "college", description: "Earn a degree in Data Science, Statistics, or Computer Science.", duration: "4-6 years", cost: "$50,000-$250,000" },
       { type: "certification", description: "Complete data science bootcamp and earn industry certifications.", duration: "6-12 months", cost: "$15,000-$30,000" },
     ],
+    bkdAlignment: {
+      be: 45,
+      know: 95,
+      do: 75,
+      primaryPillar: "know",
+      careerPersonality: "Curious analytical mind driven by discovering patterns and insights in data"
+    },
     blsCode: "15-2051",
     jobOutlook: "much_faster",
     projectedGrowth: 36,
@@ -909,6 +959,13 @@ let seedCareers: Career[] = [
       { type: "trade", description: "Complete wind energy technology certificate program.", duration: "1-2 years", cost: "$5,000-$15,000" },
       { type: "certification", description: "Earn technical certifications and safety credentials.", duration: "6-12 months", cost: "$3,000-$8,000" },
     ],
+    bkdAlignment: {
+      be: 55,
+      know: 60,
+      do: 95,
+      primaryPillar: "do",
+      careerPersonality: "Physically capable hands-on worker passionate about renewable energy and outdoor work"
+    },
     blsCode: "49-9081",
     jobOutlook: "much_faster",
     projectedGrowth: 45,
@@ -945,6 +1002,13 @@ let seedCareers: Career[] = [
     pathways: [
       { type: "college", description: "Complete Bachelor's degree then PA Master's program.", duration: "6-7 years", cost: "$100,000-$300,000" },
     ],
+    bkdAlignment: {
+      be: 80,
+      know: 90,
+      do: 85,
+      primaryPillar: "know",
+      careerPersonality: "Dedicated learner with deep medical knowledge and compassion for patient care"
+    },
     blsCode: "29-1071",
     jobOutlook: "much_faster",
     projectedGrowth: 28,
@@ -983,6 +1047,13 @@ let seedCareers: Career[] = [
       { type: "certification", description: "Earn security certifications like CompTIA Security+, CISSP.", duration: "6-12 months", cost: "$5,000-$15,000" },
       { type: "military", description: "Serve in military cyber operations and transition to civilian roles.", duration: "4+ years", cost: "Free + Benefits" },
     ],
+    bkdAlignment: {
+      be: 60,
+      know: 90,
+      do: 80,
+      primaryPillar: "know",
+      careerPersonality: "Vigilant protector with strong ethics and passion for continuous technical learning"
+    },
     blsCode: "15-1212",
     jobOutlook: "much_faster",
     projectedGrowth: 33,
@@ -1021,6 +1092,13 @@ let seedCareers: Career[] = [
       { type: "trade", description: "Complete solar installation training program.", duration: "6-12 months", cost: "$3,000-$10,000" },
       { type: "certification", description: "Earn NABCEP certification for solar installation.", duration: "3-6 months", cost: "$2,000-$5,000" },
     ],
+    bkdAlignment: {
+      be: 60,
+      know: 55,
+      do: 95,
+      primaryPillar: "do",
+      careerPersonality: "Environmentally conscious hands-on worker who enjoys physical outdoor work"
+    },
     blsCode: "47-2231",
     jobOutlook: "much_faster",
     projectedGrowth: 22,
@@ -1058,6 +1136,13 @@ let seedCareers: Career[] = [
       { type: "college", description: "Earn a Bachelor's in Elementary Education and obtain teaching license.", duration: "4 years", cost: "$40,000-$150,000" },
       { type: "certification", description: "Complete alternative certification program after bachelor's degree.", duration: "1-2 years", cost: "$5,000-$15,000" },
     ],
+    bkdAlignment: {
+      be: 90,
+      know: 75,
+      do: 80,
+      primaryPillar: "be",
+      careerPersonality: "Nurturing guide with strong purpose who finds fulfillment in shaping young minds"
+    },
     blsCode: "25-2021",
     jobOutlook: "little_change",
     projectedGrowth: 1,
@@ -1094,6 +1179,13 @@ let seedCareers: Career[] = [
     pathways: [
       { type: "college", description: "Complete Bachelor's degree then Doctor of Physical Therapy (DPT) program.", duration: "7 years", cost: "$150,000-$350,000" },
     ],
+    bkdAlignment: {
+      be: 75,
+      know: 85,
+      do: 90,
+      primaryPillar: "do",
+      careerPersonality: "Hands-on healer who combines scientific knowledge with direct patient care"
+    },
     blsCode: "29-1123",
     jobOutlook: "much_faster",
     projectedGrowth: 15,
@@ -1130,6 +1222,13 @@ let seedCareers: Career[] = [
     pathways: [
       { type: "college", description: "Complete Bachelor's degree then Doctor of Veterinary Medicine (DVM) program.", duration: "8 years", cost: "$200,000-$400,000" },
     ],
+    bkdAlignment: {
+      be: 85,
+      know: 90,
+      do: 80,
+      primaryPillar: "be",
+      careerPersonality: "Compassionate animal lover with deep dedication to animal welfare and healing"
+    },
     blsCode: "29-1131",
     jobOutlook: "much_faster",
     projectedGrowth: 19,
@@ -1169,6 +1268,13 @@ let seedCareers: Career[] = [
       { type: "college", description: "Earn a degree in Construction Management or Civil Engineering.", duration: "4 years", cost: "$40,000-$180,000" },
       { type: "trade", description: "Advance through construction trades and gain management experience.", duration: "10+ years", cost: "On-the-job experience" },
     ],
+    bkdAlignment: {
+      be: 65,
+      know: 70,
+      do: 90,
+      primaryPillar: "do",
+      careerPersonality: "Natural leader who excels at coordinating teams and seeing projects through to completion"
+    },
     blsCode: "11-9021",
     jobOutlook: "faster_than_average",
     projectedGrowth: 5,
@@ -1967,6 +2073,65 @@ export class DatabaseStorage implements IStorage {
     };
     
     return seedCareers[index];
+  }
+
+  async getRecommendedCareers(
+    beScore: number,
+    knowScore: number,
+    doScore: number,
+    limit: number = 10
+  ): Promise<{ career: Career; matchScore: number; matchReasons: string[] }[]> {
+    const userTotal = beScore + knowScore + doScore;
+    if (userTotal === 0) return [];
+
+    const userBePercent = (beScore / userTotal) * 100;
+    const userKnowPercent = (knowScore / userTotal) * 100;
+    const userDoPercent = (doScore / userTotal) * 100;
+
+    const userPrimaryPillar = userBePercent >= userKnowPercent && userBePercent >= userDoPercent
+      ? "be"
+      : userKnowPercent >= userDoPercent
+        ? "know"
+        : "do";
+
+    const recommendations = seedCareers
+      .filter(career => career.bkdAlignment)
+      .map(career => {
+        const alignment = career.bkdAlignment!;
+        const careerTotal = alignment.be + alignment.know + alignment.do;
+        const careerBePercent = (alignment.be / careerTotal) * 100;
+        const careerKnowPercent = (alignment.know / careerTotal) * 100;
+        const careerDoPercent = (alignment.do / careerTotal) * 100;
+
+        const beDiff = Math.abs(userBePercent - careerBePercent);
+        const knowDiff = Math.abs(userKnowPercent - careerKnowPercent);
+        const doDiff = Math.abs(userDoPercent - careerDoPercent);
+
+        const matchScore = Math.max(0, 100 - (beDiff + knowDiff + doDiff));
+
+        const matchReasons: string[] = [];
+        if (alignment.primaryPillar === userPrimaryPillar) {
+          matchReasons.push(`Strong ${userPrimaryPillar.toUpperCase()} alignment matches your profile`);
+        }
+        if (userBePercent > 35 && alignment.be >= 70) {
+          matchReasons.push("Your identity-focused strengths align well with this role");
+        }
+        if (userKnowPercent > 35 && alignment.know >= 70) {
+          matchReasons.push("Your knowledge-seeking nature fits this career's learning requirements");
+        }
+        if (userDoPercent > 35 && alignment.do >= 70) {
+          matchReasons.push("Your action-oriented approach matches this hands-on career");
+        }
+        if (alignment.careerPersonality) {
+          matchReasons.push(alignment.careerPersonality);
+        }
+
+        return { career, matchScore, matchReasons };
+      })
+      .sort((a, b) => b.matchScore - a.matchScore)
+      .slice(0, limit);
+
+    return recommendations;
   }
 
   // Static data - resources

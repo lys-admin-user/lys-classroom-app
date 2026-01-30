@@ -838,6 +838,49 @@ export async function registerRoutes(
     }
   });
 
+  app.get("/api/careers/recommended", async (req, res) => {
+    try {
+      const userId = req.user?.claims?.sub;
+      if (!userId) {
+        return res.status(401).json({ error: "Authentication required" });
+      }
+
+      const results = await storage.getSelfDiscoveryResults(userId);
+      
+      if (results.length === 0) {
+        return res.json({ 
+          hasAssessment: false, 
+          recommendations: [],
+          message: "Complete the Self-Discovery assessment to get personalized career recommendations"
+        });
+      }
+
+      const latestResult = results[0];
+      const limit = parseInt(req.query.limit as string) || 6;
+      
+      const recommendations = await storage.getRecommendedCareers(
+        latestResult.beScore,
+        latestResult.knowScore,
+        latestResult.doScore,
+        limit
+      );
+
+      res.json({ 
+        hasAssessment: true,
+        userProfile: {
+          beScore: latestResult.beScore,
+          knowScore: latestResult.knowScore,
+          doScore: latestResult.doScore,
+          strengths: latestResult.strengths
+        },
+        recommendations 
+      });
+    } catch (error) {
+      console.error("Error fetching recommended careers:", error);
+      res.status(500).json({ error: "Failed to fetch recommended careers" });
+    }
+  });
+
   // Get market trends data - aggregated BLS statistics
   app.get("/api/careers/market-trends", async (req, res) => {
     try {

@@ -225,6 +225,19 @@ export type GradeLevelBand = z.infer<typeof gradeLevelBand>;
 export const jobOutlook = z.enum(["declining", "little_change", "average", "faster_than_average", "much_faster"]);
 export type JobOutlook = z.infer<typeof jobOutlook>;
 
+// Be-Know-Do Career Alignment Schema
+// Weights indicate how strongly a career aligns with each pillar (0-100)
+// - BE: Identity, purpose, values alignment (careers requiring strong self-awareness, ethics, identity)
+// - KNOW: Knowledge acquisition, research, learning (careers requiring extensive study, expertise)
+// - DO: Action, execution, practical skills (careers requiring hands-on work, project completion)
+export const bkdCareerAlignmentSchema = z.object({
+  be: z.number().min(0).max(100), // Identity/purpose alignment weight
+  know: z.number().min(0).max(100), // Knowledge/learning alignment weight
+  do: z.number().min(0).max(100), // Action/execution alignment weight
+  primaryPillar: z.enum(["be", "know", "do"]), // Which pillar is most dominant
+  careerPersonality: z.string().optional(), // Brief description of ideal personality fit
+});
+
 // Career Pathway Schema (KNOW - Strategy & Resources)
 export const careerSchema = z.object({
   id: z.string(),
@@ -245,6 +258,8 @@ export const careerSchema = z.object({
     duration: z.string(),
     cost: z.string(),
   })),
+  // Be-Know-Do Alignment for personalized recommendations
+  bkdAlignment: bkdCareerAlignmentSchema.optional(),
   // BLS and Market Data
   blsCode: z.string().optional(), // BLS Standard Occupational Classification (SOC) code
   jobOutlook: jobOutlook.optional(), // BLS job outlook category

@@ -30,7 +30,12 @@ import {
   MapPin,
   BarChart3,
   Users,
-  BookOpen
+  BookOpen,
+  Sparkles,
+  Target,
+  Heart,
+  Brain,
+  Zap
 } from "lucide-react";
 import type { Career, SavedCareer } from "@shared/schema";
 import { useAuth } from "@/hooks/use-auth";
@@ -38,6 +43,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useTier } from "@/hooks/use-tier";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { AdBanner } from "@/components/AdBanner";
+import { Link } from "wouter";
 
 const categories = [
   { value: "all", label: "All Categories", icon: Briefcase },
@@ -93,6 +99,22 @@ const demandLabels: Record<string, { label: string; color: string }> = {
   low: { label: "Low Demand", color: "text-amber-600" },
 };
 
+interface RecommendedCareersResponse {
+  hasAssessment: boolean;
+  message?: string;
+  userProfile?: {
+    beScore: number;
+    knowScore: number;
+    doScore: number;
+    strengths: string[];
+  };
+  recommendations: Array<{
+    career: Career;
+    matchScore: number;
+    matchReasons: string[];
+  }>;
+}
+
 interface MarketTrends {
   summary: {
     totalCareers: number;
@@ -140,6 +162,11 @@ export default function Careers() {
 
   const { data: marketTrends } = useQuery<MarketTrends>({
     queryKey: [marketTrendsUrl],
+  });
+
+  const { data: recommendedData, isLoading: isLoadingRecommended } = useQuery<RecommendedCareersResponse>({
+    queryKey: ["/api/careers/recommended"],
+    enabled: isAuthenticated,
   });
 
   const { data: savedCareers = [] } = useQuery<SavedCareer[]>({
@@ -492,7 +519,13 @@ export default function Careers() {
 
         {/* Tabs for Explore / Trending / Market Data */}
         <Tabs value={activeTab} onValueChange={setActiveTab} className="mb-6" data-testid="tabs-careers">
-          <TabsList>
+          <TabsList className="flex-wrap h-auto">
+            {isAuthenticated && (
+              <TabsTrigger value="recommended" className="font-roboto gap-2" data-testid="tab-recommended">
+                <Sparkles className="h-4 w-4" />
+                For You
+              </TabsTrigger>
+            )}
             <TabsTrigger value="explore" className="font-roboto gap-2" data-testid="tab-explore">
               <Briefcase className="h-4 w-4" />
               Explore Careers
@@ -506,6 +539,134 @@ export default function Careers() {
               Market Trends
             </TabsTrigger>
           </TabsList>
+
+          {isAuthenticated && (
+            <TabsContent value="recommended" className="mt-6">
+              {isLoadingRecommended ? (
+                <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {[...Array(6)].map((_, i) => (
+                    <Card key={i}>
+                      <CardContent className="p-4">
+                        <Skeleton className="h-6 w-3/4 mb-2" />
+                        <Skeleton className="h-4 w-1/2 mb-4" />
+                        <Skeleton className="h-16 w-full" />
+                      </CardContent>
+                    </Card>
+                  ))}
+                </div>
+              ) : !recommendedData?.hasAssessment ? (
+                <Card className="bg-gradient-to-r from-lys-teal/10 to-lys-yellow/10">
+                  <CardContent className="p-8 text-center">
+                    <Target className="h-12 w-12 text-lys-teal mx-auto mb-4" />
+                    <h3 className="font-marker text-2xl mb-2">Discover Your Ideal Career Path</h3>
+                    <p className="text-muted-foreground font-roboto mb-6 max-w-md mx-auto">
+                      Complete the Self-Discovery assessment to unlock personalized career recommendations based on your unique Be-Know-Do profile.
+                    </p>
+                    <Link href="/self-discovery">
+                      <Button
+                        className="bg-lys-teal text-white font-oswald gap-2"
+                        data-testid="button-take-assessment"
+                      >
+                        <Compass className="h-4 w-4" />
+                        Take Self-Discovery Assessment
+                      </Button>
+                    </Link>
+                  </CardContent>
+                </Card>
+              ) : (
+                <div className="space-y-6">
+                  {recommendedData.userProfile && (
+                    <Card className="bg-gradient-to-r from-lys-red/5 via-lys-yellow/5 to-lys-teal/5">
+                      <CardContent className="p-6">
+                        <div className="flex flex-wrap items-center gap-4 mb-4">
+                          <h3 className="font-marker text-xl">Your Be-Know-Do Profile</h3>
+                          <div className="flex gap-2">
+                            <Badge className="bg-lys-red/10 text-lys-red font-roboto gap-1">
+                              <Heart className="h-3 w-3" />
+                              BE: {recommendedData.userProfile.beScore}%
+                            </Badge>
+                            <Badge className="bg-lys-yellow/10 text-amber-700 font-roboto gap-1">
+                              <Brain className="h-3 w-3" />
+                              KNOW: {recommendedData.userProfile.knowScore}%
+                            </Badge>
+                            <Badge className="bg-lys-teal/10 text-lys-teal font-roboto gap-1">
+                              <Zap className="h-3 w-3" />
+                              DO: {recommendedData.userProfile.doScore}%
+                            </Badge>
+                          </div>
+                        </div>
+                        {recommendedData.userProfile.strengths && recommendedData.userProfile.strengths.length > 0 && (
+                          <div className="flex flex-wrap gap-2">
+                            <span className="text-sm text-muted-foreground font-roboto">Strengths:</span>
+                            {recommendedData.userProfile.strengths.map((strength, i) => (
+                              <Badge key={i} variant="outline" className="font-roboto text-xs">{strength}</Badge>
+                            ))}
+                          </div>
+                        )}
+                      </CardContent>
+                    </Card>
+                  )}
+
+                  <div>
+                    <h3 className="font-oswald text-lg mb-4 flex items-center gap-2">
+                      <Sparkles className="h-5 w-5 text-lys-yellow" />
+                      Recommended Careers Based on Your Profile
+                    </h3>
+                    <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                      {recommendedData.recommendations.map((rec) => (
+                        <Card 
+                          key={rec.career.id} 
+                          className="hover-elevate cursor-pointer"
+                          onClick={() => setSelectedCareer(rec.career)}
+                          data-testid={`card-recommended-career-${rec.career.id}`}
+                        >
+                          <CardContent className="p-4">
+                            <div className="flex items-start justify-between gap-2 mb-2">
+                              <div>
+                                <h4 className="font-oswald text-lg">{rec.career.title}</h4>
+                                <Badge className="capitalize font-roboto text-xs">{rec.career.category}</Badge>
+                              </div>
+                              <div className="text-right">
+                                <div className="flex items-center gap-1 text-lys-teal">
+                                  <Target className="h-4 w-4" />
+                                  <span className="font-oswald text-lg">{Math.round(rec.matchScore)}%</span>
+                                </div>
+                                <span className="text-xs text-muted-foreground font-roboto">Match</span>
+                              </div>
+                            </div>
+                            <Progress 
+                              value={rec.matchScore} 
+                              className="h-2 mb-3" 
+                            />
+                            <p className="text-sm text-muted-foreground font-roboto line-clamp-2 mb-3">
+                              {rec.career.description}
+                            </p>
+                            {rec.matchReasons.length > 0 && (
+                              <div className="text-xs text-muted-foreground font-roboto italic">
+                                {rec.matchReasons[0]}
+                              </div>
+                            )}
+                            <div className="flex flex-wrap items-center gap-2 mt-3 pt-3 border-t">
+                              <span className="text-sm font-oswald text-lys-yellow flex items-center gap-1">
+                                <DollarSign className="h-3 w-3" />
+                                {new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(rec.career.salaryMedian)}
+                              </span>
+                              {rec.career.jobOutlook && (
+                                <Badge className={`${outlookLabels[rec.career.jobOutlook]?.color} text-xs font-roboto`}>
+                                  <TrendingUp className="h-3 w-3 mr-1" />
+                                  {rec.career.projectedGrowth || 0}%
+                                </Badge>
+                              )}
+                            </div>
+                          </CardContent>
+                        </Card>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              )}
+            </TabsContent>
+          )}
 
           <TabsContent value="explore" className="mt-6">
             {/* Filters */}
