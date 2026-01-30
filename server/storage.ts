@@ -246,6 +246,7 @@ export interface IStorage {
   updateUserTier(userId: string, tier: string): Promise<User | undefined>;
   updateUserRole(userId: string, role: UserRole): Promise<User | undefined>;
   completeOnboarding(userId: string): Promise<User | undefined>;
+  incrementOnboardingSkipCount(userId: string): Promise<User>;
   
   // Sponsored Access
   getUserSponsoredAccess(userId: string): Promise<SponsoredAccess | undefined>;
@@ -1794,6 +1795,22 @@ export class DatabaseStorage implements IStorage {
       .where(eq(users.id, userId))
       .returning();
     return updated || undefined;
+  }
+
+  async incrementOnboardingSkipCount(userId: string): Promise<User> {
+    const [user] = await db.select().from(users).where(eq(users.id, userId));
+    const currentCount = user?.onboardingSkipCount || 0;
+    
+    const [updated] = await db.update(users)
+      .set({ 
+        onboardingSkipCount: currentCount + 1,
+        onboardingLastSkipped: new Date(),
+        updatedAt: new Date() 
+      })
+      .where(eq(users.id, userId))
+      .returning();
+    
+    return updated;
   }
 
   // Sponsored Access

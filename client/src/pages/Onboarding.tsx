@@ -225,6 +225,33 @@ export default function Onboarding() {
     },
   });
 
+  const skipMutation = useMutation({
+    mutationFn: () => apiRequest("POST", "/api/onboarding/skip", {}),
+    onSuccess: (data: any) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/auth/user"] });
+      toast({ 
+        title: "Exploring LYS", 
+        description: data.message || "Complete your profile anytime from Settings" 
+      });
+      setLocation("/");
+    },
+    onError: (error: any) => {
+      if (error?.message?.includes("Maximum skips")) {
+        toast({ 
+          title: "Profile Required", 
+          description: "Please complete your profile to continue using LYS", 
+          variant: "destructive" 
+        });
+      } else {
+        toast({ title: "Error", description: "Something went wrong", variant: "destructive" });
+      }
+    },
+  });
+
+  const handleSkip = () => {
+    skipMutation.mutate();
+  };
+
   const getRecommendedPath = () => {
     if (primaryGoal === "discover") return "/self-discovery";
     if (primaryGoal === "career") return "/careers";
@@ -671,36 +698,49 @@ export default function Onboarding() {
           )}
         </CardContent>
 
-        <CardFooter className="flex justify-between gap-4">
-          <Button
-            variant="outline"
-            onClick={prevStep}
-            disabled={currentStepIndex === 0}
-            data-testid="button-back"
-          >
-            <ChevronLeft className="h-4 w-4 mr-2" />
-            Back
-          </Button>
+        <CardFooter className="flex flex-col gap-4">
+          <div className="flex justify-between gap-4 w-full">
+            <Button
+              variant="outline"
+              onClick={prevStep}
+              disabled={currentStepIndex === 0}
+              data-testid="button-back"
+            >
+              <ChevronLeft className="h-4 w-4 mr-2" />
+              Back
+            </Button>
 
-          {step === "complete" ? (
-            <Button
-              onClick={handleComplete}
-              disabled={completeMutation.isPending}
-              data-testid="button-get-started"
-            >
-              {completeMutation.isPending ? "Setting up..." : "Get Started"}
-              <Sparkles className="h-4 w-4 ml-2" />
-            </Button>
-          ) : (
-            <Button
-              onClick={nextStep}
-              disabled={!canProceed()}
-              data-testid="button-next"
-            >
-              Next
-              <ChevronRight className="h-4 w-4 ml-2" />
-            </Button>
-          )}
+            {step === "complete" ? (
+              <Button
+                onClick={handleComplete}
+                disabled={completeMutation.isPending}
+                data-testid="button-get-started"
+              >
+                {completeMutation.isPending ? "Setting up..." : "Get Started"}
+                <Sparkles className="h-4 w-4 ml-2" />
+              </Button>
+            ) : (
+              <Button
+                onClick={nextStep}
+                disabled={!canProceed()}
+                data-testid="button-next"
+              >
+                Next
+                <ChevronRight className="h-4 w-4 ml-2" />
+              </Button>
+            )}
+          </div>
+          
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={handleSkip}
+            disabled={skipMutation.isPending}
+            className="text-muted-foreground hover:text-foreground"
+            data-testid="button-skip-onboarding"
+          >
+            {skipMutation.isPending ? "Skipping..." : "Skip for now and explore"}
+          </Button>
         </CardFooter>
       </Card>
     </div>

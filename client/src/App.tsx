@@ -5,6 +5,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { Header } from "@/components/Header";
 import { Footer } from "@/components/Footer";
+import { OnboardingReminderBanner } from "@/components/OnboardingReminderBanner";
 import { useAuth } from "@/hooks/use-auth";
 import { useEffect } from "react";
 import Dashboard from "@/pages/Dashboard";
@@ -42,6 +43,8 @@ import SISIntegration from "@/pages/SISIntegration";
 import NotFound from "@/pages/not-found";
 
 const EXEMPT_PATHS = ["/onboarding", "/pricing", "/shared", "/p/"];
+const MAX_ONBOARDING_SKIPS = 3;
+const SESSION_TRACKED_KEY = "lys_onboarding_session_tracked";
 
 function OnboardingGuard({ children }: { children: React.ReactNode }) {
   const { user, isAuthenticated, isLoading } = useAuth();
@@ -53,9 +56,32 @@ function OnboardingGuard({ children }: { children: React.ReactNode }) {
     const isExemptPath = EXEMPT_PATHS.some(path => location.startsWith(path));
     
     if (isAuthenticated && user && !user.onboardingCompleted && !isExemptPath) {
-      setLocation("/onboarding");
+      const skipCount = user.onboardingSkipCount || 0;
+      
+      // Only force redirect if user has exceeded skip limit
+      if (skipCount >= MAX_ONBOARDING_SKIPS) {
+        setLocation("/onboarding");
+        return;
+      }
+      
+      // Auto-track session visit (once per browser session using sessionStorage)
+      const sessionTracked = sessionStorage.getItem(SESSION_TRACKED_KEY);
+      if (!sessionTracked && skipCount < MAX_ONBOARDING_SKIPS) {
+        sessionStorage.setItem(SESSION_TRACKED_KEY, "true");
+        // Silently increment skip count for this session
+        fetch("/api/onboarding/skip", { method: "POST", credentials: "include" })
+          .then(res => res.json())
+          .catch(() => {});
+      }
     }
   }, [isAuthenticated, user, isLoading, location, setLocation]);
+
+  // Clear session tracking when onboarding is completed
+  useEffect(() => {
+    if (user?.onboardingCompleted) {
+      sessionStorage.removeItem(SESSION_TRACKED_KEY);
+    }
+  }, [user?.onboardingCompleted]);
 
   return <>{children}</>;
 }
@@ -107,6 +133,7 @@ function App() {
       <TooltipProvider>
         <OnboardingGuard>
           <div className="flex flex-col min-h-screen">
+            <OnboardingReminderBanner />
             <Header />
             <main className="flex-1">
               <Router />

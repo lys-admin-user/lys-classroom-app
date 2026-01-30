@@ -40,6 +40,8 @@ export const users = pgTable("users", {
   tier: varchar("tier").default("free").$type<UserTier>(),
   role: varchar("role").default("student").$type<UserRole>(),
   onboardingCompleted: boolean("onboarding_completed").default(false),
+  onboardingSkipCount: integer("onboarding_skip_count").default(0),
+  onboardingLastSkipped: timestamp("onboarding_last_skipped"),
   sponsoredAccessId: varchar("sponsored_access_id"),
   stripeCustomerId: varchar("stripe_customer_id"),
   stripeSubscriptionId: varchar("stripe_subscription_id"),

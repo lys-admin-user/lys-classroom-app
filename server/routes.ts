@@ -1364,6 +1364,43 @@ export async function registerRoutes(
     }
   });
 
+  // Skip onboarding (with limit tracking)
+  app.post("/api/onboarding/skip", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user?.claims?.sub;
+      const user = await storage.getUser(userId);
+      
+      if (!user) {
+        res.status(404).json({ error: "User not found" });
+        return;
+      }
+      
+      const currentSkipCount = user.onboardingSkipCount || 0;
+      const maxSkips = 3;
+      
+      if (currentSkipCount >= maxSkips) {
+        res.status(403).json({ 
+          error: "Maximum skips reached", 
+          message: "Please complete onboarding to continue using the app",
+          skipsRemaining: 0 
+        });
+        return;
+      }
+      
+      // Increment skip count
+      const updatedUser = await storage.incrementOnboardingSkipCount(userId);
+      
+      res.json({ 
+        success: true, 
+        skipsRemaining: maxSkips - (updatedUser.onboardingSkipCount || 0),
+        message: `You have ${maxSkips - (updatedUser.onboardingSkipCount || 0)} skips remaining`
+      });
+    } catch (error) {
+      console.error("Skip onboarding error:", error);
+      res.status(500).json({ error: "Failed to skip onboarding" });
+    }
+  });
+
   // Complete onboarding
   app.post("/api/onboarding/complete", isAuthenticated, async (req: any, res) => {
     try {
