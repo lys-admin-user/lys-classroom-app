@@ -1073,7 +1073,7 @@ export const assignments = pgTable("assignments", {
   assignmentType: text("assignment_type").notNull().default("individual"),
   status: text("status").notNull().default("draft"),
   accommodationModified: boolean("accommodation_modified").default(false),
-  accommodationType: text("accommodation_type"),
+  accommodationTypes: jsonb("accommodation_types").$type<string[]>(),
   accommodationNotes: text("accommodation_notes"),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
@@ -1228,7 +1228,7 @@ export const generateAssignmentRequestSchema = z.object({
   questionCount: z.number().min(1).max(20).default(5),
   difficulty: z.enum(["easy", "medium", "hard"]).default("medium"),
   includeBeKnowDo: z.boolean().default(true),
-  accommodationType: z.enum(accommodationTypes).optional(),
+  accommodationTypes: z.array(z.enum(accommodationTypes)).optional(),
   accommodationNotes: z.string().optional(),
 });
 

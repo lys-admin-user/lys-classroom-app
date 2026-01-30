@@ -12,6 +12,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
 import { Sparkles, FileText, Users, UserPlus, AlertTriangle, Check, Clock, BookOpen, Target, Compass, Lightbulb, Lock, GraduationCap, Copy, Printer, Pencil, Trash2, Plus, CheckCircle, Play, Search, RefreshCw, Star, ArrowRight, HelpCircle, ScrollText, Heart, ChevronDown, ChevronRight, Eye, EyeOff, BarChart3 } from "lucide-react";
@@ -84,7 +85,7 @@ export default function Assignments() {
   const [questionCount, setQuestionCount] = useState(5);
   const [difficulty, setDifficulty] = useState("medium");
   const [includeBeKnowDo, setIncludeBeKnowDo] = useState(true);
-  const [accommodationType, setAccommodationType] = useState<AccommodationType | undefined>();
+  const [selectedAccommodations, setSelectedAccommodations] = useState<AccommodationType[]>([]);
   const [accommodationNotes, setAccommodationNotes] = useState("");
   const [generatedAssignment, setGeneratedAssignment] = useState<any>(null);
   const [projectTemplate, setProjectTemplate] = useState("community_consultant");
@@ -236,8 +237,8 @@ export default function Assignments() {
   });
 
   const { data: suggestions } = useQuery<AccommodationSuggestion[]>({
-    queryKey: ["/api/accommodations/suggestions", accommodationType],
-    enabled: !!accommodationType,
+    queryKey: ["/api/accommodations/suggestions", selectedAccommodations],
+    enabled: selectedAccommodations.length > 0,
   });
 
   const generateMutation = useMutation({
@@ -314,7 +315,7 @@ export default function Assignments() {
       questionCount,
       difficulty,
       includeBeKnowDo,
-      accommodationType,
+      accommodationTypes: selectedAccommodations.length > 0 ? selectedAccommodations : undefined,
       accommodationNotes: accommodationNotes || undefined,
       projectTemplate: assignmentType === "project" ? projectTemplate : undefined,
     });
@@ -331,7 +332,7 @@ export default function Assignments() {
       questions: generatedAssignment.questions,
       totalPoints: generatedAssignment.totalPoints,
       accommodationModified: generatedAssignment.accommodationModified,
-      accommodationType: generatedAssignment.accommodationType,
+      accommodationTypes: generatedAssignment.accommodationTypes,
       accommodationNotes: generatedAssignment.accommodationNotes,
     });
   };
@@ -603,36 +604,76 @@ export default function Assignments() {
                       <Label className="font-oswald">Accommodation Modifications</Label>
                       <Button
                         variant="ghost"
-                       
                         onClick={() => setSuggestionsDialogOpen(true)}
-                        disabled={!accommodationType}
+                        disabled={selectedAccommodations.length === 0}
                         data-testid="button-suggestions"
                       >
                         <Lightbulb className="h-4 w-4 mr-1" />
                         View Suggestions
                       </Button>
                     </div>
-                    <Select value={accommodationType || "none"} onValueChange={(v) => setAccommodationType(v === "none" ? undefined : v as AccommodationType)}>
-                      <SelectTrigger data-testid="select-accommodation">
-                        <SelectValue placeholder="No accommodation (standard)" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="none">No accommodation</SelectItem>
-                        <SelectItem value="extraTime">Extra Time</SelectItem>
-                        <SelectItem value="notesCopyProvided">Notes/Presentation Copy Provided</SelectItem>
-                        <SelectItem value="studySheetProvided">Study Sheet Provided</SelectItem>
-                        <SelectItem value="graphicOrganizer">Graphic Organizer</SelectItem>
-                        <SelectItem value="mnemonicDevices">Mnemonic Devices</SelectItem>
-                        <SelectItem value="largerFont">Larger Size Font</SelectItem>
-                        <SelectItem value="shortenedText">Shortened Text</SelectItem>
-                        <SelectItem value="peerSupport">Peer Support</SelectItem>
-                        <SelectItem value="preferentialSeating">Preferential Seating</SelectItem>
-                        <SelectItem value="frequentReminders">Frequent On Task Reminders</SelectItem>
-                        <SelectItem value="completedExample">Provided A Completed Example</SelectItem>
-                        <SelectItem value="visualOrganizer">Visual Organizer Provided</SelectItem>
-                      </SelectContent>
-                    </Select>
-                    {accommodationType && (
+                    <Popover>
+                      <PopoverTrigger asChild>
+                        <Button variant="outline" className="w-full justify-between" data-testid="select-accommodation">
+                          {selectedAccommodations.length === 0 ? (
+                            <span className="text-muted-foreground">No accommodations selected</span>
+                          ) : (
+                            <span className="truncate">
+                              {selectedAccommodations.length} accommodation{selectedAccommodations.length > 1 ? "s" : ""} selected
+                            </span>
+                          )}
+                          <ChevronDown className="h-4 w-4 ml-2 shrink-0 opacity-50" />
+                        </Button>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-80 p-0" align="start">
+                        <ScrollArea className="h-72">
+                          <div className="p-2 space-y-1">
+                            {(Object.entries(accommodationLabels) as [AccommodationType, string][]).map(([key, label]) => {
+                              const isSelected = selectedAccommodations.includes(key);
+                              return (
+                                <div
+                                  key={key}
+                                  className="flex items-center gap-2 p-2 rounded-md hover-elevate cursor-pointer"
+                                  onClick={() => {
+                                    if (isSelected) {
+                                      setSelectedAccommodations(selectedAccommodations.filter(a => a !== key));
+                                    } else {
+                                      setSelectedAccommodations([...selectedAccommodations, key]);
+                                    }
+                                  }}
+                                  data-testid={`checkbox-accommodation-${key}`}
+                                >
+                                  <Checkbox checked={isSelected} />
+                                  <span className="text-sm">{label}</span>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </ScrollArea>
+                        {selectedAccommodations.length > 0 && (
+                          <div className="border-t p-2">
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="w-full"
+                              onClick={() => setSelectedAccommodations([])}
+                            >
+                              Clear all
+                            </Button>
+                          </div>
+                        )}
+                      </PopoverContent>
+                    </Popover>
+                    {selectedAccommodations.length > 0 && (
+                      <div className="mt-2 flex flex-wrap gap-1">
+                        {selectedAccommodations.map(acc => (
+                          <Badge key={acc} variant="secondary" className="text-xs">
+                            {accommodationLabels[acc]}
+                          </Badge>
+                        ))}
+                      </div>
+                    )}
+                    {selectedAccommodations.length > 0 && (
                       <Textarea
                         placeholder="Additional accommodation notes..."
                         value={accommodationNotes}
@@ -1400,8 +1441,8 @@ export default function Assignments() {
                     <CardHeader className="pb-2">
                       <div className="flex items-start justify-between gap-2">
                         <CardTitle className="font-oswald text-lg">{assignment.title}</CardTitle>
-                        {assignment.accommodationModified && assignment.accommodationType && (
-                          <Badge variant="outline">{accommodationLabels[assignment.accommodationType as AccommodationType] || assignment.accommodationType}</Badge>
+                        {assignment.accommodationModified && (assignment as any).accommodationTypes && (assignment as any).accommodationTypes.length > 0 && (
+                          <Badge variant="outline">{(assignment as any).accommodationTypes.length} accommodation{(assignment as any).accommodationTypes.length > 1 ? "s" : ""}</Badge>
                         )}
                       </div>
                       <CardDescription className="line-clamp-2">{assignment.description}</CardDescription>
@@ -1545,7 +1586,7 @@ export default function Assignments() {
           <DialogContent className="max-w-2xl">
             <DialogHeader>
               <DialogTitle className="font-oswald">
-                {accommodationType} Accommodation Suggestions
+                Accommodation Suggestions
               </DialogTitle>
             </DialogHeader>
             <ScrollArea className="max-h-[400px]">

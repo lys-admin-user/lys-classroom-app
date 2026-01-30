@@ -36,7 +36,7 @@ interface GenerateAssignmentRequest {
   questionCount: number;
   difficulty: "easy" | "medium" | "hard";
   includeBeKnowDo: boolean;
-  accommodationType?: "IEP" | "504" | "BIP";
+  accommodationTypes?: string[];
   accommodationNotes?: string;
   projectTemplate?: ProjectTemplateType;
 }
@@ -141,32 +141,26 @@ interface GeneratedAssignment {
   questions: AssignmentQuestion[];
   totalPoints: number;
   accommodationModified: boolean;
-  accommodationType?: string;
+  accommodationTypes?: string[];
   accommodationNotes?: string;
   worksheet: WorksheetMetadata;
   accommodationChecklist: AccommodationChecklist;
   project?: GeneratedProject;
 }
 
-const accommodationGuidelines = {
-  IEP: `Apply these IEP accommodations:
-- Simplify language and reduce complexity
-- Break complex questions into smaller parts
-- Provide more context and scaffolding
-- Allow for various response formats
-- Include visual supports where appropriate`,
-  504: `Apply these 504 accommodations:
-- Reduce the number of items if appropriate
-- Provide clear, structured instructions
-- Include check-in points within longer tasks
-- Allow for extended response time consideration
-- Minimize distracting elements`,
-  BIP: `Apply these BIP accommodations:
-- Include clear behavioral expectations
-- Break work into manageable chunks
-- Provide positive reinforcement opportunities
-- Offer choice where possible
-- Include breaks or transition points`,
+const accommodationGuidelines: Record<string, string> = {
+  extraTime: "Provide extended time (1.5x to 2x) for completing the assignment",
+  notesCopyProvided: "Provide copies of notes or presentation slides with the assignment",
+  studySheetProvided: "Include a study sheet with key concepts and vocabulary",
+  graphicOrganizer: "Use graphic organizers to structure information visually",
+  mnemonicDevices: "Include mnemonic devices to aid in memorization",
+  largerFont: "Use larger font size (14pt or larger) for readability",
+  shortenedText: "Reduce reading length while maintaining key concepts",
+  peerSupport: "Allow peer buddy support for collaborative learning",
+  preferentialSeating: "Note that student has preferential seating near instruction",
+  frequentReminders: "Include regular check-in points and on-task prompts",
+  completedExample: "Provide a completed example before independent work",
+  visualOrganizer: "Use visual schedules and checklists for task completion",
 };
 
 // "Low-Floor, High-Ceiling" Project Templates
@@ -522,8 +516,8 @@ export async function generateAssignment(request: GenerateAssignmentRequest): Pr
     return generateMockAssignment(request);
   }
 
-  const accommodationContext = request.accommodationType 
-    ? `\n\nIMPORTANT ACCOMMODATION REQUIREMENTS (${request.accommodationType}):\n${accommodationGuidelines[request.accommodationType]}\n${request.accommodationNotes ? `Additional notes: ${request.accommodationNotes}` : ""}`
+  const accommodationContext = request.accommodationTypes && request.accommodationTypes.length > 0
+    ? `\n\nIMPORTANT ACCOMMODATION REQUIREMENTS:\n${request.accommodationTypes.map(t => `- ${accommodationGuidelines[t] || t}`).join('\n')}\n${request.accommodationNotes ? `Additional notes: ${request.accommodationNotes}` : ""}`
     : "";
 
   const systemPrompt = `You are an expert educator creating ${request.assignmentType} assignments based on lesson plans.
@@ -630,11 +624,11 @@ Assessment: ${request.lesson.assessment}
       instructions: parsed.instructions || getDefaultInstructions(request.assignmentType),
       questions,
       totalPoints: questions.reduce((sum, q) => sum + q.points, 0),
-      accommodationModified: !!request.accommodationType,
-      accommodationType: request.accommodationType,
+      accommodationModified: !!(request.accommodationTypes && request.accommodationTypes.length > 0),
+      accommodationTypes: request.accommodationTypes,
       accommodationNotes: request.accommodationNotes,
       worksheet: extractWorksheetMetadata(request.lesson),
-      accommodationChecklist: getDefaultAccommodationChecklist(request.accommodationType),
+      accommodationChecklist: getDefaultAccommodationChecklist(request.accommodationTypes),
     };
   } catch (error) {
     console.error("AI assignment generation error:", error);
@@ -679,7 +673,7 @@ function extractWorksheetMetadata(lesson: Lesson): WorksheetMetadata {
   };
 }
 
-function getDefaultAccommodationChecklist(accommodationType?: string): AccommodationChecklist {
+function getDefaultAccommodationChecklist(accommodationTypes?: string[]): AccommodationChecklist {
   const defaults: AccommodationChecklist = {
     extraTime: false,
     notesCopyProvided: false,
@@ -695,31 +689,19 @@ function getDefaultAccommodationChecklist(accommodationType?: string): Accommoda
     visualOrganizer: false,
   };
 
-  if (accommodationType === "IEP") {
-    return {
-      ...defaults,
-      extraTime: true,
-      notesCopyProvided: true,
-      graphicOrganizer: true,
-      visualOrganizer: true,
-    };
-  } else if (accommodationType === "504") {
-    return {
-      ...defaults,
-      extraTime: true,
-      preferentialSeating: true,
-      frequentReminders: true,
-    };
-  } else if (accommodationType === "BIP") {
-    return {
-      ...defaults,
-      frequentReminders: true,
-      peerSupport: true,
-      completedExample: true,
-    };
+  if (!accommodationTypes || accommodationTypes.length === 0) {
+    return defaults;
   }
 
-  return defaults;
+  // Set each selected accommodation to true
+  const checklist = { ...defaults };
+  for (const accType of accommodationTypes) {
+    if (accType in checklist) {
+      (checklist as any)[accType] = true;
+    }
+  }
+  
+  return checklist;
 }
 
 function getDefaultInstructions(type: string): string {
@@ -827,11 +809,11 @@ function generateMockAssignment(request: GenerateAssignmentRequest): GeneratedAs
     instructions: getDefaultInstructions(request.assignmentType),
     questions,
     totalPoints: request.assignmentType === "project" ? projectPoints : questionPoints,
-    accommodationModified: !!request.accommodationType,
-    accommodationType: request.accommodationType,
+    accommodationModified: !!(request.accommodationTypes && request.accommodationTypes.length > 0),
+    accommodationTypes: request.accommodationTypes,
     accommodationNotes: request.accommodationNotes,
     worksheet: extractWorksheetMetadata(request.lesson),
-    accommodationChecklist: getDefaultAccommodationChecklist(request.accommodationType),
+    accommodationChecklist: getDefaultAccommodationChecklist(request.accommodationTypes),
     project: projectData,
   };
 }

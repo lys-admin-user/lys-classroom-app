@@ -1579,7 +1579,7 @@ export async function registerRoutes(
   app.post("/api/assignments/generate", isAuthenticated, requirePaidTier, async (req: any, res) => {
     try {
       const userId = req.user?.claims?.sub;
-      const { lessonId, assignmentType, questionCount, difficulty, includeBeKnowDo, accommodationType, accommodationNotes, projectTemplate } = req.body;
+      const { lessonId, assignmentType, questionCount, difficulty, includeBeKnowDo, accommodationTypes, accommodationNotes, projectTemplate } = req.body;
       
       const lesson = await storage.getLesson(lessonId);
       if (!lesson) {
@@ -1599,7 +1599,7 @@ export async function registerRoutes(
         questionCount: questionCount || 5,
         difficulty: difficulty || "medium",
         includeBeKnowDo: includeBeKnowDo !== false,
-        accommodationType,
+        accommodationTypes,
         accommodationNotes,
         projectTemplate: projectTemplate || "community_consultant",
       });
