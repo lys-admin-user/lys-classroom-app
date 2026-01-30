@@ -1587,6 +1587,17 @@ export async function registerRoutes(
         return;
       }
       
+      console.log("[Assignment Generate] Lesson data:", {
+        id: lesson.id,
+        title: lesson.title,
+        topic: lesson.topic,
+        gradeLevel: lesson.gradeLevel,
+        bkdFocus: lesson.bkdFocus,
+        standards: lesson.standards,
+        objectives: lesson.objectives,
+        assessment: lesson.assessment
+      });
+      
       if (lesson.userId !== userId) {
         res.status(403).json({ error: "You can only generate assignments from your own lessons" });
         return;

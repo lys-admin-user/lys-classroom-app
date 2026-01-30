@@ -643,6 +643,16 @@ Assessment: ${request.lesson.assessment}
 }
 
 function extractWorksheetMetadata(lesson: Lesson): WorksheetMetadata {
+  console.log("[extractWorksheetMetadata] Input lesson:", {
+    title: lesson.title,
+    topic: lesson.topic,
+    gradeLevel: lesson.gradeLevel,
+    bkdFocus: lesson.bkdFocus,
+    standards: lesson.standards,
+    objectives: lesson.objectives,
+    assessment: lesson.assessment
+  });
+  
   const objectives = lesson.objectives as string[] || [];
   const bkdFocus = lesson.bkdFocus || "know";
   const standards = lesson.standards || "";
@@ -665,7 +675,7 @@ function extractWorksheetMetadata(lesson: Lesson): WorksheetMetadata {
     ? `How can students demonstrate understanding of: ${objectives[0]}?`
     : "What key concepts will students master in this lesson?";
   
-  return {
+  const worksheetMetadata = {
     course: lesson.topic || "Course Name",
     unit: lesson.title || "Unit Topic",
     contentObjective: standards || objectives[0] || "Content objective from TEKS",
@@ -677,6 +687,10 @@ function extractWorksheetMetadata(lesson: Lesson): WorksheetMetadata {
     duration: lesson.duration || "Duration",
     standards: standards || "TEKS/Standards",
   };
+  
+  console.log("[extractWorksheetMetadata] Output:", worksheetMetadata);
+  
+  return worksheetMetadata;
 }
 
 function getDefaultAccommodationChecklist(accommodationType?: string): AccommodationChecklist {
