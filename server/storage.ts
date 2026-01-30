@@ -145,6 +145,7 @@ import {
   type InsertEntityShare,
   entityShares,
   lessonGenerations,
+  guestLessonGenerations,
   type InsertLessonGeneration,
   type EducatorCareerGoal,
   type InsertEducatorCareerGoal,
@@ -217,6 +218,8 @@ export interface IStorage {
   countMonthlyGenerations(userId: string): Promise<number>;
   logLessonGeneration(userId: string, topic?: string): Promise<void>;
   tryReserveLessonGeneration(userId: string, limit: number, topic?: string): Promise<{ success: boolean; currentCount: number }>;
+  countGuestGenerations(ipAddress: string): Promise<number>;
+  tryReserveGuestLessonGeneration(ipAddress: string, limit: number, topic?: string): Promise<{ success: boolean; currentCount: number }>;
   
   // Lesson Templates
   getLessonTemplates(userId: string): Promise<LessonTemplate[]>;
@@ -1612,6 +1615,40 @@ export class DatabaseStorage implements IStorage {
       inserted AS (
         INSERT INTO lesson_generations (id, user_id, topic, created_at)
         SELECT gen_random_uuid(), ${userId}, ${topic}, NOW()
+        WHERE (SELECT cnt FROM current_count) < ${limit}
+        RETURNING 1
+      )
+      SELECT 
+        (SELECT cnt FROM current_count)::int as current_count,
+        (SELECT COUNT(*) FROM inserted)::int as inserted_count
+    `);
+    
+    const row = result.rows[0] as any;
+    const currentCount = Number(row?.current_count || 0);
+    const insertedCount = Number(row?.inserted_count || 0);
+    
+    return {
+      success: insertedCount > 0,
+      currentCount: currentCount
+    };
+  }
+
+  async countGuestGenerations(ipAddress: string): Promise<number> {
+    const result = await db.select({ count: sql<number>`count(*)` })
+      .from(guestLessonGenerations)
+      .where(eq(guestLessonGenerations.ipAddress, ipAddress));
+    return Number(result[0]?.count || 0);
+  }
+
+  async tryReserveGuestLessonGeneration(ipAddress: string, limit: number, topic?: string): Promise<{ success: boolean; currentCount: number }> {
+    const result = await db.execute(sql`
+      WITH current_count AS (
+        SELECT COUNT(*) as cnt FROM guest_lesson_generations 
+        WHERE ip_address = ${ipAddress}
+      ),
+      inserted AS (
+        INSERT INTO guest_lesson_generations (id, ip_address, topic, created_at)
+        SELECT gen_random_uuid(), ${ipAddress}, ${topic}, NOW()
         WHERE (SELECT cnt FROM current_count) < ${limit}
         RETURNING 1
       )

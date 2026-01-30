@@ -68,6 +68,18 @@ export const insertLessonGenerationSchema = createInsertSchema(lessonGenerations
 export type InsertLessonGeneration = z.infer<typeof insertLessonGenerationSchema>;
 export type LessonGeneration = typeof lessonGenerations.$inferSelect;
 
+// Guest Lesson Generation Tracking (for unauthenticated users, tracked by IP)
+export const guestLessonGenerations = pgTable("guest_lesson_generations", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  ipAddress: varchar("ip_address").notNull(),
+  topic: text("topic"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertGuestLessonGenerationSchema = createInsertSchema(guestLessonGenerations).omit({ id: true, createdAt: true });
+export type InsertGuestLessonGeneration = z.infer<typeof insertGuestLessonGenerationSchema>;
+export type GuestLessonGeneration = typeof guestLessonGenerations.$inferSelect;
+
 // Goals Table (for action plans)
 export const goals = pgTable("goals", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),

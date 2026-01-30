@@ -83,6 +83,11 @@ export default function LessonGenerator() {
     enabled: isAuthenticated,
   });
 
+  const { data: guestUsageData, refetch: refetchGuestUsage } = useQuery<{ used: number; limit: number; remaining: number }>({
+    queryKey: ["/api/lessons/guest-usage"],
+    enabled: !isAuthenticated,
+  });
+
   const { data: savedLessons = [], isLoading: lessonsLoading } = useQuery<Lesson[]>({
     queryKey: ["/api/lessons"],
     enabled: isAuthenticated,
@@ -236,7 +241,8 @@ export default function LessonGenerator() {
   const generateMutation = useMutation({
     mutationFn: async () => {
       const stateData = states.find(s => s.abbreviation === selectedState);
-      const response = await apiRequest("POST", "/api/lessons/generate", {
+      const endpoint = isAuthenticated ? "/api/lessons/generate" : "/api/lessons/generate-guest";
+      const response = await apiRequest("POST", endpoint, {
         topic,
         course,
         unit,
@@ -257,7 +263,11 @@ export default function LessonGenerator() {
     onSuccess: (data) => {
       setGeneratedLesson(data);
       setIsSaved(false);
-      refetchUsage();
+      if (isAuthenticated) {
+        refetchUsage();
+      } else {
+        refetchGuestUsage();
+      }
       // Initialize resources from generated lesson if any
       if (data.resources && data.resources.length > 0) {
         setAddedResources(data.resources.map(r => ({
@@ -278,7 +288,13 @@ export default function LessonGenerator() {
     },
     onError: async (error: any) => {
       const errorData = error?.response ? await error.response.json().catch(() => ({})) : {};
-      if (errorData.requiredTier) {
+      if (errorData.requiresSignup) {
+        toast({
+          title: "Free Lessons Used",
+          description: "Create a free account to continue generating lessons and save your work!",
+          variant: "destructive",
+        });
+      } else if (errorData.requiredTier) {
         toast({
           title: "Monthly Limit Reached",
           description: "Free accounts can generate up to 3 lessons per month. Upgrade to Pro for unlimited lessons.",
@@ -812,9 +828,27 @@ ${addedResources.length > 0 ? addedResources.map(r => `- ${r.title}: ${r.url}`).
                   </div>
                 )}
 
+                {!isAuthenticated && guestUsageData && (
+                  <div className="flex items-center justify-between p-3 bg-muted rounded-md">
+                    <div className="flex items-center gap-2">
+                      <Sparkles className="h-4 w-4 text-lys-yellow" />
+                      <span className="text-sm font-roboto">
+                        {guestUsageData.remaining === 0 
+                          ? "Free lessons used" 
+                          : `${guestUsageData.remaining} of ${guestUsageData.limit} free lessons remaining`}
+                      </span>
+                    </div>
+                    <Link href="/api/login">
+                      <Button size="sm" variant="default" data-testid="button-signup-guest">
+                        {guestUsageData.remaining === 0 ? "Sign Up Free" : "Sign In"}
+                      </Button>
+                    </Link>
+                  </div>
+                )}
+
                 <Button
                   onClick={handleGenerate}
-                  disabled={generateMutation.isPending || (usageData && usageData.remaining === 0)}
+                  disabled={generateMutation.isPending || (isAuthenticated && usageData && usageData.remaining === 0) || (!isAuthenticated && guestUsageData && guestUsageData.remaining === 0)}
                   className="w-full bg-lys-red hover:bg-lys-red/90 text-white font-oswald text-lg h-12 gap-2"
                   data-testid="button-generate-lesson"
                 >

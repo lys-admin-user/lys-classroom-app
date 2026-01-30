@@ -160,6 +160,51 @@ export async function registerRoutes(
     }
   });
 
+  // Guest Lesson Generation - limited to 3 total per IP for unauthenticated users
+  app.post("/api/lessons/generate-guest", async (req: any, res) => {
+    try {
+      const validated = generateLessonRequestSchema.parse(req.body);
+      const ipAddress = req.ip || req.headers['x-forwarded-for'] || req.connection.remoteAddress || 'unknown';
+      
+      // Check and reserve guest generation (3 total per IP)
+      const { success, currentCount } = await storage.tryReserveGuestLessonGeneration(ipAddress, 3, validated.topic);
+      if (!success) {
+        res.status(403).json({ 
+          error: "Guest limit reached", 
+          message: "Create a free account to continue generating lessons.",
+          guestCount: currentCount,
+          limit: 3,
+          requiresSignup: true
+        });
+        return;
+      }
+      
+      const generatedPlan = await generateLessonPlan(validated);
+      res.json({ 
+        ...generatedPlan, 
+        guestUsage: { used: currentCount + 1, limit: 3, remaining: 3 - currentCount - 1 }
+      });
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        res.status(400).json({ error: "Invalid request data", details: error.errors });
+      } else {
+        console.error("Guest lesson generation error:", error);
+        res.status(500).json({ error: error instanceof Error ? error.message : "Failed to generate lesson" });
+      }
+    }
+  });
+
+  // Guest usage check endpoint
+  app.get("/api/lessons/guest-usage", async (req: any, res) => {
+    try {
+      const ipAddress = req.ip || req.headers['x-forwarded-for'] || req.connection.remoteAddress || 'unknown';
+      const count = await storage.countGuestGenerations(ipAddress);
+      res.json({ used: count, limit: 3, remaining: Math.max(0, 3 - count) });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to check guest usage" });
+    }
+  });
+
   // Lesson Plans - Generate (requires auth, free users limited to 3/month)
   app.post("/api/lessons/generate", isAuthenticated, async (req: any, res) => {
     try {
