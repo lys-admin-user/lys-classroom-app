@@ -4728,7 +4728,15 @@ export async function registerRoutes(
         return;
       }
       
-      const permissions = (link.permissions || {}) as { viewGoals?: boolean; viewAssessments?: boolean; viewCareers?: boolean; viewLessons?: boolean; receiveNotifications?: boolean };
+      const permissions = (link.permissions || {}) as { 
+        viewGoals?: boolean; 
+        viewAssessments?: boolean; 
+        viewCareers?: boolean; 
+        viewLessons?: boolean; 
+        viewMilestones?: boolean;
+        viewActivities?: boolean;
+        receiveNotifications?: boolean;
+      };
       const studentData: any = {};
       
       // Get student user info
@@ -4738,7 +4746,27 @@ export async function registerRoutes(
           id: student.id,
           firstName: student.firstName,
           lastName: student.lastName,
+          email: student.email,
         };
+      }
+      
+      // Always try to get journey progress (core feature for parents)
+      try {
+        const journeyProgress = await storage.getStudentJourneyProgress(studentId);
+        if (journeyProgress) {
+          studentData.journeyProgress = {
+            beScore: journeyProgress.beScore,
+            knowScore: journeyProgress.knowScore,
+            doScore: journeyProgress.doScore,
+            overallScore: journeyProgress.overallScore,
+            totalAssessmentsCompleted: journeyProgress.totalAssessmentsCompleted,
+            totalMilestonesAchieved: journeyProgress.totalMilestonesAchieved,
+            currentFocus: journeyProgress.currentFocus,
+            lastActivityDate: journeyProgress.lastActivityDate,
+          };
+        }
+      } catch (e) {
+        // Journey progress may not exist yet
       }
       
       // Get goals if permitted
@@ -4754,6 +4782,30 @@ export async function registerRoutes(
       // Get saved careers if permitted
       if (permissions.viewCareers) {
         studentData.savedCareers = await storage.getSavedCareers(studentId);
+      }
+      
+      // Get milestones if permitted
+      if (permissions.viewMilestones) {
+        try {
+          const milestones = await storage.getLyseMilestones(studentId);
+          studentData.milestones = milestones.filter(m => m.status === 'completed');
+        } catch (e) {
+          studentData.milestones = [];
+        }
+      }
+      
+      // Get recent activities if permitted - use journey progress activities
+      if (permissions.viewActivities) {
+        try {
+          const existingJourneyProgress = await storage.getStudentJourneyProgress(studentId);
+          if (existingJourneyProgress) {
+            studentData.recentActivities = await storage.getStudentJourneyActivities(existingJourneyProgress.id, 10);
+          } else {
+            studentData.recentActivities = [];
+          }
+        } catch (e) {
+          studentData.recentActivities = [];
+        }
       }
       
       // Get parent's notes for this link

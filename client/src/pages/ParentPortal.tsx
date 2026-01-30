@@ -12,6 +12,8 @@ import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Progress } from "@/components/ui/progress";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { Separator } from "@/components/ui/separator";
 import { 
   Users, 
   UserPlus, 
@@ -29,7 +31,17 @@ import {
   AlertCircle,
   Shield,
   Heart,
-  ChevronRight
+  ChevronRight,
+  TrendingUp,
+  Calendar,
+  Star,
+  Award,
+  Activity,
+  FileText,
+  GraduationCap,
+  Milestone,
+  Brain,
+  Compass
 } from "lucide-react";
 import { useAuth } from "@/hooks/use-auth";
 import { useToast } from "@/hooks/use-toast";
@@ -41,6 +53,9 @@ type ParentPermissions = {
   viewAssessments?: boolean;
   viewCareers?: boolean;
   viewLessons?: boolean;
+  viewPortfolio?: boolean;
+  viewMilestones?: boolean;
+  viewActivities?: boolean;
   receiveNotifications?: boolean;
 };
 
@@ -53,17 +68,479 @@ type EnrichedLink = ParentStudentLink & {
   } | null;
 };
 
+type JourneyProgress = {
+  beScore: number;
+  knowScore: number;
+  doScore: number;
+  overallScore: number;
+  totalAssessmentsCompleted: number;
+  totalMilestonesAchieved: number;
+  currentFocus: string;
+  lastActivityDate: string;
+};
+
+type StudentActivity = {
+  id: string;
+  activityType: string;
+  title: string;
+  description: string;
+  category: string;
+  pointsEarned: number;
+  createdAt: string;
+};
+
 type StudentData = {
   student: {
     id: string;
     firstName: string;
     lastName: string;
+    email?: string;
   };
+  journeyProgress?: JourneyProgress;
   goals?: Goal[];
   assessments?: any[];
   savedCareers?: any[];
+  milestones?: any[];
+  recentActivities?: StudentActivity[];
+  portfolio?: any;
   notes?: any[];
 };
+
+function BeKnowDoProgress({ beScore, knowScore, doScore, overallScore }: { beScore: number; knowScore: number; doScore: number; overallScore: number }) {
+  return (
+    <div className="space-y-6">
+      <div className="text-center">
+        <div className="relative inline-flex items-center justify-center">
+          <svg className="w-32 h-32 transform -rotate-90">
+            <circle
+              cx="64"
+              cy="64"
+              r="56"
+              stroke="currentColor"
+              strokeWidth="8"
+              fill="none"
+              className="text-muted"
+            />
+            <circle
+              cx="64"
+              cy="64"
+              r="56"
+              stroke="currentColor"
+              strokeWidth="8"
+              fill="none"
+              strokeDasharray={`${overallScore * 3.52} 352`}
+              className="text-lys-teal"
+            />
+          </svg>
+          <div className="absolute inset-0 flex flex-col items-center justify-center">
+            <span className="text-3xl font-bold">{overallScore}%</span>
+            <span className="text-xs text-muted-foreground">Overall</span>
+          </div>
+        </div>
+      </div>
+      
+      <div className="grid grid-cols-3 gap-4">
+        <div className="text-center space-y-2">
+          <div className="mx-auto w-12 h-12 rounded-full bg-lys-red/10 flex items-center justify-center">
+            <Heart className="w-6 h-6 text-lys-red" />
+          </div>
+          <div>
+            <p className="text-2xl font-bold text-lys-red">{beScore}%</p>
+            <p className="text-xs text-muted-foreground font-oswald uppercase tracking-wide">BE</p>
+          </div>
+          <Progress value={beScore} className="h-2 bg-lys-red/20 [&>div]:bg-lys-red" />
+        </div>
+        
+        <div className="text-center space-y-2">
+          <div className="mx-auto w-12 h-12 rounded-full bg-lys-yellow/10 flex items-center justify-center">
+            <Brain className="w-6 h-6 text-lys-yellow" />
+          </div>
+          <div>
+            <p className="text-2xl font-bold text-lys-yellow">{knowScore}%</p>
+            <p className="text-xs text-muted-foreground font-oswald uppercase tracking-wide">KNOW</p>
+          </div>
+          <Progress value={knowScore} className="h-2 bg-lys-yellow/20 [&>div]:bg-lys-yellow" />
+        </div>
+        
+        <div className="text-center space-y-2">
+          <div className="mx-auto w-12 h-12 rounded-full bg-lys-teal/10 flex items-center justify-center">
+            <Target className="w-6 h-6 text-lys-teal" />
+          </div>
+          <div>
+            <p className="text-2xl font-bold text-lys-teal">{doScore}%</p>
+            <p className="text-xs text-muted-foreground font-oswald uppercase tracking-wide">DO</p>
+          </div>
+          <Progress value={doScore} className="h-2 bg-lys-teal/20 [&>div]:bg-lys-teal" />
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function ActivityTimeline({ activities }: { activities: StudentActivity[] }) {
+  const getActivityIcon = (type: string, category: string) => {
+    if (category === 'be') return <Heart className="w-4 h-4 text-lys-red" />;
+    if (category === 'know') return <Brain className="w-4 h-4 text-lys-yellow" />;
+    if (category === 'do') return <Target className="w-4 h-4 text-lys-teal" />;
+    
+    switch (type) {
+      case 'assessment': return <FileText className="w-4 h-4 text-primary" />;
+      case 'goal': return <Target className="w-4 h-4 text-primary" />;
+      case 'career': return <Briefcase className="w-4 h-4 text-primary" />;
+      case 'milestone': return <Milestone className="w-4 h-4 text-primary" />;
+      default: return <Activity className="w-4 h-4 text-primary" />;
+    }
+  };
+
+  const getCategoryColor = (category: string) => {
+    switch (category) {
+      case 'be': return 'border-l-lys-red bg-lys-red/5';
+      case 'know': return 'border-l-lys-yellow bg-lys-yellow/5';
+      case 'do': return 'border-l-lys-teal bg-lys-teal/5';
+      default: return 'border-l-primary bg-primary/5';
+    }
+  };
+
+  if (!activities || activities.length === 0) {
+    return (
+      <div className="text-center py-8 text-muted-foreground">
+        <Activity className="w-12 h-12 mx-auto mb-2 opacity-50" />
+        <p>No recent activities</p>
+      </div>
+    );
+  }
+
+  return (
+    <ScrollArea className="h-[300px]">
+      <div className="space-y-3 pr-4">
+        {activities.map((activity) => (
+          <div
+            key={activity.id}
+            className={`p-3 rounded-md border-l-4 ${getCategoryColor(activity.category)}`}
+          >
+            <div className="flex items-start gap-3">
+              <div className="mt-0.5">
+                {getActivityIcon(activity.activityType, activity.category)}
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="font-medium text-sm">{activity.title}</p>
+                {activity.description && (
+                  <p className="text-xs text-muted-foreground mt-0.5">{activity.description}</p>
+                )}
+                <div className="flex items-center gap-2 mt-1">
+                  <span className="text-xs text-muted-foreground">
+                    {new Date(activity.createdAt).toLocaleDateString()}
+                  </span>
+                  {activity.pointsEarned > 0 && (
+                    <Badge variant="secondary" className="text-xs">
+                      +{activity.pointsEarned} pts
+                    </Badge>
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
+    </ScrollArea>
+  );
+}
+
+function StudentDashboard({ studentData, isLoading }: { studentData: StudentData | undefined; isLoading: boolean }) {
+  if (isLoading) {
+    return (
+      <div className="space-y-4">
+        <Skeleton className="h-64" />
+        <div className="grid gap-4 md:grid-cols-2">
+          <Skeleton className="h-48" />
+          <Skeleton className="h-48" />
+        </div>
+      </div>
+    );
+  }
+
+  if (!studentData) {
+    return null;
+  }
+
+  const { student, journeyProgress, goals, savedCareers, milestones, recentActivities } = studentData;
+  const hasJourneyData = journeyProgress && journeyProgress.overallScore > 0;
+
+  return (
+    <div className="space-y-6">
+      <div className="flex items-center justify-between">
+        <div>
+          <h2 className="text-2xl font-bold font-oswald">
+            {student.firstName}'s Journey
+          </h2>
+          <p className="text-muted-foreground">
+            {hasJourneyData && journeyProgress.lastActivityDate && (
+              <>Last active: {new Date(journeyProgress.lastActivityDate).toLocaleDateString()}</>
+            )}
+          </p>
+        </div>
+        {hasJourneyData && (
+          <Badge variant="outline" className="gap-1">
+            <Compass className="w-3 h-3" />
+            Focus: {journeyProgress.currentFocus?.toUpperCase() || 'Exploring'}
+          </Badge>
+        )}
+      </div>
+
+      <div className="grid gap-6 lg:grid-cols-3">
+        <Card className="lg:col-span-1">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-lg flex items-center gap-2">
+              <TrendingUp className="w-5 h-5 text-primary" />
+              Be-Know-Do Progress
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            {hasJourneyData ? (
+              <BeKnowDoProgress
+                beScore={journeyProgress.beScore}
+                knowScore={journeyProgress.knowScore}
+                doScore={journeyProgress.doScore}
+                overallScore={journeyProgress.overallScore}
+              />
+            ) : (
+              <div className="text-center py-8 text-muted-foreground">
+                <TrendingUp className="w-12 h-12 mx-auto mb-2 opacity-50" />
+                <p>No assessment data yet</p>
+                <p className="text-xs mt-1">Progress will appear after completing assessments</p>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        <Card className="lg:col-span-2">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-lg flex items-center gap-2">
+              <Activity className="w-5 h-5 text-primary" />
+              Recent Activity
+            </CardTitle>
+            <CardDescription>Your student's learning journey updates</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <ActivityTimeline activities={recentActivities || []} />
+          </CardContent>
+        </Card>
+      </div>
+
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+        <Card>
+          <CardContent className="pt-6">
+            <div className="flex items-center gap-4">
+              <div className="p-3 rounded-full bg-lys-red/10">
+                <FileText className="w-6 h-6 text-lys-red" />
+              </div>
+              <div>
+                <p className="text-2xl font-bold">{hasJourneyData ? journeyProgress.totalAssessmentsCompleted : 0}</p>
+                <p className="text-sm text-muted-foreground">Assessments</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardContent className="pt-6">
+            <div className="flex items-center gap-4">
+              <div className="p-3 rounded-full bg-lys-yellow/10">
+                <Target className="w-6 h-6 text-lys-yellow" />
+              </div>
+              <div>
+                <p className="text-2xl font-bold">{goals?.length || 0}</p>
+                <p className="text-sm text-muted-foreground">Active Goals</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardContent className="pt-6">
+            <div className="flex items-center gap-4">
+              <div className="p-3 rounded-full bg-lys-teal/10">
+                <Award className="w-6 h-6 text-lys-teal" />
+              </div>
+              <div>
+                <p className="text-2xl font-bold">{hasJourneyData ? journeyProgress.totalMilestonesAchieved : 0}</p>
+                <p className="text-sm text-muted-foreground">Milestones</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardContent className="pt-6">
+            <div className="flex items-center gap-4">
+              <div className="p-3 rounded-full bg-primary/10">
+                <Briefcase className="w-6 h-6 text-primary" />
+              </div>
+              <div>
+                <p className="text-2xl font-bold">{savedCareers?.length || 0}</p>
+                <p className="text-sm text-muted-foreground">Saved Careers</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      <Tabs defaultValue="goals" className="space-y-4">
+        <TabsList>
+          <TabsTrigger value="goals" data-testid="tab-goals">
+            <Target className="w-4 h-4 mr-2" />
+            Goals
+          </TabsTrigger>
+          <TabsTrigger value="careers" data-testid="tab-careers">
+            <Briefcase className="w-4 h-4 mr-2" />
+            Careers
+          </TabsTrigger>
+          <TabsTrigger value="milestones" data-testid="tab-milestones">
+            <Award className="w-4 h-4 mr-2" />
+            Milestones
+          </TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="goals" className="space-y-4">
+          {!goals ? (
+            <Card>
+              <CardContent className="py-8 text-center text-muted-foreground">
+                <EyeOff className="w-12 h-12 mx-auto mb-2 opacity-50" />
+                <p>Goal viewing is not permitted</p>
+              </CardContent>
+            </Card>
+          ) : goals.length === 0 ? (
+            <Card>
+              <CardContent className="py-8 text-center text-muted-foreground">
+                <Target className="w-12 h-12 mx-auto mb-2 opacity-50" />
+                <p>No goals set yet</p>
+                <p className="text-xs mt-1">Goals will appear here once created</p>
+              </CardContent>
+            </Card>
+          ) : (
+            <div className="grid gap-4 md:grid-cols-2">
+              {goals.map((goal) => (
+                <Card key={goal.id}>
+                  <CardContent className="pt-6">
+                    <div className="space-y-3">
+                      <div className="flex items-start justify-between gap-2">
+                        <div>
+                          <h4 className="font-medium">{goal.title}</h4>
+                          <p className="text-sm text-muted-foreground line-clamp-2">{goal.description}</p>
+                        </div>
+                        <Badge variant={goal.status === 'completed' ? 'default' : 'outline'}>
+                          {goal.status}
+                        </Badge>
+                      </div>
+                      <div>
+                        <div className="flex justify-between text-sm mb-1">
+                          <span className="text-muted-foreground">Progress</span>
+                          <span className="font-medium">{goal.progress}%</span>
+                        </div>
+                        <Progress value={goal.progress} className="h-2" />
+                      </div>
+                      {goal.targetDate && (
+                        <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                          <Calendar className="w-3 h-3" />
+                          Target: {new Date(goal.targetDate).toLocaleDateString()}
+                        </div>
+                      )}
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          )}
+        </TabsContent>
+
+        <TabsContent value="careers" className="space-y-4">
+          {!savedCareers ? (
+            <Card>
+              <CardContent className="py-8 text-center text-muted-foreground">
+                <EyeOff className="w-12 h-12 mx-auto mb-2 opacity-50" />
+                <p>Career viewing is not permitted</p>
+              </CardContent>
+            </Card>
+          ) : savedCareers.length === 0 ? (
+            <Card>
+              <CardContent className="py-8 text-center text-muted-foreground">
+                <Briefcase className="w-12 h-12 mx-auto mb-2 opacity-50" />
+                <p>No careers saved yet</p>
+                <p className="text-xs mt-1">Saved careers will appear here</p>
+              </CardContent>
+            </Card>
+          ) : (
+            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+              {savedCareers.map((career, idx) => (
+                <Card key={idx}>
+                  <CardContent className="pt-6">
+                    <div className="flex items-start gap-3">
+                      <div className="p-2 rounded-md bg-primary/10">
+                        <Briefcase className="w-5 h-5 text-primary" />
+                      </div>
+                      <div>
+                        <p className="font-medium">{career.careerTitle}</p>
+                        <p className="text-sm text-muted-foreground capitalize">{career.careerCategory}</p>
+                        {career.savedAt && (
+                          <p className="text-xs text-muted-foreground mt-1">
+                            Saved: {new Date(career.savedAt).toLocaleDateString()}
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          )}
+        </TabsContent>
+
+        <TabsContent value="milestones" className="space-y-4">
+          {!milestones ? (
+            <Card>
+              <CardContent className="py-8 text-center text-muted-foreground">
+                <EyeOff className="w-12 h-12 mx-auto mb-2 opacity-50" />
+                <p>Milestone viewing is not permitted</p>
+              </CardContent>
+            </Card>
+          ) : milestones.length === 0 ? (
+            <Card>
+              <CardContent className="py-8 text-center text-muted-foreground">
+                <Award className="w-12 h-12 mx-auto mb-2 opacity-50" />
+                <p>No milestones achieved yet</p>
+                <p className="text-xs mt-1">Milestones will appear here as they're completed</p>
+              </CardContent>
+            </Card>
+          ) : (
+            <div className="grid gap-4 md:grid-cols-2">
+              {milestones.map((milestone, idx) => (
+                <Card key={idx}>
+                  <CardContent className="pt-6">
+                    <div className="flex items-start gap-3">
+                      <div className="p-2 rounded-full bg-lys-teal/10">
+                        <Award className="w-5 h-5 text-lys-teal" />
+                      </div>
+                      <div>
+                        <p className="font-medium">{milestone.title}</p>
+                        <p className="text-sm text-muted-foreground">{milestone.description}</p>
+                        {milestone.achievedAt && (
+                          <Badge variant="secondary" className="mt-2">
+                            <Check className="w-3 h-3 mr-1" />
+                            Achieved {new Date(milestone.achievedAt).toLocaleDateString()}
+                          </Badge>
+                        )}
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          )}
+        </TabsContent>
+      </Tabs>
+    </div>
+  );
+}
 
 export default function ParentPortal() {
   const [inviteEmail, setInviteEmail] = useState("");
@@ -72,6 +549,7 @@ export default function ParentPortal() {
   const [selectedStudent, setSelectedStudent] = useState<string | null>(null);
   const [noteContent, setNoteContent] = useState("");
   const [noteType, setNoteType] = useState("encouragement");
+  const [activeTab, setActiveTab] = useState("dashboard");
   const { isAuthenticated, user } = useAuth();
   const { toast } = useToast();
 
@@ -252,7 +730,7 @@ export default function ParentPortal() {
   const getStatusBadge = (status: string) => {
     switch (status) {
       case 'active':
-        return <Badge variant="default" className="bg-green-500/10 text-green-600"><Check className="w-3 h-3 mr-1" /> Active</Badge>;
+        return <Badge variant="default" className="bg-green-500/10 text-green-600 border-green-500/20"><Check className="w-3 h-3 mr-1" /> Active</Badge>;
       case 'pending':
         return <Badge variant="secondary"><Clock className="w-3 h-3 mr-1" /> Pending</Badge>;
       case 'revoked':
@@ -266,11 +744,11 @@ export default function ParentPortal() {
     return (
       <div className="flex items-center justify-center min-h-[60vh]">
         <Card className="w-full max-w-md">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Users className="h-5 w-5" />
-              Parent Portal
-            </CardTitle>
+          <CardHeader className="text-center">
+            <div className="mx-auto mb-4 h-16 w-16 rounded-full bg-primary/10 flex items-center justify-center">
+              <Users className="h-8 w-8 text-primary" />
+            </div>
+            <CardTitle>Parent Portal</CardTitle>
             <CardDescription>
               Please sign in to access the Parent Portal
             </CardDescription>
@@ -319,14 +797,14 @@ export default function ParentPortal() {
     <div className="space-y-6 p-6">
       <div className="flex flex-wrap items-center justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-bold flex items-center gap-2">
+          <h1 className="text-3xl font-bold font-oswald flex items-center gap-2">
             <Users className="h-8 w-8 text-primary" />
             Parent Portal
           </h1>
           <p className="text-muted-foreground mt-1">
             {isStudent 
               ? "Manage which family members can view your progress"
-              : "Track your student's educational journey"}
+              : "Track your student's educational journey and celebrate their achievements"}
           </p>
         </div>
         
@@ -342,7 +820,7 @@ export default function ParentPortal() {
               <DialogHeader>
                 <DialogTitle>Invite Parent or Guardian</DialogTitle>
                 <DialogDescription>
-                  Send an invitation to your parent or guardian so they can view your progress.
+                  Send an invitation to your parent or guardian so they can view your progress and celebrate your achievements.
                 </DialogDescription>
               </DialogHeader>
               <div className="space-y-4 pt-4">
@@ -394,7 +872,7 @@ export default function ParentPortal() {
             </TabsTrigger>
             <TabsTrigger value="pending" data-testid="tab-pending-invitations">
               <Mail className="mr-2 h-4 w-4" />
-              Pending Invitations ({invitations.filter(i => i.status === 'pending').length})
+              Pending ({invitations.filter(i => i.status === 'pending').length})
             </TabsTrigger>
           </TabsList>
 
@@ -402,7 +880,9 @@ export default function ParentPortal() {
             {links.length === 0 ? (
               <Card>
                 <CardContent className="flex flex-col items-center justify-center py-12 text-center">
-                  <Users className="h-12 w-12 text-muted-foreground mb-4" />
+                  <div className="h-16 w-16 rounded-full bg-primary/10 flex items-center justify-center mb-4">
+                    <Users className="h-8 w-8 text-primary" />
+                  </div>
                   <h3 className="text-lg font-semibold">No Linked Parents</h3>
                   <p className="text-muted-foreground max-w-sm mt-2">
                     Invite your parents or guardians so they can track your progress and support your journey.
@@ -445,10 +925,12 @@ export default function ParentPortal() {
                         </Label>
                         <div className="space-y-2">
                           {[
-                            { key: 'viewGoals' as const, label: 'View Goals & Progress', icon: Target },
-                            { key: 'viewAssessments' as const, label: 'View Assessments', icon: BookOpen },
-                            { key: 'viewCareers' as const, label: 'View Saved Careers', icon: Briefcase },
-                            { key: 'receiveNotifications' as const, label: 'Receive Updates', icon: Mail },
+                            { key: 'viewGoals' as const, label: 'Goals & Progress', icon: Target },
+                            { key: 'viewAssessments' as const, label: 'Assessments', icon: BookOpen },
+                            { key: 'viewCareers' as const, label: 'Saved Careers', icon: Briefcase },
+                            { key: 'viewMilestones' as const, label: 'Milestones', icon: Award },
+                            { key: 'viewActivities' as const, label: 'Activity Feed', icon: Activity },
+                            { key: 'receiveNotifications' as const, label: 'Email Updates', icon: Mail },
                           ].map(({ key, label, icon: Icon }) => (
                             <div key={key} className="flex items-center justify-between">
                               <div className="flex items-center gap-2 text-sm">
@@ -464,6 +946,7 @@ export default function ParentPortal() {
                           ))}
                         </div>
                       </div>
+                      <Separator />
                       <Button
                         variant="destructive"
                         size="sm"
@@ -502,7 +985,9 @@ export default function ParentPortal() {
                   <Card key={invitation.id}>
                     <CardContent className="flex items-center justify-between py-4">
                       <div className="flex items-center gap-3">
-                        <Mail className="h-5 w-5 text-muted-foreground" />
+                        <div className="h-10 w-10 rounded-full bg-muted flex items-center justify-center">
+                          <Mail className="h-5 w-5 text-muted-foreground" />
+                        </div>
                         <div>
                           <p className="font-medium">{invitation.parentEmail}</p>
                           <p className="text-sm text-muted-foreground">
@@ -512,7 +997,7 @@ export default function ParentPortal() {
                       </div>
                       <Button
                         variant="ghost"
-                        size="sm"
+                        size="icon"
                         onClick={() => deleteInvitationMutation.mutate(invitation.id)}
                         disabled={deleteInvitationMutation.isPending}
                         data-testid={`button-cancel-invite-${invitation.id}`}
@@ -527,20 +1012,22 @@ export default function ParentPortal() {
           </TabsContent>
         </Tabs>
       ) : (
-        <div className="grid gap-6 lg:grid-cols-3">
+        <div className="grid gap-6 lg:grid-cols-4">
           <div className="lg:col-span-1">
             <Card>
               <CardHeader>
                 <CardTitle className="text-lg">Your Students</CardTitle>
-                <CardDescription>Select a student to view their progress</CardDescription>
+                <CardDescription>Select to view progress</CardDescription>
               </CardHeader>
               <CardContent className="space-y-2">
                 {parentLinks.length === 0 ? (
                   <div className="text-center py-8">
-                    <Users className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
-                    <p className="text-muted-foreground">No linked students yet</p>
-                    <p className="text-sm text-muted-foreground mt-1">
-                      Your student will need to send you an invitation.
+                    <div className="h-12 w-12 rounded-full bg-muted mx-auto flex items-center justify-center mb-4">
+                      <Users className="h-6 w-6 text-muted-foreground" />
+                    </div>
+                    <p className="text-muted-foreground text-sm">No linked students</p>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Your student needs to send you an invitation.
                     </p>
                   </div>
                 ) : (
@@ -550,14 +1037,18 @@ export default function ParentPortal() {
                       onClick={() => setSelectedStudent(link.studentUserId)}
                       className={`w-full p-3 rounded-md text-left flex items-center justify-between transition-colors ${
                         selectedStudent === link.studentUserId
-                          ? "bg-primary/10 border-primary"
+                          ? "bg-primary/10 border border-primary/20"
                           : "hover-elevate"
                       }`}
                       data-testid={`button-select-student-${link.id}`}
                     >
                       <div className="flex items-center gap-3">
-                        <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center">
-                          <Users className="h-5 w-5 text-primary" />
+                        <div className={`h-10 w-10 rounded-full flex items-center justify-center ${
+                          selectedStudent === link.studentUserId ? 'bg-primary/20' : 'bg-muted'
+                        }`}>
+                          <GraduationCap className={`h-5 w-5 ${
+                            selectedStudent === link.studentUserId ? 'text-primary' : 'text-muted-foreground'
+                          }`} />
                         </div>
                         <div>
                           <p className="font-medium">
@@ -574,199 +1065,78 @@ export default function ParentPortal() {
                 )}
               </CardContent>
             </Card>
+
+            {selectedStudent && studentData && (
+              <Card className="mt-4">
+                <CardHeader>
+                  <CardTitle className="text-lg flex items-center gap-2">
+                    <MessageSquare className="h-5 w-5" />
+                    Send a Note
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  <Select value={noteType} onValueChange={setNoteType}>
+                    <SelectTrigger data-testid="select-note-type">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="encouragement">
+                        <div className="flex items-center gap-2">
+                          <Heart className="h-4 w-4 text-lys-red" />
+                          Encouragement
+                        </div>
+                      </SelectItem>
+                      <SelectItem value="milestone_celebration">
+                        <div className="flex items-center gap-2">
+                          <Star className="h-4 w-4 text-lys-yellow" />
+                          Celebration
+                        </div>
+                      </SelectItem>
+                      <SelectItem value="general">
+                        <div className="flex items-center gap-2">
+                          <MessageSquare className="h-4 w-4" />
+                          General
+                        </div>
+                      </SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <Textarea
+                    placeholder="Write an encouraging note..."
+                    value={noteContent}
+                    onChange={(e) => setNoteContent(e.target.value)}
+                    className="min-h-[80px]"
+                    data-testid="textarea-note-content"
+                  />
+                  <Button
+                    onClick={handleAddNote}
+                    disabled={!noteContent.trim() || addNoteMutation.isPending}
+                    className="w-full"
+                    data-testid="button-add-note"
+                  >
+                    <Send className="mr-2 h-4 w-4" />
+                    {addNoteMutation.isPending ? "Sending..." : "Send"}
+                  </Button>
+                </CardContent>
+              </Card>
+            )}
           </div>
 
-          <div className="lg:col-span-2">
+          <div className="lg:col-span-3">
             {!selectedStudent ? (
               <Card>
                 <CardContent className="flex flex-col items-center justify-center py-16 text-center">
-                  <Eye className="h-16 w-16 text-muted-foreground mb-4" />
+                  <div className="h-20 w-20 rounded-full bg-primary/10 flex items-center justify-center mb-4">
+                    <Eye className="h-10 w-10 text-primary" />
+                  </div>
                   <h3 className="text-xl font-semibold">Select a Student</h3>
                   <p className="text-muted-foreground max-w-sm mt-2">
-                    Choose a student from the list to view their goals, progress, and achievements.
+                    Choose a student from the list to view their progress, goals, and achievements in their Be-Know-Do journey.
                   </p>
                 </CardContent>
               </Card>
-            ) : studentDataLoading ? (
-              <div className="space-y-4">
-                <Skeleton className="h-32" />
-                <Skeleton className="h-48" />
-              </div>
-            ) : studentData ? (
-              <div className="space-y-4">
-                <Card>
-                  <CardHeader>
-                    <CardTitle className="flex items-center gap-2">
-                      <Target className="h-5 w-5" />
-                      {studentData.student?.firstName}'s Progress
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <Tabs defaultValue="goals">
-                      <TabsList className="grid w-full grid-cols-3">
-                        <TabsTrigger value="goals">Goals</TabsTrigger>
-                        <TabsTrigger value="assessments">Assessments</TabsTrigger>
-                        <TabsTrigger value="careers">Careers</TabsTrigger>
-                      </TabsList>
-                      
-                      <TabsContent value="goals" className="space-y-4 mt-4">
-                        {!studentData.goals ? (
-                          <div className="text-center py-8 text-muted-foreground">
-                            <EyeOff className="h-8 w-8 mx-auto mb-2" />
-                            <p>Goal viewing is not permitted</p>
-                          </div>
-                        ) : studentData.goals.length === 0 ? (
-                          <p className="text-center py-8 text-muted-foreground">No goals set yet</p>
-                        ) : (
-                          studentData.goals.map((goal) => (
-                            <Card key={goal.id}>
-                              <CardContent className="py-4">
-                                <div className="flex items-start justify-between gap-4">
-                                  <div className="flex-1">
-                                    <h4 className="font-medium">{goal.title}</h4>
-                                    <p className="text-sm text-muted-foreground">{goal.description}</p>
-                                    <div className="mt-2">
-                                      <Progress value={goal.progress} className="h-2" />
-                                      <p className="text-xs text-muted-foreground mt-1">
-                                        {goal.progress}% complete
-                                      </p>
-                                    </div>
-                                  </div>
-                                  <Badge variant="outline">{goal.status}</Badge>
-                                </div>
-                              </CardContent>
-                            </Card>
-                          ))
-                        )}
-                      </TabsContent>
-                      
-                      <TabsContent value="assessments" className="mt-4">
-                        {!studentData.assessments ? (
-                          <div className="text-center py-8 text-muted-foreground">
-                            <EyeOff className="h-8 w-8 mx-auto mb-2" />
-                            <p>Assessment viewing is not permitted</p>
-                          </div>
-                        ) : studentData.assessments.length === 0 ? (
-                          <p className="text-center py-8 text-muted-foreground">No assessments completed yet</p>
-                        ) : (
-                          <div className="space-y-4">
-                            {studentData.assessments.map((assessment, idx) => (
-                              <Card key={idx}>
-                                <CardContent className="py-4">
-                                  <p className="text-sm text-muted-foreground">
-                                    Completed: {new Date(assessment.completedAt).toLocaleDateString()}
-                                  </p>
-                                  <div className="mt-2 flex gap-2">
-                                    <Badge variant="outline">BE: {assessment.scores?.be || 0}%</Badge>
-                                    <Badge variant="outline">KNOW: {assessment.scores?.know || 0}%</Badge>
-                                    <Badge variant="outline">DO: {assessment.scores?.do || 0}%</Badge>
-                                  </div>
-                                </CardContent>
-                              </Card>
-                            ))}
-                          </div>
-                        )}
-                      </TabsContent>
-                      
-                      <TabsContent value="careers" className="mt-4">
-                        {!studentData.savedCareers ? (
-                          <div className="text-center py-8 text-muted-foreground">
-                            <EyeOff className="h-8 w-8 mx-auto mb-2" />
-                            <p>Career viewing is not permitted</p>
-                          </div>
-                        ) : studentData.savedCareers.length === 0 ? (
-                          <p className="text-center py-8 text-muted-foreground">No careers saved yet</p>
-                        ) : (
-                          <div className="space-y-2">
-                            {studentData.savedCareers.map((career, idx) => (
-                              <div key={idx} className="flex items-center gap-3 p-3 rounded-md bg-muted/50">
-                                <Briefcase className="h-5 w-5 text-primary" />
-                                <div>
-                                  <p className="font-medium">{career.careerTitle}</p>
-                                  <p className="text-sm text-muted-foreground capitalize">{career.careerCategory}</p>
-                                </div>
-                              </div>
-                            ))}
-                          </div>
-                        )}
-                      </TabsContent>
-                    </Tabs>
-                  </CardContent>
-                </Card>
-
-                <Card>
-                  <CardHeader>
-                    <CardTitle className="flex items-center gap-2">
-                      <MessageSquare className="h-5 w-5" />
-                      Encouragement Notes
-                    </CardTitle>
-                    <CardDescription>Leave supportive notes for your student</CardDescription>
-                  </CardHeader>
-                  <CardContent className="space-y-4">
-                    <div className="space-y-2">
-                      <Select value={noteType} onValueChange={setNoteType}>
-                        <SelectTrigger data-testid="select-note-type">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="encouragement">
-                            <div className="flex items-center gap-2">
-                              <Heart className="h-4 w-4" />
-                              Encouragement
-                            </div>
-                          </SelectItem>
-                          <SelectItem value="milestone_celebration">
-                            <div className="flex items-center gap-2">
-                              <Check className="h-4 w-4" />
-                              Milestone Celebration
-                            </div>
-                          </SelectItem>
-                          <SelectItem value="general">
-                            <div className="flex items-center gap-2">
-                              <MessageSquare className="h-4 w-4" />
-                              General Note
-                            </div>
-                          </SelectItem>
-                        </SelectContent>
-                      </Select>
-                      <Textarea
-                        placeholder="Write an encouraging note for your student..."
-                        value={noteContent}
-                        onChange={(e) => setNoteContent(e.target.value)}
-                        data-testid="textarea-note-content"
-                      />
-                      <Button
-                        onClick={handleAddNote}
-                        disabled={!noteContent.trim() || addNoteMutation.isPending}
-                        data-testid="button-add-note"
-                      >
-                        <Send className="mr-2 h-4 w-4" />
-                        {addNoteMutation.isPending ? "Sending..." : "Send Note"}
-                      </Button>
-                    </div>
-
-                    {studentData.notes && studentData.notes.length > 0 && (
-                      <div className="space-y-2 mt-4">
-                        <Label>Previous Notes</Label>
-                        {studentData.notes.map((note: any, idx: number) => (
-                          <div key={idx} className="p-3 rounded-md bg-muted/50">
-                            <div className="flex items-center gap-2 mb-1">
-                              <Badge variant="outline" className="text-xs capitalize">
-                                {note.noteType}
-                              </Badge>
-                              <span className="text-xs text-muted-foreground">
-                                {new Date(note.createdAt).toLocaleDateString()}
-                              </span>
-                            </div>
-                            <p className="text-sm">{note.content}</p>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </CardContent>
-                </Card>
-              </div>
-            ) : null}
+            ) : (
+              <StudentDashboard studentData={studentData} isLoading={studentDataLoading} />
+            )}
           </div>
         </div>
       )}
