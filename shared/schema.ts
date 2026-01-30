@@ -806,8 +806,37 @@ export type BlsSyncLog = typeof blsSyncLog.$inferSelect;
 // ================================
 
 // Accommodation Types
-export const accommodationTypes = ["IEP", "504", "BIP"] as const;
+export const accommodationTypes = [
+  "extraTime",
+  "notesCopyProvided",
+  "studySheetProvided",
+  "graphicOrganizer",
+  "mnemonicDevices",
+  "largerFont",
+  "shortenedText",
+  "peerSupport",
+  "preferentialSeating",
+  "frequentReminders",
+  "completedExample",
+  "visualOrganizer"
+] as const;
 export type AccommodationType = typeof accommodationTypes[number];
+
+// Accommodation labels for display
+export const accommodationLabels: Record<AccommodationType, string> = {
+  extraTime: "Extra Time",
+  notesCopyProvided: "Notes/Presentation Copy Provided",
+  studySheetProvided: "Study Sheet Provided",
+  graphicOrganizer: "Graphic Organizer",
+  mnemonicDevices: "Mnemonic Devices",
+  largerFont: "Larger Size Font",
+  shortenedText: "Shortened Text",
+  peerSupport: "Peer Support",
+  preferentialSeating: "Preferential Seating",
+  frequentReminders: "Frequent On Task Reminders",
+  completedExample: "Provided A Completed Example",
+  visualOrganizer: "Visual Organizer Provided"
+};
 
 // Classes Table (educator's classes)
 export const classes = pgTable("classes", {
@@ -1174,23 +1203,20 @@ export const insertPortfolioCommentSchema = createInsertSchema(portfolioComments
 export type InsertPortfolioComment = z.infer<typeof insertPortfolioCommentSchema>;
 export type PortfolioComment = typeof portfolioComments.$inferSelect;
 
-// IEP/504/BIP Accommodation Suggestions (static reference data)
+// Accommodation Suggestions (static reference data)
 export const accommodationSuggestions = [
-  { id: "1", type: "IEP" as AccommodationType, category: "Presentation", suggestion: "Provide audio recordings of written materials", source: "IDEA Best Practices" },
-  { id: "2", type: "IEP" as AccommodationType, category: "Presentation", suggestion: "Use larger print or visual aids", source: "IDEA Best Practices" },
-  { id: "3", type: "IEP" as AccommodationType, category: "Response", suggestion: "Allow verbal responses instead of written", source: "IDEA Best Practices" },
-  { id: "4", type: "IEP" as AccommodationType, category: "Response", suggestion: "Permit use of assistive technology for responses", source: "IDEA Best Practices" },
-  { id: "5", type: "IEP" as AccommodationType, category: "Timing", suggestion: "Provide extended time (typically 1.5x to 2x)", source: "IDEA Best Practices" },
-  { id: "6", type: "504" as AccommodationType, category: "Setting", suggestion: "Preferential seating near instruction", source: "Section 504 Guidelines" },
-  { id: "7", type: "504" as AccommodationType, category: "Setting", suggestion: "Reduce distractions in testing environment", source: "Section 504 Guidelines" },
-  { id: "8", type: "504" as AccommodationType, category: "Timing", suggestion: "Allow frequent breaks during extended tasks", source: "Section 504 Guidelines" },
-  { id: "9", type: "504" as AccommodationType, category: "Presentation", suggestion: "Provide written instructions alongside verbal", source: "Section 504 Guidelines" },
-  { id: "10", type: "504" as AccommodationType, category: "Response", suggestion: "Allow use of calculator for math problems", source: "Section 504 Guidelines" },
-  { id: "11", type: "BIP" as AccommodationType, category: "Environment", suggestion: "Establish clear behavioral expectations before activity", source: "PBIS Framework" },
-  { id: "12", type: "BIP" as AccommodationType, category: "Environment", suggestion: "Provide structured check-ins during independent work", source: "PBIS Framework" },
-  { id: "13", type: "BIP" as AccommodationType, category: "Support", suggestion: "Use positive reinforcement for on-task behavior", source: "PBIS Framework" },
-  { id: "14", type: "BIP" as AccommodationType, category: "Support", suggestion: "Offer choice in assignment format or order", source: "PBIS Framework" },
-  { id: "15", type: "BIP" as AccommodationType, category: "Environment", suggestion: "Provide sensory breaks or movement opportunities", source: "PBIS Framework" },
+  { id: "1", type: "extraTime" as AccommodationType, category: "Timing", suggestion: "Provide 1.5x to 2x extended time for completing assignments", source: "IDEA Best Practices" },
+  { id: "2", type: "notesCopyProvided" as AccommodationType, category: "Presentation", suggestion: "Provide copies of notes or presentation slides before class", source: "Universal Design for Learning" },
+  { id: "3", type: "studySheetProvided" as AccommodationType, category: "Support", suggestion: "Provide a study sheet with key concepts and vocabulary", source: "Differentiated Instruction" },
+  { id: "4", type: "graphicOrganizer" as AccommodationType, category: "Organization", suggestion: "Use graphic organizers to structure information visually", source: "Cognitive Strategy Instruction" },
+  { id: "5", type: "mnemonicDevices" as AccommodationType, category: "Memory", suggestion: "Teach mnemonic devices to aid in memorization", source: "Cognitive Strategy Instruction" },
+  { id: "6", type: "largerFont" as AccommodationType, category: "Presentation", suggestion: "Increase font size to 14pt or larger for readability", source: "Section 504 Guidelines" },
+  { id: "7", type: "shortenedText" as AccommodationType, category: "Presentation", suggestion: "Reduce reading length while maintaining key concepts", source: "Differentiated Instruction" },
+  { id: "8", type: "peerSupport" as AccommodationType, category: "Support", suggestion: "Pair with a peer buddy for collaborative learning", source: "Cooperative Learning" },
+  { id: "9", type: "preferentialSeating" as AccommodationType, category: "Setting", suggestion: "Seat near the front or away from distractions", source: "Section 504 Guidelines" },
+  { id: "10", type: "frequentReminders" as AccommodationType, category: "Behavior", suggestion: "Provide regular check-ins and on-task prompts", source: "PBIS Framework" },
+  { id: "11", type: "completedExample" as AccommodationType, category: "Modeling", suggestion: "Show a completed example before independent work", source: "Explicit Instruction" },
+  { id: "12", type: "visualOrganizer" as AccommodationType, category: "Organization", suggestion: "Use visual schedules and checklists for task completion", source: "Universal Design for Learning" },
 ] as const;
 
 export type AccommodationSuggestion = typeof accommodationSuggestions[number];
@@ -1202,7 +1228,7 @@ export const generateAssignmentRequestSchema = z.object({
   questionCount: z.number().min(1).max(20).default(5),
   difficulty: z.enum(["easy", "medium", "hard"]).default("medium"),
   includeBeKnowDo: z.boolean().default(true),
-  accommodationType: z.enum(["IEP", "504", "BIP"]).optional(),
+  accommodationType: z.enum(accommodationTypes).optional(),
   accommodationNotes: z.string().optional(),
 });
 

@@ -19,6 +19,7 @@ import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/use-auth";
 import type { Lesson, Assignment, Class, Student, StudentGroup, AccommodationType } from "@shared/schema";
+import { accommodationLabels } from "@shared/schema";
 
 const ASSIGNMENT_TYPES = [
   { value: "quiz", label: "Quiz", description: "Multiple choice and short answer questions" },
@@ -617,9 +618,18 @@ export default function Assignments() {
                       </SelectTrigger>
                       <SelectContent>
                         <SelectItem value="none">No accommodation</SelectItem>
-                        <SelectItem value="IEP">IEP (Individualized Education Program)</SelectItem>
-                        <SelectItem value="504">504 Plan</SelectItem>
-                        <SelectItem value="BIP">BIP (Behavior Intervention Plan)</SelectItem>
+                        <SelectItem value="extraTime">Extra Time</SelectItem>
+                        <SelectItem value="notesCopyProvided">Notes/Presentation Copy Provided</SelectItem>
+                        <SelectItem value="studySheetProvided">Study Sheet Provided</SelectItem>
+                        <SelectItem value="graphicOrganizer">Graphic Organizer</SelectItem>
+                        <SelectItem value="mnemonicDevices">Mnemonic Devices</SelectItem>
+                        <SelectItem value="largerFont">Larger Size Font</SelectItem>
+                        <SelectItem value="shortenedText">Shortened Text</SelectItem>
+                        <SelectItem value="peerSupport">Peer Support</SelectItem>
+                        <SelectItem value="preferentialSeating">Preferential Seating</SelectItem>
+                        <SelectItem value="frequentReminders">Frequent On Task Reminders</SelectItem>
+                        <SelectItem value="completedExample">Provided A Completed Example</SelectItem>
+                        <SelectItem value="visualOrganizer">Visual Organizer Provided</SelectItem>
                       </SelectContent>
                     </Select>
                     {accommodationType && (
@@ -1366,55 +1376,7 @@ export default function Assignments() {
                           </>
                         )}
 
-                        {generatedAssignment.accommodationChecklist && (
-                          <>
-                            <Separator className="my-6" />
-                            <div className="print:break-inside-avoid">
-                              <h3 className="font-oswald text-lg mb-3">Accommodations/Modifications Provided On This Assignment</h3>
-                              <table className="w-full border-collapse text-sm">
-                                <thead>
-                                  <tr className="bg-muted print:bg-gray-100">
-                                    <th className="border p-2 text-left font-semibold">Accommodation/Modification</th>
-                                    <th className="border p-2 text-center font-semibold w-32">Applied (Y/N)</th>
-                                  </tr>
-                                </thead>
-                                <tbody>
-                                  {[
-                                    { key: "extraTime", label: "Extra Time" },
-                                    { key: "notesCopyProvided", label: "Notes/Presentation Copy Provided" },
-                                    { key: "studySheetProvided", label: "Study Sheet Provided" },
-                                    { key: "graphicOrganizer", label: "Graphic Organizer" },
-                                    { key: "mnemonicDevices", label: "Mnemonic Devices" },
-                                    { key: "largerFont", label: "Larger Size Font" },
-                                    { key: "shortenedText", label: "Shortened Text" },
-                                    { key: "peerSupport", label: "Peer Support" },
-                                    { key: "preferentialSeating", label: "Preferential Seating" },
-                                    { key: "frequentReminders", label: "Frequent On Task Reminders" },
-                                    { key: "completedExample", label: "Provided A Completed Example" },
-                                    { key: "visualOrganizer", label: "Visual Organizer Provided" },
-                                  ].map((item) => (
-                                    <tr key={item.key}>
-                                      <td className="border p-2">{item.label}</td>
-                                      <td className="border p-2 text-center">
-                                        {isEditing ? (
-                                          <Checkbox 
-                                            checked={(generatedAssignment.accommodationChecklist as any)?.[item.key]} 
-                                            onCheckedChange={() => toggleAccommodation(item.key)}
-                                            data-testid={`checkbox-accommodation-${item.key}`}
-                                          />
-                                        ) : (generatedAssignment.accommodationChecklist as any)?.[item.key] ? (
-                                          <span className="text-green-600 font-semibold">Y</span>
-                                        ) : (
-                                          <span className="text-muted-foreground">N</span>
-                                        )}
-                                      </td>
-                                    </tr>
-                                  ))}
-                                </tbody>
-                              </table>
-                            </div>
-                          </>
-                        )}
+                        {/* Accommodations section removed - now handled via dropdown selection */}
 
                         <div className="mt-6 text-center text-xs text-muted-foreground print:mt-8">
                           <Badge variant="outline" className="print:hidden">{generatedAssignment.totalPoints} Total Points</Badge>
@@ -1438,8 +1400,8 @@ export default function Assignments() {
                     <CardHeader className="pb-2">
                       <div className="flex items-start justify-between gap-2">
                         <CardTitle className="font-oswald text-lg">{assignment.title}</CardTitle>
-                        {assignment.accommodationModified && (
-                          <Badge variant="outline">{assignment.accommodationType}</Badge>
+                        {assignment.accommodationModified && assignment.accommodationType && (
+                          <Badge variant="outline">{accommodationLabels[assignment.accommodationType as AccommodationType] || assignment.accommodationType}</Badge>
                         )}
                       </div>
                       <CardDescription className="line-clamp-2">{assignment.description}</CardDescription>
