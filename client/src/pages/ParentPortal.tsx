@@ -56,6 +56,7 @@ type ParentPermissions = {
   viewPortfolio?: boolean;
   viewMilestones?: boolean;
   viewActivities?: boolean;
+  viewAssignments?: boolean;
   receiveNotifications?: boolean;
 };
 
@@ -89,6 +90,38 @@ type StudentActivity = {
   createdAt: string;
 };
 
+type PortfolioItem = {
+  id: string;
+  title: string;
+  description: string;
+  itemType: string;
+  mediaUrl?: string;
+  thumbnailUrl?: string;
+  displayOrder: number;
+  createdAt: string;
+};
+
+type StudentPortfolio = {
+  id: string;
+  userId: string;
+  title: string;
+  bio: string;
+  theme: string;
+  visibility: string;
+  items: PortfolioItem[];
+};
+
+type StudentAssignment = {
+  id: string;
+  title: string;
+  type: string;
+  status: string;
+  grade?: number;
+  submittedAt?: string;
+  dueDate?: string;
+  feedback?: string;
+};
+
 type StudentData = {
   student: {
     id: string;
@@ -102,7 +135,8 @@ type StudentData = {
   savedCareers?: any[];
   milestones?: any[];
   recentActivities?: StudentActivity[];
-  portfolio?: any;
+  portfolio?: StudentPortfolio;
+  assignments?: StudentAssignment[];
   notes?: any[];
 };
 
@@ -263,7 +297,7 @@ function StudentDashboard({ studentData, isLoading }: { studentData: StudentData
     return null;
   }
 
-  const { student, journeyProgress, goals, savedCareers, milestones, recentActivities } = studentData;
+  const { student, journeyProgress, goals, savedCareers, milestones, recentActivities, portfolio, assignments } = studentData;
   const hasJourneyData = journeyProgress && journeyProgress.overallScore > 0;
 
   return (
@@ -386,7 +420,7 @@ function StudentDashboard({ studentData, isLoading }: { studentData: StudentData
       </div>
 
       <Tabs defaultValue="goals" className="space-y-4">
-        <TabsList>
+        <TabsList className="flex-wrap h-auto gap-1">
           <TabsTrigger value="goals" data-testid="tab-goals">
             <Target className="w-4 h-4 mr-2" />
             Goals
@@ -398,6 +432,14 @@ function StudentDashboard({ studentData, isLoading }: { studentData: StudentData
           <TabsTrigger value="milestones" data-testid="tab-milestones">
             <Award className="w-4 h-4 mr-2" />
             Milestones
+          </TabsTrigger>
+          <TabsTrigger value="portfolio" data-testid="tab-portfolio">
+            <GraduationCap className="w-4 h-4 mr-2" />
+            Portfolio
+          </TabsTrigger>
+          <TabsTrigger value="assignments" data-testid="tab-assignments">
+            <FileText className="w-4 h-4 mr-2" />
+            Assignments
           </TabsTrigger>
         </TabsList>
 
@@ -531,6 +573,182 @@ function StudentDashboard({ studentData, isLoading }: { studentData: StudentData
                         )}
                       </div>
                     </div>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          )}
+        </TabsContent>
+
+        <TabsContent value="portfolio" className="space-y-4">
+          {portfolio === undefined ? (
+            <Card>
+              <CardContent className="py-8 text-center text-muted-foreground">
+                <EyeOff className="w-12 h-12 mx-auto mb-2 opacity-50" />
+                <p>Portfolio viewing is not permitted</p>
+              </CardContent>
+            </Card>
+          ) : portfolio === null || !portfolio ? (
+            <Card>
+              <CardContent className="py-8 text-center text-muted-foreground">
+                <GraduationCap className="w-12 h-12 mx-auto mb-2 opacity-50" />
+                <p>No portfolio created yet</p>
+                <p className="text-xs mt-1">Portfolio items will appear here once created</p>
+              </CardContent>
+            </Card>
+          ) : (
+            <div className="space-y-4">
+              <Card>
+                <CardHeader className="pb-2">
+                  <div className="flex items-center justify-between gap-2 flex-wrap">
+                    <div>
+                      <CardTitle className="flex items-center gap-2">
+                        <GraduationCap className="w-5 h-5 text-primary" />
+                        {portfolio.title || `${student.firstName}'s Portfolio`}
+                      </CardTitle>
+                      {portfolio.bio && (
+                        <CardDescription className="mt-1">{portfolio.bio}</CardDescription>
+                      )}
+                    </div>
+                    <div className="flex gap-2">
+                      <Badge variant="outline" className="capitalize">{portfolio.theme}</Badge>
+                      <Badge variant={portfolio.visibility === 'public' ? 'default' : 'secondary'}>
+                        {portfolio.visibility === 'public' ? <Eye className="w-3 h-3 mr-1" /> : <EyeOff className="w-3 h-3 mr-1" />}
+                        {portfolio.visibility}
+                      </Badge>
+                    </div>
+                  </div>
+                </CardHeader>
+              </Card>
+              
+              {portfolio.items && portfolio.items.length > 0 ? (
+                <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+                  {portfolio.items.map((item) => (
+                    <Card key={item.id} className="overflow-hidden">
+                      {item.thumbnailUrl && (
+                        <div className="aspect-video bg-muted overflow-hidden">
+                          <img 
+                            src={item.thumbnailUrl} 
+                            alt={item.title}
+                            className="w-full h-full object-cover"
+                          />
+                        </div>
+                      )}
+                      <CardContent className={item.thumbnailUrl ? "pt-4" : "pt-6"}>
+                        <div className="space-y-2">
+                          <div className="flex items-start justify-between gap-2">
+                            <h4 className="font-medium line-clamp-1">{item.title}</h4>
+                            <Badge variant="secondary" className="text-xs capitalize shrink-0">
+                              {item.itemType.replace('_', ' ')}
+                            </Badge>
+                          </div>
+                          {item.description && (
+                            <p className="text-sm text-muted-foreground line-clamp-2">{item.description}</p>
+                          )}
+                          <p className="text-xs text-muted-foreground">
+                            Added {new Date(item.createdAt).toLocaleDateString()}
+                          </p>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  ))}
+                </div>
+              ) : (
+                <Card>
+                  <CardContent className="py-8 text-center text-muted-foreground">
+                    <FileText className="w-12 h-12 mx-auto mb-2 opacity-50" />
+                    <p>No portfolio items yet</p>
+                  </CardContent>
+                </Card>
+              )}
+            </div>
+          )}
+        </TabsContent>
+
+        <TabsContent value="assignments" className="space-y-4">
+          {assignments === undefined ? (
+            <Card>
+              <CardContent className="py-8 text-center text-muted-foreground">
+                <EyeOff className="w-12 h-12 mx-auto mb-2 opacity-50" />
+                <p>Assignment viewing is not permitted</p>
+              </CardContent>
+            </Card>
+          ) : !assignments || assignments.length === 0 ? (
+            <Card>
+              <CardContent className="py-8 text-center text-muted-foreground">
+                <FileText className="w-12 h-12 mx-auto mb-2 opacity-50" />
+                <p>No assignments yet</p>
+                <p className="text-xs mt-1">Assignments will appear here once assigned</p>
+              </CardContent>
+            </Card>
+          ) : (
+            <div className="space-y-3">
+              {assignments.map((assignment) => (
+                <Card key={assignment.id}>
+                  <CardContent className="pt-6">
+                    <div className="flex items-start justify-between gap-4 flex-wrap">
+                      <div className="flex items-start gap-3">
+                        <div className={`p-2 rounded-md ${
+                          assignment.status === 'completed' || assignment.status === 'graded' 
+                            ? 'bg-green-500/10' 
+                            : assignment.status === 'submitted'
+                            ? 'bg-blue-500/10'
+                            : 'bg-muted'
+                        }`}>
+                          <FileText className={`w-5 h-5 ${
+                            assignment.status === 'completed' || assignment.status === 'graded'
+                              ? 'text-green-600'
+                              : assignment.status === 'submitted'
+                              ? 'text-blue-600'
+                              : 'text-muted-foreground'
+                          }`} />
+                        </div>
+                        <div>
+                          <p className="font-medium">{assignment.title}</p>
+                          <div className="flex items-center gap-2 mt-1 flex-wrap">
+                            <Badge variant="outline" className="text-xs capitalize">{assignment.type}</Badge>
+                            <Badge 
+                              variant={
+                                assignment.status === 'completed' || assignment.status === 'graded' ? 'default' :
+                                assignment.status === 'submitted' ? 'secondary' : 'outline'
+                              }
+                              className="text-xs capitalize"
+                            >
+                              {assignment.status === 'graded' && assignment.grade !== undefined ? (
+                                <><Star className="w-3 h-3 mr-1" />{assignment.grade}%</>
+                              ) : (
+                                assignment.status
+                              )}
+                            </Badge>
+                          </div>
+                          {assignment.dueDate && (
+                            <p className="text-xs text-muted-foreground mt-1 flex items-center gap-1">
+                              <Calendar className="w-3 h-3" />
+                              Due: {new Date(assignment.dueDate).toLocaleDateString()}
+                            </p>
+                          )}
+                          {assignment.submittedAt && (
+                            <p className="text-xs text-muted-foreground flex items-center gap-1">
+                              <Check className="w-3 h-3" />
+                              Submitted: {new Date(assignment.submittedAt).toLocaleDateString()}
+                            </p>
+                          )}
+                        </div>
+                      </div>
+                      {assignment.grade !== undefined && assignment.grade !== null && (
+                        <div className="text-right">
+                          <p className="text-2xl font-bold text-green-600">{assignment.grade}%</p>
+                          <p className="text-xs text-muted-foreground">Grade</p>
+                        </div>
+                      )}
+                    </div>
+                    {assignment.feedback && (
+                      <div className="mt-3 pt-3 border-t">
+                        <p className="text-sm text-muted-foreground">
+                          <span className="font-medium">Feedback:</span> {assignment.feedback}
+                        </p>
+                      </div>
+                    )}
                   </CardContent>
                 </Card>
               ))}
@@ -730,7 +948,7 @@ export default function ParentPortal() {
   const getStatusBadge = (status: string) => {
     switch (status) {
       case 'active':
-        return <Badge variant="default" className="bg-green-500/10 text-green-600 border-green-500/20"><Check className="w-3 h-3 mr-1" /> Active</Badge>;
+        return <Badge variant="default"><Check className="w-3 h-3 mr-1" /> Active</Badge>;
       case 'pending':
         return <Badge variant="secondary"><Clock className="w-3 h-3 mr-1" /> Pending</Badge>;
       case 'revoked':
@@ -930,6 +1148,8 @@ export default function ParentPortal() {
                             { key: 'viewCareers' as const, label: 'Saved Careers', icon: Briefcase },
                             { key: 'viewMilestones' as const, label: 'Milestones', icon: Award },
                             { key: 'viewActivities' as const, label: 'Activity Feed', icon: Activity },
+                            { key: 'viewPortfolio' as const, label: 'Portfolio', icon: GraduationCap },
+                            { key: 'viewAssignments' as const, label: 'Assignments', icon: FileText },
                             { key: 'receiveNotifications' as const, label: 'Email Updates', icon: Mail },
                           ].map(({ key, label, icon: Icon }) => (
                             <div key={key} className="flex items-center justify-between">

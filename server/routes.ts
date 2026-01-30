@@ -4808,6 +4808,41 @@ export async function registerRoutes(
         }
       }
       
+      // Get portfolio if permitted
+      if (permissions.viewPortfolio) {
+        try {
+          const portfolio = await storage.getStudentPortfolio(studentId);
+          if (portfolio) {
+            const portfolioItems = await storage.getPortfolioItems(portfolio.id);
+            studentData.portfolio = {
+              ...portfolio,
+              items: portfolioItems.slice(0, 10), // Limit to recent 10 items
+            };
+          }
+        } catch (e) {
+          studentData.portfolio = null;
+        }
+      }
+      
+      // Get assignments for the student if permitted
+      if (permissions.viewAssignments) {
+        try {
+          const studentAssignments = await storage.getAssignmentsForStudent(studentId);
+          studentData.assignments = studentAssignments.slice(0, 10).map(({ assignment, recipient }) => ({
+            id: assignment.id,
+            title: assignment.title,
+            type: assignment.type,
+            status: recipient.status,
+            grade: recipient.grade,
+            submittedAt: recipient.submittedAt,
+            dueDate: assignment.dueDate,
+            feedback: recipient.feedback,
+          }));
+        } catch (e) {
+          studentData.assignments = [];
+        }
+      }
+      
       // Get parent's notes for this link
       const notes = await storage.getParentProgressNotes(link.id);
       studentData.notes = notes.filter(n => !n.isPrivate || n.parentUserId === parentUserId);
