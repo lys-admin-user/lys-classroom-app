@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useLocation } from "wouter";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -219,6 +220,7 @@ interface AssessmentResult {
 }
 
 export default function Assessments() {
+  const [, setLocation] = useLocation();
   const [selectedAssessment, setSelectedAssessment] = useState<Assessment | null>(null);
   const [currentQuestion, setCurrentQuestion] = useState(0);
   const [answers, setAnswers] = useState<Record<string, string>>({});
@@ -391,7 +393,11 @@ export default function Assessments() {
                 <Button onClick={handleBackToList} variant="outline" className="flex-1 font-oswald" data-testid="button-back-assessments">
                   Take Another Assessment
                 </Button>
-                <Button className="flex-1 bg-lys-teal hover:bg-lys-teal/90 text-white font-oswald" data-testid="button-explore-careers">
+                <Button 
+                  className="flex-1 bg-lys-teal text-white font-oswald" 
+                  onClick={() => setLocation("/careers")}
+                  data-testid="button-explore-careers"
+                >
                   Explore Matching Careers
                 </Button>
               </div>
