@@ -54,7 +54,22 @@ const GRADE_LEVELS = [
   "College/University"
 ];
 
-const ACCOMMODATION_TYPES: AccommodationType[] = ["IEP", "504", "BIP"];
+const ACCOMMODATION_TYPES: AccommodationType[] = ["extraTime", "notesCopyProvided", "studySheetProvided", "graphicOrganizer", "mnemonicDevices", "largerFont", "shortenedText", "peerSupport", "preferentialSeating", "frequentReminders", "completedExample", "visualOrganizer"];
+
+const ACCOMMODATION_LABELS: Record<AccommodationType, string> = {
+  extraTime: "Extra Time",
+  notesCopyProvided: "Notes Copy Provided",
+  studySheetProvided: "Study Sheet Provided",
+  graphicOrganizer: "Graphic Organizer",
+  mnemonicDevices: "Mnemonic Devices",
+  largerFont: "Larger Font",
+  shortenedText: "Shortened Text",
+  peerSupport: "Peer Support",
+  preferentialSeating: "Preferential Seating",
+  frequentReminders: "Frequent Reminders",
+  completedExample: "Completed Example",
+  visualOrganizer: "Visual Organizer"
+};
 
 export default function Classroom() {
   const { user, isLoading: authLoading } = useAuth();
@@ -71,6 +86,9 @@ export default function Classroom() {
   const [shareTargetOrgId, setShareTargetOrgId] = useState<string>("");
   const [sharePermission, setSharePermission] = useState<"view" | "edit" | "copy">("view");
   const [managingSharesClass, setManagingSharesClass] = useState<Class | null>(null);
+  const [managingStudentsClass, setManagingStudentsClass] = useState<Class | null>(null);
+  const [isBulkUploadOpen, setIsBulkUploadOpen] = useState(false);
+  const [bulkUploadData, setBulkUploadData] = useState<string>("");
 
   const isCampusAdmin = user?.role === "campus_admin";
   
@@ -127,7 +145,13 @@ export default function Classroom() {
     type: AccommodationType;
     description: string;
     active: boolean;
-  }>({ type: "IEP", description: "", active: true });
+  }>({ type: "extraTime", description: "", active: true });
+
+  // Query for students in the currently managed class
+  const { data: managedClassStudents = [], isLoading: managedClassStudentsLoading } = useQuery<Student[]>({
+    queryKey: ["/api/classes", managingStudentsClass?.id, "students"],
+    enabled: !!managingStudentsClass,
+  });
 
   // Personal classes/students queries
   const { data: personalClasses = [], isLoading: classesLoading } = useQuery<Class[]>({
@@ -263,7 +287,8 @@ export default function Classroom() {
     mutationFn: async ({ classId, studentId }: { classId: string; studentId: string }) => {
       return await apiRequest("POST", `/api/classes/${classId}/students`, { studentId });
     },
-    onSuccess: () => {
+    onSuccess: (_data, variables) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/classes", variables.classId, "students"] });
       queryClient.invalidateQueries({ queryKey: ["/api/classes", selectedClassId, "students"] });
       toast({ title: "Student added to class" });
     },
@@ -276,7 +301,8 @@ export default function Classroom() {
     mutationFn: async ({ classId, studentId }: { classId: string; studentId: string }) => {
       return await apiRequest("DELETE", `/api/classes/${classId}/students/${studentId}`);
     },
-    onSuccess: () => {
+    onSuccess: (_data, variables) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/classes", variables.classId, "students"] });
       queryClient.invalidateQueries({ queryKey: ["/api/classes", selectedClassId, "students"] });
       toast({ title: "Student removed from class" });
     },
@@ -327,7 +353,7 @@ export default function Classroom() {
       ...newStudent,
       accommodations: [...current, { ...newAccommodation }]
     });
-    setNewAccommodation({ type: "IEP", description: "", active: true });
+    setNewAccommodation({ type: "extraTime", description: "", active: true });
   };
 
   type AccommodationItem = { type: AccommodationType; description: string; active: boolean };
@@ -579,6 +605,15 @@ export default function Classroom() {
                       </div>
                     </div>
                     <div className="flex items-center gap-1">
+                      <Button
+                        size="icon"
+                        variant="ghost"
+                        onClick={() => setManagingStudentsClass(cls)}
+                        title="Manage Students"
+                        data-testid={`button-manage-students-${cls.id}`}
+                      >
+                        <UserPlus className="h-4 w-4" />
+                      </Button>
                       {isCampusAdmin && userOrgs.length > 0 && (
                         <>
                           <Button
@@ -652,7 +687,11 @@ export default function Classroom() {
 
         {/* Students Tab */}
         <TabsContent value="students" className="space-y-4">
-          <div className="flex justify-end">
+          <div className="flex justify-end gap-2">
+            <Button variant="outline" onClick={() => setIsBulkUploadOpen(true)} data-testid="button-bulk-upload">
+              <FileText className="h-4 w-4 mr-2" />
+              Bulk Upload
+            </Button>
             <Dialog open={isCreateStudentOpen} onOpenChange={setIsCreateStudentOpen}>
               <DialogTrigger asChild>
                 <Button className="bg-lys-red hover:bg-lys-red/90" data-testid="button-add-student">
@@ -738,7 +777,7 @@ export default function Classroom() {
                       <div className="space-y-2">
                         {((newStudent.accommodations || []) as AccommodationItem[]).map((acc, idx) => (
                           <div key={idx} className="flex items-center gap-2 p-2 bg-muted rounded-md">
-                            <Badge variant="outline">{acc.type}</Badge>
+                            <Badge variant="outline">{ACCOMMODATION_LABELS[acc.type as AccommodationType] || acc.type}</Badge>
                             <span className="text-sm flex-1 truncate">{acc.description}</span>
                             <Button
                               size="icon"
@@ -870,7 +909,7 @@ export default function Classroom() {
                           <AlertCircle className="h-4 w-4 text-amber-500" />
                           {student.accommodations.map((acc, idx) => (
                             <Badge key={idx} variant="secondary" className="gap-1">
-                              {acc.type}: {acc.description.substring(0, 30)}...
+                              {ACCOMMODATION_LABELS[acc.type as AccommodationType] || acc.type}: {acc.description.substring(0, 30)}...
                             </Badge>
                           ))}
                         </div>
@@ -1169,6 +1208,189 @@ export default function Classroom() {
             >
               {shareClassMutation.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
               Share Class
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Manage Students Dialog */}
+      <Dialog open={!!managingStudentsClass} onOpenChange={(open) => !open && setManagingStudentsClass(null)}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Users className="h-5 w-5" />
+              Manage Students - {managingStudentsClass?.name}
+            </DialogTitle>
+            <DialogDescription>
+              Add or remove students from this class.
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="space-y-4">
+            {/* Current Students */}
+            <div>
+              <Label className="text-sm font-medium">Students in Class ({managedClassStudents.length})</Label>
+              {managedClassStudentsLoading ? (
+                <div className="flex items-center justify-center py-4">
+                  <Loader2 className="h-5 w-5 animate-spin" />
+                </div>
+              ) : managedClassStudents.length === 0 ? (
+                <p className="text-sm text-muted-foreground py-4">No students assigned to this class yet.</p>
+              ) : (
+                <div className="mt-2 space-y-2 max-h-40 overflow-y-auto">
+                  {managedClassStudents.map((student) => (
+                    <div key={student.id} className="flex items-center justify-between p-2 bg-muted rounded-md">
+                      <div className="flex items-center gap-2">
+                        <GraduationCap className="h-4 w-4 text-muted-foreground" />
+                        <span className="font-medium">{student.firstName} {student.lastName}</span>
+                        {student.gradeLevel && <Badge variant="outline" className="text-xs">{student.gradeLevel}</Badge>}
+                      </div>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => {
+                          if (managingStudentsClass) {
+                            removeStudentFromClassMutation.mutate({
+                              classId: managingStudentsClass.id,
+                              studentId: student.id
+                            });
+                          }
+                        }}
+                        data-testid={`button-remove-student-from-class-${student.id}`}
+                      >
+                        <X className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Available Students to Add */}
+            <div>
+              <Label className="text-sm font-medium">Add Students</Label>
+              <div className="mt-2 space-y-2 max-h-48 overflow-y-auto">
+                {students
+                  .filter(s => !managedClassStudents.find(cs => cs.id === s.id))
+                  .map((student) => (
+                    <div key={student.id} className="flex items-center justify-between p-2 border rounded-md hover-elevate">
+                      <div className="flex items-center gap-2">
+                        <GraduationCap className="h-4 w-4 text-muted-foreground" />
+                        <span>{student.firstName} {student.lastName}</span>
+                        {student.gradeLevel && <Badge variant="outline" className="text-xs">{student.gradeLevel}</Badge>}
+                      </div>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => {
+                          if (managingStudentsClass) {
+                            addStudentToClassMutation.mutate({
+                              classId: managingStudentsClass.id,
+                              studentId: student.id
+                            });
+                          }
+                        }}
+                        disabled={addStudentToClassMutation.isPending}
+                        data-testid={`button-add-student-to-class-${student.id}`}
+                      >
+                        <Plus className="h-4 w-4 mr-1" />
+                        Add
+                      </Button>
+                    </div>
+                  ))}
+                {students.filter(s => !managedClassStudents.find(cs => cs.id === s.id)).length === 0 && (
+                  <p className="text-sm text-muted-foreground py-2">
+                    All students are already in this class, or no students have been created yet.
+                  </p>
+                )}
+              </div>
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setManagingStudentsClass(null)}>
+              Done
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Bulk Upload Students Dialog */}
+      <Dialog open={isBulkUploadOpen} onOpenChange={setIsBulkUploadOpen}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>Bulk Upload Students</DialogTitle>
+            <DialogDescription>
+              Paste student data in CSV format. Each line should have: First Name, Last Name, Student ID, Grade Level
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="space-y-4">
+            <div>
+              <Label>CSV Data</Label>
+              <Textarea
+                placeholder="John,Doe,12345,9th Grade
+Jane,Smith,12346,10th Grade
+..."
+                value={bulkUploadData}
+                onChange={(e) => setBulkUploadData(e.target.value)}
+                rows={10}
+                className="font-mono text-sm"
+                data-testid="textarea-bulk-upload"
+              />
+            </div>
+            <p className="text-sm text-muted-foreground">
+              Format: FirstName,LastName,StudentID,GradeLevel (one student per line)
+            </p>
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsBulkUploadOpen(false)}>Cancel</Button>
+            <Button
+              onClick={async () => {
+                const lines = bulkUploadData.trim().split('\n').filter(line => line.trim().length > 0);
+                let successCount = 0;
+                let errorCount = 0;
+                const errors: string[] = [];
+                
+                for (const line of lines) {
+                  const parts = line.split(',').map(p => p.trim());
+                  const firstName = parts[0] || "";
+                  const lastName = parts[1] || "";
+                  
+                  if (!firstName || !lastName) {
+                    errors.push(`Skipped line: "${line}" (missing name)`);
+                    errorCount++;
+                    continue;
+                  }
+                  
+                  try {
+                    await apiRequest("POST", "/api/students", {
+                      firstName,
+                      lastName,
+                      studentId: parts[2] || "",
+                      gradeLevel: parts[3] || ""
+                    });
+                    successCount++;
+                  } catch (err: any) {
+                    errors.push(`Failed: ${firstName} ${lastName}`);
+                    errorCount++;
+                  }
+                }
+                
+                queryClient.invalidateQueries({ queryKey: ["/api/students"] });
+                toast({
+                  title: `Bulk upload complete`,
+                  description: `${successCount} students added${errorCount > 0 ? `, ${errorCount} failed` : ''}`,
+                  variant: errorCount > 0 ? "destructive" : "default"
+                });
+                setBulkUploadData("");
+                setIsBulkUploadOpen(false);
+              }}
+              disabled={!bulkUploadData.trim()}
+              data-testid="button-submit-bulk-upload"
+            >
+              Upload Students
             </Button>
           </DialogFooter>
         </DialogContent>
