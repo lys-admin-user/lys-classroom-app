@@ -221,6 +221,18 @@ import {
   type AttendanceRecord,
   type InsertAttendanceRecord,
   attendanceRecords,
+  type SystemLessonAuthor,
+  type InsertSystemLessonAuthor,
+  systemLessonAuthors,
+  type MasterLesson,
+  type InsertMasterLesson,
+  masterLessons,
+  type ContentLibraryItem,
+  type InsertContentLibrary,
+  contentLibrary,
+  type LessonBulkImport,
+  type InsertLessonBulkImport,
+  lessonBulkImports,
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, desc, and, asc, gte, sql } from "drizzle-orm";
@@ -689,6 +701,42 @@ export interface IStorage {
   getCampusPerformanceMetrics(): Promise<CampusPerformanceMetric[]>;
   getOrganizationPerformanceMetrics(): Promise<OrganizationPerformanceMetric[]>;
   getSystemWideStats(): Promise<SystemWideStats>;
+  
+  // System Lesson Authors
+  getSystemLessonAuthors(): Promise<SystemLessonAuthor[]>;
+  getSystemLessonAuthor(userId: string): Promise<SystemLessonAuthor | undefined>;
+  isSystemLessonAuthor(userId: string): Promise<boolean>;
+  createSystemLessonAuthor(author: InsertSystemLessonAuthor): Promise<SystemLessonAuthor>;
+  updateSystemLessonAuthor(userId: string, updates: Partial<SystemLessonAuthor>): Promise<SystemLessonAuthor | undefined>;
+  deleteSystemLessonAuthor(userId: string): Promise<boolean>;
+  incrementAuthorLessonCount(userId: string): Promise<void>;
+  
+  // Master Lessons Repository
+  getMasterLessons(filters?: { subject?: string; gradeLevel?: string; status?: string }): Promise<MasterLesson[]>;
+  getMasterLesson(id: string): Promise<MasterLesson | undefined>;
+  getMasterLessonsByAuthor(authorId: string): Promise<MasterLesson[]>;
+  getApprovedMasterLessons(filters?: { subject?: string; gradeLevel?: string; bkdFocus?: string }): Promise<MasterLesson[]>;
+  createMasterLesson(lesson: InsertMasterLesson): Promise<MasterLesson>;
+  updateMasterLesson(id: string, updates: Partial<MasterLesson>): Promise<MasterLesson | undefined>;
+  deleteMasterLesson(id: string, authorId: string): Promise<boolean>;
+  approveMasterLesson(id: string, reviewerId: string, notes?: string): Promise<MasterLesson | undefined>;
+  rejectMasterLesson(id: string, reviewerId: string, notes: string): Promise<MasterLesson | undefined>;
+  incrementMasterLessonUsage(id: string): Promise<void>;
+  
+  // Content Library
+  getContentLibraryItems(filters?: { contentType?: string; subjects?: string[]; isActive?: boolean }): Promise<ContentLibraryItem[]>;
+  getContentLibraryItem(id: string): Promise<ContentLibraryItem | undefined>;
+  createContentLibraryItem(item: InsertContentLibrary): Promise<ContentLibraryItem>;
+  updateContentLibraryItem(id: string, updates: Partial<ContentLibraryItem>): Promise<ContentLibraryItem | undefined>;
+  deleteContentLibraryItem(id: string): Promise<boolean>;
+  incrementContentUsage(id: string): Promise<void>;
+  getActiveContentForAI(subjects?: string[], gradeLevels?: string[]): Promise<ContentLibraryItem[]>;
+  
+  // Lesson Bulk Imports
+  getLessonBulkImports(): Promise<LessonBulkImport[]>;
+  getLessonBulkImport(id: string): Promise<LessonBulkImport | undefined>;
+  createLessonBulkImport(importRecord: InsertLessonBulkImport): Promise<LessonBulkImport>;
+  updateLessonBulkImport(id: string, updates: Partial<LessonBulkImport>): Promise<LessonBulkImport | undefined>;
 }
 
 // Performance Analytics Types
@@ -5144,6 +5192,224 @@ export class DatabaseStorage implements IStorage {
       topPerformingEducators: educatorMetrics.slice(0, 10),
       topPerformingCampuses: campusMetrics.slice(0, 10),
     };
+  }
+
+  // ===========================================
+  // SYSTEM LESSON AUTHORS
+  // ===========================================
+  
+  async getSystemLessonAuthors(): Promise<SystemLessonAuthor[]> {
+    return db.select().from(systemLessonAuthors).orderBy(desc(systemLessonAuthors.createdAt));
+  }
+  
+  async getSystemLessonAuthor(userId: string): Promise<SystemLessonAuthor | undefined> {
+    const [author] = await db.select().from(systemLessonAuthors).where(eq(systemLessonAuthors.userId, userId));
+    return author;
+  }
+  
+  async isSystemLessonAuthor(userId: string): Promise<boolean> {
+    const author = await this.getSystemLessonAuthor(userId);
+    return author !== undefined && author.status === 'active';
+  }
+  
+  async createSystemLessonAuthor(author: InsertSystemLessonAuthor): Promise<SystemLessonAuthor> {
+    const [newAuthor] = await db.insert(systemLessonAuthors).values(author).returning();
+    return newAuthor;
+  }
+  
+  async updateSystemLessonAuthor(userId: string, updates: Partial<SystemLessonAuthor>): Promise<SystemLessonAuthor | undefined> {
+    const [updated] = await db.update(systemLessonAuthors)
+      .set({ ...updates, updatedAt: new Date() })
+      .where(eq(systemLessonAuthors.userId, userId))
+      .returning();
+    return updated;
+  }
+  
+  async deleteSystemLessonAuthor(userId: string): Promise<boolean> {
+    const result = await db.delete(systemLessonAuthors).where(eq(systemLessonAuthors.userId, userId));
+    return true;
+  }
+  
+  async incrementAuthorLessonCount(userId: string): Promise<void> {
+    await db.update(systemLessonAuthors)
+      .set({ lessonsCreated: sql`${systemLessonAuthors.lessonsCreated} + 1`, updatedAt: new Date() })
+      .where(eq(systemLessonAuthors.userId, userId));
+  }
+
+  // ===========================================
+  // MASTER LESSONS REPOSITORY
+  // ===========================================
+  
+  async getMasterLessons(filters?: { subject?: string; gradeLevel?: string; status?: string }): Promise<MasterLesson[]> {
+    let query = db.select().from(masterLessons);
+    const conditions: any[] = [];
+    
+    if (filters?.subject) {
+      conditions.push(eq(masterLessons.subject, filters.subject));
+    }
+    if (filters?.gradeLevel) {
+      conditions.push(eq(masterLessons.gradeLevel, filters.gradeLevel));
+    }
+    if (filters?.status) {
+      conditions.push(eq(masterLessons.status, filters.status));
+    }
+    
+    if (conditions.length > 0) {
+      return db.select().from(masterLessons).where(and(...conditions)).orderBy(desc(masterLessons.createdAt));
+    }
+    return db.select().from(masterLessons).orderBy(desc(masterLessons.createdAt));
+  }
+  
+  async getMasterLesson(id: string): Promise<MasterLesson | undefined> {
+    const [lesson] = await db.select().from(masterLessons).where(eq(masterLessons.id, id));
+    return lesson;
+  }
+  
+  async getMasterLessonsByAuthor(authorId: string): Promise<MasterLesson[]> {
+    return db.select().from(masterLessons).where(eq(masterLessons.authorId, authorId)).orderBy(desc(masterLessons.createdAt));
+  }
+  
+  async getApprovedMasterLessons(filters?: { subject?: string; gradeLevel?: string; bkdFocus?: string }): Promise<MasterLesson[]> {
+    const conditions: any[] = [eq(masterLessons.status, 'approved')];
+    
+    if (filters?.subject) {
+      conditions.push(eq(masterLessons.subject, filters.subject));
+    }
+    if (filters?.gradeLevel) {
+      conditions.push(eq(masterLessons.gradeLevel, filters.gradeLevel));
+    }
+    if (filters?.bkdFocus) {
+      conditions.push(eq(masterLessons.bkdFocus, filters.bkdFocus));
+    }
+    
+    return db.select().from(masterLessons).where(and(...conditions)).orderBy(desc(masterLessons.usageCount));
+  }
+  
+  async createMasterLesson(lesson: InsertMasterLesson): Promise<MasterLesson> {
+    const [newLesson] = await db.insert(masterLessons).values(lesson).returning();
+    return newLesson;
+  }
+  
+  async updateMasterLesson(id: string, updates: Partial<MasterLesson>): Promise<MasterLesson | undefined> {
+    const [updated] = await db.update(masterLessons)
+      .set({ ...updates, updatedAt: new Date() })
+      .where(eq(masterLessons.id, id))
+      .returning();
+    return updated;
+  }
+  
+  async deleteMasterLesson(id: string, authorId: string): Promise<boolean> {
+    const [lesson] = await db.select().from(masterLessons).where(and(eq(masterLessons.id, id), eq(masterLessons.authorId, authorId)));
+    if (!lesson) return false;
+    await db.delete(masterLessons).where(eq(masterLessons.id, id));
+    return true;
+  }
+  
+  async approveMasterLesson(id: string, reviewerId: string, notes?: string): Promise<MasterLesson | undefined> {
+    const [updated] = await db.update(masterLessons)
+      .set({ status: 'approved', reviewedBy: reviewerId, reviewedAt: new Date(), reviewNotes: notes, updatedAt: new Date() })
+      .where(eq(masterLessons.id, id))
+      .returning();
+    return updated;
+  }
+  
+  async rejectMasterLesson(id: string, reviewerId: string, notes: string): Promise<MasterLesson | undefined> {
+    const [updated] = await db.update(masterLessons)
+      .set({ status: 'draft', reviewedBy: reviewerId, reviewedAt: new Date(), reviewNotes: notes, updatedAt: new Date() })
+      .where(eq(masterLessons.id, id))
+      .returning();
+    return updated;
+  }
+  
+  async incrementMasterLessonUsage(id: string): Promise<void> {
+    await db.update(masterLessons)
+      .set({ usageCount: sql`${masterLessons.usageCount} + 1` })
+      .where(eq(masterLessons.id, id));
+  }
+
+  // ===========================================
+  // CONTENT LIBRARY
+  // ===========================================
+  
+  async getContentLibraryItems(filters?: { contentType?: string; subjects?: string[]; isActive?: boolean }): Promise<ContentLibraryItem[]> {
+    let query = db.select().from(contentLibrary);
+    const conditions: any[] = [];
+    
+    if (filters?.contentType) {
+      conditions.push(eq(contentLibrary.contentType, filters.contentType));
+    }
+    if (filters?.isActive !== undefined) {
+      conditions.push(eq(contentLibrary.isActive, filters.isActive));
+    }
+    
+    if (conditions.length > 0) {
+      return db.select().from(contentLibrary).where(and(...conditions)).orderBy(desc(contentLibrary.createdAt));
+    }
+    return db.select().from(contentLibrary).orderBy(desc(contentLibrary.createdAt));
+  }
+  
+  async getContentLibraryItem(id: string): Promise<ContentLibraryItem | undefined> {
+    const [item] = await db.select().from(contentLibrary).where(eq(contentLibrary.id, id));
+    return item;
+  }
+  
+  async createContentLibraryItem(item: InsertContentLibrary): Promise<ContentLibraryItem> {
+    const [newItem] = await db.insert(contentLibrary).values(item).returning();
+    return newItem;
+  }
+  
+  async updateContentLibraryItem(id: string, updates: Partial<ContentLibraryItem>): Promise<ContentLibraryItem | undefined> {
+    const [updated] = await db.update(contentLibrary)
+      .set({ ...updates, updatedAt: new Date() })
+      .where(eq(contentLibrary.id, id))
+      .returning();
+    return updated;
+  }
+  
+  async deleteContentLibraryItem(id: string): Promise<boolean> {
+    await db.delete(contentLibrary).where(eq(contentLibrary.id, id));
+    return true;
+  }
+  
+  async incrementContentUsage(id: string): Promise<void> {
+    await db.update(contentLibrary)
+      .set({ usageCount: sql`${contentLibrary.usageCount} + 1` })
+      .where(eq(contentLibrary.id, id));
+  }
+  
+  async getActiveContentForAI(subjects?: string[], gradeLevels?: string[]): Promise<ContentLibraryItem[]> {
+    const conditions: any[] = [
+      eq(contentLibrary.isActive, true),
+      eq(contentLibrary.processingStatus, 'completed')
+    ];
+    
+    return db.select().from(contentLibrary).where(and(...conditions)).orderBy(desc(contentLibrary.usageCount));
+  }
+
+  // ===========================================
+  // LESSON BULK IMPORTS
+  // ===========================================
+  
+  async getLessonBulkImports(): Promise<LessonBulkImport[]> {
+    return db.select().from(lessonBulkImports).orderBy(desc(lessonBulkImports.createdAt));
+  }
+  
+  async getLessonBulkImport(id: string): Promise<LessonBulkImport | undefined> {
+    const [importRecord] = await db.select().from(lessonBulkImports).where(eq(lessonBulkImports.id, id));
+    return importRecord;
+  }
+  
+  async createLessonBulkImport(importRecord: InsertLessonBulkImport): Promise<LessonBulkImport> {
+    const [newImport] = await db.insert(lessonBulkImports).values(importRecord).returning();
+    return newImport;
+  }
+  
+  async updateLessonBulkImport(id: string, updates: Partial<LessonBulkImport>): Promise<LessonBulkImport | undefined> {
+    const [updated] = await db.update(lessonBulkImports)
+      .set(updates)
+      .where(eq(lessonBulkImports.id, id))
+      .returning();
+    return updated;
   }
 }
 

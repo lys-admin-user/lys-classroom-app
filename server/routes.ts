@@ -3897,6 +3897,458 @@ export async function registerRoutes(
     }
   });
 
+  // ===========================================
+  // SYSTEM LESSON AUTHORS (Site Admin Only)
+  // ===========================================
+  
+  app.get("/api/admin/lesson-authors", isAuthenticated, isSiteAdmin, async (req: any, res) => {
+    try {
+      const authors = await storage.getSystemLessonAuthors();
+      // Enrich with user details
+      const enrichedAuthors = await Promise.all(
+        authors.map(async (author) => {
+          const user = await storage.getUser(author.userId);
+          return { ...author, user };
+        })
+      );
+      res.json(enrichedAuthors);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch lesson authors" });
+    }
+  });
+  
+  app.post("/api/admin/lesson-authors", isAuthenticated, isSiteAdmin, async (req: any, res) => {
+    try {
+      const adminId = req.user?.claims?.sub;
+      const { userId, specializations, bio } = req.body;
+      
+      // Check if user exists
+      const user = await storage.getUser(userId);
+      if (!user) {
+        res.status(404).json({ error: "User not found" });
+        return;
+      }
+      
+      // Check if already an author
+      const existing = await storage.getSystemLessonAuthor(userId);
+      if (existing) {
+        res.status(400).json({ error: "User is already a lesson author" });
+        return;
+      }
+      
+      const author = await storage.createSystemLessonAuthor({
+        userId,
+        authorizedBy: adminId,
+        specializations: specializations || [],
+        bio: bio || null,
+        status: "active"
+      });
+      
+      res.json(author);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to create lesson author" });
+    }
+  });
+  
+  app.patch("/api/admin/lesson-authors/:userId", isAuthenticated, isSiteAdmin, async (req: any, res) => {
+    try {
+      const { userId } = req.params;
+      const updates = req.body;
+      const updated = await storage.updateSystemLessonAuthor(userId, updates);
+      if (!updated) {
+        res.status(404).json({ error: "Lesson author not found" });
+        return;
+      }
+      res.json(updated);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to update lesson author" });
+    }
+  });
+  
+  app.delete("/api/admin/lesson-authors/:userId", isAuthenticated, isSiteAdmin, async (req: any, res) => {
+    try {
+      const { userId } = req.params;
+      await storage.deleteSystemLessonAuthor(userId);
+      res.json({ success: true });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to remove lesson author" });
+    }
+  });
+  
+  // Check if current user is a lesson author
+  app.get("/api/lesson-author/status", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user?.claims?.sub;
+      const isAuthor = await storage.isSystemLessonAuthor(userId);
+      const author = isAuthor ? await storage.getSystemLessonAuthor(userId) : null;
+      res.json({ isAuthor, author });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to check author status" });
+    }
+  });
+
+  // ===========================================
+  // MASTER LESSONS REPOSITORY
+  // ===========================================
+  
+  // Get all master lessons (Site Admin or Lesson Author)
+  app.get("/api/admin/master-lessons", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user?.claims?.sub;
+      const isSiteAdminUser = await storage.isSiteAdmin(userId);
+      const isAuthor = await storage.isSystemLessonAuthor(userId);
+      
+      if (!isSiteAdminUser && !isAuthor) {
+        res.status(403).json({ error: "Access denied" });
+        return;
+      }
+      
+      const { subject, gradeLevel, status } = req.query;
+      const lessons = await storage.getMasterLessons({ 
+        subject: subject as string, 
+        gradeLevel: gradeLevel as string, 
+        status: status as string 
+      });
+      
+      res.json(lessons);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch master lessons" });
+    }
+  });
+  
+  // Get my authored lessons (Lesson Author)
+  app.get("/api/lesson-author/my-lessons", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user?.claims?.sub;
+      const isAuthor = await storage.isSystemLessonAuthor(userId);
+      
+      if (!isAuthor) {
+        res.status(403).json({ error: "Lesson author access required" });
+        return;
+      }
+      
+      const lessons = await storage.getMasterLessonsByAuthor(userId);
+      res.json(lessons);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch lessons" });
+    }
+  });
+  
+  // Get single master lesson
+  app.get("/api/admin/master-lessons/:id", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user?.claims?.sub;
+      const isSiteAdminUser = await storage.isSiteAdmin(userId);
+      const isAuthor = await storage.isSystemLessonAuthor(userId);
+      
+      if (!isSiteAdminUser && !isAuthor) {
+        res.status(403).json({ error: "Access denied" });
+        return;
+      }
+      
+      const { id } = req.params;
+      const lesson = await storage.getMasterLesson(id);
+      
+      if (!lesson) {
+        res.status(404).json({ error: "Lesson not found" });
+        return;
+      }
+      
+      res.json(lesson);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch lesson" });
+    }
+  });
+  
+  // Create master lesson (Lesson Author only)
+  app.post("/api/lesson-author/master-lessons", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user?.claims?.sub;
+      const isAuthor = await storage.isSystemLessonAuthor(userId);
+      
+      if (!isAuthor) {
+        res.status(403).json({ error: "Lesson author access required" });
+        return;
+      }
+      
+      const lessonData = { ...req.body, authorId: userId, status: "draft" };
+      const lesson = await storage.createMasterLesson(lessonData);
+      await storage.incrementAuthorLessonCount(userId);
+      
+      res.json(lesson);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to create lesson" });
+    }
+  });
+  
+  // Update master lesson
+  app.patch("/api/lesson-author/master-lessons/:id", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user?.claims?.sub;
+      const { id } = req.params;
+      
+      const lesson = await storage.getMasterLesson(id);
+      if (!lesson) {
+        res.status(404).json({ error: "Lesson not found" });
+        return;
+      }
+      
+      // Only author can edit their own lessons, site admin can edit any
+      const isSiteAdminUser = await storage.isSiteAdmin(userId);
+      if (lesson.authorId !== userId && !isSiteAdminUser) {
+        res.status(403).json({ error: "Access denied" });
+        return;
+      }
+      
+      const updated = await storage.updateMasterLesson(id, req.body);
+      res.json(updated);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to update lesson" });
+    }
+  });
+  
+  // Submit lesson for review
+  app.post("/api/lesson-author/master-lessons/:id/submit", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user?.claims?.sub;
+      const { id } = req.params;
+      
+      const lesson = await storage.getMasterLesson(id);
+      if (!lesson || lesson.authorId !== userId) {
+        res.status(403).json({ error: "Access denied" });
+        return;
+      }
+      
+      const updated = await storage.updateMasterLesson(id, { status: "pending_review" });
+      res.json(updated);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to submit lesson" });
+    }
+  });
+  
+  // Approve master lesson (Site Admin only)
+  app.post("/api/admin/master-lessons/:id/approve", isAuthenticated, isSiteAdmin, async (req: any, res) => {
+    try {
+      const reviewerId = req.user?.claims?.sub;
+      const { id } = req.params;
+      const { notes } = req.body;
+      
+      const lesson = await storage.approveMasterLesson(id, reviewerId, notes);
+      if (!lesson) {
+        res.status(404).json({ error: "Lesson not found" });
+        return;
+      }
+      
+      res.json(lesson);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to approve lesson" });
+    }
+  });
+  
+  // Reject master lesson (Site Admin only)
+  app.post("/api/admin/master-lessons/:id/reject", isAuthenticated, isSiteAdmin, async (req: any, res) => {
+    try {
+      const reviewerId = req.user?.claims?.sub;
+      const { id } = req.params;
+      const { notes } = req.body;
+      
+      if (!notes) {
+        res.status(400).json({ error: "Rejection notes are required" });
+        return;
+      }
+      
+      const lesson = await storage.rejectMasterLesson(id, reviewerId, notes);
+      if (!lesson) {
+        res.status(404).json({ error: "Lesson not found" });
+        return;
+      }
+      
+      res.json(lesson);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to reject lesson" });
+    }
+  });
+  
+  // Delete master lesson
+  app.delete("/api/admin/master-lessons/:id", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user?.claims?.sub;
+      const { id } = req.params;
+      
+      const isSiteAdminUser = await storage.isSiteAdmin(userId);
+      const lesson = await storage.getMasterLesson(id);
+      
+      if (!lesson) {
+        res.status(404).json({ error: "Lesson not found" });
+        return;
+      }
+      
+      // Only author or site admin can delete
+      if (lesson.authorId !== userId && !isSiteAdminUser) {
+        res.status(403).json({ error: "Access denied" });
+        return;
+      }
+      
+      await storage.deleteMasterLesson(id, lesson.authorId);
+      res.json({ success: true });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to delete lesson" });
+    }
+  });
+
+  // ===========================================
+  // CONTENT LIBRARY (Site Admin Only)
+  // ===========================================
+  
+  app.get("/api/admin/content-library", isAuthenticated, isSiteAdmin, async (req: any, res) => {
+    try {
+      const { contentType, isActive } = req.query;
+      const items = await storage.getContentLibraryItems({
+        contentType: contentType as string,
+        isActive: isActive === "true" ? true : isActive === "false" ? false : undefined
+      });
+      res.json(items);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch content library" });
+    }
+  });
+  
+  app.get("/api/admin/content-library/:id", isAuthenticated, isSiteAdmin, async (req: any, res) => {
+    try {
+      const { id } = req.params;
+      const item = await storage.getContentLibraryItem(id);
+      if (!item) {
+        res.status(404).json({ error: "Content not found" });
+        return;
+      }
+      res.json(item);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch content" });
+    }
+  });
+  
+  app.post("/api/admin/content-library", isAuthenticated, isSiteAdmin, async (req: any, res) => {
+    try {
+      const userId = req.user?.claims?.sub;
+      const contentData = { ...req.body, uploadedBy: userId };
+      const item = await storage.createContentLibraryItem(contentData);
+      res.json(item);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to create content" });
+    }
+  });
+  
+  app.patch("/api/admin/content-library/:id", isAuthenticated, isSiteAdmin, async (req: any, res) => {
+    try {
+      const { id } = req.params;
+      const updated = await storage.updateContentLibraryItem(id, req.body);
+      if (!updated) {
+        res.status(404).json({ error: "Content not found" });
+        return;
+      }
+      res.json(updated);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to update content" });
+    }
+  });
+  
+  app.delete("/api/admin/content-library/:id", isAuthenticated, isSiteAdmin, async (req: any, res) => {
+    try {
+      const { id } = req.params;
+      await storage.deleteContentLibraryItem(id);
+      res.json({ success: true });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to delete content" });
+    }
+  });
+
+  // ===========================================
+  // LESSON BULK IMPORTS (Site Admin Only)
+  // ===========================================
+  
+  app.get("/api/admin/bulk-imports", isAuthenticated, isSiteAdmin, async (req: any, res) => {
+    try {
+      const imports = await storage.getLessonBulkImports();
+      res.json(imports);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch bulk imports" });
+    }
+  });
+  
+  app.post("/api/admin/bulk-imports", isAuthenticated, isSiteAdmin, async (req: any, res) => {
+    try {
+      const userId = req.user?.claims?.sub;
+      const { fileName, fileType, lessons } = req.body;
+      
+      // Create import record
+      const importRecord = await storage.createLessonBulkImport({
+        uploadedBy: userId,
+        fileName,
+        fileType,
+        totalRecords: lessons?.length || 0,
+        status: "processing"
+      });
+      
+      // Process lessons in background (simplified for now)
+      let successCount = 0;
+      let errorCount = 0;
+      const errors: { row: number; field: string; message: string }[] = [];
+      
+      if (lessons && Array.isArray(lessons)) {
+        for (let i = 0; i < lessons.length; i++) {
+          try {
+            const lesson = lessons[i];
+            // Validate required fields
+            if (!lesson.title || !lesson.topic || !lesson.subject || !lesson.gradeLevel) {
+              errors.push({ row: i + 1, field: "required", message: "Missing required fields" });
+              errorCount++;
+              continue;
+            }
+            
+            // Create master lesson from import
+            await storage.createMasterLesson({
+              authorId: userId,
+              title: lesson.title,
+              description: lesson.description || null,
+              topic: lesson.topic,
+              subject: lesson.subject,
+              gradeLevel: lesson.gradeLevel,
+              gradeBand: lesson.gradeBand || null,
+              bkdFocus: lesson.bkdFocus || "integrated",
+              standards: lesson.standards || [],
+              duration: lesson.duration || "45 minutes",
+              objectives: lesson.objectives || [],
+              activities: lesson.activities || [],
+              materials: lesson.materials || [],
+              assessment: lesson.assessment || "",
+              reflection: lesson.reflection || null,
+              lysMethodology: lesson.lysMethodology || null,
+              tags: lesson.tags || [],
+              status: "pending_review"
+            });
+            successCount++;
+          } catch (err) {
+            errors.push({ row: i + 1, field: "system", message: "Failed to create lesson" });
+            errorCount++;
+          }
+        }
+      }
+      
+      // Update import record
+      const updatedImport = await storage.updateLessonBulkImport(importRecord.id, {
+        successCount,
+        errorCount,
+        errors,
+        status: "completed",
+        completedAt: new Date()
+      });
+      
+      res.json(updatedImport);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to process bulk import" });
+    }
+  });
+
   // Get organization members (site admin or org admin)
   app.get("/api/admin/organizations/:id/members", isAuthenticated, async (req: any, res) => {
     try {

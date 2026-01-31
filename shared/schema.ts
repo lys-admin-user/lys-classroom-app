@@ -2172,3 +2172,120 @@ export const AttendanceStatus = {
 } as const;
 export type AttendanceStatusValue = typeof AttendanceStatus[keyof typeof AttendanceStatus];
 
+// ===========================================
+// SYSTEM LESSON REPOSITORY & CONTENT LIBRARY
+// ===========================================
+
+// System Lesson Authors - Educators authorized to create master lessons
+export const systemLessonAuthors = pgTable("system_lesson_authors", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull().unique(),
+  authorizedBy: varchar("authorized_by").notNull(), // Site admin who granted permission
+  specializations: jsonb("specializations").$type<string[]>().default([]), // e.g., ["math", "science", "elementary"]
+  bio: text("bio"),
+  status: text("status").notNull().default("active"), // active, suspended, revoked
+  lessonsCreated: integer("lessons_created").default(0),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertSystemLessonAuthorSchema = createInsertSchema(systemLessonAuthors).omit({ id: true, createdAt: true, updatedAt: true, lessonsCreated: true });
+export type InsertSystemLessonAuthor = z.infer<typeof insertSystemLessonAuthorSchema>;
+export type SystemLessonAuthor = typeof systemLessonAuthors.$inferSelect;
+
+// Master Lessons - System-level authoritative lessons that influence AI generation
+export const masterLessons = pgTable("master_lessons", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  authorId: varchar("author_id").notNull(), // System lesson author who created this
+  title: text("title").notNull(),
+  description: text("description"),
+  topic: text("topic").notNull(),
+  subject: text("subject").notNull(), // e.g., "math", "science", "english"
+  gradeLevel: text("grade_level").notNull(),
+  gradeBand: text("grade_band"), // e.g., "K-2", "3-5", "6-8", "9-12"
+  bkdFocus: text("bkd_focus").notNull(), // "be", "know", "do", or "integrated"
+  standards: jsonb("standards").$type<{ code: string; description: string }[]>().default([]),
+  duration: text("duration").notNull(),
+  objectives: jsonb("objectives").notNull().$type<string[]>(),
+  activities: jsonb("activities").notNull().$type<{ title: string; description: string; duration: string; type: string; bkdAlignment?: string }[]>(),
+  materials: jsonb("materials").notNull().$type<string[]>(),
+  assessment: text("assessment").notNull(),
+  reflection: text("reflection"),
+  lysMethodology: jsonb("lys_methodology").$type<{ be: { focus: string; description: string }; know: { focus: string; description: string }; do: { focus: string; description: string } }>(),
+  tags: jsonb("tags").$type<string[]>().default([]),
+  qualityScore: integer("quality_score").default(0), // 0-100 based on completeness and usage
+  usageCount: integer("usage_count").default(0), // Times this influenced AI generation
+  status: text("status").notNull().default("draft"), // draft, pending_review, approved, archived
+  reviewedBy: varchar("reviewed_by"), // Site admin who approved
+  reviewedAt: timestamp("reviewed_at"),
+  reviewNotes: text("review_notes"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertMasterLessonSchema = createInsertSchema(masterLessons).omit({ id: true, createdAt: true, updatedAt: true, qualityScore: true, usageCount: true, reviewedAt: true });
+export type InsertMasterLesson = z.infer<typeof insertMasterLessonSchema>;
+export type MasterLesson = typeof masterLessons.$inferSelect;
+
+// Content Library - PDFs, eBooks, podcasts, YouTube for AI influence
+export const ContentType = {
+  PDF: "pdf",
+  EBOOK: "ebook",
+  BOOK: "book",
+  PODCAST: "podcast",
+  YOUTUBE_CHANNEL: "youtube_channel",
+  YOUTUBE_VIDEO: "youtube_video",
+  ARTICLE: "article",
+  RESEARCH_PAPER: "research_paper",
+} as const;
+export type ContentTypeValue = typeof ContentType[keyof typeof ContentType];
+
+export const contentLibrary = pgTable("content_library", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  uploadedBy: varchar("uploaded_by").notNull(), // Site admin or system author
+  title: text("title").notNull(),
+  description: text("description"),
+  contentType: text("content_type").notNull().$type<ContentTypeValue>(),
+  source: text("source"), // URL for online content, or original source reference
+  fileUrl: text("file_url"), // S3/storage URL for uploaded files
+  fileName: text("file_name"),
+  fileSize: integer("file_size"), // in bytes
+  author: text("author"), // Original author of the content
+  publisher: text("publisher"),
+  publicationDate: text("publication_date"),
+  subjects: jsonb("subjects").$type<string[]>().default([]), // e.g., ["math", "stem", "education"]
+  gradeLevels: jsonb("grade_levels").$type<string[]>().default([]), // e.g., ["K-2", "3-5"]
+  tags: jsonb("tags").$type<string[]>().default([]),
+  extractedText: text("extracted_text"), // Extracted/summarized text for AI processing
+  embeddingVector: jsonb("embedding_vector").$type<number[]>(), // Vector embedding for semantic search
+  processingStatus: text("processing_status").notNull().default("pending"), // pending, processing, completed, failed
+  processingError: text("processing_error"),
+  isActive: boolean("is_active").default(true),
+  usageCount: integer("usage_count").default(0), // Times used in AI generation
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertContentLibrarySchema = createInsertSchema(contentLibrary).omit({ id: true, createdAt: true, updatedAt: true, usageCount: true, embeddingVector: true });
+export type InsertContentLibrary = z.infer<typeof insertContentLibrarySchema>;
+export type ContentLibraryItem = typeof contentLibrary.$inferSelect;
+
+// Lesson Bulk Import Log - Track bulk uploads of lessons
+export const lessonBulkImports = pgTable("lesson_bulk_imports", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  uploadedBy: varchar("uploaded_by").notNull(),
+  fileName: text("file_name").notNull(),
+  fileType: text("file_type").notNull(), // csv, json
+  totalRecords: integer("total_records").default(0),
+  successCount: integer("success_count").default(0),
+  errorCount: integer("error_count").default(0),
+  errors: jsonb("errors").$type<{ row: number; field: string; message: string }[]>().default([]),
+  status: text("status").notNull().default("pending"), // pending, processing, completed, failed
+  completedAt: timestamp("completed_at"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertLessonBulkImportSchema = createInsertSchema(lessonBulkImports).omit({ id: true, createdAt: true, completedAt: true });
+export type InsertLessonBulkImport = z.infer<typeof insertLessonBulkImportSchema>;
+export type LessonBulkImport = typeof lessonBulkImports.$inferSelect;
+
