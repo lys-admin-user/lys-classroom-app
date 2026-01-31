@@ -4143,6 +4143,37 @@ export async function registerRoutes(
       res.status(500).json({ error: "Failed to submit lesson" });
     }
   });
+
+  // Delete master lesson (Author only, if not approved)
+  app.delete("/api/lesson-author/master-lessons/:id", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user?.claims?.sub;
+      const { id } = req.params;
+      
+      const lesson = await storage.getMasterLesson(id);
+      if (!lesson) {
+        res.status(404).json({ error: "Lesson not found" });
+        return;
+      }
+      
+      // Only author can delete their own non-approved lessons
+      if (lesson.authorId !== userId) {
+        res.status(403).json({ error: "Access denied" });
+        return;
+      }
+      
+      if (lesson.status === "approved") {
+        res.status(400).json({ error: "Cannot delete approved lessons" });
+        return;
+      }
+      
+      await storage.deleteMasterLesson(id, userId);
+      await storage.decrementAuthorLessonCount(userId);
+      res.json({ success: true });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to delete lesson" });
+    }
+  });
   
   // Approve master lesson (Site Admin only)
   app.post("/api/admin/master-lessons/:id/approve", isAuthenticated, isSiteAdmin, async (req: any, res) => {

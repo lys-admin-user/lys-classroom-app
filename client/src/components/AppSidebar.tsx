@@ -42,6 +42,7 @@ import {
   Milestone,
   Presentation,
   Link2,
+  PenTool,
 } from "lucide-react";
 
 interface NavItem {
@@ -105,6 +106,7 @@ const navigationGroups: NavGroup[] = [
       { title: "Collaboration", url: "/collaboration", icon: Share2, requiresAuth: true },
       { title: "Resource Library", url: "/resource-library", icon: Folder, requiresAuth: true },
       { title: "SIS Integration", url: "/sis-integration", icon: Link2, requiresAuth: true },
+      { title: "Lesson Authoring", url: "/lesson-authoring", icon: PenTool, requiresAuth: true },
     ],
   },
   {

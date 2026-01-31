@@ -194,6 +194,9 @@ export default function SiteAdminPage() {
   
   const [contentTypeFilter, setContentTypeFilter] = useState<string>("all");
   const [isAddContentOpen, setIsAddContentOpen] = useState(false);
+  const [isBulkUploadOpen, setIsBulkUploadOpen] = useState(false);
+  const [bulkUploadFile, setBulkUploadFile] = useState<File | null>(null);
+  const [bulkUploadPreview, setBulkUploadPreview] = useState<any[]>([]);
   const [newContent, setNewContent] = useState({
     title: "",
     description: "",
@@ -463,6 +466,110 @@ export default function SiteAdminPage() {
       toast({ title: "Failed to remove content", variant: "destructive" });
     },
   });
+
+  const bulkUploadMutation = useMutation({
+    mutationFn: async ({ fileName, fileType, lessons }: { fileName: string; fileType: string; lessons: any[] }) => {
+      return await apiRequest("POST", "/api/admin/bulk-imports", { fileName, fileType, lessons });
+    },
+    onSuccess: (data: any) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/master-lessons"] });
+      setIsBulkUploadOpen(false);
+      setBulkUploadFile(null);
+      setBulkUploadPreview([]);
+      toast({ 
+        title: "Bulk import completed", 
+        description: `${data.successCount || 0} lessons imported, ${data.errorCount || 0} errors` 
+      });
+    },
+    onError: () => {
+      toast({ title: "Failed to import lessons", variant: "destructive" });
+    },
+  });
+
+  const handleBulkUploadFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setBulkUploadFile(file);
+    
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      try {
+        const content = event.target?.result as string;
+        let lessons: any[] = [];
+        
+        if (file.name.endsWith('.json')) {
+          lessons = JSON.parse(content);
+        } else if (file.name.endsWith('.csv')) {
+          const lines = content.split('\n');
+          const headers = lines[0].split(',').map(h => h.trim().replace(/"/g, ''));
+          for (let i = 1; i < lines.length; i++) {
+            if (!lines[i].trim()) continue;
+            const values = lines[i].split(',').map(v => v.trim().replace(/"/g, ''));
+            const lesson: any = {};
+            headers.forEach((header, idx) => {
+              if (header === 'objectives' || header === 'materials' || header === 'tags') {
+                lesson[header] = values[idx] ? values[idx].split(';').map((v: string) => v.trim()) : [];
+              } else if (header === 'activities') {
+                lesson[header] = values[idx] ? values[idx].split(';').map((v: string) => ({ title: v.trim(), description: v.trim(), duration: '15 min', type: 'activity' })) : [];
+              } else {
+                lesson[header] = values[idx] || '';
+              }
+            });
+            lessons.push(lesson);
+          }
+        }
+        
+        setBulkUploadPreview(lessons.slice(0, 5));
+      } catch (error) {
+        toast({ title: "Failed to parse file", description: "Please check file format", variant: "destructive" });
+        setBulkUploadPreview([]);
+      }
+    };
+    reader.readAsText(file);
+  };
+
+  const handleBulkUploadSubmit = () => {
+    if (!bulkUploadFile || bulkUploadPreview.length === 0) return;
+    
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      try {
+        const content = event.target?.result as string;
+        let lessons: any[] = [];
+        
+        if (bulkUploadFile.name.endsWith('.json')) {
+          lessons = JSON.parse(content);
+        } else if (bulkUploadFile.name.endsWith('.csv')) {
+          const lines = content.split('\n');
+          const headers = lines[0].split(',').map(h => h.trim().replace(/"/g, ''));
+          for (let i = 1; i < lines.length; i++) {
+            if (!lines[i].trim()) continue;
+            const values = lines[i].split(',').map(v => v.trim().replace(/"/g, ''));
+            const lesson: any = {};
+            headers.forEach((header, idx) => {
+              if (header === 'objectives' || header === 'materials' || header === 'tags') {
+                lesson[header] = values[idx] ? values[idx].split(';').map((v: string) => v.trim()) : [];
+              } else if (header === 'activities') {
+                lesson[header] = values[idx] ? values[idx].split(';').map((v: string) => ({ title: v.trim(), description: v.trim(), duration: '15 min', type: 'activity' })) : [];
+              } else {
+                lesson[header] = values[idx] || '';
+              }
+            });
+            lessons.push(lesson);
+          }
+        }
+        
+        bulkUploadMutation.mutate({
+          fileName: bulkUploadFile.name,
+          fileType: bulkUploadFile.name.endsWith('.json') ? 'json' : 'csv',
+          lessons
+        });
+      } catch (error) {
+        toast({ title: "Failed to process file", variant: "destructive" });
+      }
+    };
+    reader.readAsText(bulkUploadFile);
+  };
 
   const getLevelLabel = (level: string) => {
     const labels: Record<string, string> = {
@@ -1990,7 +2097,7 @@ export default function SiteAdminPage() {
               <h2 className="font-oswald text-xl">Master Lesson Repository</h2>
               <p className="text-sm text-muted-foreground">Authoritative lessons that influence AI-generated content across the platform</p>
             </div>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 flex-wrap">
               <Select value={lessonStatusFilter} onValueChange={setLessonStatusFilter}>
                 <SelectTrigger className="w-[150px]" data-testid="select-lesson-status">
                   <SelectValue placeholder="Status" />
@@ -2016,6 +2123,66 @@ export default function SiteAdminPage() {
                   <SelectItem value="art">Art</SelectItem>
                 </SelectContent>
               </Select>
+              <Dialog open={isBulkUploadOpen} onOpenChange={setIsBulkUploadOpen}>
+                <DialogTrigger asChild>
+                  <Button variant="outline" data-testid="button-bulk-upload">
+                    <Upload className="h-4 w-4 mr-2" />
+                    Bulk Import
+                  </Button>
+                </DialogTrigger>
+                <DialogContent className="max-w-2xl">
+                  <DialogHeader>
+                    <DialogTitle>Bulk Import Lessons</DialogTitle>
+                    <DialogDescription>
+                      Upload a CSV or JSON file containing lesson data. Lessons will be imported for review.
+                    </DialogDescription>
+                  </DialogHeader>
+                  <div className="space-y-4">
+                    <div>
+                      <Label htmlFor="bulk-file">Upload File (CSV or JSON)</Label>
+                      <Input
+                        id="bulk-file"
+                        type="file"
+                        accept=".csv,.json"
+                        onChange={handleBulkUploadFileChange}
+                        className="mt-2"
+                        data-testid="input-bulk-file"
+                      />
+                      <p className="text-xs text-muted-foreground mt-1">
+                        CSV columns: title, topic, subject, gradeLevel, gradeBand, bkdFocus, duration, assessment, objectives (semicolon-separated), materials (semicolon-separated), tags (semicolon-separated)
+                      </p>
+                    </div>
+                    {bulkUploadFile && (
+                      <div className="p-3 bg-muted rounded-md">
+                        <p className="text-sm font-medium">File: {bulkUploadFile.name}</p>
+                        {bulkUploadPreview.length > 0 && (
+                          <div className="mt-2">
+                            <p className="text-xs text-muted-foreground mb-2">Preview (first {Math.min(5, bulkUploadPreview.length)} records):</p>
+                            <div className="space-y-1 max-h-40 overflow-y-auto">
+                              {bulkUploadPreview.map((lesson, idx) => (
+                                <div key={idx} className="text-xs p-2 bg-background rounded border">
+                                  <strong>{lesson.title}</strong> - {lesson.subject} / Grade {lesson.gradeLevel}
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                  <DialogFooter>
+                    <Button variant="outline" onClick={() => setIsBulkUploadOpen(false)}>Cancel</Button>
+                    <Button 
+                      onClick={handleBulkUploadSubmit}
+                      disabled={!bulkUploadFile || bulkUploadPreview.length === 0 || bulkUploadMutation.isPending}
+                      data-testid="button-submit-bulk"
+                    >
+                      {bulkUploadMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Upload className="h-4 w-4 mr-2" />}
+                      Import {bulkUploadPreview.length > 0 ? `${bulkUploadPreview.length}+ Lessons` : 'Lessons'}
+                    </Button>
+                  </DialogFooter>
+                </DialogContent>
+              </Dialog>
             </div>
           </div>
 

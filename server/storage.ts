@@ -711,6 +711,7 @@ export interface IStorage {
   updateSystemLessonAuthor(userId: string, updates: Partial<SystemLessonAuthor>): Promise<SystemLessonAuthor | undefined>;
   deleteSystemLessonAuthor(userId: string): Promise<boolean>;
   incrementAuthorLessonCount(userId: string): Promise<void>;
+  decrementAuthorLessonCount(userId: string): Promise<void>;
   
   // Master Lessons Repository
   getMasterLessons(filters?: { subject?: string; gradeLevel?: string; status?: string }): Promise<MasterLesson[]>;
@@ -5238,6 +5239,12 @@ export class DatabaseStorage implements IStorage {
   async incrementAuthorLessonCount(userId: string): Promise<void> {
     await db.update(systemLessonAuthors)
       .set({ lessonsCreated: sql`${systemLessonAuthors.lessonsCreated} + 1`, updatedAt: new Date() })
+      .where(eq(systemLessonAuthors.userId, userId));
+  }
+
+  async decrementAuthorLessonCount(userId: string): Promise<void> {
+    await db.update(systemLessonAuthors)
+      .set({ lessonsCreated: sql`GREATEST(${systemLessonAuthors.lessonsCreated} - 1, 0)`, updatedAt: new Date() })
       .where(eq(systemLessonAuthors.userId, userId));
   }
 
