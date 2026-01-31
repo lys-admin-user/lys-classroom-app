@@ -15,7 +15,9 @@ import { Slider } from "@/components/ui/slider";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useState } from "react";
-import { Shield, Building2, Users, Plus, Trash2, Settings, BarChart3, AlertTriangle, Loader2, Flag, Mail, Edit2, ToggleLeft, Percent, Globe, MapPin, ChevronRight } from "lucide-react";
+import { Shield, Building2, Users, Plus, Trash2, Settings, BarChart3, AlertTriangle, Loader2, Flag, Mail, Edit2, ToggleLeft, Percent, Globe, MapPin, ChevronRight, TrendingUp, Target, Award, GraduationCap, Star, Brain, Compass, Briefcase } from "lucide-react";
+import { Progress } from "@/components/ui/progress";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import type { Organization, SiteAdmin, FeatureFlag, EmailTemplate, Authority } from "@shared/schema";
 
 export default function SiteAdminPage() {
@@ -82,6 +84,101 @@ export default function SiteAdminPage() {
     queryKey: ["/api/authorities"],
     enabled: adminCheck?.isSiteAdmin,
   });
+
+  // Performance Analytics Types
+  type EducatorPerformanceMetric = {
+    userId: string;
+    firstName: string | null;
+    lastName: string | null;
+    email: string | null;
+    organizationId: string | null;
+    organizationName: string | null;
+    goalsCompleted: number;
+    goalsTotal: number;
+    goalsCompletionRate: number;
+    lessonsCreated: number;
+    studentsCount: number;
+    avgStudentBeScore: number;
+    avgStudentKnowScore: number;
+    avgStudentDoScore: number;
+    avgStudentOverallScore: number;
+    classesCount: number;
+  };
+
+  type CampusPerformanceMetric = {
+    organizationId: string;
+    organizationName: string;
+    educatorsCount: number;
+    studentsCount: number;
+    goalsCompleted: number;
+    goalsTotal: number;
+    goalsCompletionRate: number;
+    avgStudentBeScore: number;
+    avgStudentKnowScore: number;
+    avgStudentDoScore: number;
+    avgStudentOverallScore: number;
+    classesCount: number;
+    lessonsCreated: number;
+  };
+
+  type OrganizationPerformanceMetric = {
+    organizationId: string;
+    organizationName: string;
+    organizationType: string;
+    tier: string;
+    campusesCount: number;
+    educatorsCount: number;
+    studentsCount: number;
+    goalsCompleted: number;
+    goalsTotal: number;
+    goalsCompletionRate: number;
+    avgStudentBeScore: number;
+    avgStudentKnowScore: number;
+    avgStudentDoScore: number;
+    avgStudentOverallScore: number;
+  };
+
+  type SystemWideStats = {
+    totalEducators: number;
+    totalStudents: number;
+    totalOrganizations: number;
+    totalCampuses: number;
+    totalGoals: number;
+    goalsCompleted: number;
+    goalsCompletionRate: number;
+    avgBeScore: number;
+    avgKnowScore: number;
+    avgDoScore: number;
+    avgOverallScore: number;
+    topPerformingEducators: EducatorPerformanceMetric[];
+    topPerformingCampuses: CampusPerformanceMetric[];
+  };
+
+  // Performance Analytics Queries
+  const { data: systemStats, isLoading: systemStatsLoading } = useQuery<SystemWideStats>({
+    queryKey: ["/api/admin/performance/system"],
+    enabled: adminCheck?.isSiteAdmin,
+  });
+
+  const { data: educatorMetrics = [], isLoading: educatorMetricsLoading } = useQuery<EducatorPerformanceMetric[]>({
+    queryKey: ["/api/admin/performance/educators"],
+    enabled: adminCheck?.isSiteAdmin,
+  });
+
+  const { data: campusMetrics = [], isLoading: campusMetricsLoading } = useQuery<CampusPerformanceMetric[]>({
+    queryKey: ["/api/admin/performance/campuses"],
+    enabled: adminCheck?.isSiteAdmin,
+  });
+
+  const { data: orgMetrics = [], isLoading: orgMetricsLoading } = useQuery<OrganizationPerformanceMetric[]>({
+    queryKey: ["/api/admin/performance/organizations"],
+    enabled: adminCheck?.isSiteAdmin,
+  });
+
+  // Sort metrics by goal completion rate (client-side safety)
+  const sortedEducatorMetrics = [...educatorMetrics].sort((a, b) => b.goalsCompletionRate - a.goalsCompletionRate);
+  const sortedCampusMetrics = [...campusMetrics].sort((a, b) => b.goalsCompletionRate - a.goalsCompletionRate);
+  const sortedOrgMetrics = [...orgMetrics].sort((a, b) => b.goalsCompletionRate - a.goalsCompletionRate);
 
   const createOrgMutation = useMutation({
     mutationFn: async (data: typeof newOrg) => {
@@ -352,6 +449,10 @@ export default function SiteAdminPage() {
           <TabsTrigger value="authorities" data-testid="tab-authorities">
             <Globe className="h-4 w-4 mr-2" />
             Global Authorities
+          </TabsTrigger>
+          <TabsTrigger value="performance" data-testid="tab-performance">
+            <TrendingUp className="h-4 w-4 mr-2" />
+            Performance
           </TabsTrigger>
         </TabsList>
 
@@ -1295,6 +1396,306 @@ export default function SiteAdminPage() {
               </DialogFooter>
             </DialogContent>
           </Dialog>
+        </TabsContent>
+
+        {/* Performance Analytics Tab */}
+        <TabsContent value="performance" className="space-y-6">
+          <div className="flex items-center justify-between gap-4 flex-wrap">
+            <div>
+              <h2 className="font-oswald text-xl">Performance Analytics</h2>
+              <p className="text-sm text-muted-foreground">
+                Track educator, campus, and organization performance based on goals, standards, and student Be-Know-Do progress
+              </p>
+            </div>
+          </div>
+
+          {/* System-Wide Overview */}
+          {systemStatsLoading ? (
+            <div className="grid gap-4 md:grid-cols-4">
+              {[1, 2, 3, 4].map(i => (
+                <Card key={i}>
+                  <CardContent className="pt-6">
+                    <div className="h-20 bg-muted animate-pulse rounded" />
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          ) : systemStats && (
+            <>
+              <div className="grid gap-4 md:grid-cols-4" data-testid="performance-stats-grid">
+                <Card data-testid="stat-card-goals">
+                  <CardHeader className="flex flex-row items-center justify-between gap-4 pb-2">
+                    <CardTitle className="text-sm font-medium">Goals Completion</CardTitle>
+                    <Target className="h-4 w-4 text-muted-foreground" />
+                  </CardHeader>
+                  <CardContent>
+                    <div className="text-2xl font-bold" data-testid="stat-value-goals">{systemStats.goalsCompletionRate}%</div>
+                    <p className="text-xs text-muted-foreground">
+                      {systemStats.goalsCompleted} of {systemStats.totalGoals} goals completed
+                    </p>
+                    <Progress value={systemStats.goalsCompletionRate} className="mt-2" />
+                  </CardContent>
+                </Card>
+                <Card data-testid="stat-card-be">
+                  <CardHeader className="flex flex-row items-center justify-between gap-4 pb-2">
+                    <CardTitle className="text-sm font-medium">Avg BE Score</CardTitle>
+                    <Brain className="h-4 w-4 text-primary" />
+                  </CardHeader>
+                  <CardContent>
+                    <div className="text-2xl font-bold text-primary" data-testid="stat-value-be">{systemStats.avgBeScore}%</div>
+                    <p className="text-xs text-muted-foreground">Self-Discovery Progress</p>
+                    <Progress value={systemStats.avgBeScore} className="mt-2" />
+                  </CardContent>
+                </Card>
+                <Card data-testid="stat-card-know">
+                  <CardHeader className="flex flex-row items-center justify-between gap-4 pb-2">
+                    <CardTitle className="text-sm font-medium">Avg KNOW Score</CardTitle>
+                    <Compass className="h-4 w-4 text-blue-600" />
+                  </CardHeader>
+                  <CardContent>
+                    <div className="text-2xl font-bold text-blue-600" data-testid="stat-value-know">{systemStats.avgKnowScore}%</div>
+                    <p className="text-xs text-muted-foreground">Career Exploration Progress</p>
+                    <Progress value={systemStats.avgKnowScore} className="mt-2" />
+                  </CardContent>
+                </Card>
+                <Card data-testid="stat-card-do">
+                  <CardHeader className="flex flex-row items-center justify-between gap-4 pb-2">
+                    <CardTitle className="text-sm font-medium">Avg DO Score</CardTitle>
+                    <Briefcase className="h-4 w-4 text-green-600" />
+                  </CardHeader>
+                  <CardContent>
+                    <div className="text-2xl font-bold text-green-600" data-testid="stat-value-do">{systemStats.avgDoScore}%</div>
+                    <p className="text-xs text-muted-foreground">Action & Goals Progress</p>
+                    <Progress value={systemStats.avgDoScore} className="mt-2" />
+                  </CardContent>
+                </Card>
+              </div>
+
+              {/* Top Educators Leaderboard */}
+              <Card data-testid="card-educators-leaderboard">
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <Award className="h-5 w-5 text-lys-yellow" />
+                    Top Performing Educators
+                  </CardTitle>
+                  <CardDescription>
+                    Educators ranked by goal completion rate and student Be-Know-Do progress
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  {educatorMetricsLoading ? (
+                    <div className="space-y-2">
+                      {[1, 2, 3].map(i => (
+                        <div key={i} className="h-16 bg-muted animate-pulse rounded" />
+                      ))}
+                    </div>
+                  ) : educatorMetrics.length === 0 ? (
+                    <p className="text-muted-foreground text-center py-8">No educator data available</p>
+                  ) : (
+                    <ScrollArea className="h-[400px]">
+                      <div className="space-y-2">
+                        {sortedEducatorMetrics.slice(0, 15).map((educator, idx) => (
+                          <div 
+                            key={educator.userId} 
+                            className="flex items-center justify-between p-3 rounded-md border"
+                            data-testid={`educator-row-${idx}`}
+                          >
+                            <div className="flex items-center gap-3">
+                              <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold ${
+                                idx === 0 ? 'bg-lys-yellow text-white' :
+                                idx === 1 ? 'bg-gray-400 text-white' :
+                                idx === 2 ? 'bg-amber-600 text-white' :
+                                'bg-muted'
+                              }`}>
+                                {idx + 1}
+                              </div>
+                              <div>
+                                <p className="font-medium">
+                                  {educator.firstName || ''} {educator.lastName || educator.email || 'Unknown'}
+                                </p>
+                                <p className="text-xs text-muted-foreground">
+                                  {educator.organizationName || 'No Organization'} • {educator.classesCount} classes • {educator.studentsCount} students
+                                </p>
+                              </div>
+                            </div>
+                            <div className="flex items-center gap-4 text-sm">
+                              <div className="text-center">
+                                <p className="font-bold">{educator.goalsCompletionRate}%</p>
+                                <p className="text-xs text-muted-foreground">Goals</p>
+                              </div>
+                              <div className="text-center">
+                                <p className="font-bold text-primary">{educator.avgStudentBeScore}%</p>
+                                <p className="text-xs text-muted-foreground">BE</p>
+                              </div>
+                              <div className="text-center">
+                                <p className="font-bold text-blue-600">{educator.avgStudentKnowScore}%</p>
+                                <p className="text-xs text-muted-foreground">KNOW</p>
+                              </div>
+                              <div className="text-center">
+                                <p className="font-bold text-green-600">{educator.avgStudentDoScore}%</p>
+                                <p className="text-xs text-muted-foreground">DO</p>
+                              </div>
+                              <div className="text-center">
+                                <p className="font-bold">{educator.lessonsCreated}</p>
+                                <p className="text-xs text-muted-foreground">Lessons</p>
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </ScrollArea>
+                  )}
+                </CardContent>
+              </Card>
+
+              {/* Top Campuses Leaderboard */}
+              <Card data-testid="card-campuses-leaderboard">
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <Building2 className="h-5 w-5 text-lys-teal" />
+                    Top Performing Campuses
+                  </CardTitle>
+                  <CardDescription>
+                    Campuses ranked by goal completion and student achievement scores
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  {campusMetricsLoading ? (
+                    <div className="space-y-2">
+                      {[1, 2, 3].map(i => (
+                        <div key={i} className="h-16 bg-muted animate-pulse rounded" />
+                      ))}
+                    </div>
+                  ) : campusMetrics.length === 0 ? (
+                    <p className="text-muted-foreground text-center py-8">No campus data available</p>
+                  ) : (
+                    <ScrollArea className="h-[400px]">
+                      <div className="space-y-2">
+                        {sortedCampusMetrics.slice(0, 15).map((campus, idx) => (
+                          <div 
+                            key={campus.organizationId} 
+                            className="flex items-center justify-between p-3 rounded-md border"
+                            data-testid={`campus-row-${idx}`}
+                          >
+                            <div className="flex items-center gap-3">
+                              <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold ${
+                                idx === 0 ? 'bg-lys-teal text-white' :
+                                idx === 1 ? 'bg-gray-400 text-white' :
+                                idx === 2 ? 'bg-amber-600 text-white' :
+                                'bg-muted'
+                              }`}>
+                                {idx + 1}
+                              </div>
+                              <div>
+                                <p className="font-medium">{campus.organizationName}</p>
+                                <p className="text-xs text-muted-foreground">
+                                  {campus.educatorsCount} educators • {campus.studentsCount} students • {campus.classesCount} classes
+                                </p>
+                              </div>
+                            </div>
+                            <div className="flex items-center gap-4 text-sm">
+                              <div className="text-center">
+                                <p className="font-bold">{campus.goalsCompletionRate}%</p>
+                                <p className="text-xs text-muted-foreground">Goals</p>
+                              </div>
+                              <div className="text-center">
+                                <p className="font-bold text-primary">{campus.avgStudentBeScore}%</p>
+                                <p className="text-xs text-muted-foreground">BE</p>
+                              </div>
+                              <div className="text-center">
+                                <p className="font-bold text-blue-600">{campus.avgStudentKnowScore}%</p>
+                                <p className="text-xs text-muted-foreground">KNOW</p>
+                              </div>
+                              <div className="text-center">
+                                <p className="font-bold text-green-600">{campus.avgStudentDoScore}%</p>
+                                <p className="text-xs text-muted-foreground">DO</p>
+                              </div>
+                              <div className="text-center">
+                                <p className="font-bold">{campus.lessonsCreated}</p>
+                                <p className="text-xs text-muted-foreground">Lessons</p>
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </ScrollArea>
+                  )}
+                </CardContent>
+              </Card>
+
+              {/* Top Organizations Leaderboard */}
+              <Card data-testid="card-organizations-leaderboard">
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <GraduationCap className="h-5 w-5 text-lys-red" />
+                    Top Performing Organizations
+                  </CardTitle>
+                  <CardDescription>
+                    Districts, schools, and universities ranked by overall performance
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  {orgMetricsLoading ? (
+                    <div className="space-y-2">
+                      {[1, 2, 3].map(i => (
+                        <div key={i} className="h-16 bg-muted animate-pulse rounded" />
+                      ))}
+                    </div>
+                  ) : sortedOrgMetrics.length === 0 ? (
+                    <p className="text-muted-foreground text-center py-8">No organization data available</p>
+                  ) : (
+                    <ScrollArea className="h-[400px]">
+                      <div className="space-y-2">
+                        {sortedOrgMetrics.slice(0, 15).map((org, idx) => (
+                          <div 
+                            key={org.organizationId} 
+                            className="flex items-center justify-between p-3 rounded-md border"
+                            data-testid={`org-row-${idx}`}
+                          >
+                            <div className="flex items-center gap-3">
+                              <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold ${
+                                idx === 0 ? 'bg-lys-red text-white' :
+                                idx === 1 ? 'bg-gray-400 text-white' :
+                                idx === 2 ? 'bg-amber-600 text-white' :
+                                'bg-muted'
+                              }`}>
+                                {idx + 1}
+                              </div>
+                              <div>
+                                <p className="font-medium">{org.organizationName}</p>
+                                <p className="text-xs text-muted-foreground">
+                                  <Badge variant="outline" className="mr-2">{org.organizationType}</Badge>
+                                  {org.tier} • {org.campusesCount} campuses • {org.educatorsCount} educators • {org.studentsCount} students
+                                </p>
+                              </div>
+                            </div>
+                            <div className="flex items-center gap-4 text-sm">
+                              <div className="text-center">
+                                <p className="font-bold">{org.goalsCompletionRate}%</p>
+                                <p className="text-xs text-muted-foreground">Goals</p>
+                              </div>
+                              <div className="text-center">
+                                <p className="font-bold text-primary">{org.avgStudentBeScore}%</p>
+                                <p className="text-xs text-muted-foreground">BE</p>
+                              </div>
+                              <div className="text-center">
+                                <p className="font-bold text-blue-600">{org.avgStudentKnowScore}%</p>
+                                <p className="text-xs text-muted-foreground">KNOW</p>
+                              </div>
+                              <div className="text-center">
+                                <p className="font-bold text-green-600">{org.avgStudentDoScore}%</p>
+                                <p className="text-xs text-muted-foreground">DO</p>
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </ScrollArea>
+                  )}
+                </CardContent>
+              </Card>
+            </>
+          )}
         </TabsContent>
       </Tabs>
     </div>
