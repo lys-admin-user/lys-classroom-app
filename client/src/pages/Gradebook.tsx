@@ -46,14 +46,24 @@ const LETTER_GRADE_COLORS: Record<string, string> = {
   "F": "bg-red-500",
 };
 
+type SisConnection = {
+  id: string;
+  provider: string;
+  name: string;
+  status: string;
+  accessToken?: string;
+};
+
 export default function Gradebook() {
   const { user } = useAuth();
   const { toast } = useToast();
   const [selectedClassId, setSelectedClassId] = useState<string>("");
   const [isAddGradeOpen, setIsAddGradeOpen] = useState(false);
   const [isAddCategoryOpen, setIsAddCategoryOpen] = useState(false);
+  const [isSisExportOpen, setIsSisExportOpen] = useState(false);
   const [editingGrade, setEditingGrade] = useState<StudentGrade | null>(null);
   const [activeTab, setActiveTab] = useState("grades");
+  const [selectedSisConnection, setSelectedSisConnection] = useState<string>("");
 
   const [newGrade, setNewGrade] = useState<Partial<InsertStudentGrade>>({
     title: "",
@@ -91,6 +101,10 @@ export default function Gradebook() {
   const { data: classStudents = [] } = useQuery<{ studentId: string }[]>({
     queryKey: ["/api/classes", selectedClassId, "students"],
     enabled: !!selectedClassId,
+  });
+
+  const { data: sisConnections = [] } = useQuery<SisConnection[]>({
+    queryKey: ["/api/integrations/sis/connections"],
   });
 
   const studentsInClass = useMemo(() => {
@@ -167,6 +181,32 @@ export default function Gradebook() {
       toast({ title: "Failed to delete category", variant: "destructive" });
     },
   });
+
+  const exportToSisMutation = useMutation({
+    mutationFn: async ({ connectionId, classId }: { connectionId: string; classId: string }) => {
+      return await apiRequest("POST", `/api/integrations/sis/connections/${connectionId}/export-grades`, { classId });
+    },
+    onSuccess: (data: any) => {
+      toast({ title: "Grades exported", description: data.message || "Grades successfully sent to SIS" });
+      setIsSisExportOpen(false);
+      setSelectedSisConnection("");
+    },
+    onError: () => {
+      toast({ title: "Failed to export grades", variant: "destructive" });
+    },
+  });
+
+  const handleExportToSis = () => {
+    if (!selectedSisConnection || !selectedClassId) {
+      toast({ title: "Please select a SIS connection", variant: "destructive" });
+      return;
+    }
+    exportToSisMutation.mutate({ connectionId: selectedSisConnection, classId: selectedClassId });
+  };
+
+  const configuredSisConnections = sisConnections.filter(
+    (c) => c.status === "active" || c.accessToken
+  );
 
   const handleExportCSV = () => {
     if (!selectedClassId) return;
@@ -479,10 +519,72 @@ export default function Gradebook() {
               Export CSV
             </Button>
 
-            <Button variant="outline" data-testid="button-share-sis">
-              <Share2 className="h-4 w-4 mr-2" />
-              Share to SIS
-            </Button>
+            <Dialog open={isSisExportOpen} onOpenChange={setIsSisExportOpen}>
+              <DialogTrigger asChild>
+                <Button variant="outline" data-testid="button-share-sis">
+                  <Share2 className="h-4 w-4 mr-2" />
+                  Share to SIS
+                </Button>
+              </DialogTrigger>
+              <DialogContent>
+                <DialogHeader>
+                  <DialogTitle>Export Grades to SIS</DialogTitle>
+                  <DialogDescription>
+                    Send grades to your Student Information System
+                  </DialogDescription>
+                </DialogHeader>
+                <div className="space-y-4">
+                  {configuredSisConnections.length === 0 ? (
+                    <div className="text-center py-4">
+                      <Upload className="h-12 w-12 mx-auto text-muted-foreground mb-2" />
+                      <p className="text-muted-foreground mb-4">No SIS connections configured</p>
+                      <Button variant="outline" onClick={() => window.location.href = "/sis-integration"}>
+                        Configure SIS Integration
+                      </Button>
+                    </div>
+                  ) : (
+                    <>
+                      <div>
+                        <Label>Select SIS Connection</Label>
+                        <Select value={selectedSisConnection} onValueChange={setSelectedSisConnection}>
+                          <SelectTrigger data-testid="select-sis-connection">
+                            <SelectValue placeholder="Choose a connection" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {configuredSisConnections.map((conn) => (
+                              <SelectItem key={conn.id} value={conn.id}>
+                                {conn.name || conn.provider}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div className="bg-muted p-3 rounded-md text-sm">
+                        <p className="font-medium mb-1">Export Summary</p>
+                        <p className="text-muted-foreground">
+                          {grades.length} grade entries for {studentsInClass.length} students in {selectedClass?.name}
+                        </p>
+                      </div>
+                    </>
+                  )}
+                </div>
+                {configuredSisConnections.length > 0 && (
+                  <DialogFooter>
+                    <Button variant="outline" onClick={() => setIsSisExportOpen(false)}>
+                      Cancel
+                    </Button>
+                    <Button 
+                      onClick={handleExportToSis} 
+                      disabled={!selectedSisConnection || exportToSisMutation.isPending}
+                      data-testid="button-confirm-sis-export"
+                    >
+                      {exportToSisMutation.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+                      Export Grades
+                    </Button>
+                  </DialogFooter>
+                )}
+              </DialogContent>
+            </Dialog>
           </div>
 
           <Tabs value={activeTab} onValueChange={setActiveTab}>
