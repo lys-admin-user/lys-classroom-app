@@ -406,6 +406,7 @@ export interface IStorage {
 
   getStudents(userId: string): Promise<Student[]>;
   getStudent(id: string): Promise<Student | undefined>;
+  findStudentBySchoolAndId(organizationId: string, studentIdNumber: string): Promise<(Student & { organizationName?: string }) | undefined>;
   createStudent(student: InsertStudent): Promise<Student>;
   updateStudent(id: string, updates: Partial<Student>, userId: string): Promise<Student | undefined>;
   deleteStudent(id: string, userId: string): Promise<boolean>;
@@ -538,6 +539,7 @@ export interface IStorage {
   getParentProgressNotes(linkId: string): Promise<ParentProgressNote[]>;
   createParentProgressNote(note: InsertParentProgressNote): Promise<ParentProgressNote>;
   deleteParentProgressNote(id: string, parentUserId: string): Promise<boolean>;
+  getPendingParentRequests(educatorId: string): Promise<any[]>;
   
   // Feature Flags
   getFeatureFlags(): Promise<FeatureFlag[]>;
@@ -2949,6 +2951,25 @@ export class DatabaseStorage implements IStorage {
     return true;
   }
 
+  async findStudentBySchoolAndId(organizationId: string, studentIdNumber: string): Promise<(Student & { organizationName?: string }) | undefined> {
+    const [result] = await db.select()
+      .from(students)
+      .where(and(
+        eq(students.organizationId, organizationId),
+        eq(students.studentId, studentIdNumber)
+      ));
+    
+    if (!result) return undefined;
+    
+    // Get organization name
+    const [org] = await db.select().from(organizations).where(eq(organizations.id, organizationId));
+    
+    return {
+      ...result,
+      organizationName: org?.name
+    };
+  }
+
   // Class-Student Relationships
   async getClassStudents(classId: string): Promise<Student[]> {
     const enrollments = await db.select().from(classStudents)
@@ -3987,6 +4008,53 @@ export class DatabaseStorage implements IStorage {
       )
     );
     return true;
+  }
+
+  async getPendingParentRequests(educatorId: string): Promise<any[]> {
+    // Get all classes taught by this educator
+    const educatorClasses = await db.select().from(classes).where(eq(classes.userId, educatorId));
+    if (educatorClasses.length === 0) return [];
+    
+    const classIds = educatorClasses.map(c => c.id);
+    
+    // Get all enrolled students in educator's classes
+    const enrollments = await db.select().from(classStudents)
+      .where(sql`${classStudents.classId} IN (${sql.join(classIds.map(id => sql`${id}`), sql`, `)})`);
+    
+    if (enrollments.length === 0) return [];
+    
+    const studentIds = enrollments.map(e => e.studentId);
+    
+    // Get students to get their userIds
+    const enrolledStudents = await db.select().from(students)
+      .where(sql`${students.id} IN (${sql.join(studentIds.map(id => sql`${id}`), sql`, `)})`);
+    
+    if (enrolledStudents.length === 0) return [];
+    
+    const studentUserIds = enrolledStudents.map(s => s.userId);
+    
+    // Get pending parent connection requests for these students
+    const pendingLinks = await db.select().from(parentStudentLinks)
+      .where(and(
+        sql`${parentStudentLinks.studentUserId} IN (${sql.join(studentUserIds.map(id => sql`${id}`), sql`, `)})`,
+        eq(parentStudentLinks.status, "pending")
+      ));
+    
+    // Enrich with user info
+    const enrichedRequests = await Promise.all(pendingLinks.map(async (link) => {
+      const [parent] = await db.select().from(users).where(eq(users.id, link.parentUserId));
+      const [studentUser] = await db.select().from(users).where(eq(users.id, link.studentUserId));
+      const student = enrolledStudents.find(s => s.userId === link.studentUserId);
+      
+      return {
+        ...link,
+        parent: parent ? { id: parent.id, firstName: parent.firstName, lastName: parent.lastName, email: parent.email } : null,
+        student: student ? { id: student.id, firstName: student.firstName, lastName: student.lastName, gradeLevel: student.gradeLevel } : null,
+        studentUser: studentUser ? { id: studentUser.id, firstName: studentUser.firstName, lastName: studentUser.lastName } : null
+      };
+    }));
+    
+    return enrichedRequests;
   }
 
   // Feature Flags

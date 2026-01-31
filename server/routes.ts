@@ -6246,6 +6246,224 @@ export async function registerRoutes(
   });
 
   // ================================
+  // Parent-Student Connection (Educator-initiated)
+  // ================================
+
+  // Educator invites parent for their student
+  app.post("/api/educator/invite-parent", isAuthenticated, async (req: any, res) => {
+    try {
+      const educatorId = req.user?.claims?.sub;
+      const { studentId, parentEmail, relationship } = req.body;
+      
+      if (!studentId || !parentEmail) {
+        res.status(400).json({ error: "Student ID and parent email are required" });
+        return;
+      }
+      
+      // Verify educator has access to this student (enrolled in their class)
+      const educator = await storage.getUser(educatorId);
+      if (!educator || (educator.role !== "educator" && educator.role !== "admin" && educator.role !== "campus_admin")) {
+        res.status(403).json({ error: "Only educators can invite parents" });
+        return;
+      }
+      
+      // Get student to verify exists
+      const student = await storage.getStudent(studentId);
+      if (!student) {
+        res.status(404).json({ error: "Student not found" });
+        return;
+      }
+      
+      // Verify student is in educator's class (unless campus admin)
+      if (educator.role === "educator") {
+        const educatorClasses = await storage.getClasses(educatorId);
+        const classIds = educatorClasses.map(c => c.id);
+        const enrollments = await db.select().from(classStudents)
+          .where(sql`${classStudents.classId} IN (${sql.join(classIds.map(id => sql`${id}`), sql`, `)}) AND ${classStudents.studentId} = ${studentId}`);
+        
+        if (enrollments.length === 0) {
+          res.status(403).json({ error: "You can only invite parents for students in your classes" });
+          return;
+        }
+      }
+      
+      // Create invitation with student's user ID
+      const token = randomUUID().replace(/-/g, "").substring(0, 32);
+      const expiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000); // 30 days
+      
+      const invitation = await storage.createParentInvitation({
+        studentUserId: student.userId,
+        parentEmail,
+        relationship: relationship || "parent",
+        token,
+        status: "pending",
+        expiresAt,
+      });
+      
+      res.json(invitation);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to create parent invitation" });
+    }
+  });
+
+  // Get schools/campuses for parent lookup (public endpoint for dropdown)
+  app.get("/api/parent-portal/schools", async (req, res) => {
+    try {
+      // Get organizations that are schools/campuses
+      const orgs = await storage.getOrganizations();
+      const schools = orgs
+        .filter(o => o.type === "school" || o.type === "campus")
+        .map(o => ({ id: o.id, name: o.name, type: o.type }));
+      res.json(schools);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch schools" });
+    }
+  });
+
+  // Parent looks up student by school and student ID
+  app.post("/api/parent-portal/lookup-student", isAuthenticated, async (req: any, res) => {
+    try {
+      const parentUserId = req.user?.claims?.sub;
+      const { schoolId, studentIdNumber } = req.body;
+      
+      // Verify this user is not a student (students can't lookup other students)
+      const requestingUser = await storage.getUser(parentUserId);
+      if (requestingUser?.role === "student") {
+        res.status(403).json({ error: "Students cannot use the parent lookup feature" });
+        return;
+      }
+      
+      if (!schoolId || !studentIdNumber) {
+        res.status(400).json({ error: "School and student ID are required" });
+        return;
+      }
+      
+      // Find student by organization and student ID number
+      const student = await storage.findStudentBySchoolAndId(schoolId, studentIdNumber);
+      if (!student) {
+        res.status(404).json({ error: "Student not found. Please verify the school and student ID." });
+        return;
+      }
+      
+      // Check if already connected
+      const existingLink = await storage.getParentStudentLinkByUsers(parentUserId, student.userId);
+      if (existingLink) {
+        res.status(400).json({ 
+          error: existingLink.status === "active" 
+            ? "You are already connected to this student" 
+            : "A connection request is already pending"
+        });
+        return;
+      }
+      
+      // Return limited student info for confirmation
+      res.json({
+        id: student.id,
+        userId: student.userId,
+        firstName: student.firstName,
+        lastName: student.lastName,
+        gradeLevel: student.gradeLevel,
+        schoolName: student.organizationName || "Unknown School"
+      });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to lookup student" });
+    }
+  });
+
+  // Parent requests connection to student
+  app.post("/api/parent-portal/request-connection", isAuthenticated, async (req: any, res) => {
+    try {
+      const parentUserId = req.user?.claims?.sub;
+      const { studentUserId, relationship } = req.body;
+      
+      if (!studentUserId) {
+        res.status(400).json({ error: "Student ID is required" });
+        return;
+      }
+      
+      // Verify student exists
+      const [studentUser] = await db.select().from(users).where(eq(users.id, studentUserId));
+      if (!studentUser) {
+        res.status(404).json({ error: "Student not found" });
+        return;
+      }
+      
+      // Check for existing link
+      const existingLink = await storage.getParentStudentLinkByUsers(parentUserId, studentUserId);
+      if (existingLink) {
+        res.status(400).json({ error: "Connection already exists or is pending" });
+        return;
+      }
+      
+      // Create pending link - requires educator/admin approval
+      const link = await storage.createParentStudentLink({
+        parentUserId,
+        studentUserId,
+        relationship: relationship || "parent",
+        status: "pending",
+        permissions: {
+          viewGoals: true,
+          viewAssessments: true,
+          viewCareers: true,
+          viewLessons: false,
+          receiveNotifications: true
+        }
+      });
+      
+      res.json(link);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to create connection request" });
+    }
+  });
+
+  // Get pending parent connection requests (for educators)
+  app.get("/api/educator/parent-requests", isAuthenticated, async (req: any, res) => {
+    try {
+      const educatorId = req.user?.claims?.sub;
+      const educator = await storage.getUser(educatorId);
+      
+      if (!educator || (educator.role !== "educator" && educator.role !== "admin")) {
+        res.status(403).json({ error: "Only educators can view parent requests" });
+        return;
+      }
+      
+      const requests = await storage.getPendingParentRequests(educatorId);
+      res.json(requests);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch parent requests" });
+    }
+  });
+
+  // Educator approves/rejects parent connection request
+  app.post("/api/educator/parent-requests/:id/respond", isAuthenticated, async (req: any, res) => {
+    try {
+      const educatorId = req.user?.claims?.sub;
+      const { id } = req.params;
+      const { action } = req.body; // "approve" or "reject"
+      
+      const educator = await storage.getUser(educatorId);
+      if (!educator || (educator.role !== "educator" && educator.role !== "admin")) {
+        res.status(403).json({ error: "Only educators can respond to parent requests" });
+        return;
+      }
+      
+      if (action !== "approve" && action !== "reject") {
+        res.status(400).json({ error: "Action must be 'approve' or 'reject'" });
+        return;
+      }
+      
+      const updatedLink = await storage.updateParentStudentLink(id, {
+        status: action === "approve" ? "active" : "revoked",
+        acceptedAt: action === "approve" ? new Date() : undefined
+      });
+      
+      res.json(updatedLink);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to process request" });
+    }
+  });
+
+  // ================================
   // Global Authority Tree (LYS V3.0)
   // ================================
 

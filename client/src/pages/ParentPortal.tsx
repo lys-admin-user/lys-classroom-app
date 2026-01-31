@@ -799,6 +799,9 @@ function StudentDashboard({ studentData, isLoading }: { studentData: StudentData
   );
 }
 
+type SchoolOption = { id: string; name: string; type: string };
+type LookupResult = { id: string; userId: string; firstName: string; lastName: string; gradeLevel: string; schoolName: string };
+
 export default function ParentPortal() {
   const [inviteEmail, setInviteEmail] = useState("");
   const [relationship, setRelationship] = useState("parent");
@@ -807,6 +810,11 @@ export default function ParentPortal() {
   const [noteContent, setNoteContent] = useState("");
   const [noteType, setNoteType] = useState("encouragement");
   const [activeTab, setActiveTab] = useState("dashboard");
+  const [lookupSchoolId, setLookupSchoolId] = useState("");
+  const [lookupStudentId, setLookupStudentId] = useState("");
+  const [lookupResult, setLookupResult] = useState<LookupResult | null>(null);
+  const [lookupRelationship, setLookupRelationship] = useState("parent");
+  const [isFindStudentOpen, setIsFindStudentOpen] = useState(false);
   const { isAuthenticated, user } = useAuth();
   const { toast } = useToast();
 
@@ -853,6 +861,54 @@ export default function ParentPortal() {
       return res.json();
     },
     enabled: isAuthenticated && hasParentLinks && !!selectedStudent,
+  });
+
+  const { data: schools = [] } = useQuery<SchoolOption[]>({
+    queryKey: ["/api/parent-portal/schools"],
+    enabled: isAuthenticated && !isStudent,
+  });
+
+  const lookupStudentMutation = useMutation({
+    mutationFn: async (data: { schoolId: string; studentIdNumber: string }) => {
+      const response = await apiRequest("POST", "/api/parent-portal/lookup-student", data);
+      return response.json();
+    },
+    onSuccess: (data) => {
+      setLookupResult(data);
+    },
+    onError: (error: any) => {
+      setLookupResult(null);
+      toast({
+        title: "Student Not Found",
+        description: error.message || "Please verify the school and student ID are correct.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const requestConnectionMutation = useMutation({
+    mutationFn: async (data: { studentUserId: string; relationship: string }) => {
+      const response = await apiRequest("POST", "/api/parent-portal/request-connection", data);
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/parent-portal/links", "parent"] });
+      setLookupResult(null);
+      setLookupSchoolId("");
+      setLookupStudentId("");
+      setIsFindStudentOpen(false);
+      toast({
+        title: "Connection Requested",
+        description: "Your request has been sent. The educator will review and approve your connection.",
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Connection Failed",
+        description: error.message || "Failed to request connection. Please try again.",
+        variant: "destructive",
+      });
+    },
   });
 
   const inviteParentMutation = useMutation({
@@ -1030,20 +1086,138 @@ export default function ParentPortal() {
   if (isUnrelatedRole) {
     return (
       <div className="flex items-center justify-center min-h-[60vh]">
-        <Card className="w-full max-w-md">
+        <Card className="w-full max-w-lg">
           <CardHeader className="text-center">
-            <div className="mx-auto mb-4 h-16 w-16 rounded-full bg-muted flex items-center justify-center">
-              <Users className="h-8 w-8 text-muted-foreground" />
+            <div className="mx-auto mb-4 h-16 w-16 rounded-full bg-primary/10 flex items-center justify-center">
+              <Users className="h-8 w-8 text-primary" />
             </div>
             <CardTitle>Parent Portal</CardTitle>
             <CardDescription>
-              This feature is designed for students to share their progress with family members, 
-              and for parents/guardians to view their children's educational journey.
+              Connect with your student to track their educational journey, view their progress, 
+              and celebrate their achievements.
             </CardDescription>
           </CardHeader>
-          <CardContent className="text-center text-sm text-muted-foreground">
-            <p>As an educator or administrator, you can encourage your students to use this feature 
-            to engage their families in their educational success.</p>
+          <CardContent className="space-y-6">
+            <div className="text-center">
+              <Dialog open={isFindStudentOpen} onOpenChange={(open) => {
+                setIsFindStudentOpen(open);
+                if (!open) {
+                  setLookupResult(null);
+                  setLookupSchoolId("");
+                  setLookupStudentId("");
+                }
+              }}>
+                <DialogTrigger asChild>
+                  <Button size="lg" data-testid="button-find-student">
+                    <UserPlus className="mr-2 h-5 w-5" />
+                    Find Your Student
+                  </Button>
+                </DialogTrigger>
+                <DialogContent className="max-w-md">
+                  <DialogHeader>
+                    <DialogTitle>Find Your Student</DialogTitle>
+                    <DialogDescription>
+                      Enter your student's school and student ID number to connect with them.
+                    </DialogDescription>
+                  </DialogHeader>
+                  <div className="space-y-4 pt-4">
+                    {!lookupResult ? (
+                      <>
+                        <div className="space-y-2">
+                          <Label htmlFor="lookup-school">School</Label>
+                          <Select value={lookupSchoolId} onValueChange={setLookupSchoolId}>
+                            <SelectTrigger data-testid="select-lookup-school">
+                              <SelectValue placeholder="Select a school" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {schools.map((school) => (
+                                <SelectItem key={school.id} value={school.id}>
+                                  {school.name}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <div className="space-y-2">
+                          <Label htmlFor="lookup-student-id">Student ID Number</Label>
+                          <Input
+                            id="lookup-student-id"
+                            type="text"
+                            placeholder="e.g., 12345"
+                            value={lookupStudentId}
+                            onChange={(e) => setLookupStudentId(e.target.value)}
+                            data-testid="input-lookup-student-id"
+                          />
+                          <p className="text-xs text-muted-foreground">
+                            This is the ID number assigned by the school
+                          </p>
+                        </div>
+                        <Button
+                          className="w-full"
+                          onClick={() => lookupStudentMutation.mutate({ schoolId: lookupSchoolId, studentIdNumber: lookupStudentId })}
+                          disabled={!lookupSchoolId || !lookupStudentId || lookupStudentMutation.isPending}
+                          data-testid="button-lookup-student"
+                        >
+                          {lookupStudentMutation.isPending ? "Searching..." : "Find Student"}
+                        </Button>
+                      </>
+                    ) : (
+                      <>
+                        <div className="p-4 bg-muted rounded-lg text-center">
+                          <div className="text-lg font-semibold">
+                            {lookupResult.firstName} {lookupResult.lastName}
+                          </div>
+                          <div className="text-sm text-muted-foreground mt-1">
+                            Grade {lookupResult.gradeLevel} at {lookupResult.schoolName}
+                          </div>
+                        </div>
+                        <div className="space-y-2">
+                          <Label htmlFor="lookup-relationship">Your Relationship</Label>
+                          <Select value={lookupRelationship} onValueChange={setLookupRelationship}>
+                            <SelectTrigger data-testid="select-lookup-relationship">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="parent">Parent</SelectItem>
+                              <SelectItem value="guardian">Guardian</SelectItem>
+                              <SelectItem value="family_member">Family Member</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <div className="flex gap-2">
+                          <Button
+                            variant="outline"
+                            className="flex-1"
+                            onClick={() => setLookupResult(null)}
+                          >
+                            Search Again
+                          </Button>
+                          <Button
+                            className="flex-1"
+                            onClick={() => requestConnectionMutation.mutate({ 
+                              studentUserId: lookupResult.userId, 
+                              relationship: lookupRelationship 
+                            })}
+                            disabled={requestConnectionMutation.isPending}
+                            data-testid="button-request-connection"
+                          >
+                            {requestConnectionMutation.isPending ? "Requesting..." : "Request Connection"}
+                          </Button>
+                        </div>
+                        <p className="text-xs text-muted-foreground text-center">
+                          Your request will be sent to the student's educator for approval.
+                        </p>
+                      </>
+                    )}
+                  </div>
+                </DialogContent>
+              </Dialog>
+            </div>
+            <Separator />
+            <div className="text-center text-sm text-muted-foreground">
+              <p className="mb-2">Don't have your student's ID?</p>
+              <p>Contact your student's school or educator to get their student ID number.</p>
+            </div>
           </CardContent>
         </Card>
       </div>
