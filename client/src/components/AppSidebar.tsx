@@ -101,6 +101,7 @@ const navigationGroups: NavGroup[] = [
       { title: "Assessments", url: "/assessments", icon: FileText, requiresAuth: true },
       { title: "Scope & Sequence", url: "/scope-sequence", icon: Map, requiresAuth: true },
       { title: "Classroom", url: "/classroom", icon: School, requiresAuth: true },
+      { title: "Gradebook", url: "/gradebook", icon: ClipboardList, requiresAuth: true },
       { title: "Collaboration", url: "/collaboration", icon: Share2, requiresAuth: true },
       { title: "Resource Library", url: "/resource-library", icon: Folder, requiresAuth: true },
       { title: "SIS Integration", url: "/sis-integration", icon: Link2, requiresAuth: true },
