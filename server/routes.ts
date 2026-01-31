@@ -4998,6 +4998,50 @@ export async function registerRoutes(
     }
   });
 
+  // Performance Analytics - Educator leaderboard
+  app.get("/api/admin/performance/educators", isAuthenticated, isSiteAdmin, async (req: any, res) => {
+    try {
+      const metrics = await storage.getEducatorPerformanceMetrics();
+      res.json(metrics);
+    } catch (error) {
+      console.error("Educator performance error:", error);
+      res.status(500).json({ error: "Failed to fetch educator performance metrics" });
+    }
+  });
+
+  // Performance Analytics - Campus leaderboard
+  app.get("/api/admin/performance/campuses", isAuthenticated, isSiteAdmin, async (req: any, res) => {
+    try {
+      const metrics = await storage.getCampusPerformanceMetrics();
+      res.json(metrics);
+    } catch (error) {
+      console.error("Campus performance error:", error);
+      res.status(500).json({ error: "Failed to fetch campus performance metrics" });
+    }
+  });
+
+  // Performance Analytics - Organization leaderboard
+  app.get("/api/admin/performance/organizations", isAuthenticated, isSiteAdmin, async (req: any, res) => {
+    try {
+      const metrics = await storage.getOrganizationPerformanceMetrics();
+      res.json(metrics);
+    } catch (error) {
+      console.error("Organization performance error:", error);
+      res.status(500).json({ error: "Failed to fetch organization performance metrics" });
+    }
+  });
+
+  // Performance Analytics - System-wide stats with top performers
+  app.get("/api/admin/performance/system", isAuthenticated, isSiteAdmin, async (req: any, res) => {
+    try {
+      const stats = await storage.getSystemWideStats();
+      res.json(stats);
+    } catch (error) {
+      console.error("System performance error:", error);
+      res.status(500).json({ error: "Failed to fetch system-wide performance stats" });
+    }
+  });
+
   // Get all users (site admin only) with pagination and search
   app.get("/api/admin/users", isAuthenticated, isSiteAdmin, async (req: any, res) => {
     try {
