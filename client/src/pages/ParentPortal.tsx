@@ -44,8 +44,10 @@ import {
   Compass
 } from "lucide-react";
 import { useAuth } from "@/hooks/use-auth";
+import { useTier } from "@/hooks/use-tier";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
+import { AdBanner } from "@/components/AdBanner";
 import type { ParentStudentLink, ParentInvitation, Goal } from "@shared/schema";
 
 type ParentPermissions = {
@@ -817,6 +819,7 @@ export default function ParentPortal() {
   const [isFindStudentOpen, setIsFindStudentOpen] = useState(false);
   const { isAuthenticated, user } = useAuth();
   const { toast } = useToast();
+  const { showAds } = useTier();
 
   const userRole = user?.role;
   const isStudent = userRole === 'student';
@@ -1238,6 +1241,8 @@ export default function ParentPortal() {
               : "Track your student's educational journey and celebrate their achievements"}
           </p>
         </div>
+        
+        {!isStudent && showAds && <AdBanner position="inline" className="flex-shrink-0" />}
         
         {isStudent && (
           <Dialog open={isInviteDialogOpen} onOpenChange={setIsInviteDialogOpen}>

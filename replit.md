@@ -39,6 +39,7 @@ Preferred communication style: Simple, everyday language.
 -   **Student Transfer System**: Campus-level feature for transferring students between educators or organizations with triple confirmation workflow (Campus → District → System Admin approval chain). Available at `/transfer-approvals`.
 -   **Gradebook System**: Educators and campus admins can manage student grades with categories, automatic letter grade calculation, CSV export, and SIS integration for sharing grades. Includes career alignment tab showing how grades relate to career readiness. Available at `/gradebook`.
 -   **Career Alignment**: Classes can be mapped to career fields (STEM, Healthcare, Business, etc.). Gradebook shows career readiness scores based on academic performance. Parent Portal displays career readiness insights alongside saved careers.
+-   **Parent Portal**: Free tier with ad support for parents. Parents can search for students by school and student ID to request connections. Educators approve/reject connection requests. Features student progress tracking, Be-Know-Do journey visualization, and career readiness insights. Available at `/parent-portal`.
 -   **System Admin Performance Analytics**: Dashboard for tracking educator, campus, and organization performance based on goal completion, standards coverage, and student Be-Know-Do progress. Available at `/site-admin` under the Performance tab.
 
 ### Global Architecture
