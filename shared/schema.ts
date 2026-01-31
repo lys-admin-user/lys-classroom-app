@@ -350,6 +350,15 @@ export const generateLessonRequestSchema = z.object({
 
 export type GenerateLessonRequest = z.infer<typeof generateLessonRequestSchema>;
 
+// Scope Visibility Levels - defines inheritance hierarchy
+export const SCOPE_VISIBILITY = {
+  personal: "personal",     // Only visible to creator
+  campus: "campus",         // Visible to all educators at campus
+  district: "district",     // Visible to all campuses in district
+  system: "system",         // System-wide (for authorized authors)
+} as const;
+export type ScopeVisibility = keyof typeof SCOPE_VISIBILITY;
+
 // Scope and Sequence Tables
 export const scopeSequences = pgTable("scope_sequences", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
@@ -364,8 +373,10 @@ export const scopeSequences = pgTable("scope_sequences", {
   totalWeeks: integer("total_weeks").default(36),
   status: text("status").notNull().default("draft"), // draft, published, archived
   isTemplate: boolean("is_template").default(false),
-  campusId: varchar("campus_id"), // null for personal, set for campus-wide
-  parentScopeId: varchar("parent_scope_id"), // if derived from admin scope
+  visibility: text("visibility").notNull().default("personal"), // personal, campus, district, system
+  organizationId: varchar("organization_id"), // The org this scope belongs to (campus or district)
+  campusId: varchar("campus_id"), // DEPRECATED: Use organizationId instead. Kept for backward compatibility
+  parentScopeId: varchar("parent_scope_id"), // if derived from admin/district scope
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });

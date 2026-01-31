@@ -8703,11 +8703,11 @@ export async function registerRoutes(
     res.json(SIS_PROVIDERS);
   });
 
-  // Get user's SIS connections
+  // Get user's SIS connections (includes inherited org connections)
   app.get("/api/integrations/sis/connections", isAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user?.claims?.sub;
-      const connections = await storage.getSisConnections(userId);
+      const connections = await storage.getSisConnectionsWithHierarchy(userId);
       
       // Don't expose tokens in response
       const safeConnections = connections.map(c => ({

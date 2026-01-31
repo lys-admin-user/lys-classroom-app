@@ -44,10 +44,19 @@ Preferred communication style: Simple, everyday language.
 
 ### Global Architecture
 -   **Educational Hierarchy**: Structured organization of students and classes (Country > State/Jurisdiction > District > School/Campus > Class > Student) with validation.
+-   **Organization Inheritance**: Resources (Scope & Sequence, SIS Connections) cascade through the hierarchy - District settings apply to all campuses; campus settings apply to all educators.
+-   **Scope & Sequence Visibility**: Supports personal, campus, district, and system-level scopes with proper inheritance.
+-   **SIS Integration Inheritance**: Campus/District SIS connections are automatically available to educators within that organization hierarchy.
 -   **Global Authority Tree**: Polymorphic hierarchy supporting various educational governance systems (bottom_heavy, top_down_unitary, federal_hybrid).
 -   **LYS Milestone Engine**: Tracks Being/Knowing/Doing progress with gatekeeper logic, regional multipliers, and alternative pathways.
 -   **Workforce Trends Integration**: Weekly automated sync with BLS Occupational Outlook Handbook data for career alignment, salary, and job outlook.
 -   **Alignment Matrix**: Connects regional gamification weights to workforce data.
+
+### Data Architecture (Journey Tracking)
+-   **studentJourneyEntries**: General event log for any user type (student, educator, admin) - BKD pillar events.
+-   **studentJourneyProgress**: Aggregated progress scores per student (BE/KNOW/DO scores).
+-   **studentJourneyMilestones**: Specific milestone achievements tracked per student.
+-   **studentJourneyActivities**: Detailed activity log tied to journey progress for student analytics.
 
 ## External Dependencies
 

@@ -308,6 +308,7 @@ export interface IStorage {
   
   // Scope and Sequence
   getScopeSequences(userId: string): Promise<ScopeSequence[]>;
+  getScopeSequencesWithHierarchy(userId: string): Promise<ScopeSequence[]>; // Includes inherited org scopes
   getScopeSequence(id: string): Promise<ScopeSequence | undefined>;
   createScopeSequence(scope: InsertScopeSequence): Promise<ScopeSequence>;
   updateScopeSequence(id: string, updates: Partial<ScopeSequence>, userId: string): Promise<ScopeSequence | undefined>;
@@ -674,6 +675,7 @@ export interface IStorage {
   getSisConnections(userId: string): Promise<SisConnection[]>;
   getSisConnection(id: string): Promise<SisConnection | undefined>;
   getSisConnectionsByOrg(organizationId: string): Promise<SisConnection[]>;
+  getSisConnectionsWithHierarchy(userId: string): Promise<SisConnection[]>; // Gets user's own + inherited org connections
   createSisConnection(connection: InsertSisConnection): Promise<SisConnection>;
   updateSisConnection(id: string, updates: Partial<SisConnection>): Promise<SisConnection | undefined>;
   deleteSisConnection(id: string, userId: string): Promise<boolean>;
@@ -2355,6 +2357,77 @@ export class DatabaseStorage implements IStorage {
     return await db.select().from(scopeSequences)
       .where(eq(scopeSequences.userId, userId))
       .orderBy(desc(scopeSequences.createdAt));
+  }
+
+  async getScopeSequencesWithHierarchy(userId: string): Promise<ScopeSequence[]> {
+    const userScopes = await this.getScopeSequences(userId);
+    const seenIds = new Set(userScopes.map(s => s.id));
+    const inheritedScopes: ScopeSequence[] = [];
+    
+    const userOrgs = await this.getUserOrganizations(userId);
+    
+    for (const membership of userOrgs) {
+      const currentOrg = await this.getOrganization(membership.organizationId);
+      if (!currentOrg) continue;
+      
+      // Get campus-level scopes (only from current org if it's a campus/school)
+      if (currentOrg.type === 'school' || currentOrg.type === 'campus') {
+        const campusScopes = await db.select().from(scopeSequences)
+          .where(and(
+            or(
+              eq(scopeSequences.organizationId, currentOrg.id),
+              eq(scopeSequences.campusId, currentOrg.id) // Backward compatibility
+            ),
+            eq(scopeSequences.visibility as any, 'campus'),
+            eq(scopeSequences.status, 'published')
+          ));
+        
+        for (const scope of campusScopes) {
+          if (!seenIds.has(scope.id)) {
+            seenIds.add(scope.id);
+            inheritedScopes.push(scope);
+          }
+        }
+      }
+      
+      // Get district-level scopes (from parent district)
+      if (currentOrg.parentOrganizationId) {
+        const parentOrg = await this.getOrganization(currentOrg.parentOrganizationId);
+        if (parentOrg && parentOrg.type === 'district') {
+          const districtScopes = await db.select().from(scopeSequences)
+            .where(and(
+              eq(scopeSequences.organizationId, parentOrg.id),
+              eq(scopeSequences.visibility as any, 'district'),
+              eq(scopeSequences.status, 'published')
+            ));
+          
+          for (const scope of districtScopes) {
+            if (!seenIds.has(scope.id)) {
+              seenIds.add(scope.id);
+              inheritedScopes.push(scope);
+            }
+          }
+        }
+      }
+    }
+    
+    // Get system-level scopes (available to all)
+    const systemScopes = await db.select().from(scopeSequences)
+      .where(and(
+        eq(scopeSequences.visibility as any, 'system'),
+        eq(scopeSequences.status, 'published')
+      ));
+    
+    for (const scope of systemScopes) {
+      if (!seenIds.has(scope.id)) {
+        seenIds.add(scope.id);
+        inheritedScopes.push(scope);
+      }
+    }
+    
+    return [...userScopes, ...inheritedScopes].sort(
+      (a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime()
+    );
   }
 
   async getScopeSequence(id: string): Promise<ScopeSequence | undefined> {
@@ -4705,6 +4778,48 @@ export class DatabaseStorage implements IStorage {
     return await db.select().from(sisConnections)
       .where(eq(sisConnections.organizationId, organizationId))
       .orderBy(desc(sisConnections.createdAt));
+  }
+
+  async getSisConnectionsWithHierarchy(userId: string): Promise<SisConnection[]> {
+    const userConnections = await this.getSisConnections(userId);
+    const seenIds = new Set(userConnections.map(c => c.id));
+    const orgConnections: SisConnection[] = [];
+    
+    const userOrgs = await this.getUserOrganizations(userId);
+    
+    for (const membership of userOrgs) {
+      const currentOrg = await this.getOrganization(membership.organizationId);
+      if (!currentOrg) continue;
+      
+      // Get SIS from current org (campus/school level)
+      if (currentOrg.type === 'school' || currentOrg.type === 'campus') {
+        const campusSis = await this.getSisConnectionsByOrg(currentOrg.id);
+        for (const conn of campusSis) {
+          if (!seenIds.has(conn.id)) {
+            seenIds.add(conn.id);
+            orgConnections.push(conn);
+          }
+        }
+      }
+      
+      // Get SIS from parent district (district → campus inheritance)
+      if (currentOrg.parentOrganizationId) {
+        const parentOrg = await this.getOrganization(currentOrg.parentOrganizationId);
+        if (parentOrg && parentOrg.type === 'district') {
+          const districtSis = await this.getSisConnectionsByOrg(parentOrg.id);
+          for (const conn of districtSis) {
+            if (!seenIds.has(conn.id)) {
+              seenIds.add(conn.id);
+              orgConnections.push(conn);
+            }
+          }
+        }
+      }
+    }
+    
+    return [...userConnections, ...orgConnections].sort(
+      (a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime()
+    );
   }
 
   async createSisConnection(connection: InsertSisConnection): Promise<SisConnection> {
