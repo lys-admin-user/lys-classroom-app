@@ -197,6 +197,8 @@ export default function SiteAdminPage() {
   const [isBulkUploadOpen, setIsBulkUploadOpen] = useState(false);
   const [bulkUploadFile, setBulkUploadFile] = useState<File | null>(null);
   const [bulkUploadPreview, setBulkUploadPreview] = useState<any[]>([]);
+  const [bulkUploadAllLessons, setBulkUploadAllLessons] = useState<any[]>([]);
+  const [bulkUploadErrors, setBulkUploadErrors] = useState<string[]>([]);
   const [newContent, setNewContent] = useState({
     title: "",
     description: "",
@@ -476,20 +478,99 @@ export default function SiteAdminPage() {
       setIsBulkUploadOpen(false);
       setBulkUploadFile(null);
       setBulkUploadPreview([]);
-      toast({ 
-        title: "Bulk import completed", 
-        description: `${data.successCount || 0} lessons imported, ${data.errorCount || 0} errors` 
-      });
+      setBulkUploadAllLessons([]);
+      setBulkUploadErrors([]);
+      const errors = data.errors || [];
+      if (errors.length > 0) {
+        toast({ 
+          title: "Import completed with errors", 
+          description: `${data.successCount || 0} imported, ${data.errorCount || 0} failed. Check console for details.`,
+          variant: "destructive"
+        });
+        console.log("Import errors:", errors);
+      } else {
+        toast({ 
+          title: "Bulk import completed", 
+          description: `${data.successCount || 0} lessons imported successfully` 
+        });
+      }
     },
     onError: () => {
       toast({ title: "Failed to import lessons", variant: "destructive" });
     },
   });
 
+  const parseCSVLine = (line: string): string[] => {
+    const result: string[] = [];
+    let current = '';
+    let inQuotes = false;
+    for (let i = 0; i < line.length; i++) {
+      const char = line[i];
+      if (char === '"') {
+        if (inQuotes && line[i + 1] === '"') {
+          current += '"';
+          i++;
+        } else {
+          inQuotes = !inQuotes;
+        }
+      } else if (char === ',' && !inQuotes) {
+        result.push(current.trim());
+        current = '';
+      } else {
+        current += char;
+      }
+    }
+    result.push(current.trim());
+    return result;
+  };
+
+  const parseCSV = (content: string): any[] => {
+    const lines = content.split(/\r?\n/);
+    if (lines.length < 2) return [];
+    const headers = parseCSVLine(lines[0]).map(h => h.replace(/^"|"$/g, ''));
+    const lessons: any[] = [];
+    for (let i = 1; i < lines.length; i++) {
+      if (!lines[i].trim()) continue;
+      const values = parseCSVLine(lines[i]);
+      const lesson: any = {};
+      headers.forEach((header, idx) => {
+        const val = (values[idx] || '').replace(/^"|"$/g, '');
+        if (header === 'objectives' || header === 'materials' || header === 'tags') {
+          lesson[header] = val ? val.split(';').map((v: string) => v.trim()).filter(Boolean) : [];
+        } else if (header === 'activities') {
+          lesson[header] = val ? val.split(';').map((v: string) => ({ title: v.trim(), description: v.trim(), duration: '15 min', type: 'activity' })).filter((a: any) => a.title) : [];
+        } else {
+          lesson[header] = val;
+        }
+      });
+      lessons.push(lesson);
+    }
+    return lessons;
+  };
+
+  const validateLessons = (lessons: any[]): { valid: any[]; errors: string[] } => {
+    const valid: any[] = [];
+    const errors: string[] = [];
+    lessons.forEach((lesson, idx) => {
+      const missing: string[] = [];
+      if (!lesson.title?.trim()) missing.push('title');
+      if (!lesson.topic?.trim()) missing.push('topic');
+      if (!lesson.subject?.trim()) missing.push('subject');
+      if (!lesson.gradeLevel?.trim()) missing.push('gradeLevel');
+      if (missing.length > 0) {
+        errors.push(`Row ${idx + 1}: Missing ${missing.join(', ')}`);
+      } else {
+        valid.push(lesson);
+      }
+    });
+    return { valid, errors };
+  };
+
   const handleBulkUploadFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
     setBulkUploadFile(file);
+    setBulkUploadErrors([]);
     
     const reader = new FileReader();
     reader.onload = (event) => {
@@ -498,77 +579,34 @@ export default function SiteAdminPage() {
         let lessons: any[] = [];
         
         if (file.name.endsWith('.json')) {
-          lessons = JSON.parse(content);
+          const parsed = JSON.parse(content);
+          lessons = Array.isArray(parsed) ? parsed : (parsed.lessons || []);
         } else if (file.name.endsWith('.csv')) {
-          const lines = content.split('\n');
-          const headers = lines[0].split(',').map(h => h.trim().replace(/"/g, ''));
-          for (let i = 1; i < lines.length; i++) {
-            if (!lines[i].trim()) continue;
-            const values = lines[i].split(',').map(v => v.trim().replace(/"/g, ''));
-            const lesson: any = {};
-            headers.forEach((header, idx) => {
-              if (header === 'objectives' || header === 'materials' || header === 'tags') {
-                lesson[header] = values[idx] ? values[idx].split(';').map((v: string) => v.trim()) : [];
-              } else if (header === 'activities') {
-                lesson[header] = values[idx] ? values[idx].split(';').map((v: string) => ({ title: v.trim(), description: v.trim(), duration: '15 min', type: 'activity' })) : [];
-              } else {
-                lesson[header] = values[idx] || '';
-              }
-            });
-            lessons.push(lesson);
-          }
+          lessons = parseCSV(content);
         }
         
-        setBulkUploadPreview(lessons.slice(0, 5));
+        const { valid, errors } = validateLessons(lessons);
+        setBulkUploadAllLessons(valid);
+        setBulkUploadPreview(valid.slice(0, 5));
+        setBulkUploadErrors(errors);
       } catch (error) {
         toast({ title: "Failed to parse file", description: "Please check file format", variant: "destructive" });
         setBulkUploadPreview([]);
+        setBulkUploadAllLessons([]);
+        setBulkUploadErrors([]);
       }
     };
     reader.readAsText(file);
   };
 
   const handleBulkUploadSubmit = () => {
-    if (!bulkUploadFile || bulkUploadPreview.length === 0) return;
+    if (!bulkUploadFile || bulkUploadAllLessons.length === 0) return;
     
-    const reader = new FileReader();
-    reader.onload = (event) => {
-      try {
-        const content = event.target?.result as string;
-        let lessons: any[] = [];
-        
-        if (bulkUploadFile.name.endsWith('.json')) {
-          lessons = JSON.parse(content);
-        } else if (bulkUploadFile.name.endsWith('.csv')) {
-          const lines = content.split('\n');
-          const headers = lines[0].split(',').map(h => h.trim().replace(/"/g, ''));
-          for (let i = 1; i < lines.length; i++) {
-            if (!lines[i].trim()) continue;
-            const values = lines[i].split(',').map(v => v.trim().replace(/"/g, ''));
-            const lesson: any = {};
-            headers.forEach((header, idx) => {
-              if (header === 'objectives' || header === 'materials' || header === 'tags') {
-                lesson[header] = values[idx] ? values[idx].split(';').map((v: string) => v.trim()) : [];
-              } else if (header === 'activities') {
-                lesson[header] = values[idx] ? values[idx].split(';').map((v: string) => ({ title: v.trim(), description: v.trim(), duration: '15 min', type: 'activity' })) : [];
-              } else {
-                lesson[header] = values[idx] || '';
-              }
-            });
-            lessons.push(lesson);
-          }
-        }
-        
-        bulkUploadMutation.mutate({
-          fileName: bulkUploadFile.name,
-          fileType: bulkUploadFile.name.endsWith('.json') ? 'json' : 'csv',
-          lessons
-        });
-      } catch (error) {
-        toast({ title: "Failed to process file", variant: "destructive" });
-      }
-    };
-    reader.readAsText(bulkUploadFile);
+    bulkUploadMutation.mutate({
+      fileName: bulkUploadFile.name,
+      fileType: bulkUploadFile.name.endsWith('.json') ? 'json' : 'csv',
+      lessons: bulkUploadAllLessons
+    });
   };
 
   const getLevelLabel = (level: string) => {
@@ -2155,9 +2193,26 @@ export default function SiteAdminPage() {
                     {bulkUploadFile && (
                       <div className="p-3 bg-muted rounded-md">
                         <p className="text-sm font-medium">File: {bulkUploadFile.name}</p>
+                        <p className="text-xs text-muted-foreground">
+                          {bulkUploadAllLessons.length} valid lessons ready to import
+                          {bulkUploadErrors.length > 0 && `, ${bulkUploadErrors.length} with errors`}
+                        </p>
+                        {bulkUploadErrors.length > 0 && (
+                          <div className="mt-2 p-2 bg-destructive/10 rounded border border-destructive/20">
+                            <p className="text-xs text-destructive font-medium mb-1">Validation Errors (will be skipped):</p>
+                            <div className="space-y-0.5 max-h-24 overflow-y-auto">
+                              {bulkUploadErrors.slice(0, 5).map((err, idx) => (
+                                <p key={idx} className="text-xs text-destructive">{err}</p>
+                              ))}
+                              {bulkUploadErrors.length > 5 && (
+                                <p className="text-xs text-destructive">...and {bulkUploadErrors.length - 5} more</p>
+                              )}
+                            </div>
+                          </div>
+                        )}
                         {bulkUploadPreview.length > 0 && (
                           <div className="mt-2">
-                            <p className="text-xs text-muted-foreground mb-2">Preview (first {Math.min(5, bulkUploadPreview.length)} records):</p>
+                            <p className="text-xs text-muted-foreground mb-2">Preview (first {Math.min(5, bulkUploadPreview.length)} valid records):</p>
                             <div className="space-y-1 max-h-40 overflow-y-auto">
                               {bulkUploadPreview.map((lesson, idx) => (
                                 <div key={idx} className="text-xs p-2 bg-background rounded border">
@@ -2174,11 +2229,11 @@ export default function SiteAdminPage() {
                     <Button variant="outline" onClick={() => setIsBulkUploadOpen(false)}>Cancel</Button>
                     <Button 
                       onClick={handleBulkUploadSubmit}
-                      disabled={!bulkUploadFile || bulkUploadPreview.length === 0 || bulkUploadMutation.isPending}
+                      disabled={!bulkUploadFile || bulkUploadAllLessons.length === 0 || bulkUploadMutation.isPending}
                       data-testid="button-submit-bulk"
                     >
                       {bulkUploadMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Upload className="h-4 w-4 mr-2" />}
-                      Import {bulkUploadPreview.length > 0 ? `${bulkUploadPreview.length}+ Lessons` : 'Lessons'}
+                      Import {bulkUploadAllLessons.length} Lesson{bulkUploadAllLessons.length !== 1 ? 's' : ''}
                     </Button>
                   </DialogFooter>
                 </DialogContent>
