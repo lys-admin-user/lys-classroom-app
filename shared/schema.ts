@@ -1215,6 +1215,64 @@ export type InsertAssignmentRecipient = z.infer<typeof insertAssignmentRecipient
 export type AssignmentRecipient = typeof assignmentRecipients.$inferSelect;
 
 // ================================
+// Gradebook System
+// ================================
+
+// Grade Categories (weights for different assignment types)
+export const gradeCategories = pgTable("grade_categories", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull(),
+  classId: varchar("class_id").notNull(),
+  name: text("name").notNull(),
+  weight: integer("weight").notNull().default(100),
+  color: text("color"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertGradeCategorySchema = createInsertSchema(gradeCategories).omit({ id: true, createdAt: true });
+export type InsertGradeCategory = z.infer<typeof insertGradeCategorySchema>;
+export type GradeCategory = typeof gradeCategories.$inferSelect;
+
+// Student Grades Table
+export const studentGrades = pgTable("student_grades", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull(),
+  classId: varchar("class_id").notNull(),
+  studentId: varchar("student_id").notNull(),
+  assignmentId: varchar("assignment_id"),
+  categoryId: varchar("category_id"),
+  title: text("title").notNull(),
+  pointsEarned: integer("points_earned"),
+  pointsPossible: integer("points_possible").notNull().default(100),
+  percentage: integer("percentage"),
+  letterGrade: text("letter_grade"),
+  comments: text("comments"),
+  gradedAt: timestamp("graded_at").defaultNow(),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertStudentGradeSchema = createInsertSchema(studentGrades).omit({ id: true, createdAt: true, updatedAt: true });
+export type InsertStudentGrade = z.infer<typeof insertStudentGradeSchema>;
+export type StudentGrade = typeof studentGrades.$inferSelect;
+
+// Grading Periods (quarters, semesters, etc.)
+export const gradingPeriods = pgTable("grading_periods", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull(),
+  classId: varchar("class_id"),
+  name: text("name").notNull(),
+  startDate: timestamp("start_date").notNull(),
+  endDate: timestamp("end_date").notNull(),
+  isCurrent: boolean("is_current").default(false),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertGradingPeriodSchema = createInsertSchema(gradingPeriods).omit({ id: true, createdAt: true });
+export type InsertGradingPeriod = z.infer<typeof insertGradingPeriodSchema>;
+export type GradingPeriod = typeof gradingPeriods.$inferSelect;
+
+// ================================
 // Student Digital Portfolio System
 // ================================
 

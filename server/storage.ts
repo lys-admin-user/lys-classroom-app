@@ -58,6 +58,12 @@ import {
   type InsertAssignment,
   type AssignmentRecipient,
   type InsertAssignmentRecipient,
+  type GradeCategory,
+  type InsertGradeCategory,
+  type StudentGrade,
+  type InsertStudentGrade,
+  type GradingPeriod,
+  type InsertGradingPeriod,
   type CollaborationSession,
   type InsertCollaborationSession,
   type SessionParticipant,
@@ -117,6 +123,9 @@ import {
   studentGroups,
   assignments,
   assignmentRecipients,
+  gradeCategories,
+  studentGrades,
+  gradingPeriods,
   collaborationSessions,
   sessionParticipants,
   collaborationMessages,
@@ -425,6 +434,24 @@ export interface IStorage {
   getAssignmentsForStudent(studentId: string): Promise<{ assignment: Assignment; recipient: AssignmentRecipient }[]>;
   createAssignmentRecipient(recipient: InsertAssignmentRecipient): Promise<AssignmentRecipient>;
   updateAssignmentRecipient(id: string, updates: Partial<AssignmentRecipient>): Promise<AssignmentRecipient | undefined>;
+  
+  // Gradebook System
+  getGradeCategories(classId: string): Promise<GradeCategory[]>;
+  createGradeCategory(category: InsertGradeCategory): Promise<GradeCategory>;
+  updateGradeCategory(id: string, updates: Partial<GradeCategory>, userId: string): Promise<GradeCategory | undefined>;
+  deleteGradeCategory(id: string, userId: string): Promise<boolean>;
+  
+  getStudentGrades(classId: string): Promise<StudentGrade[]>;
+  getStudentGradesByStudent(studentId: string): Promise<StudentGrade[]>;
+  createStudentGrade(grade: InsertStudentGrade): Promise<StudentGrade>;
+  updateStudentGrade(id: string, updates: Partial<StudentGrade>, userId: string): Promise<StudentGrade | undefined>;
+  deleteStudentGrade(id: string, userId: string): Promise<boolean>;
+  bulkUpdateStudentGrades(grades: { id: string; pointsEarned: number; comments?: string }[], userId: string): Promise<StudentGrade[]>;
+  
+  getGradingPeriods(userId: string): Promise<GradingPeriod[]>;
+  createGradingPeriod(period: InsertGradingPeriod): Promise<GradingPeriod>;
+  updateGradingPeriod(id: string, updates: Partial<GradingPeriod>, userId: string): Promise<GradingPeriod | undefined>;
+  deleteGradingPeriod(id: string, userId: string): Promise<boolean>;
   
   // Helper: Get students with specific accommodation types
   getStudentsByAccommodations(accommodationTypes: string[], classId?: string): Promise<Student[]>;
@@ -3040,6 +3067,148 @@ export class DatabaseStorage implements IStorage {
     return await db.select().from(assignments)
       .where(eq(assignments.classId, classId))
       .orderBy(desc(assignments.createdAt));
+  }
+
+  // Gradebook System Implementation
+  async getGradeCategories(classId: string): Promise<GradeCategory[]> {
+    return await db.select().from(gradeCategories)
+      .where(eq(gradeCategories.classId, classId))
+      .orderBy(gradeCategories.name);
+  }
+
+  async createGradeCategory(category: InsertGradeCategory): Promise<GradeCategory> {
+    const [created] = await db.insert(gradeCategories).values(category as any).returning();
+    return created;
+  }
+
+  async updateGradeCategory(id: string, updates: Partial<GradeCategory>, userId: string): Promise<GradeCategory | undefined> {
+    const [existing] = await db.select().from(gradeCategories).where(eq(gradeCategories.id, id));
+    if (!existing || existing.userId !== userId) return undefined;
+    const [updated] = await db.update(gradeCategories)
+      .set(updates)
+      .where(eq(gradeCategories.id, id))
+      .returning();
+    return updated || undefined;
+  }
+
+  async deleteGradeCategory(id: string, userId: string): Promise<boolean> {
+    const [existing] = await db.select().from(gradeCategories).where(eq(gradeCategories.id, id));
+    if (!existing || existing.userId !== userId) return false;
+    await db.delete(gradeCategories).where(eq(gradeCategories.id, id));
+    return true;
+  }
+
+  async getStudentGrades(classId: string): Promise<StudentGrade[]> {
+    return await db.select().from(studentGrades)
+      .where(eq(studentGrades.classId, classId))
+      .orderBy(desc(studentGrades.gradedAt));
+  }
+
+  async getStudentGradesByStudent(studentId: string): Promise<StudentGrade[]> {
+    return await db.select().from(studentGrades)
+      .where(eq(studentGrades.studentId, studentId))
+      .orderBy(desc(studentGrades.gradedAt));
+  }
+
+  async createStudentGrade(grade: InsertStudentGrade): Promise<StudentGrade> {
+    // Calculate percentage and letter grade if not provided
+    const percentage = grade.pointsEarned !== undefined && grade.pointsEarned !== null
+      ? Math.round((grade.pointsEarned / (grade.pointsPossible || 100)) * 100)
+      : undefined;
+    const letterGrade = percentage !== undefined ? this.calculateLetterGrade(percentage) : undefined;
+    
+    const [created] = await db.insert(studentGrades).values({
+      ...grade,
+      percentage,
+      letterGrade,
+    } as any).returning();
+    return created;
+  }
+
+  private calculateLetterGrade(percentage: number): string {
+    if (percentage >= 97) return "A+";
+    if (percentage >= 93) return "A";
+    if (percentage >= 90) return "A-";
+    if (percentage >= 87) return "B+";
+    if (percentage >= 83) return "B";
+    if (percentage >= 80) return "B-";
+    if (percentage >= 77) return "C+";
+    if (percentage >= 73) return "C";
+    if (percentage >= 70) return "C-";
+    if (percentage >= 67) return "D+";
+    if (percentage >= 63) return "D";
+    if (percentage >= 60) return "D-";
+    return "F";
+  }
+
+  async updateStudentGrade(id: string, updates: Partial<StudentGrade>, userId: string): Promise<StudentGrade | undefined> {
+    const [existing] = await db.select().from(studentGrades).where(eq(studentGrades.id, id));
+    if (!existing || existing.userId !== userId) return undefined;
+    
+    // Recalculate percentage if points changed
+    let percentage = updates.percentage;
+    let letterGrade = updates.letterGrade;
+    if (updates.pointsEarned !== undefined || updates.pointsPossible !== undefined) {
+      const earned = updates.pointsEarned ?? existing.pointsEarned;
+      const possible = updates.pointsPossible ?? existing.pointsPossible;
+      if (earned !== null && earned !== undefined) {
+        percentage = Math.round((earned / (possible || 100)) * 100);
+        letterGrade = this.calculateLetterGrade(percentage);
+      }
+    }
+    
+    const [updated] = await db.update(studentGrades)
+      .set({ ...updates, percentage, letterGrade, updatedAt: new Date() })
+      .where(eq(studentGrades.id, id))
+      .returning();
+    return updated || undefined;
+  }
+
+  async deleteStudentGrade(id: string, userId: string): Promise<boolean> {
+    const [existing] = await db.select().from(studentGrades).where(eq(studentGrades.id, id));
+    if (!existing || existing.userId !== userId) return false;
+    await db.delete(studentGrades).where(eq(studentGrades.id, id));
+    return true;
+  }
+
+  async bulkUpdateStudentGrades(gradesData: { id: string; pointsEarned: number; comments?: string }[], userId: string): Promise<StudentGrade[]> {
+    const results: StudentGrade[] = [];
+    for (const g of gradesData) {
+      const updated = await this.updateStudentGrade(g.id, { 
+        pointsEarned: g.pointsEarned,
+        comments: g.comments,
+      }, userId);
+      if (updated) results.push(updated);
+    }
+    return results;
+  }
+
+  async getGradingPeriods(userId: string): Promise<GradingPeriod[]> {
+    return await db.select().from(gradingPeriods)
+      .where(eq(gradingPeriods.userId, userId))
+      .orderBy(gradingPeriods.startDate);
+  }
+
+  async createGradingPeriod(period: InsertGradingPeriod): Promise<GradingPeriod> {
+    const [created] = await db.insert(gradingPeriods).values(period as any).returning();
+    return created;
+  }
+
+  async updateGradingPeriod(id: string, updates: Partial<GradingPeriod>, userId: string): Promise<GradingPeriod | undefined> {
+    const [existing] = await db.select().from(gradingPeriods).where(eq(gradingPeriods.id, id));
+    if (!existing || existing.userId !== userId) return undefined;
+    const [updated] = await db.update(gradingPeriods)
+      .set(updates)
+      .where(eq(gradingPeriods.id, id))
+      .returning();
+    return updated || undefined;
+  }
+
+  async deleteGradingPeriod(id: string, userId: string): Promise<boolean> {
+    const [existing] = await db.select().from(gradingPeriods).where(eq(gradingPeriods.id, id));
+    if (!existing || existing.userId !== userId) return false;
+    await db.delete(gradingPeriods).where(eq(gradingPeriods.id, id));
+    return true;
   }
 
   async getStudentsByAccommodations(accommodationTypes: string[], classId?: string): Promise<Student[]> {
