@@ -514,7 +514,7 @@ function StudentDashboard({ studentData, isLoading }: { studentData: StudentData
           ) : (
             <>
               {/* Career Readiness Overview */}
-              <Card className="border-primary/20 bg-primary/5">
+              <Card className="border-primary/20 bg-primary/5" data-testid="card-career-readiness">
                 <CardHeader className="pb-2">
                   <CardTitle className="flex items-center gap-2 text-lg">
                     <Target className="h-5 w-5 text-primary" />
@@ -526,15 +526,15 @@ function StudentDashboard({ studentData, isLoading }: { studentData: StudentData
                 </CardHeader>
                 <CardContent className="space-y-4">
                   <div className="grid gap-4 sm:grid-cols-3">
-                    <div className="text-center p-3 rounded-md bg-background">
+                    <div className="text-center p-3 rounded-md bg-background" data-testid="stat-careers-explored">
                       <p className="text-2xl font-bold text-primary">{savedCareers.length}</p>
                       <p className="text-xs text-muted-foreground">Careers Explored</p>
                     </div>
-                    <div className="text-center p-3 rounded-md bg-background">
+                    <div className="text-center p-3 rounded-md bg-background" data-testid="stat-learning-progress">
                       <p className="text-2xl font-bold text-green-600">{journeyProgress?.overallScore || 0}%</p>
                       <p className="text-xs text-muted-foreground">Learning Progress</p>
                     </div>
-                    <div className="text-center p-3 rounded-md bg-background">
+                    <div className="text-center p-3 rounded-md bg-background" data-testid="stat-readiness-status">
                       <p className="text-2xl font-bold text-blue-600">
                         {journeyProgress?.overallScore && journeyProgress.overallScore >= 80 ? "On Track" : 
                          journeyProgress?.overallScore && journeyProgress.overallScore >= 60 ? "Developing" : "Getting Started"}
