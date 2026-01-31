@@ -3664,6 +3664,24 @@ export async function registerRoutes(
     }
   });
 
+  // Get all users (site admin only) - for selecting lesson authors
+  app.get("/api/users", isAuthenticated, isSiteAdmin, async (req: any, res) => {
+    try {
+      const allUsers = await storage.getAllUsers();
+      // Return basic user info only
+      const users = allUsers.map(u => ({
+        id: u.id,
+        email: u.email,
+        firstName: u.firstName,
+        lastName: u.lastName,
+        role: u.role
+      }));
+      res.json(users);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch users" });
+    }
+  });
+
   // Get all site admins (site admin only)
   app.get("/api/admin/site-admins", isAuthenticated, isSiteAdmin, async (req: any, res) => {
     try {

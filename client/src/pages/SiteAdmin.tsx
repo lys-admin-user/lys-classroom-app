@@ -15,10 +15,10 @@ import { Slider } from "@/components/ui/slider";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useState } from "react";
-import { Shield, Building2, Users, Plus, Trash2, Settings, BarChart3, AlertTriangle, Loader2, Flag, Mail, Edit2, ToggleLeft, Percent, Globe, MapPin, ChevronRight, TrendingUp, Target, Award, GraduationCap, Star, Brain, Compass, Briefcase } from "lucide-react";
+import { Shield, Building2, Users, Plus, Trash2, Settings, BarChart3, AlertTriangle, Loader2, Flag, Mail, Edit2, ToggleLeft, Percent, Globe, MapPin, ChevronRight, TrendingUp, Target, Award, GraduationCap, Star, Brain, Compass, Briefcase, BookOpen, Library, FileText, Video, Headphones, Upload, Eye, Check, X, Clock, Search } from "lucide-react";
 import { Progress } from "@/components/ui/progress";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import type { Organization, SiteAdmin, FeatureFlag, EmailTemplate, Authority } from "@shared/schema";
+import type { Organization, SiteAdmin, FeatureFlag, EmailTemplate, Authority, SystemLessonAuthor, MasterLesson, ContentLibraryItem } from "@shared/schema";
 
 export default function SiteAdminPage() {
   const { user, isLoading: authLoading } = useAuth();
@@ -180,6 +180,62 @@ export default function SiteAdminPage() {
   const sortedCampusMetrics = [...campusMetrics].sort((a, b) => b.goalsCompletionRate - a.goalsCompletionRate);
   const sortedOrgMetrics = [...orgMetrics].sort((a, b) => b.goalsCompletionRate - a.goalsCompletionRate);
 
+  // Lesson Authors, Master Lessons, Content Library
+  type EnrichedAuthor = SystemLessonAuthor & { user?: { firstName: string | null; lastName: string | null; email: string | null } };
+  
+  const [isAddAuthorOpen, setIsAddAuthorOpen] = useState(false);
+  const [authorSearch, setAuthorSearch] = useState("");
+  const [selectedUserId, setSelectedUserId] = useState("");
+  const [authorSpecializations, setAuthorSpecializations] = useState<string[]>([]);
+  const [authorBio, setAuthorBio] = useState("");
+  
+  const [lessonStatusFilter, setLessonStatusFilter] = useState<string>("all");
+  const [lessonSubjectFilter, setLessonSubjectFilter] = useState<string>("all");
+  
+  const [contentTypeFilter, setContentTypeFilter] = useState<string>("all");
+  const [isAddContentOpen, setIsAddContentOpen] = useState(false);
+  const [newContent, setNewContent] = useState({
+    title: "",
+    description: "",
+    contentType: "pdf" as string,
+    source: "",
+    author: "",
+    subjects: [] as string[],
+    gradeLevels: [] as string[],
+    tags: [] as string[]
+  });
+
+  const { data: lessonAuthors = [], isLoading: authorsLoading } = useQuery<EnrichedAuthor[]>({
+    queryKey: ["/api/admin/lesson-authors"],
+    enabled: adminCheck?.isSiteAdmin,
+  });
+
+  const { data: masterLessons = [], isLoading: lessonsLoading } = useQuery<MasterLesson[]>({
+    queryKey: ["/api/admin/master-lessons"],
+    enabled: adminCheck?.isSiteAdmin,
+  });
+
+  const { data: contentLibrary = [], isLoading: contentLoading } = useQuery<ContentLibraryItem[]>({
+    queryKey: ["/api/admin/content-library"],
+    enabled: adminCheck?.isSiteAdmin,
+  });
+
+  const { data: allUsers = [] } = useQuery<Array<{ id: string; email: string | null; firstName: string | null; lastName: string | null }>>({
+    queryKey: ["/api/users"],
+    enabled: adminCheck?.isSiteAdmin && isAddAuthorOpen,
+  });
+
+  const filteredMasterLessons = masterLessons.filter(lesson => {
+    if (lessonStatusFilter !== "all" && lesson.status !== lessonStatusFilter) return false;
+    if (lessonSubjectFilter !== "all" && lesson.subject !== lessonSubjectFilter) return false;
+    return true;
+  });
+
+  const filteredContent = contentLibrary.filter(item => {
+    if (contentTypeFilter !== "all" && item.contentType !== contentTypeFilter) return false;
+    return true;
+  });
+
   const createOrgMutation = useMutation({
     mutationFn: async (data: typeof newOrg) => {
       return await apiRequest("POST", "/api/admin/organizations", data);
@@ -323,6 +379,91 @@ export default function SiteAdminPage() {
     },
   });
 
+  // Lesson Author Mutations
+  const createAuthorMutation = useMutation({
+    mutationFn: async (data: { userId: string; specializations: string[]; bio: string }) => {
+      return await apiRequest("POST", "/api/admin/lesson-authors", data);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/lesson-authors"] });
+      setIsAddAuthorOpen(false);
+      setSelectedUserId("");
+      setAuthorSpecializations([]);
+      setAuthorBio("");
+      toast({ title: "Lesson author added successfully" });
+    },
+    onError: () => {
+      toast({ title: "Failed to add lesson author", variant: "destructive" });
+    },
+  });
+
+  const removeAuthorMutation = useMutation({
+    mutationFn: async (userId: string) => {
+      return await apiRequest("DELETE", `/api/admin/lesson-authors/${userId}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/lesson-authors"] });
+      toast({ title: "Lesson author removed" });
+    },
+    onError: () => {
+      toast({ title: "Failed to remove author", variant: "destructive" });
+    },
+  });
+
+  const approveLessonMutation = useMutation({
+    mutationFn: async ({ id, notes }: { id: string; notes?: string }) => {
+      return await apiRequest("POST", `/api/admin/master-lessons/${id}/approve`, { notes });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/master-lessons"] });
+      toast({ title: "Lesson approved" });
+    },
+    onError: () => {
+      toast({ title: "Failed to approve lesson", variant: "destructive" });
+    },
+  });
+
+  const rejectLessonMutation = useMutation({
+    mutationFn: async ({ id, notes }: { id: string; notes: string }) => {
+      return await apiRequest("POST", `/api/admin/master-lessons/${id}/reject`, { notes });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/master-lessons"] });
+      toast({ title: "Lesson rejected" });
+    },
+    onError: () => {
+      toast({ title: "Failed to reject lesson", variant: "destructive" });
+    },
+  });
+
+  const createContentMutation = useMutation({
+    mutationFn: async (data: typeof newContent) => {
+      return await apiRequest("POST", "/api/admin/content-library", data);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/content-library"] });
+      setIsAddContentOpen(false);
+      setNewContent({ title: "", description: "", contentType: "pdf", source: "", author: "", subjects: [], gradeLevels: [], tags: [] });
+      toast({ title: "Content added to library" });
+    },
+    onError: () => {
+      toast({ title: "Failed to add content", variant: "destructive" });
+    },
+  });
+
+  const deleteContentMutation = useMutation({
+    mutationFn: async (id: string) => {
+      return await apiRequest("DELETE", `/api/admin/content-library/${id}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/content-library"] });
+      toast({ title: "Content removed" });
+    },
+    onError: () => {
+      toast({ title: "Failed to remove content", variant: "destructive" });
+    },
+  });
+
   const getLevelLabel = (level: string) => {
     const labels: Record<string, string> = {
       supranational: "Supranational (UN/EU)",
@@ -453,6 +594,18 @@ export default function SiteAdminPage() {
           <TabsTrigger value="performance" data-testid="tab-performance">
             <TrendingUp className="h-4 w-4 mr-2" />
             Performance
+          </TabsTrigger>
+          <TabsTrigger value="lesson-authors" data-testid="tab-lesson-authors">
+            <Users className="h-4 w-4 mr-2" />
+            Lesson Authors
+          </TabsTrigger>
+          <TabsTrigger value="lesson-repository" data-testid="tab-lesson-repository">
+            <BookOpen className="h-4 w-4 mr-2" />
+            Lesson Repository
+          </TabsTrigger>
+          <TabsTrigger value="content-library" data-testid="tab-content-library">
+            <Library className="h-4 w-4 mr-2" />
+            Content Library
           </TabsTrigger>
         </TabsList>
 
@@ -1695,6 +1848,424 @@ export default function SiteAdminPage() {
                 </CardContent>
               </Card>
             </>
+          )}
+        </TabsContent>
+
+        {/* Lesson Authors Tab */}
+        <TabsContent value="lesson-authors" className="space-y-4">
+          <div className="flex items-center justify-between gap-4 flex-wrap">
+            <div>
+              <h2 className="font-oswald text-xl">System Lesson Authors</h2>
+              <p className="text-sm text-muted-foreground">Educators authorized to create master lessons for the system repository</p>
+            </div>
+            <Dialog open={isAddAuthorOpen} onOpenChange={setIsAddAuthorOpen}>
+              <DialogTrigger asChild>
+                <Button className="bg-lys-teal hover:bg-lys-teal/90" data-testid="button-add-author">
+                  <Plus className="h-4 w-4 mr-2" />
+                  Add Author
+                </Button>
+              </DialogTrigger>
+              <DialogContent>
+                <DialogHeader>
+                  <DialogTitle>Add System Lesson Author</DialogTitle>
+                  <DialogDescription>
+                    Grant an educator permission to create master lessons that influence AI-generated content.
+                  </DialogDescription>
+                </DialogHeader>
+                <div className="grid gap-4 py-4">
+                  <div className="grid gap-2">
+                    <Label htmlFor="author-user">Select Educator</Label>
+                    <Select value={selectedUserId} onValueChange={setSelectedUserId}>
+                      <SelectTrigger data-testid="select-author-user">
+                        <SelectValue placeholder="Choose an educator..." />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {allUsers.filter(u => !lessonAuthors.some(a => a.userId === u.id)).map(user => (
+                          <SelectItem key={user.id} value={user.id}>
+                            {user.firstName} {user.lastName} ({user.email})
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="grid gap-2">
+                    <Label htmlFor="author-specializations">Specializations (comma-separated)</Label>
+                    <Input
+                      id="author-specializations"
+                      placeholder="e.g., math, elementary, stem"
+                      onChange={(e) => setAuthorSpecializations(e.target.value.split(",").map(s => s.trim()).filter(Boolean))}
+                      data-testid="input-author-specializations"
+                    />
+                  </div>
+                  <div className="grid gap-2">
+                    <Label htmlFor="author-bio">Bio (optional)</Label>
+                    <Textarea
+                      id="author-bio"
+                      placeholder="Brief description of the author's expertise..."
+                      value={authorBio}
+                      onChange={(e) => setAuthorBio(e.target.value)}
+                      data-testid="input-author-bio"
+                    />
+                  </div>
+                </div>
+                <DialogFooter>
+                  <Button
+                    onClick={() => createAuthorMutation.mutate({ userId: selectedUserId, specializations: authorSpecializations, bio: authorBio })}
+                    disabled={!selectedUserId || createAuthorMutation.isPending}
+                    data-testid="button-submit-author"
+                  >
+                    {createAuthorMutation.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+                    Add Author
+                  </Button>
+                </DialogFooter>
+              </DialogContent>
+            </Dialog>
+          </div>
+
+          {authorsLoading ? (
+            <div className="space-y-2">
+              {[1, 2, 3].map(i => (
+                <div key={i} className="h-20 bg-muted animate-pulse rounded" />
+              ))}
+            </div>
+          ) : lessonAuthors.length === 0 ? (
+            <Card>
+              <CardContent className="py-8 text-center">
+                <Users className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
+                <p className="text-muted-foreground">No lesson authors yet. Add your first author to start building the master lesson repository.</p>
+              </CardContent>
+            </Card>
+          ) : (
+            <div className="grid gap-4">
+              {lessonAuthors.map((author) => (
+                <Card key={author.id} data-testid={`author-card-${author.userId}`}>
+                  <CardContent className="py-4">
+                    <div className="flex items-center justify-between gap-4 flex-wrap">
+                      <div className="flex items-center gap-4">
+                        <div className="w-12 h-12 rounded-full bg-lys-teal/20 flex items-center justify-center">
+                          <BookOpen className="h-6 w-6 text-lys-teal" />
+                        </div>
+                        <div>
+                          <p className="font-semibold">{author.user?.firstName} {author.user?.lastName}</p>
+                          <p className="text-sm text-muted-foreground">{author.user?.email}</p>
+                          {author.specializations && author.specializations.length > 0 && (
+                            <div className="flex gap-1 mt-1 flex-wrap">
+                              {author.specializations.map(spec => (
+                                <Badge key={spec} variant="secondary" className="text-xs">{spec}</Badge>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-4">
+                        <div className="text-right">
+                          <p className="text-lg font-bold">{author.lessonsCreated || 0}</p>
+                          <p className="text-xs text-muted-foreground">Lessons Created</p>
+                        </div>
+                        <Badge variant={author.status === "active" ? "default" : "secondary"}>
+                          {author.status}
+                        </Badge>
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          className="text-destructive hover:text-destructive"
+                          onClick={() => removeAuthorMutation.mutate(author.userId)}
+                          data-testid={`button-remove-author-${author.userId}`}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          )}
+        </TabsContent>
+
+        {/* Lesson Repository Tab */}
+        <TabsContent value="lesson-repository" className="space-y-4">
+          <div className="flex items-center justify-between gap-4 flex-wrap">
+            <div>
+              <h2 className="font-oswald text-xl">Master Lesson Repository</h2>
+              <p className="text-sm text-muted-foreground">Authoritative lessons that influence AI-generated content across the platform</p>
+            </div>
+            <div className="flex items-center gap-2">
+              <Select value={lessonStatusFilter} onValueChange={setLessonStatusFilter}>
+                <SelectTrigger className="w-[150px]" data-testid="select-lesson-status">
+                  <SelectValue placeholder="Status" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Status</SelectItem>
+                  <SelectItem value="draft">Draft</SelectItem>
+                  <SelectItem value="pending_review">Pending Review</SelectItem>
+                  <SelectItem value="approved">Approved</SelectItem>
+                  <SelectItem value="archived">Archived</SelectItem>
+                </SelectContent>
+              </Select>
+              <Select value={lessonSubjectFilter} onValueChange={setLessonSubjectFilter}>
+                <SelectTrigger className="w-[150px]" data-testid="select-lesson-subject">
+                  <SelectValue placeholder="Subject" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Subjects</SelectItem>
+                  <SelectItem value="math">Math</SelectItem>
+                  <SelectItem value="science">Science</SelectItem>
+                  <SelectItem value="english">English</SelectItem>
+                  <SelectItem value="history">History</SelectItem>
+                  <SelectItem value="art">Art</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+
+          {lessonsLoading ? (
+            <div className="space-y-2">
+              {[1, 2, 3].map(i => (
+                <div key={i} className="h-24 bg-muted animate-pulse rounded" />
+              ))}
+            </div>
+          ) : filteredMasterLessons.length === 0 ? (
+            <Card>
+              <CardContent className="py-8 text-center">
+                <BookOpen className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
+                <p className="text-muted-foreground">No lessons found. Lesson authors can create master lessons that will appear here.</p>
+              </CardContent>
+            </Card>
+          ) : (
+            <ScrollArea className="h-[600px]">
+              <div className="space-y-4">
+                {filteredMasterLessons.map((lesson) => (
+                  <Card key={lesson.id} data-testid={`lesson-card-${lesson.id}`}>
+                    <CardContent className="py-4">
+                      <div className="flex items-start justify-between gap-4">
+                        <div className="flex-1">
+                          <div className="flex items-center gap-2 mb-1">
+                            <h3 className="font-semibold">{lesson.title}</h3>
+                            <Badge variant={
+                              lesson.status === "approved" ? "default" :
+                              lesson.status === "pending_review" ? "secondary" :
+                              lesson.status === "draft" ? "outline" : "secondary"
+                            }>
+                              {lesson.status === "pending_review" ? "Pending Review" : lesson.status}
+                            </Badge>
+                          </div>
+                          <p className="text-sm text-muted-foreground line-clamp-2">{lesson.description || lesson.topic}</p>
+                          <div className="flex items-center gap-4 mt-2 flex-wrap">
+                            <Badge variant="outline">{lesson.subject}</Badge>
+                            <Badge variant="outline">{lesson.gradeLevel}</Badge>
+                            <Badge variant="outline" className="capitalize">{lesson.bkdFocus}</Badge>
+                            <span className="text-xs text-muted-foreground">{lesson.duration}</span>
+                          </div>
+                          <div className="flex items-center gap-4 mt-2 text-sm text-muted-foreground">
+                            <span>Quality: {lesson.qualityScore || 0}%</span>
+                            <span>Used: {lesson.usageCount || 0} times</span>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          {lesson.status === "pending_review" && (
+                            <>
+                              <Button
+                                size="sm"
+                                variant="default"
+                                className="bg-green-600 hover:bg-green-700"
+                                onClick={() => approveLessonMutation.mutate({ id: lesson.id })}
+                                disabled={approveLessonMutation.isPending}
+                                data-testid={`button-approve-${lesson.id}`}
+                              >
+                                <Check className="h-4 w-4 mr-1" />
+                                Approve
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="destructive"
+                                onClick={() => rejectLessonMutation.mutate({ id: lesson.id, notes: "Needs revision" })}
+                                disabled={rejectLessonMutation.isPending}
+                                data-testid={`button-reject-${lesson.id}`}
+                              >
+                                <X className="h-4 w-4 mr-1" />
+                                Reject
+                              </Button>
+                            </>
+                          )}
+                          <Button size="icon" variant="ghost" data-testid={`button-view-${lesson.id}`}>
+                            <Eye className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            </ScrollArea>
+          )}
+        </TabsContent>
+
+        {/* Content Library Tab */}
+        <TabsContent value="content-library" className="space-y-4">
+          <div className="flex items-center justify-between gap-4 flex-wrap">
+            <div>
+              <h2 className="font-oswald text-xl">Content Library</h2>
+              <p className="text-sm text-muted-foreground">PDFs, eBooks, podcasts, and videos that influence AI lesson generation</p>
+            </div>
+            <div className="flex items-center gap-2">
+              <Select value={contentTypeFilter} onValueChange={setContentTypeFilter}>
+                <SelectTrigger className="w-[150px]" data-testid="select-content-type">
+                  <SelectValue placeholder="Type" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Types</SelectItem>
+                  <SelectItem value="pdf">PDF</SelectItem>
+                  <SelectItem value="ebook">eBook</SelectItem>
+                  <SelectItem value="book">Book</SelectItem>
+                  <SelectItem value="podcast">Podcast</SelectItem>
+                  <SelectItem value="youtube_channel">YouTube Channel</SelectItem>
+                  <SelectItem value="youtube_video">YouTube Video</SelectItem>
+                  <SelectItem value="article">Article</SelectItem>
+                </SelectContent>
+              </Select>
+              <Dialog open={isAddContentOpen} onOpenChange={setIsAddContentOpen}>
+                <DialogTrigger asChild>
+                  <Button className="bg-lys-teal hover:bg-lys-teal/90" data-testid="button-add-content">
+                    <Upload className="h-4 w-4 mr-2" />
+                    Add Content
+                  </Button>
+                </DialogTrigger>
+                <DialogContent className="max-w-lg">
+                  <DialogHeader>
+                    <DialogTitle>Add Content to Library</DialogTitle>
+                    <DialogDescription>
+                      Add educational content that will be used to enhance AI lesson generation.
+                    </DialogDescription>
+                  </DialogHeader>
+                  <div className="grid gap-4 py-4 max-h-[60vh] overflow-y-auto">
+                    <div className="grid gap-2">
+                      <Label htmlFor="content-title">Title</Label>
+                      <Input
+                        id="content-title"
+                        value={newContent.title}
+                        onChange={(e) => setNewContent({ ...newContent, title: e.target.value })}
+                        placeholder="Content title"
+                        data-testid="input-content-title"
+                      />
+                    </div>
+                    <div className="grid gap-2">
+                      <Label htmlFor="content-type">Content Type</Label>
+                      <Select value={newContent.contentType} onValueChange={(v) => setNewContent({ ...newContent, contentType: v })}>
+                        <SelectTrigger data-testid="select-new-content-type">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="pdf">PDF Document</SelectItem>
+                          <SelectItem value="ebook">eBook</SelectItem>
+                          <SelectItem value="book">Book</SelectItem>
+                          <SelectItem value="podcast">Podcast</SelectItem>
+                          <SelectItem value="youtube_channel">YouTube Channel</SelectItem>
+                          <SelectItem value="youtube_video">YouTube Video</SelectItem>
+                          <SelectItem value="article">Article</SelectItem>
+                          <SelectItem value="research_paper">Research Paper</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="grid gap-2">
+                      <Label htmlFor="content-source">Source URL</Label>
+                      <Input
+                        id="content-source"
+                        value={newContent.source}
+                        onChange={(e) => setNewContent({ ...newContent, source: e.target.value })}
+                        placeholder="https://..."
+                        data-testid="input-content-source"
+                      />
+                    </div>
+                    <div className="grid gap-2">
+                      <Label htmlFor="content-author">Author</Label>
+                      <Input
+                        id="content-author"
+                        value={newContent.author}
+                        onChange={(e) => setNewContent({ ...newContent, author: e.target.value })}
+                        placeholder="Original author"
+                        data-testid="input-content-author"
+                      />
+                    </div>
+                    <div className="grid gap-2">
+                      <Label htmlFor="content-description">Description</Label>
+                      <Textarea
+                        id="content-description"
+                        value={newContent.description}
+                        onChange={(e) => setNewContent({ ...newContent, description: e.target.value })}
+                        placeholder="Brief description of the content..."
+                        data-testid="input-content-description"
+                      />
+                    </div>
+                  </div>
+                  <DialogFooter>
+                    <Button
+                      onClick={() => createContentMutation.mutate(newContent)}
+                      disabled={!newContent.title || createContentMutation.isPending}
+                      data-testid="button-submit-content"
+                    >
+                      {createContentMutation.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+                      Add Content
+                    </Button>
+                  </DialogFooter>
+                </DialogContent>
+              </Dialog>
+            </div>
+          </div>
+
+          {contentLoading ? (
+            <div className="space-y-2">
+              {[1, 2, 3].map(i => (
+                <div key={i} className="h-20 bg-muted animate-pulse rounded" />
+              ))}
+            </div>
+          ) : filteredContent.length === 0 ? (
+            <Card>
+              <CardContent className="py-8 text-center">
+                <Library className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
+                <p className="text-muted-foreground">No content in library yet. Add PDFs, eBooks, podcasts, or YouTube content to enhance AI generation.</p>
+              </CardContent>
+            </Card>
+          ) : (
+            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+              {filteredContent.map((item) => (
+                <Card key={item.id} data-testid={`content-card-${item.id}`}>
+                  <CardContent className="py-4">
+                    <div className="flex items-start gap-3">
+                      <div className="w-10 h-10 rounded-lg bg-muted flex items-center justify-center shrink-0">
+                        {item.contentType === "pdf" && <FileText className="h-5 w-5" />}
+                        {item.contentType === "ebook" && <BookOpen className="h-5 w-5" />}
+                        {item.contentType === "book" && <BookOpen className="h-5 w-5" />}
+                        {item.contentType === "podcast" && <Headphones className="h-5 w-5" />}
+                        {(item.contentType === "youtube_channel" || item.contentType === "youtube_video") && <Video className="h-5 w-5" />}
+                        {item.contentType === "article" && <FileText className="h-5 w-5" />}
+                        {item.contentType === "research_paper" && <FileText className="h-5 w-5" />}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <h3 className="font-semibold text-sm truncate">{item.title}</h3>
+                        {item.author && <p className="text-xs text-muted-foreground">by {item.author}</p>}
+                        <div className="flex items-center gap-2 mt-1">
+                          <Badge variant="outline" className="text-xs capitalize">{item.contentType.replace("_", " ")}</Badge>
+                          <Badge variant={item.processingStatus === "completed" ? "default" : item.processingStatus === "failed" ? "destructive" : "secondary"} className="text-xs">
+                            {item.processingStatus === "completed" ? "Ready" : item.processingStatus}
+                          </Badge>
+                        </div>
+                        <p className="text-xs text-muted-foreground mt-1">Used {item.usageCount || 0} times</p>
+                      </div>
+                      <Button
+                        size="icon"
+                        variant="ghost"
+                        className="text-destructive hover:text-destructive shrink-0"
+                        onClick={() => deleteContentMutation.mutate(item.id)}
+                        data-testid={`button-delete-content-${item.id}`}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
           )}
         </TabsContent>
       </Tabs>
