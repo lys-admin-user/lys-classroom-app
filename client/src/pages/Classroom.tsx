@@ -37,10 +37,12 @@ import {
   CheckCircle2,
   XCircle,
   Clock,
-  Filter
+  Filter,
+  ArrowRightLeft,
+  Send
 } from "lucide-react";
 import { Link } from "wouter";
-import type { Class, Student, InsertClass, InsertStudent, AccommodationType, Organization, OrgMembership, StudentNote, AttendanceRecord } from "@shared/schema";
+import type { Class, Student, InsertClass, InsertStudent, AccommodationType, Organization, OrgMembership, StudentNote, AttendanceRecord, StudentTransferRequest } from "@shared/schema";
 
 const NOTE_TYPES = [
   { value: "general", label: "General" },
@@ -125,6 +127,13 @@ export default function Classroom() {
   const [attendanceDate, setAttendanceDate] = useState(new Date().toISOString().split('T')[0]);
   const [attendanceRecords, setAttendanceRecords] = useState<Record<string, string>>({});
   
+  // Transfer request state
+  const [isTransferDialogOpen, setIsTransferDialogOpen] = useState(false);
+  const [transferStudent, setTransferStudent] = useState<Student | null>(null);
+  const [transferType, setTransferType] = useState<"educator" | "organization">("organization");
+  const [targetOrganizationId, setTargetOrganizationId] = useState("");
+  const [transferReason, setTransferReason] = useState("");
+  const [transferNotes, setTransferNotes] = useState("");
 
   const isCampusAdmin = user?.role === "campus_admin";
   
@@ -466,6 +475,23 @@ export default function Classroom() {
     },
   });
 
+  // Transfer request mutation
+  const createTransferMutation = useMutation({
+    mutationFn: async (data: { studentId: string; transferType: string; targetOrganizationId?: string; reason?: string; notes?: string }) => {
+      return await apiRequest("POST", "/api/transfers", data);
+    },
+    onSuccess: () => {
+      toast({ title: "Transfer request submitted", description: "Awaiting campus, district, and system admin approval." });
+      setIsTransferDialogOpen(false);
+      setTransferStudent(null);
+      setTargetOrganizationId("");
+      setTransferReason("");
+      setTransferNotes("");
+    },
+    onError: () => {
+      toast({ title: "Failed to submit transfer request", variant: "destructive" });
+    },
+  });
 
   // Filtered students based on search and filters
   const filteredStudents = students.filter(student => {
@@ -1108,6 +1134,20 @@ export default function Classroom() {
                           <TrendingUp className="h-4 w-4" />
                         </Button>
                       </Link>
+                      {isCampusAdmin && (
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          title="Transfer Student"
+                          onClick={() => {
+                            setTransferStudent(student);
+                            setIsTransferDialogOpen(true);
+                          }}
+                          data-testid={`button-transfer-student-${student.id}`}
+                        >
+                          <ArrowRightLeft className="h-4 w-4" />
+                        </Button>
+                      )}
                       <Button
                         size="icon"
                         variant="ghost"
@@ -1793,6 +1833,134 @@ Jane,Smith,12346,10th Grade
             >
               {saveAttendanceMutation.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
               Save Attendance
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Transfer Student Dialog */}
+      <Dialog open={isTransferDialogOpen} onOpenChange={(open) => {
+        if (!open) {
+          setIsTransferDialogOpen(false);
+          setTransferStudent(null);
+          setTargetOrganizationId("");
+          setTransferReason("");
+          setTransferNotes("");
+        }
+      }}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <ArrowRightLeft className="h-5 w-5" />
+              Transfer Student
+            </DialogTitle>
+            <DialogDescription>
+              Request to transfer {transferStudent?.firstName} {transferStudent?.lastName} to another organization. 
+              This requires approval from campus, district, and system administrators.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4">
+            <div className="p-3 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-md">
+              <div className="flex items-start gap-2">
+                <AlertCircle className="h-5 w-5 text-amber-600 dark:text-amber-400 mt-0.5" />
+                <div>
+                  <p className="text-sm font-medium text-amber-800 dark:text-amber-200">Triple Confirmation Required</p>
+                  <p className="text-xs text-amber-700 dark:text-amber-300 mt-1">
+                    Organization transfers require approval from:
+                  </p>
+                  <ol className="text-xs text-amber-700 dark:text-amber-300 mt-1 list-decimal list-inside">
+                    <li>Campus Administrator</li>
+                    <li>District Administrator</li>
+                    <li>System Administrator</li>
+                  </ol>
+                </div>
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label>Transfer Type</Label>
+              <Select value={transferType} onValueChange={(v) => setTransferType(v as "educator" | "organization")}>
+                <SelectTrigger data-testid="select-transfer-type">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="educator">Transfer to Different Educator (Same Campus)</SelectItem>
+                  <SelectItem value="organization">Transfer to Different Organization</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            {transferType === "organization" && (
+              <div className="space-y-2">
+                <Label>Target Organization</Label>
+                <Select value={targetOrganizationId} onValueChange={setTargetOrganizationId}>
+                  <SelectTrigger data-testid="select-target-org">
+                    <SelectValue placeholder="Select organization" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {allOrgs
+                      .filter(org => org.id !== transferStudent?.organizationId)
+                      .map((org) => (
+                        <SelectItem key={org.id} value={org.id}>
+                          {org.name} ({org.type})
+                        </SelectItem>
+                      ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
+
+            <div className="space-y-2">
+              <Label htmlFor="transfer-reason">Reason for Transfer</Label>
+              <Input
+                id="transfer-reason"
+                placeholder="e.g., Family relocation, program change"
+                value={transferReason}
+                onChange={(e) => setTransferReason(e.target.value)}
+                data-testid="input-transfer-reason"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="transfer-notes">Additional Notes (Optional)</Label>
+              <Textarea
+                id="transfer-notes"
+                placeholder="Any additional information for approvers"
+                value={transferNotes}
+                onChange={(e) => setTransferNotes(e.target.value)}
+                rows={3}
+                data-testid="input-transfer-notes"
+              />
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsTransferDialogOpen(false)}>
+              Cancel
+            </Button>
+            <Button
+              onClick={() => {
+                if (transferStudent) {
+                  createTransferMutation.mutate({
+                    studentId: transferStudent.id,
+                    transferType,
+                    targetOrganizationId: transferType === "organization" ? targetOrganizationId : undefined,
+                    reason: transferReason,
+                    notes: transferNotes
+                  });
+                }
+              }}
+              disabled={
+                createTransferMutation.isPending ||
+                !transferReason ||
+                (transferType === "organization" && !targetOrganizationId)
+              }
+              data-testid="button-submit-transfer"
+            >
+              {createTransferMutation.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+              <Send className="h-4 w-4 mr-2" />
+              Submit Transfer Request
             </Button>
           </DialogFooter>
         </DialogContent>
