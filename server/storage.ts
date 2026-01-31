@@ -683,7 +683,82 @@ export interface IStorage {
   createSisCourse(course: InsertSisCourse): Promise<SisCourse>;
   updateSisCourse(id: string, updates: Partial<SisCourse>): Promise<SisCourse | undefined>;
   deleteSisCourse(id: string): Promise<boolean>;
+  
+  // System Admin Performance Analytics
+  getEducatorPerformanceMetrics(): Promise<EducatorPerformanceMetric[]>;
+  getCampusPerformanceMetrics(): Promise<CampusPerformanceMetric[]>;
+  getOrganizationPerformanceMetrics(): Promise<OrganizationPerformanceMetric[]>;
+  getSystemWideStats(): Promise<SystemWideStats>;
 }
+
+// Performance Analytics Types
+export type EducatorPerformanceMetric = {
+  userId: string;
+  firstName: string | null;
+  lastName: string | null;
+  email: string | null;
+  organizationId: string | null;
+  organizationName: string | null;
+  goalsCompleted: number;
+  goalsTotal: number;
+  goalsCompletionRate: number;
+  lessonsCreated: number;
+  studentsCount: number;
+  avgStudentBeScore: number;
+  avgStudentKnowScore: number;
+  avgStudentDoScore: number;
+  avgStudentOverallScore: number;
+  classesCount: number;
+};
+
+export type CampusPerformanceMetric = {
+  organizationId: string;
+  organizationName: string;
+  educatorsCount: number;
+  studentsCount: number;
+  goalsCompleted: number;
+  goalsTotal: number;
+  goalsCompletionRate: number;
+  avgStudentBeScore: number;
+  avgStudentKnowScore: number;
+  avgStudentDoScore: number;
+  avgStudentOverallScore: number;
+  classesCount: number;
+  lessonsCreated: number;
+};
+
+export type OrganizationPerformanceMetric = {
+  organizationId: string;
+  organizationName: string;
+  organizationType: string;
+  tier: string;
+  campusesCount: number;
+  educatorsCount: number;
+  studentsCount: number;
+  goalsCompleted: number;
+  goalsTotal: number;
+  goalsCompletionRate: number;
+  avgStudentBeScore: number;
+  avgStudentKnowScore: number;
+  avgStudentDoScore: number;
+  avgStudentOverallScore: number;
+};
+
+export type SystemWideStats = {
+  totalEducators: number;
+  totalStudents: number;
+  totalOrganizations: number;
+  totalCampuses: number;
+  totalGoals: number;
+  goalsCompleted: number;
+  goalsCompletionRate: number;
+  avgBeScore: number;
+  avgKnowScore: number;
+  avgDoScore: number;
+  avgOverallScore: number;
+  topPerformingEducators: EducatorPerformanceMetric[];
+  topPerformingCampuses: CampusPerformanceMetric[];
+};
 
 // Seed data for careers and resources (static content - mutable for BLS sync updates)
 let seedCareers: Career[] = [
@@ -4858,6 +4933,217 @@ export class DatabaseStorage implements IStorage {
       .where(eq(studentTransferRequests.id, id))
       .returning();
     return updated || undefined;
+  }
+
+  // System Admin Performance Analytics Implementation
+  async getEducatorPerformanceMetrics(): Promise<EducatorPerformanceMetric[]> {
+    const allUsers = await db.select().from(users).where(
+      sql`${users.role} IN ('educator', 'campus_admin', 'district_admin')`
+    );
+    
+    const metrics: EducatorPerformanceMetric[] = [];
+    
+    for (const user of allUsers) {
+      const userGoals = await db.select().from(goals).where(eq(goals.userId, user.id));
+      const goalsCompleted = userGoals.filter(g => g.status === 'completed').length;
+      const goalsTotal = userGoals.length;
+      
+      const userLessons = await db.select().from(lessons).where(eq(lessons.userId, user.id));
+      const userClasses = await db.select().from(classes).where(eq(classes.userId, user.id));
+      
+      let totalStudents = 0;
+      for (const cls of userClasses) {
+        const classStudentsList = await db.select().from(classStudents).where(eq(classStudents.classId, cls.id));
+        totalStudents += classStudentsList.length;
+      }
+      
+      const journeyProgress = await db.select().from(studentJourneyProgress).where(eq(studentJourneyProgress.educatorUserId, user.id));
+      const avgBeScore = journeyProgress.length > 0 ? journeyProgress.reduce((sum, p) => sum + p.beScore, 0) / journeyProgress.length : 0;
+      const avgKnowScore = journeyProgress.length > 0 ? journeyProgress.reduce((sum, p) => sum + p.knowScore, 0) / journeyProgress.length : 0;
+      const avgDoScore = journeyProgress.length > 0 ? journeyProgress.reduce((sum, p) => sum + p.doScore, 0) / journeyProgress.length : 0;
+      const avgOverallScore = journeyProgress.length > 0 ? journeyProgress.reduce((sum, p) => sum + p.overallScore, 0) / journeyProgress.length : 0;
+      
+      let orgName: string | null = null;
+      if (user.organizationId) {
+        const [org] = await db.select().from(organizations).where(eq(organizations.id, user.organizationId));
+        orgName = org?.name || null;
+      }
+      
+      metrics.push({
+        userId: user.id,
+        firstName: user.firstName,
+        lastName: user.lastName,
+        email: user.email,
+        organizationId: user.organizationId,
+        organizationName: orgName,
+        goalsCompleted,
+        goalsTotal,
+        goalsCompletionRate: goalsTotal > 0 ? Math.round((goalsCompleted / goalsTotal) * 100) : 0,
+        lessonsCreated: userLessons.length,
+        studentsCount: totalStudents,
+        avgStudentBeScore: Math.round(avgBeScore),
+        avgStudentKnowScore: Math.round(avgKnowScore),
+        avgStudentDoScore: Math.round(avgDoScore),
+        avgStudentOverallScore: Math.round(avgOverallScore),
+        classesCount: userClasses.length,
+      });
+    }
+    
+    return metrics.sort((a, b) => b.goalsCompletionRate - a.goalsCompletionRate);
+  }
+
+  async getCampusPerformanceMetrics(): Promise<CampusPerformanceMetric[]> {
+    const allOrgs = await db.select().from(organizations).where(eq(organizations.tier, 'campus'));
+    const metrics: CampusPerformanceMetric[] = [];
+    
+    for (const org of allOrgs) {
+      const orgUsers = await db.select().from(users).where(eq(users.organizationId, org.id));
+      const educatorIds = orgUsers.map(u => u.id);
+      
+      let goalsCompleted = 0;
+      let goalsTotal = 0;
+      let lessonsCreated = 0;
+      let classesCount = 0;
+      let studentsCount = 0;
+      
+      for (const userId of educatorIds) {
+        const userGoals = await db.select().from(goals).where(eq(goals.userId, userId));
+        goalsCompleted += userGoals.filter(g => g.status === 'completed').length;
+        goalsTotal += userGoals.length;
+        
+        const userLessons = await db.select().from(lessons).where(eq(lessons.userId, userId));
+        lessonsCreated += userLessons.length;
+        
+        const userClasses = await db.select().from(classes).where(eq(classes.userId, userId));
+        classesCount += userClasses.length;
+        
+        for (const cls of userClasses) {
+          const classStudentsList = await db.select().from(classStudents).where(eq(classStudents.classId, cls.id));
+          studentsCount += classStudentsList.length;
+        }
+      }
+      
+      const journeyProgress = await db.select().from(studentJourneyProgress).where(
+        sql`${studentJourneyProgress.educatorUserId} IN (${educatorIds.length > 0 ? educatorIds.map(id => `'${id}'`).join(',') : "'none'"})`
+      );
+      
+      const avgBeScore = journeyProgress.length > 0 ? journeyProgress.reduce((sum, p) => sum + p.beScore, 0) / journeyProgress.length : 0;
+      const avgKnowScore = journeyProgress.length > 0 ? journeyProgress.reduce((sum, p) => sum + p.knowScore, 0) / journeyProgress.length : 0;
+      const avgDoScore = journeyProgress.length > 0 ? journeyProgress.reduce((sum, p) => sum + p.doScore, 0) / journeyProgress.length : 0;
+      const avgOverallScore = journeyProgress.length > 0 ? journeyProgress.reduce((sum, p) => sum + p.overallScore, 0) / journeyProgress.length : 0;
+      
+      metrics.push({
+        organizationId: org.id,
+        organizationName: org.name,
+        educatorsCount: educatorIds.length,
+        studentsCount,
+        goalsCompleted,
+        goalsTotal,
+        goalsCompletionRate: goalsTotal > 0 ? Math.round((goalsCompleted / goalsTotal) * 100) : 0,
+        avgStudentBeScore: Math.round(avgBeScore),
+        avgStudentKnowScore: Math.round(avgKnowScore),
+        avgStudentDoScore: Math.round(avgDoScore),
+        avgStudentOverallScore: Math.round(avgOverallScore),
+        classesCount,
+        lessonsCreated,
+      });
+    }
+    
+    return metrics.sort((a, b) => b.goalsCompletionRate - a.goalsCompletionRate);
+  }
+
+  async getOrganizationPerformanceMetrics(): Promise<OrganizationPerformanceMetric[]> {
+    const allOrgs = await db.select().from(organizations);
+    const metrics: OrganizationPerformanceMetric[] = [];
+    
+    for (const org of allOrgs) {
+      const childOrgs = await db.select().from(organizations).where(eq(organizations.parentId, org.id));
+      const campusesCount = childOrgs.filter(o => o.tier === 'campus').length;
+      
+      const allOrgIds = [org.id, ...childOrgs.map(o => o.id)];
+      const orgUsers = await db.select().from(users).where(
+        sql`${users.organizationId} IN (${allOrgIds.map(id => `'${id}'`).join(',')})`
+      );
+      
+      const educatorIds = orgUsers.filter(u => ['educator', 'campus_admin', 'district_admin'].includes(u.role || '')).map(u => u.id);
+      const studentIds = orgUsers.filter(u => u.role === 'student').map(u => u.id);
+      
+      let goalsCompleted = 0;
+      let goalsTotal = 0;
+      
+      for (const userId of educatorIds) {
+        const userGoals = await db.select().from(goals).where(eq(goals.userId, userId));
+        goalsCompleted += userGoals.filter(g => g.status === 'completed').length;
+        goalsTotal += userGoals.length;
+      }
+      
+      const journeyProgress = educatorIds.length > 0 
+        ? await db.select().from(studentJourneyProgress).where(
+            sql`${studentJourneyProgress.educatorUserId} IN (${educatorIds.map(id => `'${id}'`).join(',')})`
+          )
+        : [];
+      
+      const avgBeScore = journeyProgress.length > 0 ? journeyProgress.reduce((sum, p) => sum + p.beScore, 0) / journeyProgress.length : 0;
+      const avgKnowScore = journeyProgress.length > 0 ? journeyProgress.reduce((sum, p) => sum + p.knowScore, 0) / journeyProgress.length : 0;
+      const avgDoScore = journeyProgress.length > 0 ? journeyProgress.reduce((sum, p) => sum + p.doScore, 0) / journeyProgress.length : 0;
+      const avgOverallScore = journeyProgress.length > 0 ? journeyProgress.reduce((sum, p) => sum + p.overallScore, 0) / journeyProgress.length : 0;
+      
+      metrics.push({
+        organizationId: org.id,
+        organizationName: org.name,
+        organizationType: org.type,
+        tier: org.tier,
+        campusesCount,
+        educatorsCount: educatorIds.length,
+        studentsCount: studentIds.length,
+        goalsCompleted,
+        goalsTotal,
+        goalsCompletionRate: goalsTotal > 0 ? Math.round((goalsCompleted / goalsTotal) * 100) : 0,
+        avgStudentBeScore: Math.round(avgBeScore),
+        avgStudentKnowScore: Math.round(avgKnowScore),
+        avgStudentDoScore: Math.round(avgDoScore),
+        avgStudentOverallScore: Math.round(avgOverallScore),
+      });
+    }
+    
+    return metrics.sort((a, b) => b.goalsCompletionRate - a.goalsCompletionRate);
+  }
+
+  async getSystemWideStats(): Promise<SystemWideStats> {
+    const allUsers = await db.select().from(users);
+    const educators = allUsers.filter(u => ['educator', 'campus_admin', 'district_admin'].includes(u.role || ''));
+    const studentUsers = allUsers.filter(u => u.role === 'student');
+    
+    const allOrgs = await db.select().from(organizations);
+    const campuses = allOrgs.filter(o => o.tier === 'campus');
+    
+    const allGoals = await db.select().from(goals);
+    const completedGoals = allGoals.filter(g => g.status === 'completed');
+    
+    const allJourneyProgress = await db.select().from(studentJourneyProgress);
+    const avgBeScore = allJourneyProgress.length > 0 ? allJourneyProgress.reduce((sum, p) => sum + p.beScore, 0) / allJourneyProgress.length : 0;
+    const avgKnowScore = allJourneyProgress.length > 0 ? allJourneyProgress.reduce((sum, p) => sum + p.knowScore, 0) / allJourneyProgress.length : 0;
+    const avgDoScore = allJourneyProgress.length > 0 ? allJourneyProgress.reduce((sum, p) => sum + p.doScore, 0) / allJourneyProgress.length : 0;
+    const avgOverallScore = allJourneyProgress.length > 0 ? allJourneyProgress.reduce((sum, p) => sum + p.overallScore, 0) / allJourneyProgress.length : 0;
+    
+    const educatorMetrics = await this.getEducatorPerformanceMetrics();
+    const campusMetrics = await this.getCampusPerformanceMetrics();
+    
+    return {
+      totalEducators: educators.length,
+      totalStudents: studentUsers.length,
+      totalOrganizations: allOrgs.length,
+      totalCampuses: campuses.length,
+      totalGoals: allGoals.length,
+      goalsCompleted: completedGoals.length,
+      goalsCompletionRate: allGoals.length > 0 ? Math.round((completedGoals.length / allGoals.length) * 100) : 0,
+      avgBeScore: Math.round(avgBeScore),
+      avgKnowScore: Math.round(avgKnowScore),
+      avgDoScore: Math.round(avgDoScore),
+      avgOverallScore: Math.round(avgOverallScore),
+      topPerformingEducators: educatorMetrics.slice(0, 10),
+      topPerformingCampuses: campusMetrics.slice(0, 10),
+    };
   }
 }
 
