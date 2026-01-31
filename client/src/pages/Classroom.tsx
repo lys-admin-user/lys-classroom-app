@@ -1173,13 +1173,23 @@ export default function Classroom() {
                   {((student.accommodations && student.accommodations.length > 0) || student.notes) && (
                     <CardContent className="pt-0">
                       {student.accommodations && student.accommodations.length > 0 && (
-                        <div className="flex items-center gap-2 flex-wrap mb-2">
-                          <AlertCircle className="h-4 w-4 text-amber-500" />
-                          {student.accommodations.map((acc, idx) => (
-                            <Badge key={idx} variant="secondary" className="gap-1">
-                              {ACCOMMODATION_LABELS[acc.type as AccommodationType] || acc.type}: {acc.description.substring(0, 30)}...
-                            </Badge>
-                          ))}
+                        <div className="space-y-2 mb-2">
+                          <div className="flex items-center gap-1">
+                            <AlertCircle className="h-4 w-4 text-amber-500" />
+                            <span className="text-xs font-medium text-amber-600 dark:text-amber-400">IEP/504 Accommodations</span>
+                          </div>
+                          <div className="flex flex-wrap gap-1">
+                            {student.accommodations.map((acc, idx) => (
+                              <Badge 
+                                key={idx} 
+                                variant="secondary" 
+                                className="text-xs"
+                                title={acc.description}
+                              >
+                                {ACCOMMODATION_LABELS[acc.type as AccommodationType] || acc.type}
+                              </Badge>
+                            ))}
+                          </div>
                         </div>
                       )}
                       {student.notes && (
