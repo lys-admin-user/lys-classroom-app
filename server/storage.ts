@@ -202,6 +202,12 @@ import {
   type SisCourse,
   type InsertSisCourse,
   sisCourses,
+  type StudentNote,
+  type InsertStudentNote,
+  studentNotes,
+  type AttendanceRecord,
+  type InsertAttendanceRecord,
+  attendanceRecords,
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, desc, and, asc, gte, sql } from "drizzle-orm";
@@ -389,6 +395,20 @@ export interface IStorage {
   createStudentGroup(group: InsertStudentGroup): Promise<StudentGroup>;
   updateStudentGroup(id: string, updates: Partial<StudentGroup>, userId: string): Promise<StudentGroup | undefined>;
   deleteStudentGroup(id: string, userId: string): Promise<boolean>;
+
+  // Student Notes
+  getStudentNotes(studentId: string, educatorId: string): Promise<StudentNote[]>;
+  getStudentNotesByClass(classId: string, educatorId: string): Promise<StudentNote[]>;
+  createStudentNote(note: InsertStudentNote): Promise<StudentNote>;
+  updateStudentNote(id: string, updates: Partial<StudentNote>, educatorId: string): Promise<StudentNote | undefined>;
+  deleteStudentNote(id: string, educatorId: string): Promise<boolean>;
+
+  // Attendance Records
+  getAttendanceByClass(classId: string, date: Date): Promise<AttendanceRecord[]>;
+  getAttendanceByStudent(studentId: string, startDate?: Date, endDate?: Date): Promise<AttendanceRecord[]>;
+  createAttendanceRecord(record: InsertAttendanceRecord): Promise<AttendanceRecord>;
+  updateAttendanceRecord(id: string, updates: Partial<AttendanceRecord>): Promise<AttendanceRecord | undefined>;
+  bulkCreateAttendance(records: InsertAttendanceRecord[]): Promise<AttendanceRecord[]>;
 
   getAssignments(userId: string): Promise<Assignment[]>;
   getAssignment(id: string): Promise<Assignment | undefined>;
@@ -4394,6 +4414,99 @@ export class DatabaseStorage implements IStorage {
   async deleteSisCourse(id: string): Promise<boolean> {
     await db.delete(sisCourses).where(eq(sisCourses.id, id));
     return true;
+  }
+
+  // Student Notes Methods
+  async getStudentNotes(studentId: string, educatorId: string): Promise<StudentNote[]> {
+    return await db.select().from(studentNotes)
+      .where(and(
+        eq(studentNotes.studentId, studentId),
+        eq(studentNotes.educatorId, educatorId)
+      ))
+      .orderBy(desc(studentNotes.createdAt));
+  }
+
+  async getStudentNotesByClass(classId: string, educatorId: string): Promise<StudentNote[]> {
+    return await db.select().from(studentNotes)
+      .where(and(
+        eq(studentNotes.classId, classId),
+        eq(studentNotes.educatorId, educatorId)
+      ))
+      .orderBy(desc(studentNotes.createdAt));
+  }
+
+  async createStudentNote(note: InsertStudentNote): Promise<StudentNote> {
+    const [created] = await db.insert(studentNotes).values(note as any).returning();
+    return created;
+  }
+
+  async updateStudentNote(id: string, updates: Partial<StudentNote>, educatorId: string): Promise<StudentNote | undefined> {
+    const [existing] = await db.select().from(studentNotes).where(eq(studentNotes.id, id));
+    if (!existing || existing.educatorId !== educatorId) return undefined;
+    
+    const [updated] = await db.update(studentNotes)
+      .set({ ...updates, updatedAt: new Date() })
+      .where(eq(studentNotes.id, id))
+      .returning();
+    return updated || undefined;
+  }
+
+  async deleteStudentNote(id: string, educatorId: string): Promise<boolean> {
+    const [existing] = await db.select().from(studentNotes).where(eq(studentNotes.id, id));
+    if (!existing || existing.educatorId !== educatorId) return false;
+    
+    await db.delete(studentNotes).where(eq(studentNotes.id, id));
+    return true;
+  }
+
+  // Attendance Records Methods
+  async getAttendanceByClass(classId: string, date: Date): Promise<AttendanceRecord[]> {
+    const startOfDay = new Date(date);
+    startOfDay.setHours(0, 0, 0, 0);
+    const endOfDay = new Date(date);
+    endOfDay.setHours(23, 59, 59, 999);
+    
+    return await db.select().from(attendanceRecords)
+      .where(and(
+        eq(attendanceRecords.classId, classId),
+        gte(attendanceRecords.date, startOfDay),
+        sql`${attendanceRecords.date} <= ${endOfDay}`
+      ))
+      .orderBy(asc(attendanceRecords.studentId));
+  }
+
+  async getAttendanceByStudent(studentId: string, startDate?: Date, endDate?: Date): Promise<AttendanceRecord[]> {
+    const conditions = [eq(attendanceRecords.studentId, studentId)];
+    
+    if (startDate) {
+      conditions.push(gte(attendanceRecords.date, startDate));
+    }
+    if (endDate) {
+      conditions.push(sql`${attendanceRecords.date} <= ${endDate}`);
+    }
+    
+    return await db.select().from(attendanceRecords)
+      .where(and(...conditions))
+      .orderBy(desc(attendanceRecords.date));
+  }
+
+  async createAttendanceRecord(record: InsertAttendanceRecord): Promise<AttendanceRecord> {
+    const [created] = await db.insert(attendanceRecords).values(record as any).returning();
+    return created;
+  }
+
+  async updateAttendanceRecord(id: string, updates: Partial<AttendanceRecord>): Promise<AttendanceRecord | undefined> {
+    const [updated] = await db.update(attendanceRecords)
+      .set(updates)
+      .where(eq(attendanceRecords.id, id))
+      .returning();
+    return updated || undefined;
+  }
+
+  async bulkCreateAttendance(records: InsertAttendanceRecord[]): Promise<AttendanceRecord[]> {
+    if (records.length === 0) return [];
+    const created = await db.insert(attendanceRecords).values(records as any[]).returning();
+    return created;
   }
 }
 

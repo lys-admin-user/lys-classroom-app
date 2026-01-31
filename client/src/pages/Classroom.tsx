@@ -29,10 +29,33 @@ import {
   Share2,
   Eye,
   X,
-  TrendingUp
+  TrendingUp,
+  Search,
+  Download,
+  StickyNote,
+  Calendar,
+  CheckCircle2,
+  XCircle,
+  Clock,
+  Filter
 } from "lucide-react";
 import { Link } from "wouter";
-import type { Class, Student, InsertClass, InsertStudent, AccommodationType, Organization, OrgMembership } from "@shared/schema";
+import type { Class, Student, InsertClass, InsertStudent, AccommodationType, Organization, OrgMembership, StudentNote, AttendanceRecord } from "@shared/schema";
+
+const NOTE_TYPES = [
+  { value: "general", label: "General" },
+  { value: "academic", label: "Academic" },
+  { value: "behavioral", label: "Behavioral" },
+  { value: "health", label: "Health" },
+  { value: "parent_contact", label: "Parent Contact" }
+];
+
+const ATTENDANCE_STATUSES = [
+  { value: "present", label: "Present", icon: CheckCircle2, selectedClass: "bg-green-600 hover:bg-green-700 text-white" },
+  { value: "absent", label: "Absent", icon: XCircle, selectedClass: "bg-red-600 hover:bg-red-700 text-white" },
+  { value: "tardy", label: "Tardy", icon: Clock, selectedClass: "bg-yellow-600 hover:bg-yellow-700 text-white" },
+  { value: "excused", label: "Excused", icon: Calendar, selectedClass: "bg-blue-600 hover:bg-blue-700 text-white" }
+];
 
 type OrgWithDetails = OrgMembership & { organization: Organization };
 
@@ -89,6 +112,18 @@ export default function Classroom() {
   const [managingStudentsClass, setManagingStudentsClass] = useState<Class | null>(null);
   const [isBulkUploadOpen, setIsBulkUploadOpen] = useState(false);
   const [bulkUploadData, setBulkUploadData] = useState<string>("");
+  
+  // New student management features
+  const [studentSearchQuery, setStudentSearchQuery] = useState("");
+  const [studentGradeFilter, setStudentGradeFilter] = useState<string>("all");
+  const [studentStatusFilter, setStudentStatusFilter] = useState<string>("all");
+  const [viewingStudent, setViewingStudent] = useState<Student | null>(null);
+  const [isStudentNotesOpen, setIsStudentNotesOpen] = useState(false);
+  const [newNoteContent, setNewNoteContent] = useState("");
+  const [newNoteType, setNewNoteType] = useState("general");
+  const [attendanceClass, setAttendanceClass] = useState<Class | null>(null);
+  const [attendanceDate, setAttendanceDate] = useState(new Date().toISOString().split('T')[0]);
+  const [attendanceRecords, setAttendanceRecords] = useState<Record<string, string>>({});
 
   const isCampusAdmin = user?.role === "campus_admin";
   
@@ -151,6 +186,24 @@ export default function Classroom() {
   const { data: managedClassStudents = [], isLoading: managedClassStudentsLoading } = useQuery<Student[]>({
     queryKey: ["/api/classes", managingStudentsClass?.id, "students"],
     enabled: !!managingStudentsClass,
+  });
+
+  // Query for student notes
+  const { data: studentNotes = [] } = useQuery<StudentNote[]>({
+    queryKey: ["/api/students", viewingStudent?.id, "notes"],
+    enabled: !!viewingStudent && isStudentNotesOpen,
+  });
+
+  // Query for class attendance
+  const { data: classAttendance = [] } = useQuery<AttendanceRecord[]>({
+    queryKey: ["/api/classes", attendanceClass?.id, "attendance"],
+    enabled: !!attendanceClass,
+  });
+
+  // Query for students in attendance class
+  const { data: attendanceClassStudents = [] } = useQuery<Student[]>({
+    queryKey: ["/api/classes", attendanceClass?.id, "students"],
+    enabled: !!attendanceClass,
   });
 
   // Personal classes/students queries
@@ -364,6 +417,88 @@ export default function Classroom() {
       ...newStudent,
       accommodations: current.filter((_, i) => i !== index)
     });
+  };
+
+  // Student notes mutation
+  const createNoteMutation = useMutation({
+    mutationFn: async ({ studentId, content, noteType }: { studentId: string; content: string; noteType: string }) => {
+      return await apiRequest("POST", `/api/students/${studentId}/notes`, { content, noteType });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/students", viewingStudent?.id, "notes"] });
+      setNewNoteContent("");
+      setNewNoteType("general");
+      toast({ title: "Note added" });
+    },
+    onError: () => {
+      toast({ title: "Failed to add note", variant: "destructive" });
+    },
+  });
+
+  const deleteNoteMutation = useMutation({
+    mutationFn: async (noteId: string) => {
+      return await apiRequest("DELETE", `/api/student-notes/${noteId}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/students", viewingStudent?.id, "notes"] });
+      toast({ title: "Note deleted" });
+    },
+    onError: () => {
+      toast({ title: "Failed to delete note", variant: "destructive" });
+    },
+  });
+
+  // Attendance mutation
+  const saveAttendanceMutation = useMutation({
+    mutationFn: async ({ classId, records }: { classId: string; records: { studentId: string; date: Date; status: string }[] }) => {
+      return await apiRequest("POST", `/api/classes/${classId}/attendance/bulk`, { records });
+    },
+    onSuccess: (_data, variables) => {
+      // Invalidate all attendance queries for this class
+      queryClient.invalidateQueries({ queryKey: ["/api/classes", variables.classId, "attendance"] });
+      toast({ title: "Attendance saved" });
+      setAttendanceClass(null);
+      setAttendanceRecords({});
+    },
+    onError: () => {
+      toast({ title: "Failed to save attendance", variant: "destructive" });
+    },
+  });
+
+  // Filtered students based on search and filters
+  const filteredStudents = students.filter(student => {
+    const matchesSearch = studentSearchQuery === "" || 
+      `${student.firstName} ${student.lastName}`.toLowerCase().includes(studentSearchQuery.toLowerCase()) ||
+      (student.studentId && student.studentId.toLowerCase().includes(studentSearchQuery.toLowerCase()));
+    
+    const matchesGrade = studentGradeFilter === "all" || student.gradeLevel === studentGradeFilter;
+    const matchesStatus = studentStatusFilter === "all" || student.status === studentStatusFilter;
+    
+    return matchesSearch && matchesGrade && matchesStatus;
+  });
+
+  // Export students to CSV
+  const exportStudentsToCSV = () => {
+    const headers = ["First Name", "Last Name", "Student ID", "Grade Level", "Status", "Email", "Enrollment Date"];
+    const csvContent = [
+      headers.join(","),
+      ...filteredStudents.map(s => [
+        s.firstName,
+        s.lastName,
+        s.studentId || "",
+        s.gradeLevel || "",
+        s.status || "active",
+        s.email || "",
+        s.enrollmentDate ? new Date(s.enrollmentDate).toLocaleDateString() : ""
+      ].map(field => `"${field}"`).join(","))
+    ].join("\n");
+    
+    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+    const link = document.createElement("a");
+    link.href = URL.createObjectURL(blob);
+    link.download = `students_${new Date().toISOString().split('T')[0]}.csv`;
+    link.click();
+    toast({ title: "Students exported to CSV" });
   };
 
   if (authLoading) {
@@ -608,6 +743,15 @@ export default function Classroom() {
                       <Button
                         size="icon"
                         variant="ghost"
+                        onClick={() => setAttendanceClass(cls)}
+                        title="Take Attendance"
+                        data-testid={`button-attendance-${cls.id}`}
+                      >
+                        <Calendar className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        size="icon"
+                        variant="ghost"
                         onClick={() => setManagingStudentsClass(cls)}
                         title="Manage Students"
                         data-testid={`button-manage-students-${cls.id}`}
@@ -687,12 +831,54 @@ export default function Classroom() {
 
         {/* Students Tab */}
         <TabsContent value="students" className="space-y-4">
-          <div className="flex justify-end gap-2">
-            <Button variant="outline" onClick={() => setIsBulkUploadOpen(true)} data-testid="button-bulk-upload">
-              <FileText className="h-4 w-4 mr-2" />
-              Bulk Upload
-            </Button>
-            <Dialog open={isCreateStudentOpen} onOpenChange={setIsCreateStudentOpen}>
+          {/* Search and Filter Bar */}
+          <div className="flex flex-col md:flex-row gap-4 items-start md:items-center justify-between">
+            <div className="flex flex-1 gap-2 flex-wrap">
+              <div className="relative flex-1 min-w-[200px]">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Input
+                  placeholder="Search students by name or ID..."
+                  value={studentSearchQuery}
+                  onChange={(e) => setStudentSearchQuery(e.target.value)}
+                  className="pl-9"
+                  data-testid="input-search-students"
+                />
+              </div>
+              <Select value={studentGradeFilter} onValueChange={setStudentGradeFilter}>
+                <SelectTrigger className="w-[150px]" data-testid="select-filter-grade">
+                  <Filter className="h-4 w-4 mr-2" />
+                  <SelectValue placeholder="Grade" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Grades</SelectItem>
+                  {GRADE_LEVELS.map((grade) => (
+                    <SelectItem key={grade} value={grade}>{grade}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <Select value={studentStatusFilter} onValueChange={setStudentStatusFilter}>
+                <SelectTrigger className="w-[130px]" data-testid="select-filter-status">
+                  <SelectValue placeholder="Status" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Status</SelectItem>
+                  <SelectItem value="active">Active</SelectItem>
+                  <SelectItem value="inactive">Inactive</SelectItem>
+                  <SelectItem value="graduated">Graduated</SelectItem>
+                  <SelectItem value="transferred">Transferred</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="flex gap-2">
+              <Button variant="outline" onClick={exportStudentsToCSV} data-testid="button-export-students">
+                <Download className="h-4 w-4 mr-2" />
+                Export CSV
+              </Button>
+              <Button variant="outline" onClick={() => setIsBulkUploadOpen(true)} data-testid="button-bulk-upload">
+                <FileText className="h-4 w-4 mr-2" />
+                Bulk Upload
+              </Button>
+              <Dialog open={isCreateStudentOpen} onOpenChange={setIsCreateStudentOpen}>
               <DialogTrigger asChild>
                 <Button className="bg-lys-red hover:bg-lys-red/90" data-testid="button-add-student">
                   <UserPlus className="h-4 w-4 mr-2" />
@@ -833,14 +1019,29 @@ export default function Classroom() {
                   </Button>
                 </DialogFooter>
               </DialogContent>
-            </Dialog>
+              </Dialog>
+            </div>
+          </div>
+
+          {/* Student count and filter info */}
+          <div className="flex items-center justify-between text-sm text-muted-foreground">
+            <span>Showing {filteredStudents.length} of {students.length} students</span>
+            {(studentSearchQuery || studentGradeFilter !== "all" || studentStatusFilter !== "all") && (
+              <Button variant="ghost" size="sm" onClick={() => {
+                setStudentSearchQuery("");
+                setStudentGradeFilter("all");
+                setStudentStatusFilter("all");
+              }}>
+                Clear filters
+              </Button>
+            )}
           </div>
 
           {studentsLoading ? (
             <div className="flex items-center justify-center py-12">
               <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
             </div>
-          ) : students.length === 0 ? (
+          ) : filteredStudents.length === 0 ? (
             <Card>
               <CardContent className="py-12 text-center">
                 <Users className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
@@ -856,7 +1057,7 @@ export default function Classroom() {
             </Card>
           ) : (
             <div className="grid gap-4">
-              {students.map((student) => (
+              {filteredStudents.map((student) => (
                 <Card key={student.id} data-testid={`card-student-${student.id}`}>
                   <CardHeader className="flex flex-row items-start justify-between gap-4">
                     <div className="flex items-center gap-3">
@@ -870,10 +1071,22 @@ export default function Classroom() {
                         <CardDescription className="flex items-center gap-2 flex-wrap">
                           {student.studentId && <span>ID: {student.studentId}</span>}
                           {student.gradeLevel && <Badge variant="outline">{student.gradeLevel}</Badge>}
+                          {student.status && student.status !== "active" && (
+                            <Badge variant="secondary" className="capitalize">{student.status}</Badge>
+                          )}
                         </CardDescription>
                       </div>
                     </div>
                     <div className="flex items-center gap-1">
+                      <Button
+                        size="icon"
+                        variant="ghost"
+                        title="Student Notes"
+                        onClick={() => { setViewingStudent(student); setIsStudentNotesOpen(true); }}
+                        data-testid={`button-notes-student-${student.id}`}
+                      >
+                        <StickyNote className="h-4 w-4" />
+                      </Button>
                       <Link href={`/student-dashboard/${student.id}`}>
                         <Button
                           size="icon"
@@ -1391,6 +1604,174 @@ Jane,Smith,12346,10th Grade
               data-testid="button-submit-bulk-upload"
             >
               Upload Students
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Student Notes Dialog */}
+      <Dialog open={isStudentNotesOpen} onOpenChange={(open) => { if (!open) { setIsStudentNotesOpen(false); setViewingStudent(null); } }}>
+        <DialogContent className="max-w-xl">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <StickyNote className="h-5 w-5" />
+              Notes for {viewingStudent?.firstName} {viewingStudent?.lastName}
+            </DialogTitle>
+            <DialogDescription>
+              Add private notes about this student. Only you can see these notes.
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="space-y-4 max-h-[60vh] overflow-y-auto">
+            {/* Add new note */}
+            <div className="space-y-3 p-4 border rounded-lg bg-muted/30">
+              <div className="flex gap-2">
+                <Select value={newNoteType} onValueChange={setNewNoteType}>
+                  <SelectTrigger className="w-[140px]" data-testid="select-note-type">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {NOTE_TYPES.map((type) => (
+                      <SelectItem key={type.value} value={type.value}>{type.label}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <Textarea
+                placeholder="Write a note about this student..."
+                value={newNoteContent}
+                onChange={(e) => setNewNoteContent(e.target.value)}
+                rows={3}
+                data-testid="textarea-new-note"
+              />
+              <Button
+                onClick={() => viewingStudent && createNoteMutation.mutate({ 
+                  studentId: viewingStudent.id, 
+                  content: newNoteContent, 
+                  noteType: newNoteType 
+                })}
+                disabled={!newNoteContent.trim() || createNoteMutation.isPending}
+                data-testid="button-add-note"
+              >
+                {createNoteMutation.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+                Add Note
+              </Button>
+            </div>
+
+            {/* Existing notes */}
+            <div className="space-y-3">
+              {studentNotes.length === 0 ? (
+                <p className="text-center text-muted-foreground py-4">No notes yet</p>
+              ) : (
+                studentNotes.map((note) => (
+                  <div key={note.id} className="p-3 border rounded-lg bg-card">
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="flex-1">
+                        <div className="flex items-center gap-2 mb-1">
+                          <Badge variant="outline" className="capitalize">{note.noteType}</Badge>
+                          <span className="text-xs text-muted-foreground">
+                            {note.createdAt && new Date(note.createdAt).toLocaleDateString()}
+                          </span>
+                        </div>
+                        <p className="text-sm">{note.content}</p>
+                      </div>
+                      <Button
+                        size="icon"
+                        variant="ghost"
+                        onClick={() => deleteNoteMutation.mutate(note.id)}
+                        data-testid={`button-delete-note-${note.id}`}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Attendance Dialog */}
+      <Dialog open={!!attendanceClass} onOpenChange={(open) => !open && setAttendanceClass(null)}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Calendar className="h-5 w-5" />
+              Take Attendance - {attendanceClass?.name}
+            </DialogTitle>
+            <DialogDescription>
+              Mark attendance for {attendanceDate}
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="space-y-4">
+            <div className="flex items-center gap-4">
+              <Label>Date</Label>
+              <Input
+                type="date"
+                value={attendanceDate}
+                onChange={(e) => setAttendanceDate(e.target.value)}
+                className="w-[180px]"
+                data-testid="input-attendance-date"
+              />
+            </div>
+
+            <div className="max-h-[50vh] overflow-y-auto space-y-2">
+              {attendanceClassStudents.length === 0 ? (
+                <p className="text-center text-muted-foreground py-8">No students in this class</p>
+              ) : (
+                attendanceClassStudents.map((student) => {
+                  const currentStatus = attendanceRecords[student.id] || "present";
+                  return (
+                    <div key={student.id} className="flex items-center justify-between p-3 border rounded-lg" data-testid={`attendance-row-${student.id}`}>
+                      <div className="flex items-center gap-3">
+                        <GraduationCap className="h-4 w-4 text-muted-foreground" />
+                        <span>{student.firstName} {student.lastName}</span>
+                      </div>
+                      <div className="flex gap-1">
+                        {ATTENDANCE_STATUSES.map((status) => {
+                          const Icon = status.icon;
+                          const isSelected = currentStatus === status.value;
+                          return (
+                            <Button
+                              key={status.value}
+                              size="sm"
+                              variant={isSelected ? "default" : "outline"}
+                              className={isSelected ? status.selectedClass : ""}
+                              onClick={() => setAttendanceRecords({ ...attendanceRecords, [student.id]: status.value })}
+                              data-testid={`button-attendance-${student.id}-${status.value}`}
+                            >
+                              <Icon className="h-4 w-4 mr-1" />
+                              {status.label}
+                            </Button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  );
+                })
+              )}
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setAttendanceClass(null)}>Cancel</Button>
+            <Button
+              onClick={() => {
+                if (!attendanceClass) return;
+                const records = attendanceClassStudents.map(s => ({
+                  studentId: s.id,
+                  date: new Date(attendanceDate),
+                  status: attendanceRecords[s.id] || "present"
+                }));
+                saveAttendanceMutation.mutate({ classId: attendanceClass.id, records });
+              }}
+              disabled={saveAttendanceMutation.isPending || attendanceClassStudents.length === 0}
+              data-testid="button-save-attendance"
+            >
+              {saveAttendanceMutation.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+              Save Attendance
             </Button>
           </DialogFooter>
         </DialogContent>

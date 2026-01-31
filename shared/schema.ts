@@ -1933,3 +1933,55 @@ export const SIS_PROVIDERS = {
 } as const;
 
 export type SisProvider = keyof typeof SIS_PROVIDERS;
+
+// Student Notes - Educator comments about students
+export const studentNotes = pgTable("student_notes", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  studentId: varchar("student_id").notNull(),
+  educatorId: varchar("educator_id").notNull(),
+  classId: varchar("class_id"), // Optional - note may be class-specific
+  noteType: text("note_type").notNull().default("general"), // general, academic, behavioral, health, parent_contact
+  content: text("content").notNull(),
+  isPrivate: boolean("is_private").default(true), // If true, only note creator can see it
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertStudentNoteSchema = createInsertSchema(studentNotes).omit({ id: true, createdAt: true, updatedAt: true });
+export type InsertStudentNote = z.infer<typeof insertStudentNoteSchema>;
+export type StudentNote = typeof studentNotes.$inferSelect;
+
+// Attendance Records
+export const attendanceRecords = pgTable("attendance_records", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  classId: varchar("class_id").notNull(),
+  studentId: varchar("student_id").notNull(),
+  date: timestamp("date").notNull(),
+  status: text("status").notNull().default("present"), // present, absent, tardy, excused
+  notes: text("notes"),
+  recordedBy: varchar("recorded_by").notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertAttendanceRecordSchema = createInsertSchema(attendanceRecords).omit({ id: true, createdAt: true });
+export type InsertAttendanceRecord = z.infer<typeof insertAttendanceRecordSchema>;
+export type AttendanceRecord = typeof attendanceRecords.$inferSelect;
+
+// Note type enum for UI
+export const NoteType = {
+  GENERAL: "general",
+  ACADEMIC: "academic",
+  BEHAVIORAL: "behavioral",
+  HEALTH: "health",
+  PARENT_CONTACT: "parent_contact",
+} as const;
+export type NoteTypeValue = typeof NoteType[keyof typeof NoteType];
+
+// Attendance status enum
+export const AttendanceStatus = {
+  PRESENT: "present",
+  ABSENT: "absent",
+  TARDY: "tardy",
+  EXCUSED: "excused",
+} as const;
+export type AttendanceStatusValue = typeof AttendanceStatus[keyof typeof AttendanceStatus];

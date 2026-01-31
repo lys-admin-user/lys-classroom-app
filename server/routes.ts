@@ -1891,6 +1891,148 @@ export async function registerRoutes(
     }
   });
 
+  // Student Notes
+  app.get("/api/students/:studentId/notes", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user?.claims?.sub;
+      const { studentId } = req.params;
+      const notes = await storage.getStudentNotes(studentId, userId);
+      res.json(notes);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch student notes" });
+    }
+  });
+
+  app.get("/api/classes/:classId/notes", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user?.claims?.sub;
+      const { classId } = req.params;
+      const notes = await storage.getStudentNotesByClass(classId, userId);
+      res.json(notes);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch class notes" });
+    }
+  });
+
+  app.post("/api/students/:studentId/notes", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user?.claims?.sub;
+      const { studentId } = req.params;
+      const note = await storage.createStudentNote({
+        ...req.body,
+        studentId,
+        educatorId: userId,
+      });
+      res.json(note);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to create student note" });
+    }
+  });
+
+  app.patch("/api/student-notes/:id", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user?.claims?.sub;
+      const { id } = req.params;
+      const note = await storage.updateStudentNote(id, req.body, userId);
+      if (!note) {
+        res.status(404).json({ error: "Note not found or not authorized" });
+        return;
+      }
+      res.json(note);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to update student note" });
+    }
+  });
+
+  app.delete("/api/student-notes/:id", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user?.claims?.sub;
+      const { id } = req.params;
+      const deleted = await storage.deleteStudentNote(id, userId);
+      if (!deleted) {
+        res.status(404).json({ error: "Note not found or not authorized" });
+        return;
+      }
+      res.json({ success: true });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to delete student note" });
+    }
+  });
+
+  // Attendance Records
+  app.get("/api/classes/:classId/attendance", isAuthenticated, async (req: any, res) => {
+    try {
+      const { classId } = req.params;
+      const { date } = req.query;
+      const attendanceDate = date ? new Date(date as string) : new Date();
+      const records = await storage.getAttendanceByClass(classId, attendanceDate);
+      res.json(records);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch attendance" });
+    }
+  });
+
+  app.get("/api/students/:studentId/attendance", isAuthenticated, async (req: any, res) => {
+    try {
+      const { studentId } = req.params;
+      const { startDate, endDate } = req.query;
+      const records = await storage.getAttendanceByStudent(
+        studentId,
+        startDate ? new Date(startDate as string) : undefined,
+        endDate ? new Date(endDate as string) : undefined
+      );
+      res.json(records);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch student attendance" });
+    }
+  });
+
+  app.post("/api/classes/:classId/attendance", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user?.claims?.sub;
+      const { classId } = req.params;
+      const record = await storage.createAttendanceRecord({
+        ...req.body,
+        classId,
+        recordedBy: userId,
+      });
+      res.json(record);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to create attendance record" });
+    }
+  });
+
+  app.post("/api/classes/:classId/attendance/bulk", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user?.claims?.sub;
+      const { classId } = req.params;
+      const { records } = req.body;
+      const attendanceRecords = records.map((r: any) => ({
+        ...r,
+        classId,
+        recordedBy: userId,
+      }));
+      const created = await storage.bulkCreateAttendance(attendanceRecords);
+      res.json(created);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to create bulk attendance" });
+    }
+  });
+
+  app.patch("/api/attendance/:id", isAuthenticated, async (req: any, res) => {
+    try {
+      const { id } = req.params;
+      const record = await storage.updateAttendanceRecord(id, req.body);
+      if (!record) {
+        res.status(404).json({ error: "Attendance record not found" });
+        return;
+      }
+      res.json(record);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to update attendance record" });
+    }
+  });
+
   // Student groups
   app.get("/api/student-groups", isAuthenticated, async (req: any, res) => {
     try {
