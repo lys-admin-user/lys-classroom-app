@@ -1762,6 +1762,241 @@ export async function registerRoutes(
   });
 
   // ================================
+  // Gradebook Routes
+  // ================================
+
+  // Get grade categories for a class
+  app.get("/api/classes/:classId/grade-categories", isAuthenticated, async (req: any, res) => {
+    try {
+      const { classId } = req.params;
+      const categoriesList = await storage.getGradeCategories(classId);
+      res.json(categoriesList);
+    } catch (error) {
+      console.error("Error fetching grade categories:", error);
+      res.status(500).json({ error: "Failed to fetch grade categories" });
+    }
+  });
+
+  // Create grade category
+  app.post("/api/grade-categories", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user?.claims?.sub;
+      const category = await storage.createGradeCategory({ ...req.body, userId });
+      res.json(category);
+    } catch (error) {
+      console.error("Error creating grade category:", error);
+      res.status(500).json({ error: "Failed to create grade category" });
+    }
+  });
+
+  // Update grade category
+  app.patch("/api/grade-categories/:id", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user?.claims?.sub;
+      const { id } = req.params;
+      const updated = await storage.updateGradeCategory(id, req.body, userId);
+      if (!updated) {
+        res.status(404).json({ error: "Category not found or not authorized" });
+        return;
+      }
+      res.json(updated);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to update category" });
+    }
+  });
+
+  // Delete grade category
+  app.delete("/api/grade-categories/:id", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user?.claims?.sub;
+      const { id } = req.params;
+      const deleted = await storage.deleteGradeCategory(id, userId);
+      if (!deleted) {
+        res.status(404).json({ error: "Category not found or not authorized" });
+        return;
+      }
+      res.json({ success: true });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to delete category" });
+    }
+  });
+
+  // Get grades for a class
+  app.get("/api/classes/:classId/grades", isAuthenticated, async (req: any, res) => {
+    try {
+      const { classId } = req.params;
+      const gradesList = await storage.getStudentGrades(classId);
+      res.json(gradesList);
+    } catch (error) {
+      console.error("Error fetching grades:", error);
+      res.status(500).json({ error: "Failed to fetch grades" });
+    }
+  });
+
+  // Get grades for a specific student
+  app.get("/api/students/:studentId/grades", isAuthenticated, async (req: any, res) => {
+    try {
+      const { studentId } = req.params;
+      const gradesList = await storage.getStudentGradesByStudent(studentId);
+      res.json(gradesList);
+    } catch (error) {
+      console.error("Error fetching student grades:", error);
+      res.status(500).json({ error: "Failed to fetch student grades" });
+    }
+  });
+
+  // Create grade entry
+  app.post("/api/grades", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user?.claims?.sub;
+      const grade = await storage.createStudentGrade({ ...req.body, userId });
+      res.json(grade);
+    } catch (error) {
+      console.error("Error creating grade:", error);
+      res.status(500).json({ error: "Failed to create grade" });
+    }
+  });
+
+  // Update grade entry
+  app.patch("/api/grades/:id", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user?.claims?.sub;
+      const { id } = req.params;
+      const updated = await storage.updateStudentGrade(id, req.body, userId);
+      if (!updated) {
+        res.status(404).json({ error: "Grade not found or not authorized" });
+        return;
+      }
+      res.json(updated);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to update grade" });
+    }
+  });
+
+  // Bulk update grades
+  app.post("/api/grades/bulk-update", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user?.claims?.sub;
+      const { grades } = req.body;
+      if (!grades || !Array.isArray(grades)) {
+        res.status(400).json({ error: "Grades array is required" });
+        return;
+      }
+      const updated = await storage.bulkUpdateStudentGrades(grades, userId);
+      res.json(updated);
+    } catch (error) {
+      console.error("Error bulk updating grades:", error);
+      res.status(500).json({ error: "Failed to bulk update grades" });
+    }
+  });
+
+  // Delete grade entry
+  app.delete("/api/grades/:id", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user?.claims?.sub;
+      const { id } = req.params;
+      const deleted = await storage.deleteStudentGrade(id, userId);
+      if (!deleted) {
+        res.status(404).json({ error: "Grade not found or not authorized" });
+        return;
+      }
+      res.json({ success: true });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to delete grade" });
+    }
+  });
+
+  // Export grades as CSV
+  app.get("/api/classes/:classId/grades/export", isAuthenticated, async (req: any, res) => {
+    try {
+      const { classId } = req.params;
+      const classData = await storage.getClass(classId);
+      if (!classData) {
+        res.status(404).json({ error: "Class not found" });
+        return;
+      }
+
+      const gradesList = await storage.getStudentGrades(classId);
+      const classStudentsList = await storage.getClassStudents(classId);
+      const studentIds = classStudentsList.map(cs => cs.studentId);
+      const studentsList = await storage.getStudents(classData.userId);
+      const studentsInClass = studentsList.filter(s => studentIds.includes(s.id));
+
+      // Build CSV
+      let csv = "Student ID,First Name,Last Name,Assignment,Points Earned,Points Possible,Percentage,Letter Grade,Comments,Graded Date\n";
+      for (const grade of gradesList) {
+        const student = studentsInClass.find(s => s.id === grade.studentId);
+        if (student) {
+          csv += `"${student.studentId || ""}","${student.firstName}","${student.lastName}","${grade.title}",${grade.pointsEarned ?? ""},${grade.pointsPossible},${grade.percentage ?? ""},${grade.letterGrade ?? ""},"${grade.comments || ""}","${grade.gradedAt?.toISOString() || ""}"\n`;
+        }
+      }
+
+      res.setHeader("Content-Type", "text/csv");
+      res.setHeader("Content-Disposition", `attachment; filename="${classData.name}_grades.csv"`);
+      res.send(csv);
+    } catch (error) {
+      console.error("Error exporting grades:", error);
+      res.status(500).json({ error: "Failed to export grades" });
+    }
+  });
+
+  // Get grading periods
+  app.get("/api/grading-periods", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user?.claims?.sub;
+      const periods = await storage.getGradingPeriods(userId);
+      res.json(periods);
+    } catch (error) {
+      console.error("Error fetching grading periods:", error);
+      res.status(500).json({ error: "Failed to fetch grading periods" });
+    }
+  });
+
+  // Create grading period
+  app.post("/api/grading-periods", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user?.claims?.sub;
+      const period = await storage.createGradingPeriod({ ...req.body, userId });
+      res.json(period);
+    } catch (error) {
+      console.error("Error creating grading period:", error);
+      res.status(500).json({ error: "Failed to create grading period" });
+    }
+  });
+
+  // Update grading period
+  app.patch("/api/grading-periods/:id", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user?.claims?.sub;
+      const { id } = req.params;
+      const updated = await storage.updateGradingPeriod(id, req.body, userId);
+      if (!updated) {
+        res.status(404).json({ error: "Period not found or not authorized" });
+        return;
+      }
+      res.json(updated);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to update period" });
+    }
+  });
+
+  // Delete grading period
+  app.delete("/api/grading-periods/:id", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user?.claims?.sub;
+      const { id } = req.params;
+      const deleted = await storage.deleteGradingPeriod(id, userId);
+      if (!deleted) {
+        res.status(404).json({ error: "Period not found or not authorized" });
+        return;
+      }
+      res.json({ success: true });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to delete period" });
+    }
+  });
+
+  // ================================
   // Student Transfer Request Routes
   // ================================
 
