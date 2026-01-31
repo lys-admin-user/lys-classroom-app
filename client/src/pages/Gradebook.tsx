@@ -31,7 +31,7 @@ import {
   Target
 } from "lucide-react";
 import { Progress } from "@/components/ui/progress";
-import type { Class, Student, StudentGrade, GradeCategory, InsertStudentGrade, InsertGradeCategory, SavedCareer } from "@shared/schema";
+import type { Class, Student, StudentGrade, GradeCategory, InsertStudentGrade, InsertGradeCategory } from "@shared/schema";
 import { CAREER_FIELDS } from "@shared/schema";
 
 const LETTER_GRADE_COLORS: Record<string, string> = {
@@ -111,10 +111,6 @@ export default function Gradebook() {
     queryKey: ["/api/integrations/sis/connections"],
   });
 
-  // Fetch saved careers for career alignment view
-  const { data: savedCareers = [] } = useQuery<SavedCareer[]>({
-    queryKey: ["/api/saved-careers"],
-  });
 
   const studentsInClass = useMemo(() => {
     const studentIds = classStudents.map((cs) => cs.studentId);
@@ -821,21 +817,26 @@ export default function Gradebook() {
                     </div>
                   </div>
 
-                  {/* Student Career Alignment */}
+                  {/* Student Career Readiness */}
                   {studentsInClass.length === 0 ? (
                     <div className="text-center py-8 text-muted-foreground">
                       No students enrolled in this class.
                     </div>
                   ) : (
                     <div className="space-y-4">
-                      <h4 className="font-medium text-sm">Student Career Alignment</h4>
+                      <div className="flex items-center justify-between">
+                        <h4 className="font-medium text-sm">Student Career Readiness</h4>
+                        <p className="text-xs text-muted-foreground">
+                          Based on grade performance in career-aligned skills
+                        </p>
+                      </div>
                       <Table>
                         <TableHeader>
                           <TableRow>
                             <TableHead>Student</TableHead>
                             <TableHead>Current Grade</TableHead>
-                            <TableHead>Saved Careers</TableHead>
                             <TableHead>Career Readiness</TableHead>
+                            <TableHead>Status</TableHead>
                           </TableRow>
                         </TableHeader>
                         <TableBody>
@@ -848,19 +849,14 @@ export default function Gradebook() {
                               : avg >= 67 ? "D+" : avg >= 63 ? "D" : avg >= 60 ? "D-" : "F"
                               : null;
                             
-                            // Find saved careers for this student (would need student-specific endpoint in real app)
-                            const studentCareers = savedCareers.filter((c) => c.userId === student.userId);
-                            
-                            // Calculate career readiness based on grade and class career fields alignment
-                            const classCareerFields = (selectedClass?.careerFields as string[]) || [];
-                            const hasAlignedCareers = studentCareers.some((career) => {
-                              const careerCategory = career.careerCategory?.toLowerCase() || "";
-                              return classCareerFields.some((field) => 
-                                careerCategory.includes(field) || field.includes(careerCategory)
-                              );
-                            });
-                            
-                            const readinessScore = avg !== null ? Math.min(100, avg + (hasAlignedCareers ? 10 : 0)) : 0;
+                            // Career readiness is based on grade - higher grades = more ready for careers requiring this subject
+                            const readinessScore = avg !== null ? avg : 0;
+                            const readinessStatus = avg !== null
+                              ? avg >= 90 ? "Excellent" : avg >= 80 ? "Good" : avg >= 70 ? "Developing" : "Needs Support"
+                              : "No Data";
+                            const statusColor = avg !== null
+                              ? avg >= 90 ? "bg-green-500" : avg >= 80 ? "bg-blue-500" : avg >= 70 ? "bg-yellow-500" : "bg-red-500"
+                              : "bg-gray-400";
 
                             return (
                               <TableRow key={student.id}>
@@ -877,36 +873,26 @@ export default function Gradebook() {
                                   )}
                                 </TableCell>
                                 <TableCell>
-                                  {studentCareers.length > 0 ? (
-                                    <div className="flex flex-wrap gap-1">
-                                      {studentCareers.slice(0, 3).map((career) => (
-                                        <Badge key={career.id} variant="outline" className="text-xs">
-                                          {career.careerTitle}
-                                        </Badge>
-                                      ))}
-                                      {studentCareers.length > 3 && (
-                                        <Badge variant="outline" className="text-xs">
-                                          +{studentCareers.length - 3} more
-                                        </Badge>
-                                      )}
-                                    </div>
-                                  ) : (
-                                    <span className="text-muted-foreground text-sm">No saved careers</span>
-                                  )}
-                                </TableCell>
-                                <TableCell>
                                   <div className="flex items-center gap-2 min-w-32">
                                     <Progress value={readinessScore} className="h-2" />
                                     <span className="text-sm text-muted-foreground w-10">
-                                      {readinessScore}%
+                                      {readinessScore.toFixed(0)}%
                                     </span>
                                   </div>
+                                </TableCell>
+                                <TableCell>
+                                  <Badge className={`${statusColor} text-white`}>
+                                    {readinessStatus}
+                                  </Badge>
                                 </TableCell>
                               </TableRow>
                             );
                           })}
                         </TableBody>
                       </Table>
+                      <p className="text-xs text-muted-foreground mt-2">
+                        Students can explore careers aligned with this class in the Career Explorer to see how their grades connect to future opportunities.
+                      </p>
                     </div>
                   )}
 
