@@ -3317,7 +3317,8 @@ export class DatabaseStorage implements IStorage {
   }
 
   // Validate that a student can be enrolled in a class
-  // Enforces: Student and Class must belong to the same school/campus organization
+  // Enforces: Student and Class should belong to the same school/campus organization
+  // Legacy mode: Allows enrollment when both have no organization assigned
   async validateEnrollment(studentId: string, classId: string): Promise<{ valid: boolean; reason?: string }> {
     const student = await this.getStudent(studentId);
     if (!student) {
@@ -3329,25 +3330,32 @@ export class DatabaseStorage implements IStorage {
       return { valid: false, reason: 'Class not found' };
     }
 
-    // Check if student has an organization
-    if (!student.organizationId) {
-      return { valid: false, reason: 'Student must be assigned to a school before enrollment' };
+    // Legacy mode: If neither has an organization, allow enrollment
+    if (!student.organizationId && !classData.organizationId) {
+      return { valid: true };
     }
 
-    // Check if class has an organization (required for proper hierarchy)
-    if (!classData.organizationId) {
-      return { valid: false, reason: 'Class must be assigned to a school before students can enroll' };
+    // If only one has an org, they need to match
+    if (!student.organizationId && classData.organizationId) {
+      return { valid: false, reason: 'Student must be assigned to a school before enrolling in an organization-linked class' };
+    }
+    
+    if (student.organizationId && !classData.organizationId) {
+      // Allow students with org to enroll in legacy classes
+      return { valid: true };
     }
 
-    // Verify the class organization is a valid container type (school, campus, university)
-    const classOrg = await this.getOrganization(classData.organizationId);
+    // Both have organizations - verify they match or are in hierarchy
+    const classOrg = await this.getOrganization(classData.organizationId!);
     if (!classOrg) {
       return { valid: false, reason: 'Class organization not found' };
     }
     
+    // Optionally verify class org type (soft check - don't fail for legacy data)
     const validClassContainerTypes = ['school', 'campus', 'university'];
-    if (!validClassContainerTypes.includes(classOrg.type || '')) {
-      return { valid: false, reason: 'Class must belong to a school, campus, or university organization' };
+    if (classOrg.type && !validClassContainerTypes.includes(classOrg.type)) {
+      // Log warning but don't fail - could be legacy or special org type
+      console.warn(`Class ${classId} org type '${classOrg.type}' is not a typical school container`);
     }
 
     // Check if student's organization matches the class organization (same school)
@@ -3357,7 +3365,7 @@ export class DatabaseStorage implements IStorage {
 
     // Check if student's org is within the class org's hierarchy
     // This allows a student at a campus to enroll in a class at the parent school
-    const studentHierarchy = await this.getOrganizationHierarchy(student.organizationId);
+    const studentHierarchy = await this.getOrganizationHierarchy(student.organizationId!);
     const classOrgInHierarchy = studentHierarchy.some(org => org.id === classData.organizationId);
     
     if (classOrgInHierarchy) {
@@ -3365,7 +3373,7 @@ export class DatabaseStorage implements IStorage {
     }
 
     // Also check reverse - student's school is a parent of the class's school
-    const classHierarchy = await this.getOrganizationHierarchy(classData.organizationId);
+    const classHierarchy = await this.getOrganizationHierarchy(classData.organizationId!);
     const studentOrgInClassHierarchy = classHierarchy.some(org => org.id === student.organizationId);
     
     if (studentOrgInClassHierarchy) {
