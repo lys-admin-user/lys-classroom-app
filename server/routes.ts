@@ -1733,6 +1733,34 @@ export async function registerRoutes(
     }
   });
 
+  // Get assignments for a specific class
+  app.get("/api/classes/:classId/assignments", isAuthenticated, async (req: any, res) => {
+    try {
+      const { classId } = req.params;
+      const assignmentsList = await storage.getAssignmentsByClass(classId);
+      res.json(assignmentsList);
+    } catch (error) {
+      console.error("Error fetching class assignments:", error);
+      res.status(500).json({ error: "Failed to fetch class assignments" });
+    }
+  });
+
+  // Get students with specific accommodation types (for accommodation group targeting)
+  app.post("/api/students/by-accommodations", isAuthenticated, async (req: any, res) => {
+    try {
+      const { accommodationTypes, classId } = req.body;
+      if (!accommodationTypes || !Array.isArray(accommodationTypes) || accommodationTypes.length === 0) {
+        res.status(400).json({ error: "Accommodation types are required" });
+        return;
+      }
+      const studentsList = await storage.getStudentsByAccommodations(accommodationTypes, classId);
+      res.json(studentsList);
+    } catch (error) {
+      console.error("Error fetching students by accommodations:", error);
+      res.status(500).json({ error: "Failed to fetch students" });
+    }
+  });
+
   // Classes management
   app.get("/api/classes", isAuthenticated, async (req: any, res) => {
     try {

@@ -124,6 +124,20 @@ export default function Classroom() {
   const [attendanceClass, setAttendanceClass] = useState<Class | null>(null);
   const [attendanceDate, setAttendanceDate] = useState(new Date().toISOString().split('T')[0]);
   const [attendanceRecords, setAttendanceRecords] = useState<Record<string, string>>({});
+  
+  // Assignment creation
+  const [isCreateAssignmentOpen, setIsCreateAssignmentOpen] = useState(false);
+  const [assignmentTargetType, setAssignmentTargetType] = useState<"class" | "accommodation_group" | "individual">("class");
+  const [assignmentClassId, setAssignmentClassId] = useState<string>("");
+  const [selectedAccommodationTypes, setSelectedAccommodationTypes] = useState<AccommodationType[]>([]);
+  const [selectedStudentIds, setSelectedStudentIds] = useState<string[]>([]);
+  const [newAssignment, setNewAssignment] = useState({
+    title: "",
+    description: "",
+    instructions: "",
+    dueDate: "",
+    totalPoints: 100
+  });
 
   const isCampusAdmin = user?.role === "campus_admin";
   
@@ -465,6 +479,39 @@ export default function Classroom() {
     },
   });
 
+  // Query for students with specific accommodations (for assignment targeting)
+  const { data: accommodationStudents = [] } = useQuery<Student[]>({
+    queryKey: ["/api/students/by-accommodations", selectedAccommodationTypes, assignmentClassId],
+    queryFn: async () => {
+      const response = await apiRequest("POST", "/api/students/by-accommodations", {
+        accommodationTypes: selectedAccommodationTypes,
+        classId: assignmentClassId || undefined
+      });
+      return response.json();
+    },
+    enabled: assignmentTargetType === "accommodation_group" && selectedAccommodationTypes.length > 0,
+  });
+
+  // Assignment creation mutation
+  const createAssignmentMutation = useMutation({
+    mutationFn: async (data: any) => {
+      return await apiRequest("POST", "/api/assignments", data);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/assignments"] });
+      toast({ title: "Assignment created" });
+      setIsCreateAssignmentOpen(false);
+      setNewAssignment({ title: "", description: "", instructions: "", dueDate: "", totalPoints: 100 });
+      setAssignmentTargetType("class");
+      setAssignmentClassId("");
+      setSelectedAccommodationTypes([]);
+      setSelectedStudentIds([]);
+    },
+    onError: () => {
+      toast({ title: "Failed to create assignment", variant: "destructive" });
+    },
+  });
+
   // Filtered students based on search and filters
   const filteredStudents = students.filter(student => {
     const matchesSearch = studentSearchQuery === "" || 
@@ -614,7 +661,15 @@ export default function Classroom() {
 
         {/* Classes Tab */}
         <TabsContent value="classes" className="space-y-4">
-          <div className="flex justify-end">
+          <div className="flex justify-end gap-2">
+            <Button 
+              variant="outline"
+              onClick={() => setIsCreateAssignmentOpen(true)} 
+              data-testid="button-open-create-assignment"
+            >
+              <FileText className="h-4 w-4 mr-2" />
+              New Assignment
+            </Button>
             <Dialog open={isCreateClassOpen} onOpenChange={setIsCreateClassOpen}>
               <DialogTrigger asChild>
                 <Button className="bg-lys-teal hover:bg-lys-teal/90" data-testid="button-create-class">
@@ -1772,6 +1827,261 @@ Jane,Smith,12346,10th Grade
             >
               {saveAttendanceMutation.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
               Save Attendance
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Create Assignment Dialog */}
+      <Dialog open={isCreateAssignmentOpen} onOpenChange={setIsCreateAssignmentOpen}>
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <FileText className="h-5 w-5" />
+              Create Assignment
+            </DialogTitle>
+            <DialogDescription>
+              Create a new assignment and choose who to assign it to
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="assignment-title">Title</Label>
+              <Input
+                id="assignment-title"
+                placeholder="Assignment title"
+                value={newAssignment.title}
+                onChange={(e) => setNewAssignment({ ...newAssignment, title: e.target.value })}
+                data-testid="input-assignment-title"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="assignment-description">Description</Label>
+              <Textarea
+                id="assignment-description"
+                placeholder="Brief description of the assignment"
+                value={newAssignment.description}
+                onChange={(e) => setNewAssignment({ ...newAssignment, description: e.target.value })}
+                data-testid="input-assignment-description"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="assignment-instructions">Instructions</Label>
+              <Textarea
+                id="assignment-instructions"
+                placeholder="Detailed instructions for students"
+                value={newAssignment.instructions}
+                onChange={(e) => setNewAssignment({ ...newAssignment, instructions: e.target.value })}
+                rows={4}
+                data-testid="input-assignment-instructions"
+              />
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="assignment-due-date">Due Date</Label>
+                <Input
+                  id="assignment-due-date"
+                  type="date"
+                  value={newAssignment.dueDate}
+                  onChange={(e) => setNewAssignment({ ...newAssignment, dueDate: e.target.value })}
+                  data-testid="input-assignment-due-date"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="assignment-points">Total Points</Label>
+                <Input
+                  id="assignment-points"
+                  type="number"
+                  value={newAssignment.totalPoints}
+                  onChange={(e) => setNewAssignment({ ...newAssignment, totalPoints: parseInt(e.target.value) || 0 })}
+                  data-testid="input-assignment-points"
+                />
+              </div>
+            </div>
+
+            <div className="border-t pt-4 mt-4">
+              <Label className="text-base font-semibold mb-3 block">Assign To</Label>
+              
+              <div className="flex gap-2 mb-4">
+                <Button
+                  variant={assignmentTargetType === "class" ? "default" : "outline"}
+                  onClick={() => setAssignmentTargetType("class")}
+                  size="sm"
+                  data-testid="button-target-class"
+                >
+                  <Users className="h-4 w-4 mr-1" />
+                  Whole Class
+                </Button>
+                <Button
+                  variant={assignmentTargetType === "accommodation_group" ? "default" : "outline"}
+                  onClick={() => setAssignmentTargetType("accommodation_group")}
+                  size="sm"
+                  data-testid="button-target-accommodation"
+                >
+                  <BookOpen className="h-4 w-4 mr-1" />
+                  IEP Group
+                </Button>
+                <Button
+                  variant={assignmentTargetType === "individual" ? "default" : "outline"}
+                  onClick={() => setAssignmentTargetType("individual")}
+                  size="sm"
+                  data-testid="button-target-individual"
+                >
+                  <GraduationCap className="h-4 w-4 mr-1" />
+                  Individual Students
+                </Button>
+              </div>
+
+              {/* Class Selection (for class or accommodation_group targeting) */}
+              {(assignmentTargetType === "class" || assignmentTargetType === "accommodation_group") && (
+                <div className="space-y-2 mb-4">
+                  <Label>Select Class</Label>
+                  <Select value={assignmentClassId} onValueChange={setAssignmentClassId}>
+                    <SelectTrigger data-testid="select-assignment-class">
+                      <SelectValue placeholder="Choose a class" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {classes.map((cls) => (
+                        <SelectItem key={cls.id} value={cls.id}>
+                          {cls.name} {cls.period && `(${cls.period})`}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
+
+              {/* Accommodation Types Selection */}
+              {assignmentTargetType === "accommodation_group" && (
+                <div className="space-y-2">
+                  <Label>Select Accommodation Types (IEP)</Label>
+                  <p className="text-sm text-muted-foreground mb-2">
+                    Students with any of these accommodations will be assigned
+                  </p>
+                  <div className="flex flex-wrap gap-2">
+                    {ACCOMMODATION_TYPES.map((type) => {
+                      const isSelected = selectedAccommodationTypes.includes(type);
+                      return (
+                        <Badge
+                          key={type}
+                          variant={isSelected ? "default" : "outline"}
+                          className="cursor-pointer"
+                          onClick={() => {
+                            if (isSelected) {
+                              setSelectedAccommodationTypes(selectedAccommodationTypes.filter(t => t !== type));
+                            } else {
+                              setSelectedAccommodationTypes([...selectedAccommodationTypes, type]);
+                            }
+                          }}
+                          data-testid={`badge-accommodation-${type}`}
+                        >
+                          {ACCOMMODATION_LABELS[type]}
+                        </Badge>
+                      );
+                    })}
+                  </div>
+                  {selectedAccommodationTypes.length > 0 && accommodationStudents.length > 0 && (
+                    <div className="mt-3 p-3 bg-muted rounded-md">
+                      <p className="text-sm font-medium mb-2">
+                        {accommodationStudents.length} student{accommodationStudents.length !== 1 ? 's' : ''} will receive this assignment:
+                      </p>
+                      <div className="flex flex-wrap gap-1">
+                        {accommodationStudents.slice(0, 10).map((student) => (
+                          <Badge key={student.id} variant="secondary" className="text-xs">
+                            {student.firstName} {student.lastName}
+                          </Badge>
+                        ))}
+                        {accommodationStudents.length > 10 && (
+                          <Badge variant="secondary" className="text-xs">
+                            +{accommodationStudents.length - 10} more
+                          </Badge>
+                        )}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Individual Student Selection */}
+              {assignmentTargetType === "individual" && (
+                <div className="space-y-2">
+                  <Label>Select Students</Label>
+                  <div className="max-h-48 overflow-y-auto border rounded-md p-2">
+                    {students.map((student) => {
+                      const isSelected = selectedStudentIds.includes(student.id);
+                      return (
+                        <div
+                          key={student.id}
+                          className={`flex items-center gap-2 p-2 rounded cursor-pointer hover-elevate ${isSelected ? 'bg-primary/10' : ''}`}
+                          onClick={() => {
+                            if (isSelected) {
+                              setSelectedStudentIds(selectedStudentIds.filter(id => id !== student.id));
+                            } else {
+                              setSelectedStudentIds([...selectedStudentIds, student.id]);
+                            }
+                          }}
+                          data-testid={`checkbox-student-${student.id}`}
+                        >
+                          <div className={`w-4 h-4 border rounded flex items-center justify-center ${isSelected ? 'bg-primary border-primary' : 'border-muted-foreground'}`}>
+                            {isSelected && <CheckCircle2 className="h-3 w-3 text-primary-foreground" />}
+                          </div>
+                          <span>{student.firstName} {student.lastName}</span>
+                          {student.gradeLevel && (
+                            <Badge variant="outline" className="text-xs">{student.gradeLevel}</Badge>
+                          )}
+                        </div>
+                      );
+                    })}
+                    {students.length === 0 && (
+                      <p className="text-sm text-muted-foreground text-center py-4">
+                        No students available
+                      </p>
+                    )}
+                  </div>
+                  {selectedStudentIds.length > 0 && (
+                    <p className="text-sm text-muted-foreground">
+                      {selectedStudentIds.length} student{selectedStudentIds.length !== 1 ? 's' : ''} selected
+                    </p>
+                  )}
+                </div>
+              )}
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsCreateAssignmentOpen(false)}>
+              Cancel
+            </Button>
+            <Button
+              onClick={() => {
+                const data: any = {
+                  title: newAssignment.title,
+                  description: newAssignment.description,
+                  instructions: newAssignment.instructions,
+                  dueDate: newAssignment.dueDate ? new Date(newAssignment.dueDate) : null,
+                  totalPoints: newAssignment.totalPoints,
+                  targetType: assignmentTargetType,
+                  classId: assignmentClassId || null,
+                  targetAccommodations: assignmentTargetType === "accommodation_group" ? selectedAccommodationTypes : null,
+                  targetStudentIds: assignmentTargetType === "individual" ? selectedStudentIds : null,
+                };
+                createAssignmentMutation.mutate(data);
+              }}
+              disabled={
+                !newAssignment.title ||
+                createAssignmentMutation.isPending ||
+                (assignmentTargetType === "class" && !assignmentClassId) ||
+                (assignmentTargetType === "accommodation_group" && (selectedAccommodationTypes.length === 0 || !assignmentClassId)) ||
+                (assignmentTargetType === "individual" && selectedStudentIds.length === 0)
+              }
+              data-testid="button-create-assignment"
+            >
+              {createAssignmentMutation.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+              Create Assignment
             </Button>
           </DialogFooter>
         </DialogContent>
