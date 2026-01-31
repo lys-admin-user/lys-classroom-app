@@ -412,6 +412,7 @@ export interface IStorage {
 
   getAssignments(userId: string): Promise<Assignment[]>;
   getAssignment(id: string): Promise<Assignment | undefined>;
+  getAssignmentsByClass(classId: string): Promise<Assignment[]>;
   createAssignment(assignment: InsertAssignment): Promise<Assignment>;
   updateAssignment(id: string, updates: Partial<Assignment>, userId: string): Promise<Assignment | undefined>;
   deleteAssignment(id: string, userId: string): Promise<boolean>;
@@ -420,6 +421,9 @@ export interface IStorage {
   getAssignmentsForStudent(studentId: string): Promise<{ assignment: Assignment; recipient: AssignmentRecipient }[]>;
   createAssignmentRecipient(recipient: InsertAssignmentRecipient): Promise<AssignmentRecipient>;
   updateAssignmentRecipient(id: string, updates: Partial<AssignmentRecipient>): Promise<AssignmentRecipient | undefined>;
+  
+  // Helper: Get students with specific accommodation types
+  getStudentsByAccommodations(accommodationTypes: string[], classId?: string): Promise<Student[]>;
 
   // Organization-Scoped Classroom Access
   getClassesByOrganization(organizationId: string): Promise<Class[]>;
@@ -3026,6 +3030,37 @@ export class DatabaseStorage implements IStorage {
       .where(eq(assignmentRecipients.id, id))
       .returning();
     return updated || undefined;
+  }
+
+  async getAssignmentsByClass(classId: string): Promise<Assignment[]> {
+    return await db.select().from(assignments)
+      .where(eq(assignments.classId, classId))
+      .orderBy(desc(assignments.createdAt));
+  }
+
+  async getStudentsByAccommodations(accommodationTypes: string[], classId?: string): Promise<Student[]> {
+    // Get all students
+    let allStudents: Student[];
+    if (classId) {
+      // Get students in specific class
+      const classStudentsList = await db.select().from(classStudents)
+        .where(eq(classStudents.classId, classId));
+      const studentIds = classStudentsList.map(cs => cs.studentId);
+      if (studentIds.length === 0) return [];
+      allStudents = await db.select().from(students)
+        .where(inArray(students.id, studentIds));
+    } else {
+      allStudents = await db.select().from(students);
+    }
+
+    // Filter students that have any of the specified accommodation types
+    return allStudents.filter(student => {
+      if (!student.accommodations || !Array.isArray(student.accommodations)) return false;
+      const studentAccommodationTypes = (student.accommodations as any[])
+        .filter(a => a.active)
+        .map(a => a.type);
+      return accommodationTypes.some(type => studentAccommodationTypes.includes(type));
+    });
   }
 
   // ================================

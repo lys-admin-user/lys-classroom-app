@@ -1063,15 +1063,19 @@ export const insertStudentGroupSchema = createInsertSchema(studentGroups).omit({
 export type InsertStudentGroup = z.infer<typeof insertStudentGroupSchema>;
 export type StudentGroup = typeof studentGroups.$inferSelect;
 
+// Assignment target types
+export const assignmentTargetTypes = ["class", "accommodation_group", "individual"] as const;
+export type AssignmentTargetType = typeof assignmentTargetTypes[number];
+
 // Assignments Table
 export const assignments = pgTable("assignments", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   userId: varchar("user_id").notNull(),
-  lessonId: varchar("lesson_id").notNull(),
+  lessonId: varchar("lesson_id"),
   title: text("title").notNull(),
   description: text("description"),
-  instructions: text("instructions").notNull(),
-  questions: jsonb("questions").notNull().$type<{
+  instructions: text("instructions"),
+  questions: jsonb("questions").$type<{
     id: string;
     type: "multiple_choice" | "short_answer" | "essay" | "true_false" | "matching";
     question: string;
@@ -1080,8 +1084,21 @@ export const assignments = pgTable("assignments", {
     points: number;
     bkdFocus?: "be" | "know" | "do";
   }[]>(),
-  totalPoints: integer("total_points").notNull(),
+  totalPoints: integer("total_points"),
   dueDate: timestamp("due_date"),
+  
+  // Target type: class, accommodation_group, or individual
+  targetType: text("target_type").notNull().default("class").$type<AssignmentTargetType>(),
+  
+  // For class targeting
+  classId: varchar("class_id"),
+  
+  // For accommodation group targeting - array of accommodation types to include
+  targetAccommodations: jsonb("target_accommodations").$type<AccommodationType[]>(),
+  
+  // For individual targeting - array of student IDs
+  targetStudentIds: jsonb("target_student_ids").$type<string[]>(),
+  
   assignmentType: text("assignment_type").notNull().default("individual"),
   status: text("status").notNull().default("draft"),
   accommodationModified: boolean("accommodation_modified").default(false),
@@ -1985,3 +2002,4 @@ export const AttendanceStatus = {
   EXCUSED: "excused",
 } as const;
 export type AttendanceStatusValue = typeof AttendanceStatus[keyof typeof AttendanceStatus];
+
