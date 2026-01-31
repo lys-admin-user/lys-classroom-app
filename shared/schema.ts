@@ -286,6 +286,30 @@ export const careerSchema = z.object({
 
 export type Career = z.infer<typeof careerSchema>;
 
+// Career Fields for mapping classes to career categories
+export const CAREER_FIELDS = [
+  { id: "stem", name: "STEM & Technology", subjects: ["math", "science", "computer science", "engineering", "physics", "chemistry", "biology"] },
+  { id: "healthcare", name: "Healthcare & Medicine", subjects: ["biology", "chemistry", "health", "anatomy", "nursing"] },
+  { id: "business", name: "Business & Finance", subjects: ["business", "economics", "accounting", "finance", "entrepreneurship"] },
+  { id: "arts", name: "Arts & Creative", subjects: ["art", "music", "theater", "drama", "creative writing", "design"] },
+  { id: "humanities", name: "Humanities & Social Sciences", subjects: ["history", "social studies", "psychology", "sociology", "philosophy"] },
+  { id: "education", name: "Education & Training", subjects: ["education", "child development", "teaching"] },
+  { id: "law", name: "Law & Government", subjects: ["government", "civics", "criminal justice", "law", "political science"] },
+  { id: "trades", name: "Skilled Trades", subjects: ["woodworking", "auto shop", "welding", "construction", "hvac", "electrical"] },
+  { id: "communications", name: "Communications & Media", subjects: ["english", "journalism", "communications", "media", "writing"] },
+  { id: "agriculture", name: "Agriculture & Environment", subjects: ["agriculture", "environmental science", "ecology", "forestry"] },
+] as const;
+
+export type CareerFieldId = typeof CAREER_FIELDS[number]["id"];
+
+// Helper to suggest career fields based on class subject
+export function suggestCareerFields(subject: string): CareerFieldId[] {
+  const lowerSubject = subject.toLowerCase();
+  return CAREER_FIELDS
+    .filter(field => field.subjects.some(s => lowerSubject.includes(s) || s.includes(lowerSubject)))
+    .map(field => field.id);
+}
+
 // Resource Schema
 export const resourceSchema = z.object({
   id: z.string(),
@@ -853,6 +877,8 @@ export const classes = pgTable("classes", {
   term: text("term"), // semester, quarter, trimester, etc.
   maxStudents: integer("max_students").default(35).notNull(),
   isActive: boolean("is_active").default(true),
+  // Career alignment - maps this class to career categories for student insights
+  careerFields: jsonb("career_fields").$type<string[]>().default([]),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });

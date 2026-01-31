@@ -26,9 +26,13 @@ import {
   FileSpreadsheet,
   Share2,
   TrendingUp,
-  Settings
+  Settings,
+  Briefcase,
+  Target
 } from "lucide-react";
-import type { Class, Student, StudentGrade, GradeCategory, InsertStudentGrade, InsertGradeCategory } from "@shared/schema";
+import { Progress } from "@/components/ui/progress";
+import type { Class, Student, StudentGrade, GradeCategory, InsertStudentGrade, InsertGradeCategory, SavedCareer } from "@shared/schema";
+import { CAREER_FIELDS } from "@shared/schema";
 
 const LETTER_GRADE_COLORS: Record<string, string> = {
   "A+": "bg-green-600",
@@ -105,6 +109,11 @@ export default function Gradebook() {
 
   const { data: sisConnections = [] } = useQuery<SisConnection[]>({
     queryKey: ["/api/integrations/sis/connections"],
+  });
+
+  // Fetch saved careers for career alignment view
+  const { data: savedCareers = [] } = useQuery<SavedCareer[]>({
+    queryKey: ["/api/saved-careers"],
   });
 
   const studentsInClass = useMemo(() => {
@@ -591,6 +600,10 @@ export default function Gradebook() {
             <TabsList>
               <TabsTrigger value="grades" data-testid="tab-grades">All Grades</TabsTrigger>
               <TabsTrigger value="by-student" data-testid="tab-by-student">By Student</TabsTrigger>
+              <TabsTrigger value="career-alignment" data-testid="tab-career-alignment">
+                <Briefcase className="h-4 w-4 mr-1" />
+                Career Alignment
+              </TabsTrigger>
             </TabsList>
 
             <TabsContent value="grades" className="space-y-4">
@@ -770,6 +783,167 @@ export default function Gradebook() {
                         })}
                       </TableBody>
                     </Table>
+                  )}
+                </CardContent>
+              </Card>
+            </TabsContent>
+
+            <TabsContent value="career-alignment" className="space-y-4">
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <Target className="h-5 w-5" />
+                    Career Alignment Insights
+                  </CardTitle>
+                  <CardDescription>
+                    See how grades in {selectedClass?.name} align with saved career interests
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-6">
+                  {/* Class Career Fields */}
+                  <div className="space-y-3">
+                    <h4 className="font-medium text-sm">This class relates to:</h4>
+                    <div className="flex flex-wrap gap-2">
+                      {(selectedClass?.careerFields as string[] || []).length > 0 ? (
+                        (selectedClass?.careerFields as string[]).map((fieldId) => {
+                          const field = CAREER_FIELDS.find((f) => f.id === fieldId);
+                          return field ? (
+                            <Badge key={fieldId} variant="secondary">
+                              {field.name}
+                            </Badge>
+                          ) : null;
+                        })
+                      ) : (
+                        <p className="text-sm text-muted-foreground">
+                          No career fields assigned to this class yet. Educators can assign career fields in class settings.
+                        </p>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Student Career Alignment */}
+                  {studentsInClass.length === 0 ? (
+                    <div className="text-center py-8 text-muted-foreground">
+                      No students enrolled in this class.
+                    </div>
+                  ) : (
+                    <div className="space-y-4">
+                      <h4 className="font-medium text-sm">Student Career Alignment</h4>
+                      <Table>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead>Student</TableHead>
+                            <TableHead>Current Grade</TableHead>
+                            <TableHead>Saved Careers</TableHead>
+                            <TableHead>Career Readiness</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {studentsInClass.map((student) => {
+                            const avg = calculateStudentAverage(student.id);
+                            const letterGrade = avg !== null
+                              ? avg >= 97 ? "A+" : avg >= 93 ? "A" : avg >= 90 ? "A-"
+                              : avg >= 87 ? "B+" : avg >= 83 ? "B" : avg >= 80 ? "B-"
+                              : avg >= 77 ? "C+" : avg >= 73 ? "C" : avg >= 70 ? "C-"
+                              : avg >= 67 ? "D+" : avg >= 63 ? "D" : avg >= 60 ? "D-" : "F"
+                              : null;
+                            
+                            // Find saved careers for this student (would need student-specific endpoint in real app)
+                            const studentCareers = savedCareers.filter((c) => c.userId === student.userId);
+                            
+                            // Calculate career readiness based on grade and class career fields alignment
+                            const classCareerFields = (selectedClass?.careerFields as string[]) || [];
+                            const hasAlignedCareers = studentCareers.some((career) => {
+                              const careerCategory = career.careerCategory?.toLowerCase() || "";
+                              return classCareerFields.some((field) => 
+                                careerCategory.includes(field) || field.includes(careerCategory)
+                              );
+                            });
+                            
+                            const readinessScore = avg !== null ? Math.min(100, avg + (hasAlignedCareers ? 10 : 0)) : 0;
+
+                            return (
+                              <TableRow key={student.id}>
+                                <TableCell className="font-medium">
+                                  {student.firstName} {student.lastName}
+                                </TableCell>
+                                <TableCell>
+                                  {letterGrade ? (
+                                    <Badge className={`${getLetterGradeColor(letterGrade)} text-white`}>
+                                      {letterGrade}
+                                    </Badge>
+                                  ) : (
+                                    <span className="text-muted-foreground">No grades</span>
+                                  )}
+                                </TableCell>
+                                <TableCell>
+                                  {studentCareers.length > 0 ? (
+                                    <div className="flex flex-wrap gap-1">
+                                      {studentCareers.slice(0, 3).map((career) => (
+                                        <Badge key={career.id} variant="outline" className="text-xs">
+                                          {career.careerTitle}
+                                        </Badge>
+                                      ))}
+                                      {studentCareers.length > 3 && (
+                                        <Badge variant="outline" className="text-xs">
+                                          +{studentCareers.length - 3} more
+                                        </Badge>
+                                      )}
+                                    </div>
+                                  ) : (
+                                    <span className="text-muted-foreground text-sm">No saved careers</span>
+                                  )}
+                                </TableCell>
+                                <TableCell>
+                                  <div className="flex items-center gap-2 min-w-32">
+                                    <Progress value={readinessScore} className="h-2" />
+                                    <span className="text-sm text-muted-foreground w-10">
+                                      {readinessScore}%
+                                    </span>
+                                  </div>
+                                </TableCell>
+                              </TableRow>
+                            );
+                          })}
+                        </TableBody>
+                      </Table>
+                    </div>
+                  )}
+
+                  {/* Career Field Performance Summary */}
+                  {(selectedClass?.careerFields as string[] || []).length > 0 && (
+                    <div className="space-y-3 pt-4 border-t">
+                      <h4 className="font-medium text-sm">Performance by Career Field</h4>
+                      <div className="grid gap-4 sm:grid-cols-2">
+                        {(selectedClass?.careerFields as string[]).map((fieldId) => {
+                          const field = CAREER_FIELDS.find((f) => f.id === fieldId);
+                          if (!field) return null;
+                          
+                          // Calculate class average for this career field
+                          const classAvg = studentsInClass.reduce((sum, student) => {
+                            const avg = calculateStudentAverage(student.id);
+                            return sum + (avg || 0);
+                          }, 0) / (studentsInClass.length || 1);
+                          
+                          return (
+                            <Card key={fieldId}>
+                              <CardContent className="pt-4">
+                                <div className="flex justify-between items-center mb-2">
+                                  <span className="font-medium">{field.name}</span>
+                                  <Badge variant={classAvg >= 80 ? "default" : classAvg >= 70 ? "secondary" : "destructive"}>
+                                    {classAvg.toFixed(0)}%
+                                  </Badge>
+                                </div>
+                                <Progress value={classAvg} className="h-2" />
+                                <p className="text-xs text-muted-foreground mt-2">
+                                  Class average in {field.name.toLowerCase()} skills
+                                </p>
+                              </CardContent>
+                            </Card>
+                          );
+                        })}
+                      </div>
+                    </div>
                   )}
                 </CardContent>
               </Card>
