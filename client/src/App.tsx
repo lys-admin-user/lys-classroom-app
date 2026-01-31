@@ -42,6 +42,7 @@ import MyJourney from "@/pages/MyJourney";
 import PortfolioBuilder from "@/pages/PortfolioBuilder";
 import PortfolioView from "@/pages/PortfolioView";
 import SISIntegration from "@/pages/SISIntegration";
+import TransferApprovals from "@/pages/TransferApprovals";
 import NotFound from "@/pages/not-found";
 
 const EXEMPT_PATHS = ["/onboarding", "/pricing", "/shared", "/p/"];
@@ -124,6 +125,7 @@ function Router() {
       <Route path="/professional-development" component={ProfessionalDevelopment} />
       <Route path="/portfolio" component={PortfolioBuilder} />
       <Route path="/p/:slug" component={PortfolioView} />
+      <Route path="/transfer-approvals" component={TransferApprovals} />
       <Route component={NotFound} />
     </Switch>
   );
