@@ -1761,6 +1761,238 @@ export async function registerRoutes(
     }
   });
 
+  // ================================
+  // Student Transfer Request Routes
+  // ================================
+
+  // Create a new transfer request
+  app.post("/api/transfers", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user?.claims?.sub;
+      const { studentId, transferType, targetEducatorId, targetOrganizationId, reason, notes } = req.body;
+
+      if (!studentId || !transferType) {
+        res.status(400).json({ error: "Student ID and transfer type are required" });
+        return;
+      }
+
+      // Get the student to find current organization
+      const student = await storage.getStudent(studentId);
+      if (!student) {
+        res.status(404).json({ error: "Student not found" });
+        return;
+      }
+
+      const request = await storage.createTransferRequest({
+        studentId,
+        transferType,
+        sourceEducatorId: userId,
+        sourceOrganizationId: student.organizationId || undefined,
+        targetEducatorId,
+        targetOrganizationId,
+        requestedBy: userId,
+        reason,
+        notes,
+        status: "pending_campus"
+      });
+
+      res.json(request);
+    } catch (error) {
+      console.error("Error creating transfer request:", error);
+      res.status(500).json({ error: "Failed to create transfer request" });
+    }
+  });
+
+  // Get transfer requests for a student
+  app.get("/api/transfers/student/:studentId", isAuthenticated, async (req: any, res) => {
+    try {
+      const { studentId } = req.params;
+      const requests = await storage.getTransferRequestsByStudent(studentId);
+      res.json(requests);
+    } catch (error) {
+      console.error("Error fetching transfer requests:", error);
+      res.status(500).json({ error: "Failed to fetch transfer requests" });
+    }
+  });
+
+  // Get pending transfer requests for a specific approval level
+  app.get("/api/transfers/pending/:level", isAuthenticated, async (req: any, res) => {
+    try {
+      const { level } = req.params;
+      const user = req.user?.claims;
+      
+      // Verify user has appropriate role for this level
+      const dbUser = await storage.getUser(user.sub);
+      if (!dbUser) {
+        res.status(401).json({ error: "User not found" });
+        return;
+      }
+
+      const validLevels = ["campus", "district", "system_admin"];
+      if (!validLevels.includes(level)) {
+        res.status(400).json({ error: "Invalid approval level" });
+        return;
+      }
+
+      // Check role permissions
+      if (level === "system_admin" && dbUser.role !== "site_admin") {
+        res.status(403).json({ error: "Only system admins can view system admin pending transfers" });
+        return;
+      }
+      if (level === "district" && !["district_admin", "site_admin"].includes(dbUser.role || "")) {
+        res.status(403).json({ error: "Only district admins can view district pending transfers" });
+        return;
+      }
+      if (level === "campus" && !["campus_admin", "district_admin", "site_admin"].includes(dbUser.role || "")) {
+        res.status(403).json({ error: "Only campus admins can view campus pending transfers" });
+        return;
+      }
+
+      const requests = await storage.getPendingTransferRequests(level as any);
+      res.json(requests);
+    } catch (error) {
+      console.error("Error fetching pending transfers:", error);
+      res.status(500).json({ error: "Failed to fetch pending transfers" });
+    }
+  });
+
+  // Approve a transfer request at a specific level
+  app.post("/api/transfers/:id/approve", isAuthenticated, async (req: any, res) => {
+    try {
+      const { id } = req.params;
+      const userId = req.user?.claims?.sub;
+      const dbUser = await storage.getUser(userId);
+      
+      if (!dbUser) {
+        res.status(401).json({ error: "User not found" });
+        return;
+      }
+
+      const request = await storage.getTransferRequest(id);
+      if (!request) {
+        res.status(404).json({ error: "Transfer request not found" });
+        return;
+      }
+
+      // Determine required level based on current status
+      let requiredRole: string[] = [];
+      let approvalLevel: "campus" | "district" | "system_admin" | null = null;
+      
+      if (request.status === "pending_campus") {
+        requiredRole = ["campus_admin", "district_admin", "site_admin"];
+        approvalLevel = "campus";
+      } else if (request.status === "pending_district") {
+        requiredRole = ["district_admin", "site_admin"];
+        approvalLevel = "district";
+      } else if (request.status === "pending_system_admin") {
+        requiredRole = ["site_admin"];
+        approvalLevel = "system_admin";
+      } else {
+        res.status(400).json({ error: "Transfer request is not pending approval" });
+        return;
+      }
+
+      if (!requiredRole.includes(dbUser.role || "")) {
+        res.status(403).json({ error: `Only ${requiredRole.join(" or ")} can approve at this level` });
+        return;
+      }
+
+      const updated = await storage.approveTransferAtLevel(id, approvalLevel, userId);
+      
+      // If fully approved, execute the transfer
+      if (updated?.status === "approved") {
+        await storage.executeTransfer(id);
+      }
+
+      res.json(updated);
+    } catch (error) {
+      console.error("Error approving transfer:", error);
+      res.status(500).json({ error: "Failed to approve transfer" });
+    }
+  });
+
+  // Reject a transfer request
+  app.post("/api/transfers/:id/reject", isAuthenticated, async (req: any, res) => {
+    try {
+      const { id } = req.params;
+      const { reason } = req.body;
+      const userId = req.user?.claims?.sub;
+      const dbUser = await storage.getUser(userId);
+      
+      if (!dbUser) {
+        res.status(401).json({ error: "User not found" });
+        return;
+      }
+
+      const request = await storage.getTransferRequest(id);
+      if (!request) {
+        res.status(404).json({ error: "Transfer request not found" });
+        return;
+      }
+
+      // Determine level based on current status
+      let level: "campus" | "district" | "system_admin" | null = null;
+      let requiredRole: string[] = [];
+      
+      if (request.status === "pending_campus") {
+        level = "campus";
+        requiredRole = ["campus_admin", "district_admin", "site_admin"];
+      } else if (request.status === "pending_district") {
+        level = "district";
+        requiredRole = ["district_admin", "site_admin"];
+      } else if (request.status === "pending_system_admin") {
+        level = "system_admin";
+        requiredRole = ["site_admin"];
+      } else {
+        res.status(400).json({ error: "Transfer request cannot be rejected" });
+        return;
+      }
+
+      if (!requiredRole.includes(dbUser.role || "")) {
+        res.status(403).json({ error: `Only ${requiredRole.join(" or ")} can reject at this level` });
+        return;
+      }
+
+      const updated = await storage.rejectTransfer(id, level, userId, reason || "No reason provided");
+      res.json(updated);
+    } catch (error) {
+      console.error("Error rejecting transfer:", error);
+      res.status(500).json({ error: "Failed to reject transfer" });
+    }
+  });
+
+  // Cancel a transfer request (by the original requester)
+  app.post("/api/transfers/:id/cancel", isAuthenticated, async (req: any, res) => {
+    try {
+      const { id } = req.params;
+      const userId = req.user?.claims?.sub;
+
+      const request = await storage.getTransferRequest(id);
+      if (!request) {
+        res.status(404).json({ error: "Transfer request not found" });
+        return;
+      }
+
+      // Only the original requester can cancel
+      if (request.requestedBy !== userId) {
+        res.status(403).json({ error: "Only the original requester can cancel this transfer" });
+        return;
+      }
+
+      // Can only cancel if not yet approved or rejected
+      if (["approved", "rejected", "cancelled"].includes(request.status)) {
+        res.status(400).json({ error: "Transfer request cannot be cancelled" });
+        return;
+      }
+
+      const updated = await storage.cancelTransferRequest(id);
+      res.json(updated);
+    } catch (error) {
+      console.error("Error cancelling transfer:", error);
+      res.status(500).json({ error: "Failed to cancel transfer" });
+    }
+  });
+
   // Classes management
   app.get("/api/classes", isAuthenticated, async (req: any, res) => {
     try {

@@ -88,6 +88,9 @@ import {
   type InsertFeatureFlag,
   type EmailTemplate,
   type InsertEmailTemplate,
+  type StudentTransferRequest,
+  type InsertStudentTransferRequest,
+  type TransferRequestStatus,
   lessons,
   goals,
   educatorProfiles,
@@ -129,6 +132,7 @@ import {
   parentProgressNotes,
   featureFlags,
   emailTemplates,
+  studentTransferRequests,
   authorities,
   lyseMilestones,
   workforceTrends,
@@ -4542,6 +4546,149 @@ export class DatabaseStorage implements IStorage {
     if (records.length === 0) return [];
     const created = await db.insert(attendanceRecords).values(records as any[]).returning();
     return created;
+  }
+
+  // ================================
+  // Student Transfer Request Methods
+  // ================================
+
+  async createTransferRequest(data: InsertStudentTransferRequest): Promise<StudentTransferRequest> {
+    const [created] = await db.insert(studentTransferRequests).values(data as any).returning();
+    return created;
+  }
+
+  async getTransferRequest(id: string): Promise<StudentTransferRequest | undefined> {
+    const [request] = await db.select().from(studentTransferRequests)
+      .where(eq(studentTransferRequests.id, id));
+    return request || undefined;
+  }
+
+  async getTransferRequestsByStudent(studentId: string): Promise<StudentTransferRequest[]> {
+    return await db.select().from(studentTransferRequests)
+      .where(eq(studentTransferRequests.studentId, studentId))
+      .orderBy(desc(studentTransferRequests.createdAt));
+  }
+
+  async getTransferRequestsByOrganization(organizationId: string): Promise<StudentTransferRequest[]> {
+    return await db.select().from(studentTransferRequests)
+      .where(or(
+        eq(studentTransferRequests.sourceOrganizationId, organizationId),
+        eq(studentTransferRequests.targetOrganizationId, organizationId)
+      ))
+      .orderBy(desc(studentTransferRequests.createdAt));
+  }
+
+  async getPendingTransferRequests(level: "campus" | "district" | "system_admin"): Promise<StudentTransferRequest[]> {
+    const statusMap = {
+      campus: "pending_campus" as TransferRequestStatus,
+      district: "pending_district" as TransferRequestStatus,
+      system_admin: "pending_system_admin" as TransferRequestStatus
+    };
+    return await db.select().from(studentTransferRequests)
+      .where(eq(studentTransferRequests.status, statusMap[level]))
+      .orderBy(desc(studentTransferRequests.createdAt));
+  }
+
+  async approveTransferAtLevel(
+    id: string, 
+    level: "campus" | "district" | "system_admin",
+    approvedBy: string
+  ): Promise<StudentTransferRequest | undefined> {
+    const now = new Date();
+    let updates: Partial<StudentTransferRequest> = { updatedAt: now };
+    
+    if (level === "campus") {
+      updates = {
+        ...updates,
+        campusApprovedBy: approvedBy,
+        campusApprovedAt: now,
+        status: "pending_district" as TransferRequestStatus
+      };
+    } else if (level === "district") {
+      updates = {
+        ...updates,
+        districtApprovedBy: approvedBy,
+        districtApprovedAt: now,
+        status: "pending_system_admin" as TransferRequestStatus
+      };
+    } else if (level === "system_admin") {
+      updates = {
+        ...updates,
+        systemAdminApprovedBy: approvedBy,
+        systemAdminApprovedAt: now,
+        status: "approved" as TransferRequestStatus,
+        transferExecutedAt: now
+      };
+    }
+
+    const [updated] = await db.update(studentTransferRequests)
+      .set(updates)
+      .where(eq(studentTransferRequests.id, id))
+      .returning();
+    return updated || undefined;
+  }
+
+  async rejectTransfer(
+    id: string,
+    level: "campus" | "district" | "system_admin",
+    rejectedBy: string,
+    reason: string
+  ): Promise<StudentTransferRequest | undefined> {
+    const now = new Date();
+    let updates: Partial<StudentTransferRequest> = { 
+      updatedAt: now,
+      status: "rejected" as TransferRequestStatus
+    };
+
+    if (level === "campus") {
+      updates.campusRejectionReason = reason;
+    } else if (level === "district") {
+      updates.districtRejectionReason = reason;
+    } else if (level === "system_admin") {
+      updates.systemAdminRejectionReason = reason;
+    }
+
+    const [updated] = await db.update(studentTransferRequests)
+      .set(updates)
+      .where(eq(studentTransferRequests.id, id))
+      .returning();
+    return updated || undefined;
+  }
+
+  async cancelTransferRequest(id: string): Promise<StudentTransferRequest | undefined> {
+    const [updated] = await db.update(studentTransferRequests)
+      .set({ 
+        status: "cancelled" as TransferRequestStatus,
+        updatedAt: new Date()
+      })
+      .where(eq(studentTransferRequests.id, id))
+      .returning();
+    return updated || undefined;
+  }
+
+  async executeTransfer(id: string): Promise<StudentTransferRequest | undefined> {
+    const request = await this.getTransferRequest(id);
+    if (!request || request.status !== "approved") return undefined;
+
+    // Update the student's organization/educator
+    if (request.transferType === "organization" && request.targetOrganizationId) {
+      await db.update(students)
+        .set({ 
+          organizationId: request.targetOrganizationId,
+          updatedAt: new Date()
+        })
+        .where(eq(students.id, request.studentId));
+    }
+
+    // Mark transfer as executed
+    const [updated] = await db.update(studentTransferRequests)
+      .set({ 
+        transferExecutedAt: new Date(),
+        updatedAt: new Date()
+      })
+      .where(eq(studentTransferRequests.id, id))
+      .returning();
+    return updated || undefined;
   }
 }
 

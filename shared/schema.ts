@@ -906,6 +906,91 @@ export type InsertClassStudent = z.infer<typeof insertClassStudentSchema>;
 export type ClassStudent = typeof classStudents.$inferSelect;
 
 // ================================
+// Student Transfer Requests (Triple Confirmation Workflow)
+// ================================
+
+// Transfer request statuses
+export const transferRequestStatuses = [
+  "pending_campus",      // Waiting for source campus approval
+  "pending_district",    // Waiting for district approval
+  "pending_system_admin", // Waiting for system admin approval
+  "approved",            // All approvals complete, transfer executed
+  "rejected",            // Rejected at any level
+  "cancelled"            // Cancelled by requester
+] as const;
+export type TransferRequestStatus = typeof transferRequestStatuses[number];
+
+// Transfer types - between educators (same org) or between organizations
+export const transferTypes = ["educator", "organization"] as const;
+export type TransferType = typeof transferTypes[number];
+
+// Student Transfer Requests Table
+export const studentTransferRequests = pgTable("student_transfer_requests", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  
+  // Student being transferred
+  studentId: varchar("student_id").notNull(),
+  
+  // Transfer type: within org (between educators) or between orgs
+  transferType: text("transfer_type").notNull().$type<TransferType>(),
+  
+  // Source information
+  sourceEducatorId: varchar("source_educator_id").notNull(), // Current educator's user ID
+  sourceOrganizationId: varchar("source_organization_id"), // Current org (campus/school)
+  sourceDistrictId: varchar("source_district_id"), // Current district
+  
+  // Target information
+  targetEducatorId: varchar("target_educator_id"), // New educator (for educator transfers)
+  targetOrganizationId: varchar("target_organization_id"), // New org (for org transfers)
+  targetDistrictId: varchar("target_district_id"), // New district (if cross-district)
+  
+  // Request details
+  requestedBy: varchar("requested_by").notNull(), // User ID who initiated request
+  reason: text("reason"), // Reason for transfer
+  notes: text("notes"),
+  
+  // Current status
+  status: text("status").notNull().default("pending_campus").$type<TransferRequestStatus>(),
+  
+  // Campus level approval (first approval)
+  campusApprovedBy: varchar("campus_approved_by"),
+  campusApprovedAt: timestamp("campus_approved_at"),
+  campusRejectionReason: text("campus_rejection_reason"),
+  
+  // District level approval (second approval)
+  districtApprovedBy: varchar("district_approved_by"),
+  districtApprovedAt: timestamp("district_approved_at"),
+  districtRejectionReason: text("district_rejection_reason"),
+  
+  // System admin approval (third/final approval)
+  systemAdminApprovedBy: varchar("system_admin_approved_by"),
+  systemAdminApprovedAt: timestamp("system_admin_approved_at"),
+  systemAdminRejectionReason: text("system_admin_rejection_reason"),
+  
+  // Transfer execution
+  transferExecutedAt: timestamp("transfer_executed_at"),
+  
+  // Timestamps
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertStudentTransferRequestSchema = createInsertSchema(studentTransferRequests).omit({ 
+  id: true, 
+  createdAt: true, 
+  updatedAt: true,
+  campusApprovedBy: true,
+  campusApprovedAt: true,
+  districtApprovedBy: true,
+  districtApprovedAt: true,
+  systemAdminApprovedBy: true,
+  systemAdminApprovedAt: true,
+  transferExecutedAt: true
+});
+export type InsertStudentTransferRequest = z.infer<typeof insertStudentTransferRequestSchema>;
+export type StudentTransferRequest = typeof studentTransferRequests.$inferSelect;
+
+// ================================
 // Student Journey Progress (Be-Know-Do Tracking)
 // ================================
 
