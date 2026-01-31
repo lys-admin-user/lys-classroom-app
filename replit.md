@@ -37,7 +37,8 @@ Preferred communication style: Simple, everyday language.
 -   **Student Digital Portfolio**: Students can create and manage portfolios with customizable themes, privacy controls, shareable links, social sharing, PDF download, and analytics.
 -   **One-Click Template Library**: Educators can save and browse community-shared lesson plan templates.
 -   **Student Transfer System**: Campus-level feature for transferring students between educators or organizations with triple confirmation workflow (Campus → District → System Admin approval chain). Available at `/transfer-approvals`.
--   **Gradebook System**: Educators and campus admins can manage student grades with categories, automatic letter grade calculation, CSV export, and SIS integration for sharing grades. Available at `/gradebook`.
+-   **Gradebook System**: Educators and campus admins can manage student grades with categories, automatic letter grade calculation, CSV export, and SIS integration for sharing grades. Includes career alignment tab showing how grades relate to career readiness. Available at `/gradebook`.
+-   **Career Alignment**: Classes can be mapped to career fields (STEM, Healthcare, Business, etc.). Gradebook shows career readiness scores based on academic performance. Parent Portal displays career readiness insights alongside saved careers.
 
 ### Global Architecture
 -   **Educational Hierarchy**: Structured organization of students and classes (Country > State/Jurisdiction > District > School/Campus > Class > Student) with validation.

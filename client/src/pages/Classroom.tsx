@@ -43,6 +43,8 @@ import {
 } from "lucide-react";
 import { Link } from "wouter";
 import type { Class, Student, InsertClass, InsertStudent, AccommodationType, Organization, OrgMembership, StudentNote, AttendanceRecord, StudentTransferRequest } from "@shared/schema";
+import { CAREER_FIELDS, suggestCareerFields } from "@shared/schema";
+import { Checkbox } from "@/components/ui/checkbox";
 
 const NOTE_TYPES = [
   { value: "general", label: "General" },
@@ -725,6 +727,47 @@ export default function Classroom() {
                       />
                     </div>
                   </div>
+                  <div className="grid gap-2">
+                    <div className="flex items-center justify-between">
+                      <Label>Career Fields (Optional)</Label>
+                      {newClass.subject && (
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => {
+                            const suggested = suggestCareerFields(newClass.subject || "");
+                            setNewClass({ ...newClass, careerFields: suggested });
+                          }}
+                        >
+                          Auto-suggest
+                        </Button>
+                      )}
+                    </div>
+                    <p className="text-xs text-muted-foreground">
+                      Link this class to career categories
+                    </p>
+                    <div className="grid grid-cols-2 gap-2 max-h-32 overflow-y-auto">
+                      {CAREER_FIELDS.map((field) => (
+                        <div key={field.id} className="flex items-center gap-2">
+                          <Checkbox
+                            id={`new-career-${field.id}`}
+                            checked={(newClass.careerFields as string[] || []).includes(field.id)}
+                            onCheckedChange={(checked) => {
+                              const current = (newClass.careerFields as string[]) || [];
+                              const updated = checked
+                                ? [...current, field.id]
+                                : current.filter(f => f !== field.id);
+                              setNewClass({ ...newClass, careerFields: updated });
+                            }}
+                          />
+                          <label htmlFor={`new-career-${field.id}`} className="text-xs">
+                            {field.name}
+                          </label>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
                 </div>
                 <DialogFooter>
                   <Button variant="outline" onClick={() => setIsCreateClassOpen(false)}>Cancel</Button>
@@ -1243,6 +1286,48 @@ export default function Classroom() {
                   onCheckedChange={(checked) => setEditingClass({ ...editingClass, isActive: checked })}
                 />
               </div>
+              <div className="grid gap-2">
+                <div className="flex items-center justify-between">
+                  <Label>Career Fields</Label>
+                  {editingClass.subject && (
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => {
+                        const suggested = suggestCareerFields(editingClass.subject || "");
+                        setEditingClass({ ...editingClass, careerFields: suggested });
+                      }}
+                      data-testid="button-suggest-careers"
+                    >
+                      Auto-suggest
+                    </Button>
+                  )}
+                </div>
+                <p className="text-xs text-muted-foreground mb-2">
+                  Select career categories this class prepares students for
+                </p>
+                <div className="grid grid-cols-2 gap-2 max-h-48 overflow-y-auto">
+                  {CAREER_FIELDS.map((field) => (
+                    <div key={field.id} className="flex items-center gap-2">
+                      <Checkbox
+                        id={`career-${field.id}`}
+                        checked={(editingClass.careerFields as string[] || []).includes(field.id)}
+                        onCheckedChange={(checked) => {
+                          const current = (editingClass.careerFields as string[]) || [];
+                          const updated = checked
+                            ? [...current, field.id]
+                            : current.filter(f => f !== field.id);
+                          setEditingClass({ ...editingClass, careerFields: updated });
+                        }}
+                      />
+                      <label htmlFor={`career-${field.id}`} className="text-sm">
+                        {field.name}
+                      </label>
+                    </div>
+                  ))}
+                </div>
+              </div>
             </div>
           )}
           <DialogFooter>
@@ -1255,6 +1340,7 @@ export default function Classroom() {
                   subject: editingClass.subject,
                   period: editingClass.period,
                   isActive: editingClass.isActive,
+                  careerFields: editingClass.careerFields,
                 }
               })}
               disabled={updateClassMutation.isPending}

@@ -512,28 +512,67 @@ function StudentDashboard({ studentData, isLoading }: { studentData: StudentData
               </CardContent>
             </Card>
           ) : (
-            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-              {savedCareers.map((career, idx) => (
-                <Card key={idx}>
-                  <CardContent className="pt-6">
-                    <div className="flex items-start gap-3">
-                      <div className="p-2 rounded-md bg-primary/10">
-                        <Briefcase className="w-5 h-5 text-primary" />
-                      </div>
-                      <div>
-                        <p className="font-medium">{career.careerTitle}</p>
-                        <p className="text-sm text-muted-foreground capitalize">{career.careerCategory}</p>
-                        {career.savedAt && (
-                          <p className="text-xs text-muted-foreground mt-1">
-                            Saved: {new Date(career.savedAt).toLocaleDateString()}
-                          </p>
-                        )}
-                      </div>
+            <>
+              {/* Career Readiness Overview */}
+              <Card className="border-primary/20 bg-primary/5">
+                <CardHeader className="pb-2">
+                  <CardTitle className="flex items-center gap-2 text-lg">
+                    <Target className="h-5 w-5 text-primary" />
+                    Career Readiness Insights
+                  </CardTitle>
+                  <CardDescription>
+                    How academic progress aligns with career interests
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="grid gap-4 sm:grid-cols-3">
+                    <div className="text-center p-3 rounded-md bg-background">
+                      <p className="text-2xl font-bold text-primary">{savedCareers.length}</p>
+                      <p className="text-xs text-muted-foreground">Careers Explored</p>
                     </div>
-                  </CardContent>
-                </Card>
-              ))}
-            </div>
+                    <div className="text-center p-3 rounded-md bg-background">
+                      <p className="text-2xl font-bold text-green-600">{journeyProgress?.overallScore || 0}%</p>
+                      <p className="text-xs text-muted-foreground">Learning Progress</p>
+                    </div>
+                    <div className="text-center p-3 rounded-md bg-background">
+                      <p className="text-2xl font-bold text-blue-600">
+                        {journeyProgress?.overallScore && journeyProgress.overallScore >= 80 ? "On Track" : 
+                         journeyProgress?.overallScore && journeyProgress.overallScore >= 60 ? "Developing" : "Getting Started"}
+                      </p>
+                      <p className="text-xs text-muted-foreground">Readiness Status</p>
+                    </div>
+                  </div>
+                  <p className="text-sm text-muted-foreground">
+                    Strong academic performance helps prepare students for their career interests. 
+                    Encourage exploration of careers that align with their strengths and interests.
+                  </p>
+                </CardContent>
+              </Card>
+
+              {/* Saved Careers Grid */}
+              <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+                {savedCareers.map((career, idx) => (
+                  <Card key={idx}>
+                    <CardContent className="pt-6">
+                      <div className="flex items-start gap-3">
+                        <div className="p-2 rounded-md bg-primary/10">
+                          <Briefcase className="w-5 h-5 text-primary" />
+                        </div>
+                        <div>
+                          <p className="font-medium">{career.careerTitle}</p>
+                          <p className="text-sm text-muted-foreground capitalize">{career.careerCategory}</p>
+                          {career.savedAt && (
+                            <p className="text-xs text-muted-foreground mt-1">
+                              Saved: {new Date(career.savedAt).toLocaleDateString()}
+                            </p>
+                          )}
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            </>
           )}
         </TabsContent>
 
