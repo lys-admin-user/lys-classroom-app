@@ -1,5 +1,6 @@
 import OpenAI from "openai";
 import type { GenerateLessonRequest } from "@shared/schema";
+import { AI_LESSON_RUBRIC_PROMPT } from "@shared/lessonRubric";
 
 const openai = process.env.OPENAI_API_KEY 
   ? new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
@@ -87,6 +88,8 @@ The LYS methodology uses the "Be-Know-Do" framework to develop the whole student
 Create engaging, student-centered lessons that incorporate all three aspects while emphasizing the primary focus.
 The lesson should be warm, encouraging, and focused on student growth.
 Always connect the lesson to real-world applications in the Lesson Close section.
+
+${AI_LESSON_RUBRIC_PROMPT}
 
 IMPORTANT: Respond ONLY with a valid JSON object, no additional text.`;
 

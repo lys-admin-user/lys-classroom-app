@@ -2,6 +2,7 @@ import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { generateLessonPlan } from "./openai";
+import { calculateLessonQualityScore, getQualityLevel } from "./lessonQualityScorer";
 import { parseDocument } from "./documentParser";
 import { 
   generateLessonRequestSchema, 
@@ -4549,6 +4550,39 @@ export async function registerRoutes(
     }
   });
   
+  // Calculate quality score for a lesson
+  app.get("/api/admin/master-lessons/:id/quality-score", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user?.claims?.sub;
+      const isSiteAdminUser = await storage.isSiteAdmin(userId);
+      
+      if (!isSiteAdminUser) {
+        res.status(403).json({ error: "Site admin access required" });
+        return;
+      }
+      
+      const { id } = req.params;
+      const lesson = await storage.getMasterLesson(id);
+      
+      if (!lesson) {
+        res.status(404).json({ error: "Lesson not found" });
+        return;
+      }
+      
+      const qualityResult = calculateLessonQualityScore(lesson);
+      const qualityLevel = getQualityLevel(qualityResult.percentage);
+      
+      res.json({
+        ...qualityResult,
+        qualityLevel,
+        lessonId: id,
+        lessonTitle: lesson.title,
+      });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to calculate quality score" });
+    }
+  });
+  
   // Create master lesson (Lesson Author only)
   app.post("/api/lesson-author/master-lessons", isAuthenticated, async (req: any, res) => {
     try {
@@ -4653,13 +4687,22 @@ export async function registerRoutes(
       const { id } = req.params;
       const { notes } = req.body;
       
-      const lesson = await storage.approveMasterLesson(id, reviewerId, notes);
-      if (!lesson) {
+      const existingLesson = await storage.getMasterLesson(id);
+      if (!existingLesson) {
         res.status(404).json({ error: "Lesson not found" });
         return;
       }
       
-      res.json(lesson);
+      const qualityResult = calculateLessonQualityScore(existingLesson);
+      const computedQualityScore = qualityResult.percentage;
+      
+      const lesson = await storage.approveMasterLesson(id, reviewerId, notes, computedQualityScore);
+      if (!lesson) {
+        res.status(404).json({ error: "Failed to approve lesson" });
+        return;
+      }
+      
+      res.json({ ...lesson, qualityBreakdown: qualityResult });
     } catch (error) {
       res.status(500).json({ error: "Failed to approve lesson" });
     }

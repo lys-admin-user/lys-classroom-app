@@ -15,6 +15,7 @@ import { queryClient } from "@/lib/queryClient";
 import { useState } from "react";
 import { BookOpen, Plus, Edit2, Eye, Clock, Check, X, Send, Trash2, Loader2, GraduationCap, FileText, Save } from "lucide-react";
 import type { SystemLessonAuthor, MasterLesson } from "@shared/schema";
+import { RubricReference, RubricQuickTips } from "@/components/RubricReference";
 
 export default function LessonAuthoringPage() {
   const { user, isLoading: authLoading } = useAuth();
@@ -268,13 +269,15 @@ export default function LessonAuthoringPage() {
               Create master lessons that influence AI-generated content
             </p>
           </div>
-          <Dialog open={isCreateLessonOpen} onOpenChange={setIsCreateLessonOpen}>
-            <DialogTrigger asChild>
-              <Button data-testid="button-create-lesson">
-                <Plus className="h-4 w-4 mr-2" />
-                Create New Lesson
-              </Button>
-            </DialogTrigger>
+          <div className="flex items-center gap-2 flex-wrap">
+            <RubricReference />
+            <Dialog open={isCreateLessonOpen} onOpenChange={setIsCreateLessonOpen}>
+              <DialogTrigger asChild>
+                <Button data-testid="button-create-lesson">
+                  <Plus className="h-4 w-4 mr-2" />
+                  Create New Lesson
+                </Button>
+              </DialogTrigger>
             <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
               <DialogHeader>
                 <DialogTitle>Create Master Lesson</DialogTitle>
@@ -290,8 +293,11 @@ export default function LessonAuthoringPage() {
                 submitLabel="Create Lesson"
               />
             </DialogContent>
-          </Dialog>
+            </Dialog>
+          </div>
         </div>
+
+        <RubricQuickTips />
 
         <Card>
           <CardHeader>

@@ -27,6 +27,7 @@ Preferred communication style: Simple, everyday language.
 
 ### Feature Specifications
 -   **Be-Know-Do Framework**: Integrates self-discovery assessments (BE), career exploration (KNOW), and goal setting with milestones (DO).
+-   **Lesson Plan Rubric System**: Comprehensive rubric with 6 categories (Objectives, Essential Questions, LYS Methodology, Resources, Instructional Input, Lesson Close) and 4 quality levels (Distinguished, Accomplished, Acceptable, Needs Improvement). Located in `shared/lessonRubric.ts`. Rubric reference dialog and quick tips available in Lesson Authoring page. AI lesson generator uses rubric standards. Quality scores calculated server-side during lesson approval.
 -   **Scope & Sequence Builder**: Tool for educators to plan curricula, create from scratch or import with AI unit extraction.
 -   **Self-Discovery Module**: 9-question assessment linking to career exploration.
 -   **Career Exploration**: Detailed career information with saving capabilities.

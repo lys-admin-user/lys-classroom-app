@@ -737,7 +737,7 @@ export interface IStorage {
   createMasterLesson(lesson: InsertMasterLesson): Promise<MasterLesson>;
   updateMasterLesson(id: string, updates: Partial<MasterLesson>): Promise<MasterLesson | undefined>;
   deleteMasterLesson(id: string, authorId: string): Promise<boolean>;
-  approveMasterLesson(id: string, reviewerId: string, notes?: string): Promise<MasterLesson | undefined>;
+  approveMasterLesson(id: string, reviewerId: string, notes?: string, qualityScore?: number): Promise<MasterLesson | undefined>;
   rejectMasterLesson(id: string, reviewerId: string, notes: string): Promise<MasterLesson | undefined>;
   incrementMasterLessonUsage(id: string): Promise<void>;
   
@@ -5865,9 +5865,21 @@ export class DatabaseStorage implements IStorage {
     return true;
   }
   
-  async approveMasterLesson(id: string, reviewerId: string, notes?: string): Promise<MasterLesson | undefined> {
+  async approveMasterLesson(id: string, reviewerId: string, notes?: string, qualityScore?: number): Promise<MasterLesson | undefined> {
+    const updateData: any = { 
+      status: 'approved', 
+      reviewedBy: reviewerId, 
+      reviewedAt: new Date(), 
+      reviewNotes: notes, 
+      updatedAt: new Date() 
+    };
+    
+    if (qualityScore !== undefined) {
+      updateData.qualityScore = qualityScore;
+    }
+    
     const [updated] = await db.update(masterLessons)
-      .set({ status: 'approved', reviewedBy: reviewerId, reviewedAt: new Date(), reviewNotes: notes, updatedAt: new Date() })
+      .set(updateData)
       .where(eq(masterLessons.id, id))
       .returning();
     return updated;
