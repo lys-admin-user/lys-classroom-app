@@ -47,7 +47,7 @@ import { useAuth } from "@/hooks/use-auth";
 import { useTier } from "@/hooks/use-tier";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
-import { AdBanner } from "@/components/AdBanner";
+import { AdSlot, AdSlotSidebar, AdSlotInFeed } from "@/components/ads/AdSlot";
 import type { ParentStudentLink, ParentInvitation, Goal } from "@shared/schema";
 
 type ParentPermissions = {
@@ -1242,7 +1242,15 @@ export default function ParentPortal() {
           </p>
         </div>
         
-        {!isStudent && showAds && <AdBanner position="inline" className="flex-shrink-0" />}
+        {!isStudent && showAds && (
+          <AdSlot 
+            slotId="pp-header" 
+            size="leaderboard" 
+            placement="header" 
+            sponsorCategory="education"
+            className="flex-shrink-0" 
+          />
+        )}
         
         {isStudent && (
           <Dialog open={isInviteDialogOpen} onOpenChange={setIsInviteDialogOpen}>
@@ -1503,6 +1511,17 @@ export default function ParentPortal() {
                 )}
               </CardContent>
             </Card>
+
+            {showAds && (
+              <div className="mt-4">
+                <AdSlot 
+                  slotId="pp-sidebar" 
+                  size="mediumRectangle" 
+                  placement="sidebar"
+                  sponsorCategory="scholarships"
+                />
+              </div>
+            )}
 
             {selectedStudent && studentData && (
               <Card className="mt-4">

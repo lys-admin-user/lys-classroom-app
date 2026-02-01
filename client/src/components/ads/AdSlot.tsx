@@ -189,8 +189,10 @@ export function AdSlot({
     );
   }
 
-  const displayWidth = typeof slotConfig.width === "number" ? `${slotConfig.width}px` : slotConfig.width;
-  const displayHeight = typeof slotConfig.height === "number" ? `${slotConfig.height}px` : slotConfig.height;
+  const width = slotConfig.width;
+  const height = slotConfig.height;
+  const displayWidth = typeof width === "number" ? `${width}px` : width;
+  const displayHeight = typeof height === "number" ? `${height}px` : height;
 
   return (
     <Card 
