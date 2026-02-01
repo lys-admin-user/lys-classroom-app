@@ -84,6 +84,7 @@ Preferred communication style: Simple, everyday language.
 -   **Ad Slot Configuration**: IAB standard sizes (leaderboard, medium rectangle, skyscraper, in-feed, native) in `client/src/lib/adConfig.ts`.
 -   **Ad Components**: `AdSlot`, `AdSlotSidebar`, `AdSlotInFeed`, `AdSlotHeader`, `AdSlotFooter` in `client/src/components/ads/`.
 -   **Tier-Aware Rendering**: Ads only display for free tier users; hidden for Pro/paid tiers and Focus Mode subscribers.
+-   **Grade-Level Restriction**: Students below 8th grade (K-7) never see ads for COPPA/child safety compliance.
 -   **Sponsor Categories**: Education, Career, EdTech, Tutoring, Scholarships, Test Prep with eCPM multipliers.
 -   **Integrated Pages**: Parent Portal with header, sidebar, and in-feed ad slots.
 

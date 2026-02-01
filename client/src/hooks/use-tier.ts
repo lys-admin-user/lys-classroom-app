@@ -1,5 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { useAuth } from "./use-auth";
+import { isGradeBelow8th } from "@/lib/adConfig";
 
 export type UserTier = "free" | "paid" | "campus" | "enterprise";
 
@@ -8,6 +9,7 @@ interface AdSettings {
   contextualOnly: boolean;
   hasSponsoredAccess: boolean;
   focusModeEnabled: boolean;
+  gradeRestricted: boolean;
 }
 
 interface TierData {
@@ -22,6 +24,7 @@ interface TierData {
   adSettings: AdSettings;
   isMinor: boolean;
   hasFocusMode: boolean;
+  gradeLevel: string | null;
 }
 
 function calculateAge(birthdate: Date | string | null): number | null {
@@ -61,12 +64,15 @@ export function useTier(): TierData {
   const age = calculateAge((user as any)?.birthdate || null);
   const isMinor = age !== null && age < 13;
   
+  const gradeLevel = (user as any)?.gradeLevel || (data as any)?.profile?.gradeLevel || null;
+  const isGradeRestricted = isGradeBelow8th(gradeLevel);
+  
   const hasSponsoredAccess = !!data?.sponsoredAccess?.adFreeAccess;
   const sponsoredFocusMode = data?.sponsoredAccess?.focusModeEnabled ?? false;
   
   const hasFocusMode = isPaid || hasSponsoredAccess || sponsoredFocusMode;
   
-  const showAds = isFree && !hasSponsoredAccess;
+  const showAds = isFree && !hasSponsoredAccess && !isGradeRestricted;
   
   const contextualOnly = isMinor;
   
@@ -75,6 +81,7 @@ export function useTier(): TierData {
     contextualOnly,
     hasSponsoredAccess,
     focusModeEnabled: hasFocusMode,
+    gradeRestricted: isGradeRestricted,
   };
 
   const requiresScopeSequence = isPaid;
@@ -91,5 +98,6 @@ export function useTier(): TierData {
     adSettings,
     isMinor,
     hasFocusMode,
+    gradeLevel,
   };
 }

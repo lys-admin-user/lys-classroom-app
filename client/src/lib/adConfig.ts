@@ -82,6 +82,29 @@ export function shouldShowAds(userTier: string | null | undefined): boolean {
   return freeTiers.includes(userTier as any);
 }
 
+const GRADE_ORDER = ["K", "1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12"];
+
+export function isGradeBelow8th(gradeLevel: string | null | undefined): boolean {
+  if (!gradeLevel) return false;
+  
+  const normalizedGrade = gradeLevel.trim().toUpperCase();
+  
+  if (normalizedGrade === "K" || normalizedGrade === "KINDERGARTEN") return true;
+  if (normalizedGrade.includes("PRE-K") || normalizedGrade.includes("PREK")) return true;
+  
+  const gradeNum = parseInt(normalizedGrade.replace(/\D/g, ""), 10);
+  if (!isNaN(gradeNum) && gradeNum < 8) return true;
+  
+  const gradeIndex = GRADE_ORDER.indexOf(normalizedGrade);
+  if (gradeIndex !== -1 && gradeIndex < GRADE_ORDER.indexOf("8")) return true;
+  
+  return false;
+}
+
+export function canShowAdsForGrade(gradeLevel: string | null | undefined): boolean {
+  return !isGradeBelow8th(gradeLevel);
+}
+
 export function getAdFrequency(pageViews: number): number {
   if (pageViews < 10) return 1;
   if (pageViews < 20) return 2;
