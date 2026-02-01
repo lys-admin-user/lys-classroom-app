@@ -46,8 +46,9 @@ import TransferApprovals from "@/pages/TransferApprovals";
 import Gradebook from "@/pages/Gradebook";
 import LessonAuthoring from "@/pages/LessonAuthoring";
 import NotFound from "@/pages/not-found";
+import { EmbedRouter } from "@/pages/EmbedRouter";
 
-const EXEMPT_PATHS = ["/onboarding", "/pricing", "/shared", "/p/"];
+const EXEMPT_PATHS = ["/onboarding", "/pricing", "/shared", "/p/", "/embed/"];
 const MAX_ONBOARDING_SKIPS = 3;
 const SESSION_TRACKED_KEY = "lys_onboarding_session_tracked";
 
@@ -94,6 +95,9 @@ function OnboardingGuard({ children }: { children: React.ReactNode }) {
 function Router() {
   return (
     <Switch>
+      {/* Embed routes - handled separately without main layout */}
+      <Route path="/embed/:rest*" component={EmbedRouter} />
+      
       <Route path="/" component={Dashboard} />
       <Route path="/lesson-generator" component={LessonGenerator} />
       <Route path="/assessments" component={Assessments} />

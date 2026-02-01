@@ -8583,10 +8583,10 @@ export async function registerRoutes(
   app.get("/api/integrations/wordpress/embed-code", async (req, res) => {
     try {
       const type = req.query.type as string || 'lesson-generator';
-      const validTypes = ['lesson-generator', 'career-explorer', 'self-discovery', 'pricing'];
+      const validTypes = Object.keys(wordpressService.EMBED_PATHS);
       
       if (!validTypes.includes(type)) {
-        res.status(400).json({ error: "Invalid embed type" });
+        res.status(400).json({ error: "Invalid embed type", validTypes });
         return;
       }
 
@@ -8595,13 +8595,53 @@ export async function registerRoutes(
         width: req.query.width as string,
         height: req.query.height as string,
         locale: req.query.locale as string,
+        initialPath: req.query.initialPath as string,
       };
 
-      const embedCode = wordpressService.generateEmbedCode(type as any, options);
-      res.json({ embedCode, type, options });
+      const embedCode = wordpressService.generateEmbedCode(type as wordpressService.EmbedType, options);
+      res.json({ embedCode, type, options, availableTypes: validTypes });
     } catch (error) {
       console.error("Failed to generate embed code:", error);
       res.status(500).json({ error: "Failed to generate embed code" });
+    }
+  });
+
+  app.get("/api/integrations/wordpress/plugin", async (req, res) => {
+    try {
+      const fs = await import('fs');
+      const path = await import('path');
+      const pluginPath = path.join(process.cwd(), 'public', 'lys-wordpress-plugin.php');
+      
+      if (!fs.existsSync(pluginPath)) {
+        res.status(404).json({ error: "WordPress plugin not found" });
+        return;
+      }
+      
+      res.setHeader('Content-Type', 'application/octet-stream');
+      res.setHeader('Content-Disposition', 'attachment; filename="lys-platform.php"');
+      res.sendFile(pluginPath);
+    } catch (error) {
+      console.error("Failed to download WordPress plugin:", error);
+      res.status(500).json({ error: "Failed to download WordPress plugin" });
+    }
+  });
+
+  app.get("/api/integrations/wordpress/embed-types", async (req, res) => {
+    try {
+      res.json({ 
+        embedTypes: wordpressService.EMBED_PATHS,
+        categories: {
+          educators: ['lesson-generator', 'dashboard', 'gradebook', 'classroom', 'assignments', 'my-lessons', 'scope-sequence', 'resource-library', 'analytics', 'professional-development', 'educator-influence'],
+          students: ['career-explorer', 'self-discovery', 'my-journey', 'milestones', 'action-plans', 'portfolio'],
+          parents: ['parent-portal'],
+          admins: ['admin', 'lesson-authoring'],
+          utility: ['pricing', 'assessments'],
+          fullSite: ['full-site']
+        }
+      });
+    } catch (error) {
+      console.error("Failed to get embed types:", error);
+      res.status(500).json({ error: "Failed to get embed types" });
     }
   });
 

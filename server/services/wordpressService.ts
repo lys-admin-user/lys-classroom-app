@@ -35,41 +35,89 @@ export interface WordPressUser {
   roles: string[];
 }
 
-export function generateEmbedCode(type: 'lesson-generator' | 'career-explorer' | 'self-discovery' | 'pricing', options?: {
+export type EmbedType = 
+  | 'lesson-generator' | 'career-explorer' | 'self-discovery' | 'pricing'
+  | 'dashboard' | 'gradebook' | 'portfolio' | 'parent-portal' | 'my-journey'
+  | 'milestones' | 'action-plans' | 'assessments' | 'resource-library'
+  | 'scope-sequence' | 'classroom' | 'assignments' | 'my-lessons' | 'analytics'
+  | 'educator-influence' | 'professional-development' | 'lesson-authoring' | 'admin'
+  | 'full-site';
+
+export const EMBED_PATHS: Record<EmbedType, string> = {
+  'lesson-generator': '/embed/lesson-generator',
+  'career-explorer': '/embed/careers',
+  'self-discovery': '/embed/self-discovery',
+  'pricing': '/embed/pricing',
+  'dashboard': '/embed/dashboard',
+  'gradebook': '/embed/gradebook',
+  'portfolio': '/embed/portfolio',
+  'parent-portal': '/embed/parent-portal',
+  'my-journey': '/embed/my-journey',
+  'milestones': '/embed/milestones',
+  'action-plans': '/embed/action-plans',
+  'assessments': '/embed/assessments',
+  'resource-library': '/embed/resource-library',
+  'scope-sequence': '/embed/scope-sequence',
+  'classroom': '/embed/classroom',
+  'assignments': '/embed/assignments',
+  'my-lessons': '/embed/my-lessons',
+  'analytics': '/embed/analytics',
+  'educator-influence': '/embed/educator-influence',
+  'professional-development': '/embed/professional-development',
+  'lesson-authoring': '/embed/lesson-authoring',
+  'admin': '/embed/admin',
+  'full-site': '/embed/full',
+};
+
+export function generateEmbedCode(type: EmbedType, options?: {
   theme?: 'light' | 'dark';
   width?: string;
   height?: string;
   locale?: string;
+  initialPath?: string;
 }): string {
   const baseUrl = process.env.REPLIT_DEV_DOMAIN 
     ? `https://${process.env.REPLIT_DEV_DOMAIN}`
     : 'https://lys.ladderingyoursuccess.com';
   
-  const embedPaths: Record<string, string> = {
-    'lesson-generator': '/embed/lesson-generator',
-    'career-explorer': '/embed/careers',
-    'self-discovery': '/embed/self-discovery',
-    'pricing': '/embed/pricing',
-  };
+  const embedPaths = EMBED_PATHS;
   
   const params = new URLSearchParams();
   if (options?.theme) params.set('theme', options.theme);
   if (options?.locale) params.set('locale', options.locale);
   
-  const embedUrl = `${baseUrl}${embedPaths[type]}?${params.toString()}`;
+  let embedPath = embedPaths[type] || '/embed/dashboard';
+  if (type === 'full-site' && options?.initialPath) {
+    embedPath = `/embed/full${options.initialPath}`;
+  }
+  
+  const embedUrl = `${baseUrl}${embedPath}?${params.toString()}`;
   const width = options?.width || '100%';
-  const height = options?.height || '600px';
+  const height = type === 'full-site' ? (options?.height || '100vh') : (options?.height || '600px');
+  
+  const iframeId = `lys-embed-${type}-${Date.now()}`;
   
   return `<!-- LYS ${type} Embed -->
 <iframe 
+  id="${iframeId}"
   src="${embedUrl}" 
   width="${width}" 
   height="${height}" 
   frameborder="0" 
-  allow="clipboard-write"
-  style="border: none; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.1);"
+  allow="clipboard-write; fullscreen"
+  style="border: none; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.1);${type === 'full-site' ? ' min-height: 100vh;' : ''}"
   title="LYS ${type}"
 ></iframe>
+<script>
+(function() {
+  var iframe = document.getElementById('${iframeId}');
+  window.addEventListener('message', function(event) {
+    if (event.data && event.data.type === 'lys-resize' && event.source === iframe.contentWindow) {
+      iframe.style.height = event.data.height + 'px';
+    }
+  });
+})();
+</script>
 <!-- End LYS Embed -->`;
 }
 
@@ -77,66 +125,44 @@ export function generateShortcodeInstructions(): string {
   return `
 ## WordPress Shortcode Integration
 
-Add the following shortcodes to your WordPress posts or pages:
+LYS provides shortcodes for embedding individual features OR the complete platform.
 
-### Lesson Generator
-\`[lys_lesson_generator theme="light" height="700px"]\`
+### Full Platform Embed (Recommended)
+\`[lys_platform theme="light" height="100vh"]\`
 
-### Career Explorer  
-\`[lys_career_explorer theme="light" height="800px"]\`
+### Individual Feature Embeds
 
-### Self-Discovery Assessment
-\`[lys_self_discovery theme="light" height="600px"]\`
+#### For Educators
+- \`[lys_lesson_generator theme="light" height="700px"]\` - AI Lesson Generator
+- \`[lys_dashboard theme="light" height="800px"]\` - Educator Dashboard
+- \`[lys_gradebook theme="light" height="800px"]\` - Student Gradebook
+- \`[lys_classroom theme="light" height="700px"]\` - Class Management
+- \`[lys_assignments theme="light" height="700px"]\` - Assignment Manager
+- \`[lys_my_lessons theme="light" height="700px"]\` - Saved Lessons
+- \`[lys_scope_sequence theme="light" height="800px"]\` - Curriculum Planning
+- \`[lys_resource_library theme="light" height="700px"]\` - Shared Resources
+- \`[lys_analytics theme="light" height="700px"]\` - Performance Analytics
+- \`[lys_professional_development theme="light" height="700px"]\` - PD Tracking
+- \`[lys_educator_influence theme="light" height="600px"]\` - Referral Program
 
-### Pricing Calculator (with CAI)
-\`[lys_pricing theme="light" height="500px"]\`
+#### For Students
+- \`[lys_career_explorer theme="light" height="800px"]\` - Career Exploration
+- \`[lys_self_discovery theme="light" height="600px"]\` - Self-Discovery Assessment
+- \`[lys_my_journey theme="light" height="700px"]\` - Be-Know-Do Journey
+- \`[lys_milestones theme="light" height="600px"]\` - Goal Milestones
+- \`[lys_action_plans theme="light" height="700px"]\` - Action Planning
+- \`[lys_portfolio theme="light" height="800px"]\` - Digital Portfolio
 
-## WordPress Plugin Code
+#### For Parents
+- \`[lys_parent_portal theme="light" height="800px"]\` - Parent Dashboard
 
-Add this to your theme's functions.php or create a custom plugin:
+#### For Admins
+- \`[lys_admin theme="light" height="900px"]\` - Site Administration
+- \`[lys_lesson_authoring theme="light" height="800px"]\` - Master Lesson Library
 
-\`\`\`php
-<?php
-/**
- * LYS Platform Integration for WordPress
- */
-
-function lys_embed_shortcode($atts, $content, $tag) {
-    $defaults = array(
-        'theme' => 'light',
-        'width' => '100%',
-        'height' => '600px',
-        'locale' => 'en'
-    );
-    
-    $atts = shortcode_atts($defaults, $atts, $tag);
-    
-    $base_url = 'https://lys.ladderingyoursuccess.com';
-    
-    $embed_paths = array(
-        'lys_lesson_generator' => '/embed/lesson-generator',
-        'lys_career_explorer' => '/embed/careers',
-        'lys_self_discovery' => '/embed/self-discovery',
-        'lys_pricing' => '/embed/pricing'
-    );
-    
-    $path = isset($embed_paths[$tag]) ? $embed_paths[$tag] : '/embed/lesson-generator';
-    $url = $base_url . $path . '?theme=' . esc_attr($atts['theme']) . '&locale=' . esc_attr($atts['locale']);
-    
-    return sprintf(
-        '<iframe src="%s" width="%s" height="%s" frameborder="0" allow="clipboard-write" style="border: none; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.1);" title="LYS %s"></iframe>',
-        esc_url($url),
-        esc_attr($atts['width']),
-        esc_attr($atts['height']),
-        esc_attr(str_replace('lys_', '', $tag))
-    );
-}
-
-add_shortcode('lys_lesson_generator', 'lys_embed_shortcode');
-add_shortcode('lys_career_explorer', 'lys_embed_shortcode');
-add_shortcode('lys_self_discovery', 'lys_embed_shortcode');
-add_shortcode('lys_pricing', 'lys_embed_shortcode');
-\`\`\`
+#### Utility
+- \`[lys_pricing theme="light" height="500px"]\` - Pricing Calculator
+- \`[lys_assessments theme="light" height="700px"]\` - Assessments
 `;
 }
 

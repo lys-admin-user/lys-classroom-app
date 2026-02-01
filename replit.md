@@ -86,8 +86,13 @@ Preferred communication style: Simple, everyday language.
 -   **Connection**: Uses Replit's HubSpot connector.
 -   **Capabilities**: Create/update contacts, companies, deals, and sync users.
 
-### WordPress Integration
+### WordPress Integration (Full Site Hosting)
 -   **Methods**: Iframe Embeds, Shortcodes, oEmbed, REST API.
+-   **Full Site Embed**: Host the complete LYS platform in WordPress using `[lys_platform]` shortcode.
+-   **Individual Widgets**: 22+ embeddable features (lesson generator, gradebook, portfolios, parent portal, etc.).
+-   **WordPress Plugin**: Downloadable from `/api/integrations/wordpress/plugin` - includes all shortcodes, admin settings, theme sync, and auto-resize.
+-   **Embed Routes**: All pages available at `/embed/{feature}` (e.g., `/embed/gradebook`, `/embed/parent-portal`).
+-   **Theme Sync**: WordPress dark/light mode communicates with embedded LYS via postMessage.
 -   **Features**: Sync lesson plans to WordPress as draft posts, embed LYS widgets.
 
 ### SIS (Student Information System) Integration
