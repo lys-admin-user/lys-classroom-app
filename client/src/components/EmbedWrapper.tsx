@@ -21,7 +21,7 @@ export function EmbedWrapper({ children }: EmbedWrapperProps) {
       document.documentElement.classList.remove('dark');
     }
 
-    window.addEventListener('message', (event) => {
+    function handleMessage(event: MessageEvent) {
       if (event.data?.type === 'lys-theme-change') {
         const newTheme = event.data.theme;
         setTheme(newTheme);
@@ -31,11 +31,15 @@ export function EmbedWrapper({ children }: EmbedWrapperProps) {
           document.documentElement.classList.remove('dark');
         }
       }
-    });
+    }
+
+    window.addEventListener('message', handleMessage);
 
     if (window.parent !== window) {
       window.parent.postMessage({ type: 'lys-embed-ready', embedType: 'full' }, '*');
     }
+
+    return () => window.removeEventListener('message', handleMessage);
   }, []);
 
   return (
@@ -68,9 +72,6 @@ export function FullSiteEmbed({ children }: { children: React.ReactNode }) {
       setSidebarCollapsed(true);
     }
 
-    window.addEventListener('message', handleMessage);
-    return () => window.removeEventListener('message', handleMessage);
-    
     function handleMessage(event: MessageEvent) {
       if (event.data?.type === 'lys-theme-change') {
         setTheme(event.data.theme);
@@ -83,10 +84,10 @@ export function FullSiteEmbed({ children }: { children: React.ReactNode }) {
       if (event.data?.type === 'lys-sidebar-toggle') {
         setSidebarCollapsed(prev => !prev);
       }
-      if (event.data?.type === 'lys-navigate') {
-        window.location.hash = event.data.path;
-      }
     }
+
+    window.addEventListener('message', handleMessage);
+    return () => window.removeEventListener('message', handleMessage);
   }, []);
 
   useEffect(() => {

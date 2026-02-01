@@ -1,9 +1,8 @@
 import { Switch, Route, useLocation } from "wouter";
 import { useEffect } from "react";
 import { EmbedWrapper, FullSiteEmbed } from "@/components/EmbedWrapper";
-import { SidebarProvider, SidebarInset } from "@/components/ui/sidebar";
-import { AppSidebar } from "@/components/AppSidebar";
-import { Header } from "@/components/Header";
+import { SidebarProvider, SidebarInset, SidebarTrigger } from "@/components/ui/sidebar";
+import { EmbedSidebar } from "@/components/EmbedSidebar";
 
 import Dashboard from "@/pages/Dashboard";
 import LessonGenerator from "@/pages/LessonGenerator";
@@ -53,13 +52,26 @@ function EmbedPage({ component: Component }: { component: React.ComponentType })
 }
 
 function FullSiteEmbedContent() {
-  const [location] = useLocation();
+  const [location, setLocation] = useLocation();
   
   useEffect(() => {
     if (window.parent !== window) {
       window.parent.postMessage({ type: 'lys-route-change', path: location }, '*');
     }
   }, [location]);
+
+  useEffect(() => {
+    function handleMessage(event: MessageEvent) {
+      if (event.data?.type === 'lys-navigate' && event.data.path) {
+        const embedPath = event.data.path.startsWith('/embed/full') 
+          ? event.data.path 
+          : `/embed/full${event.data.path}`;
+        setLocation(embedPath);
+      }
+    }
+    window.addEventListener('message', handleMessage);
+    return () => window.removeEventListener('message', handleMessage);
+  }, [setLocation]);
 
   const sidebarStyle = {
     "--sidebar-width": "14rem",
@@ -70,9 +82,12 @@ function FullSiteEmbedContent() {
     <FullSiteEmbed>
       <SidebarProvider style={sidebarStyle as React.CSSProperties}>
         <div className="flex min-h-screen w-full">
-          <AppSidebar />
+          <EmbedSidebar />
           <SidebarInset className="flex flex-col flex-1">
-            <Header />
+            <header className="flex h-12 items-center gap-2 border-b px-4 bg-background">
+              <SidebarTrigger data-testid="button-embed-sidebar-toggle" />
+              <span className="font-heading text-sm font-medium">LYS Educational Platform</span>
+            </header>
             <main className="flex-1 overflow-auto">
               <Switch>
                 <Route path="/embed/full" component={Dashboard} />
