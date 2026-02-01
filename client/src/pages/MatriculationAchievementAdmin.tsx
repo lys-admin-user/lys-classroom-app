@@ -1,8 +1,10 @@
 import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
+import { useAuth } from "@/hooks/use-auth";
 import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
+import { Loader2, ShieldOff } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -253,11 +255,19 @@ function AchievementForm({
 }
 
 export default function MatriculationAchievementAdmin() {
+  const { user, isLoading: authLoading } = useAuth();
   const { toast } = useToast();
   const [activeTab, setActiveTab] = useState("overview");
   const [showAchievementDialog, setShowAchievementDialog] = useState(false);
   const [editingAchievement, setEditingAchievement] = useState<SystemAchievement | undefined>();
   const [selectedYear, setSelectedYear] = useState("");
+
+  const { data: adminCheck, isLoading: checkLoading } = useQuery<{ isSiteAdmin: boolean }>({
+    queryKey: ["/api/admin/check"],
+    enabled: !!user,
+  });
+
+  const isAdmin = adminCheck?.isSiteAdmin;
 
   const { data: matriculationStats, isLoading: matriculationLoading } = useQuery<MatriculationStats>({
     queryKey: ["/api/admin/matriculation/stats", selectedYear],
@@ -267,6 +277,7 @@ export default function MatriculationAchievementAdmin() {
       if (!res.ok) throw new Error("Failed to fetch matriculation stats");
       return res.json();
     },
+    enabled: isAdmin,
   });
 
   const { data: achievementStats, isLoading: achievementLoading } = useQuery<AchievementStats>({
@@ -277,10 +288,12 @@ export default function MatriculationAchievementAdmin() {
       if (!res.ok) throw new Error("Failed to fetch achievement stats");
       return res.json();
     },
+    enabled: isAdmin,
   });
 
   const { data: achievements = [], isLoading: achievementsLoading } = useQuery<SystemAchievement[]>({
     queryKey: ["/api/achievements"],
+    enabled: isAdmin,
   });
 
   const createAchievementMutation = useMutation({
@@ -326,6 +339,24 @@ export default function MatriculationAchievementAdmin() {
       toast({ title: "Failed to delete achievement", variant: "destructive" });
     },
   });
+
+  if (authLoading || checkLoading) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <Loader2 className="w-8 h-8 animate-spin" />
+      </div>
+    );
+  }
+
+  if (!isAdmin) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-screen gap-4">
+        <ShieldOff className="w-16 h-16 text-muted-foreground" />
+        <h1 className="text-2xl font-bold">Access Denied</h1>
+        <p className="text-muted-foreground">You need system or site admin privileges to access this page.</p>
+      </div>
+    );
+  }
 
   const handleEditAchievement = (achievement: SystemAchievement) => {
     setEditingAchievement(achievement);
