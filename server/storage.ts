@@ -76,6 +76,15 @@ import {
   type InsertResourceLike,
   type KnowResource,
   type InsertKnowResource,
+  type StudentMatriculationHistory,
+  type InsertStudentMatriculationHistory,
+  type SystemAchievement,
+  type InsertSystemAchievement,
+  type StudentAchievement,
+  type InsertStudentAchievement,
+  studentMatriculationHistory,
+  systemAchievements,
+  studentAchievements,
   type SessionEditHistory,
   type InsertSessionEditHistory,
   type Organization,
@@ -746,6 +755,37 @@ export interface IStorage {
   getLessonBulkImport(id: string): Promise<LessonBulkImport | undefined>;
   createLessonBulkImport(importRecord: InsertLessonBulkImport): Promise<LessonBulkImport>;
   updateLessonBulkImport(id: string, updates: Partial<LessonBulkImport>): Promise<LessonBulkImport | undefined>;
+  
+  // KNOW Resources (Admin-managed educational resources)
+  getKnowResources(filters?: { resourceType?: string; category?: string; isActive?: boolean; featured?: boolean }): Promise<KnowResource[]>;
+  getKnowResource(id: string): Promise<KnowResource | undefined>;
+  createKnowResource(resource: InsertKnowResource): Promise<KnowResource>;
+  updateKnowResource(id: string, updates: Partial<KnowResource>, userId: string): Promise<KnowResource | undefined>;
+  deleteKnowResource(id: string): Promise<boolean>;
+  
+  // Student Matriculation History (System-Level Tracking)
+  getStudentMatriculationHistory(studentId: string): Promise<StudentMatriculationHistory[]>;
+  getStudentMatriculationEvent(id: string): Promise<StudentMatriculationHistory | undefined>;
+  createMatriculationEvent(event: InsertStudentMatriculationHistory): Promise<StudentMatriculationHistory>;
+  getMatriculationEventsByOrg(organizationId: string): Promise<StudentMatriculationHistory[]>;
+  getMatriculationEventsByType(eventType: string): Promise<StudentMatriculationHistory[]>;
+  getMatriculationStats(filters?: { organizationId?: string; academicYear?: string }): Promise<MatriculationStats>;
+  
+  // System Achievements (Definitions)
+  getSystemAchievements(filters?: { category?: string; isActive?: boolean; isSystemWide?: boolean }): Promise<SystemAchievement[]>;
+  getSystemAchievement(id: string): Promise<SystemAchievement | undefined>;
+  createSystemAchievement(achievement: InsertSystemAchievement): Promise<SystemAchievement>;
+  updateSystemAchievement(id: string, updates: Partial<SystemAchievement>): Promise<SystemAchievement | undefined>;
+  deleteSystemAchievement(id: string): Promise<boolean>;
+  
+  // Student Achievements (Earned)
+  getStudentAchievements(studentId: string): Promise<StudentAchievement[]>;
+  getStudentAchievement(id: string): Promise<StudentAchievement | undefined>;
+  awardAchievement(achievement: InsertStudentAchievement): Promise<StudentAchievement>;
+  verifyAchievement(id: string, verifiedBy: string): Promise<StudentAchievement | undefined>;
+  revokeAchievement(id: string, reason: string): Promise<StudentAchievement | undefined>;
+  getAchievementsByOrg(organizationId: string): Promise<StudentAchievement[]>;
+  getAchievementStats(filters?: { organizationId?: string; academicYear?: string }): Promise<AchievementStats>;
 }
 
 // Performance Analytics Types
@@ -815,6 +855,29 @@ export type SystemWideStats = {
   avgOverallScore: number;
   topPerformingEducators: EducatorPerformanceMetric[];
   topPerformingCampuses: CampusPerformanceMetric[];
+};
+
+// Matriculation Stats Type
+export type MatriculationStats = {
+  totalEnrollments: number;
+  totalGraduations: number;
+  totalTransfersIn: number;
+  totalTransfersOut: number;
+  totalWithdrawals: number;
+  gradePromotions: number;
+  gradeRetentions: number;
+  byGradeLevel: { gradeLevel: string; count: number }[];
+  byAcademicYear: { academicYear: string; enrollments: number; graduations: number }[];
+};
+
+// Achievement Stats Type
+export type AchievementStats = {
+  totalAchievementsAwarded: number;
+  totalStudentsWithAchievements: number;
+  totalPendingVerification: number;
+  byCategory: { category: string; count: number }[];
+  mostAwardedAchievements: { achievementId: string; name: string; count: number }[];
+  recentAwards: { achievementId: string; studentId: string; earnedAt: Date }[];
 };
 
 // Seed data for careers and resources (static content - mutable for BLS sync updates)
@@ -3728,6 +3791,247 @@ export class DatabaseStorage implements IStorage {
   async deleteKnowResource(id: string): Promise<boolean> {
     const result = await db.delete(knowResources).where(eq(knowResources.id, id));
     return true;
+  }
+
+  // Student Matriculation History (System-Level Tracking)
+  async getStudentMatriculationHistory(studentId: string): Promise<StudentMatriculationHistory[]> {
+    return await db.select().from(studentMatriculationHistory)
+      .where(eq(studentMatriculationHistory.studentId, studentId))
+      .orderBy(desc(studentMatriculationHistory.eventDate));
+  }
+
+  async getStudentMatriculationEvent(id: string): Promise<StudentMatriculationHistory | undefined> {
+    const [result] = await db.select().from(studentMatriculationHistory)
+      .where(eq(studentMatriculationHistory.id, id));
+    return result || undefined;
+  }
+
+  async createMatriculationEvent(event: InsertStudentMatriculationHistory): Promise<StudentMatriculationHistory> {
+    const [created] = await db.insert(studentMatriculationHistory)
+      .values(event as any)
+      .returning();
+    return created;
+  }
+
+  async getMatriculationEventsByOrg(organizationId: string): Promise<StudentMatriculationHistory[]> {
+    return await db.select().from(studentMatriculationHistory)
+      .where(eq(studentMatriculationHistory.organizationId, organizationId))
+      .orderBy(desc(studentMatriculationHistory.eventDate));
+  }
+
+  async getMatriculationEventsByType(eventType: string): Promise<StudentMatriculationHistory[]> {
+    return await db.select().from(studentMatriculationHistory)
+      .where(eq(studentMatriculationHistory.eventType, eventType))
+      .orderBy(desc(studentMatriculationHistory.eventDate));
+  }
+
+  async getMatriculationStats(filters?: { organizationId?: string; academicYear?: string }): Promise<MatriculationStats> {
+    let conditions: any[] = [];
+    if (filters?.organizationId) {
+      conditions.push(eq(studentMatriculationHistory.organizationId, filters.organizationId));
+    }
+    if (filters?.academicYear) {
+      conditions.push(eq(studentMatriculationHistory.academicYear, filters.academicYear));
+    }
+
+    const baseQuery = conditions.length > 0 
+      ? db.select().from(studentMatriculationHistory).where(and(...conditions))
+      : db.select().from(studentMatriculationHistory);
+    
+    const events = await baseQuery;
+    
+    const stats: MatriculationStats = {
+      totalEnrollments: events.filter(e => e.eventType === 'enrollment').length,
+      totalGraduations: events.filter(e => e.eventType === 'graduation').length,
+      totalTransfersIn: events.filter(e => e.eventType === 'transfer_in').length,
+      totalTransfersOut: events.filter(e => e.eventType === 'transfer_out').length,
+      totalWithdrawals: events.filter(e => e.eventType === 'withdrawal').length,
+      gradePromotions: events.filter(e => e.eventType === 'grade_promotion').length,
+      gradeRetentions: events.filter(e => e.eventType === 'grade_retention').length,
+      byGradeLevel: [],
+      byAcademicYear: [],
+    };
+
+    // Group by grade level
+    const gradeLevelCounts = new Map<string, number>();
+    events.forEach(e => {
+      const grade = e.newGradeLevel || e.previousGradeLevel || 'Unknown';
+      gradeLevelCounts.set(grade, (gradeLevelCounts.get(grade) || 0) + 1);
+    });
+    stats.byGradeLevel = Array.from(gradeLevelCounts.entries()).map(([gradeLevel, count]) => ({ gradeLevel, count }));
+
+    // Group by academic year
+    const yearStats = new Map<string, { enrollments: number; graduations: number }>();
+    events.forEach(e => {
+      const year = e.academicYear || 'Unknown';
+      if (!yearStats.has(year)) {
+        yearStats.set(year, { enrollments: 0, graduations: 0 });
+      }
+      const ys = yearStats.get(year)!;
+      if (e.eventType === 'enrollment') ys.enrollments++;
+      if (e.eventType === 'graduation') ys.graduations++;
+    });
+    stats.byAcademicYear = Array.from(yearStats.entries()).map(([academicYear, data]) => ({ 
+      academicYear, 
+      enrollments: data.enrollments, 
+      graduations: data.graduations 
+    }));
+
+    return stats;
+  }
+
+  // System Achievements (Definitions)
+  async getSystemAchievements(filters?: { category?: string; isActive?: boolean; isSystemWide?: boolean }): Promise<SystemAchievement[]> {
+    let conditions: any[] = [];
+    if (filters?.category) {
+      conditions.push(eq(systemAchievements.category, filters.category));
+    }
+    if (filters?.isActive !== undefined) {
+      conditions.push(eq(systemAchievements.isActive, filters.isActive));
+    }
+    if (filters?.isSystemWide !== undefined) {
+      conditions.push(eq(systemAchievements.isSystemWide, filters.isSystemWide));
+    }
+
+    if (conditions.length > 0) {
+      return await db.select().from(systemAchievements)
+        .where(and(...conditions))
+        .orderBy(systemAchievements.category, systemAchievements.name);
+    }
+    
+    return await db.select().from(systemAchievements)
+      .orderBy(systemAchievements.category, systemAchievements.name);
+  }
+
+  async getSystemAchievement(id: string): Promise<SystemAchievement | undefined> {
+    const [result] = await db.select().from(systemAchievements)
+      .where(eq(systemAchievements.id, id));
+    return result || undefined;
+  }
+
+  async createSystemAchievement(achievement: InsertSystemAchievement): Promise<SystemAchievement> {
+    const [created] = await db.insert(systemAchievements)
+      .values(achievement as any)
+      .returning();
+    return created;
+  }
+
+  async updateSystemAchievement(id: string, updates: Partial<SystemAchievement>): Promise<SystemAchievement | undefined> {
+    const [updated] = await db.update(systemAchievements)
+      .set({ ...updates, updatedAt: new Date() })
+      .where(eq(systemAchievements.id, id))
+      .returning();
+    return updated || undefined;
+  }
+
+  async deleteSystemAchievement(id: string): Promise<boolean> {
+    await db.delete(systemAchievements).where(eq(systemAchievements.id, id));
+    return true;
+  }
+
+  // Student Achievements (Earned)
+  async getStudentAchievements(studentId: string): Promise<StudentAchievement[]> {
+    return await db.select().from(studentAchievements)
+      .where(eq(studentAchievements.studentId, studentId))
+      .orderBy(desc(studentAchievements.earnedAt));
+  }
+
+  async getStudentAchievement(id: string): Promise<StudentAchievement | undefined> {
+    const [result] = await db.select().from(studentAchievements)
+      .where(eq(studentAchievements.id, id));
+    return result || undefined;
+  }
+
+  async awardAchievement(achievement: InsertStudentAchievement): Promise<StudentAchievement> {
+    const [created] = await db.insert(studentAchievements)
+      .values(achievement as any)
+      .returning();
+    return created;
+  }
+
+  async verifyAchievement(id: string, verifiedBy: string): Promise<StudentAchievement | undefined> {
+    const [updated] = await db.update(studentAchievements)
+      .set({ status: 'verified', verifiedBy, verifiedAt: new Date() })
+      .where(eq(studentAchievements.id, id))
+      .returning();
+    return updated || undefined;
+  }
+
+  async revokeAchievement(id: string, reason: string): Promise<StudentAchievement | undefined> {
+    const [updated] = await db.update(studentAchievements)
+      .set({ status: 'revoked', revokedReason: reason })
+      .where(eq(studentAchievements.id, id))
+      .returning();
+    return updated || undefined;
+  }
+
+  async getAchievementsByOrg(organizationId: string): Promise<StudentAchievement[]> {
+    return await db.select().from(studentAchievements)
+      .where(eq(studentAchievements.organizationId, organizationId))
+      .orderBy(desc(studentAchievements.earnedAt));
+  }
+
+  async getAchievementStats(filters?: { organizationId?: string; academicYear?: string }): Promise<AchievementStats> {
+    let conditions: any[] = [];
+    if (filters?.organizationId) {
+      conditions.push(eq(studentAchievements.organizationId, filters.organizationId));
+    }
+    if (filters?.academicYear) {
+      conditions.push(eq(studentAchievements.academicYear, filters.academicYear));
+    }
+
+    const baseQuery = conditions.length > 0 
+      ? db.select().from(studentAchievements).where(and(...conditions))
+      : db.select().from(studentAchievements);
+    
+    const awards = await baseQuery;
+    const allAchievements = await this.getSystemAchievements();
+    const achievementMap = new Map(allAchievements.map(a => [a.id, a.name]));
+
+    // Calculate stats
+    const uniqueStudents = new Set(awards.map(a => a.studentId));
+    const pendingCount = awards.filter(a => a.status === 'pending').length;
+
+    // Group by category
+    const categoryCountMap = new Map<string, number>();
+    for (const award of awards) {
+      const achievement = allAchievements.find(a => a.id === award.achievementId);
+      const category = achievement?.category || 'unknown';
+      categoryCountMap.set(category, (categoryCountMap.get(category) || 0) + 1);
+    }
+
+    // Most awarded
+    const awardCounts = new Map<string, number>();
+    awards.forEach(a => {
+      awardCounts.set(a.achievementId, (awardCounts.get(a.achievementId) || 0) + 1);
+    });
+    const sortedAwards = Array.from(awardCounts.entries())
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 10)
+      .map(([achievementId, count]) => ({
+        achievementId,
+        name: achievementMap.get(achievementId) || 'Unknown',
+        count
+      }));
+
+    // Recent awards
+    const recentAwards = awards
+      .sort((a, b) => new Date(b.earnedAt!).getTime() - new Date(a.earnedAt!).getTime())
+      .slice(0, 10)
+      .map(a => ({
+        achievementId: a.achievementId,
+        studentId: a.studentId,
+        earnedAt: a.earnedAt!
+      }));
+
+    return {
+      totalAchievementsAwarded: awards.length,
+      totalStudentsWithAchievements: uniqueStudents.size,
+      totalPendingVerification: pendingCount,
+      byCategory: Array.from(categoryCountMap.entries()).map(([category, count]) => ({ category, count })),
+      mostAwardedAchievements: sortedAwards,
+      recentAwards
+    };
   }
 
   // Session Edit History
