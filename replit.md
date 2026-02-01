@@ -79,6 +79,14 @@ Preferred communication style: Simple, everyday language.
 -   **Demo Mode**: Simulation of tier upgrades.
 -   **Future**: Stripe integration via Replit's Stripe connector.
 
+### Ad Monetization (Free Tier)
+-   **Revenue Model**: EdTech eCPM range of $8-$15 (average $12), with 40 page views/month and 2 ads/screen = ~$0.96/user/month.
+-   **Ad Slot Configuration**: IAB standard sizes (leaderboard, medium rectangle, skyscraper, in-feed, native) in `client/src/lib/adConfig.ts`.
+-   **Ad Components**: `AdSlot`, `AdSlotSidebar`, `AdSlotInFeed`, `AdSlotHeader`, `AdSlotFooter` in `client/src/components/ads/`.
+-   **Tier-Aware Rendering**: Ads only display for free tier users; hidden for Pro/paid tiers and Focus Mode subscribers.
+-   **Sponsor Categories**: Education, Career, EdTech, Tutoring, Scholarships, Test Prep with eCPM multipliers.
+-   **Integrated Pages**: Parent Portal with header, sidebar, and in-feed ad slots.
+
 ### Country Affordability Index (CAI) Global Pricing
 -   **Purpose**: Equitable, cross-border pricing based on local purchasing power using GDP per Capita, Monthly Income, Healthcare Spend, and Cost-of-Living Index.
 -   **Formula**: `Adjusted Price = Global Reference Price × (CAI Score + LCSI Adjustment)`.
