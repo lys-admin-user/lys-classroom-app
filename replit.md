@@ -41,6 +41,7 @@ Preferred communication style: Simple, everyday language.
 -   **Career Alignment**: Classes can be mapped to career fields (STEM, Healthcare, Business, etc.). Gradebook shows career readiness scores based on academic performance. Parent Portal displays career readiness insights alongside saved careers.
 -   **Parent Portal**: Free tier with ad support for parents. Parents can search for students by school and student ID to request connections. Educators approve/reject connection requests. Features student progress tracking, Be-Know-Do journey visualization, and career readiness insights. Available at `/parent-portal`.
 -   **System Admin Performance Analytics**: Dashboard for tracking educator, campus, and organization performance based on goal completion, standards coverage, and student Be-Know-Do progress. Available at `/site-admin` under the Performance tab.
+-   **KNOW Resources Management**: Admin-managed curated educational content (books, ebooks, YouTube channels, podcasts, WhatsApp channels) for the KNOW pillar. Site/system/campus admins can create, edit, and manage resources with categories, target audiences (students, educators, parents), career field alignment, and featured status. Public API for students/educators to browse active resources. Available at `/admin/know-resources`.
 
 ### Global Architecture
 -   **Educational Hierarchy**: Structured organization of students and classes (Country > State/Jurisdiction > District > School/Campus > Class > Student) with validation.

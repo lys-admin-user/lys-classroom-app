@@ -1542,6 +1542,60 @@ export const insertResourceLikeSchema = createInsertSchema(resourceLikes).omit({
 export type InsertResourceLike = z.infer<typeof insertResourceLikeSchema>;
 export type ResourceLike = typeof resourceLikes.$inferSelect;
 
+// KNOW Resources Table - Admin-managed educational resources for career exploration
+export const KNOW_RESOURCE_TYPES = ["book", "ebook", "youtube_channel", "podcast", "whatsapp_channel", "website", "course"] as const;
+export type KnowResourceType = typeof KNOW_RESOURCE_TYPES[number];
+
+export const knowResources = pgTable("know_resources", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  title: text("title").notNull(),
+  description: text("description"),
+  resourceType: text("resource_type").notNull().$type<KnowResourceType>(),
+  category: text("category"), // career field: STEM, Healthcare, Business, Arts, etc.
+  
+  // Common fields
+  url: text("url"),
+  imageUrl: text("image_url"),
+  author: text("author"),
+  
+  // Book/Ebook specific
+  isbn: text("isbn"),
+  publisher: text("publisher"),
+  publishYear: integer("publish_year"),
+  
+  // YouTube specific
+  channelId: text("channel_id"),
+  subscriberCount: text("subscriber_count"),
+  
+  // Podcast specific
+  rssFeedUrl: text("rss_feed_url"),
+  podcastHost: text("podcast_host"),
+  episodeCount: integer("episode_count"),
+  
+  // WhatsApp specific
+  whatsappLink: text("whatsapp_link"),
+  
+  // Metadata
+  tags: jsonb("tags").$type<string[]>().default([]),
+  targetAudience: jsonb("target_audience").$type<string[]>().default([]), // students, educators, parents
+  careerFields: jsonb("career_fields").$type<string[]>().default([]), // aligned career fields
+  featured: boolean("featured").default(false),
+  sortOrder: integer("sort_order").default(0),
+  isActive: boolean("is_active").default(true),
+  
+  // Admin tracking
+  createdBy: varchar("created_by").notNull(),
+  updatedBy: varchar("updated_by"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertKnowResourceSchema = createInsertSchema(knowResources).omit({ 
+  id: true, createdAt: true, updatedAt: true 
+});
+export type InsertKnowResource = z.infer<typeof insertKnowResourceSchema>;
+export type KnowResource = typeof knowResources.$inferSelect;
+
 // Session Edit History (for tracking collaborative changes)
 export const sessionEditHistory = pgTable("session_edit_history", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),

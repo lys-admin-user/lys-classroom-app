@@ -74,6 +74,8 @@ import {
   type InsertSharedResource,
   type ResourceLike,
   type InsertResourceLike,
+  type KnowResource,
+  type InsertKnowResource,
   type SessionEditHistory,
   type InsertSessionEditHistory,
   type Organization,
@@ -131,6 +133,7 @@ import {
   collaborationMessages,
   sharedResources,
   resourceLikes,
+  knowResources,
   sessionEditHistory,
   organizations,
   organizationMemberships,
@@ -3667,6 +3670,64 @@ export class DatabaseStorage implements IStorage {
         .where(eq(sharedResources.id, resourceId));
       return true;
     }
+  }
+
+  // KNOW Resources (Admin-managed educational resources)
+  async getKnowResources(filters?: { 
+    resourceType?: string; 
+    category?: string; 
+    isActive?: boolean;
+    featured?: boolean;
+  }): Promise<KnowResource[]> {
+    let conditions = [];
+    
+    if (filters?.isActive !== undefined) {
+      conditions.push(eq(knowResources.isActive, filters.isActive));
+    }
+    if (filters?.featured !== undefined) {
+      conditions.push(eq(knowResources.featured, filters.featured));
+    }
+    if (filters?.resourceType) {
+      conditions.push(eq(knowResources.resourceType, filters.resourceType));
+    }
+    if (filters?.category) {
+      conditions.push(eq(knowResources.category, filters.category));
+    }
+    
+    if (conditions.length > 0) {
+      return await db.select().from(knowResources)
+        .where(and(...conditions))
+        .orderBy(knowResources.sortOrder, desc(knowResources.createdAt));
+    }
+    
+    return await db.select().from(knowResources)
+      .orderBy(knowResources.sortOrder, desc(knowResources.createdAt));
+  }
+
+  async getKnowResource(id: string): Promise<KnowResource | undefined> {
+    const [result] = await db.select().from(knowResources)
+      .where(eq(knowResources.id, id));
+    return result || undefined;
+  }
+
+  async createKnowResource(resource: InsertKnowResource): Promise<KnowResource> {
+    const [created] = await db.insert(knowResources)
+      .values(resource as any)
+      .returning();
+    return created;
+  }
+
+  async updateKnowResource(id: string, updates: Partial<KnowResource>, userId: string): Promise<KnowResource | undefined> {
+    const [updated] = await db.update(knowResources)
+      .set({ ...updates, updatedBy: userId, updatedAt: new Date() })
+      .where(eq(knowResources.id, id))
+      .returning();
+    return updated || undefined;
+  }
+
+  async deleteKnowResource(id: string): Promise<boolean> {
+    const result = await db.delete(knowResources).where(eq(knowResources.id, id));
+    return true;
   }
 
   // Session Edit History

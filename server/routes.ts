@@ -8,6 +8,7 @@ import {
   insertScopeSequenceSchema, 
   insertSequenceUnitSchema, 
   insertScopeChangeRequestSchema, 
+  insertKnowResourceSchema,
   users, 
   insertFeatureFlagSchema, 
   insertEmailTemplateSchema, 
@@ -2881,6 +2882,147 @@ export async function registerRoutes(
       res.json({ success: true });
     } catch (error) {
       res.status(500).json({ error: "Failed to track download" });
+    }
+  });
+
+  // ================================
+  // KNOW Resources Routes (Admin-managed educational resources)
+  // ================================
+
+  // Get all KNOW resources (public - for students/educators)
+  app.get("/api/know-resources", async (req, res) => {
+    try {
+      const { type, category, featured } = req.query;
+      const resources = await storage.getKnowResources({
+        resourceType: type as string,
+        category: category as string,
+        isActive: true,
+        featured: featured === "true" ? true : undefined,
+      });
+      res.json(resources);
+    } catch (error) {
+      console.error("Failed to fetch KNOW resources:", error);
+      res.status(500).json({ error: "Failed to fetch resources" });
+    }
+  });
+
+  // Get all KNOW resources for admin (includes inactive)
+  app.get("/api/admin/know-resources", isAuthenticated, async (req: any, res) => {
+    try {
+      const user = req.user;
+      const role = user?.role || user?.claims?.role;
+      
+      if (!["site_admin", "system_admin", "campus_admin"].includes(role)) {
+        res.status(403).json({ error: "Admin access required" });
+        return;
+      }
+      
+      const { type, category } = req.query;
+      const resources = await storage.getKnowResources({
+        resourceType: type as string,
+        category: category as string,
+      });
+      res.json(resources);
+    } catch (error) {
+      console.error("Failed to fetch admin KNOW resources:", error);
+      res.status(500).json({ error: "Failed to fetch resources" });
+    }
+  });
+
+  // Get single KNOW resource (public - only returns active resources)
+  app.get("/api/know-resources/:id", async (req, res) => {
+    try {
+      const { id } = req.params;
+      const resource = await storage.getKnowResource(id);
+      if (!resource || !resource.isActive) {
+        res.status(404).json({ error: "Resource not found" });
+        return;
+      }
+      res.json(resource);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch resource" });
+    }
+  });
+
+  // Create KNOW resource (admin only)
+  app.post("/api/admin/know-resources", isAuthenticated, async (req: any, res) => {
+    try {
+      const user = req.user;
+      const userId = user?.claims?.sub || user?.id;
+      const role = user?.role || user?.claims?.role;
+      
+      if (!["site_admin", "system_admin", "campus_admin"].includes(role)) {
+        res.status(403).json({ error: "Admin access required" });
+        return;
+      }
+      
+      const validationResult = insertKnowResourceSchema.safeParse({
+        ...req.body,
+        createdBy: userId,
+      });
+      
+      if (!validationResult.success) {
+        res.status(400).json({ error: "Invalid resource data", details: validationResult.error.flatten() });
+        return;
+      }
+      
+      const resource = await storage.createKnowResource(validationResult.data);
+      res.json(resource);
+    } catch (error) {
+      console.error("Create KNOW resource error:", error);
+      res.status(500).json({ error: "Failed to create resource" });
+    }
+  });
+
+  // Update KNOW resource (admin only)
+  app.patch("/api/admin/know-resources/:id", isAuthenticated, async (req: any, res) => {
+    try {
+      const user = req.user;
+      const userId = user?.claims?.sub || user?.id;
+      const role = user?.role || user?.claims?.role;
+      
+      if (!["site_admin", "system_admin", "campus_admin"].includes(role)) {
+        res.status(403).json({ error: "Admin access required" });
+        return;
+      }
+      
+      const { id } = req.params;
+      
+      const updateSchema = insertKnowResourceSchema.partial().omit({ createdBy: true });
+      const validationResult = updateSchema.safeParse(req.body);
+      
+      if (!validationResult.success) {
+        res.status(400).json({ error: "Invalid update data", details: validationResult.error.flatten() });
+        return;
+      }
+      
+      const updated = await storage.updateKnowResource(id, validationResult.data, userId);
+      if (!updated) {
+        res.status(404).json({ error: "Resource not found" });
+        return;
+      }
+      res.json(updated);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to update resource" });
+    }
+  });
+
+  // Delete KNOW resource (admin only)
+  app.delete("/api/admin/know-resources/:id", isAuthenticated, async (req: any, res) => {
+    try {
+      const user = req.user;
+      const role = user?.role || user?.claims?.role;
+      
+      if (!["site_admin", "system_admin", "campus_admin"].includes(role)) {
+        res.status(403).json({ error: "Admin access required" });
+        return;
+      }
+      
+      const { id } = req.params;
+      await storage.deleteKnowResource(id);
+      res.json({ success: true });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to delete resource" });
     }
   });
 
