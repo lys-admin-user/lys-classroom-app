@@ -3026,6 +3026,335 @@ export async function registerRoutes(
     }
   });
 
+  // ================================
+  // Student Matriculation & Achievement Tracking (System-Level)
+  // ================================
+
+  // Get matriculation history for a student
+  app.get("/api/students/:studentId/matriculation", isAuthenticated, async (req: any, res) => {
+    try {
+      const { studentId } = req.params;
+      const history = await storage.getStudentMatriculationHistory(studentId);
+      res.json(history);
+    } catch (error) {
+      console.error("Get matriculation history error:", error);
+      res.status(500).json({ error: "Failed to get matriculation history" });
+    }
+  });
+
+  // Create matriculation event (admin only)
+  app.post("/api/admin/matriculation", isAuthenticated, async (req: any, res) => {
+    try {
+      const user = req.user;
+      const role = user?.role || user?.claims?.role;
+      const userId = user?.claims?.sub || user?.id;
+      
+      if (!["site_admin", "system_admin", "campus_admin"].includes(role)) {
+        res.status(403).json({ error: "Admin access required" });
+        return;
+      }
+      
+      const { insertStudentMatriculationHistorySchema } = await import("@shared/schema");
+      const parseResult = insertStudentMatriculationHistorySchema.safeParse({
+        ...req.body,
+        createdBy: userId,
+      });
+      
+      if (!parseResult.success) {
+        res.status(400).json({ error: "Invalid data", details: parseResult.error.format() });
+        return;
+      }
+      
+      const event = await storage.createMatriculationEvent(parseResult.data);
+      res.status(201).json(event);
+    } catch (error) {
+      console.error("Create matriculation event error:", error);
+      res.status(500).json({ error: "Failed to create matriculation event" });
+    }
+  });
+
+  // Get matriculation events by organization (admin)
+  app.get("/api/admin/matriculation/org/:orgId", isAuthenticated, async (req: any, res) => {
+    try {
+      const user = req.user;
+      const role = user?.role || user?.claims?.role;
+      
+      if (!["site_admin", "system_admin", "campus_admin"].includes(role)) {
+        res.status(403).json({ error: "Admin access required" });
+        return;
+      }
+      
+      const { orgId } = req.params;
+      const events = await storage.getMatriculationEventsByOrg(orgId);
+      res.json(events);
+    } catch (error) {
+      console.error("Get org matriculation error:", error);
+      res.status(500).json({ error: "Failed to get matriculation events" });
+    }
+  });
+
+  // Get matriculation statistics (admin)
+  app.get("/api/admin/matriculation/stats", isAuthenticated, async (req: any, res) => {
+    try {
+      const user = req.user;
+      const role = user?.role || user?.claims?.role;
+      
+      if (!["site_admin", "system_admin"].includes(role)) {
+        res.status(403).json({ error: "System admin access required" });
+        return;
+      }
+      
+      const { organizationId, academicYear } = req.query;
+      const stats = await storage.getMatriculationStats({
+        organizationId: organizationId as string,
+        academicYear: academicYear as string,
+      });
+      res.json(stats);
+    } catch (error) {
+      console.error("Get matriculation stats error:", error);
+      res.status(500).json({ error: "Failed to get matriculation stats" });
+    }
+  });
+
+  // Get all system achievements (public for browsing)
+  app.get("/api/achievements", async (req, res) => {
+    try {
+      const { category, isActive } = req.query;
+      const achievements = await storage.getSystemAchievements({
+        category: category as string,
+        isActive: isActive === 'true',
+        isSystemWide: true,
+      });
+      res.json(achievements);
+    } catch (error) {
+      console.error("Get achievements error:", error);
+      res.status(500).json({ error: "Failed to get achievements" });
+    }
+  });
+
+  // Get single achievement
+  app.get("/api/achievements/:id", async (req, res) => {
+    try {
+      const { id } = req.params;
+      const achievement = await storage.getSystemAchievement(id);
+      if (!achievement) {
+        res.status(404).json({ error: "Achievement not found" });
+        return;
+      }
+      res.json(achievement);
+    } catch (error) {
+      console.error("Get achievement error:", error);
+      res.status(500).json({ error: "Failed to get achievement" });
+    }
+  });
+
+  // Admin: Create system achievement
+  app.post("/api/admin/achievements", isAuthenticated, async (req: any, res) => {
+    try {
+      const user = req.user;
+      const role = user?.role || user?.claims?.role;
+      const userId = user?.claims?.sub || user?.id;
+      
+      if (!["site_admin", "system_admin"].includes(role)) {
+        res.status(403).json({ error: "System admin access required" });
+        return;
+      }
+      
+      const { insertSystemAchievementSchema } = await import("@shared/schema");
+      const parseResult = insertSystemAchievementSchema.safeParse({
+        ...req.body,
+        createdBy: userId,
+      });
+      
+      if (!parseResult.success) {
+        res.status(400).json({ error: "Invalid data", details: parseResult.error.format() });
+        return;
+      }
+      
+      const achievement = await storage.createSystemAchievement(parseResult.data);
+      res.status(201).json(achievement);
+    } catch (error) {
+      console.error("Create achievement error:", error);
+      res.status(500).json({ error: "Failed to create achievement" });
+    }
+  });
+
+  // Admin: Update system achievement
+  app.patch("/api/admin/achievements/:id", isAuthenticated, async (req: any, res) => {
+    try {
+      const user = req.user;
+      const role = user?.role || user?.claims?.role;
+      
+      if (!["site_admin", "system_admin"].includes(role)) {
+        res.status(403).json({ error: "System admin access required" });
+        return;
+      }
+      
+      const { id } = req.params;
+      const { insertSystemAchievementSchema } = await import("@shared/schema");
+      const parseResult = insertSystemAchievementSchema.partial().safeParse(req.body);
+      
+      if (!parseResult.success) {
+        res.status(400).json({ error: "Invalid data", details: parseResult.error.format() });
+        return;
+      }
+      
+      const updated = await storage.updateSystemAchievement(id, parseResult.data);
+      if (!updated) {
+        res.status(404).json({ error: "Achievement not found" });
+        return;
+      }
+      res.json(updated);
+    } catch (error) {
+      console.error("Update achievement error:", error);
+      res.status(500).json({ error: "Failed to update achievement" });
+    }
+  });
+
+  // Admin: Delete system achievement
+  app.delete("/api/admin/achievements/:id", isAuthenticated, async (req: any, res) => {
+    try {
+      const user = req.user;
+      const role = user?.role || user?.claims?.role;
+      
+      if (!["site_admin", "system_admin"].includes(role)) {
+        res.status(403).json({ error: "System admin access required" });
+        return;
+      }
+      
+      const { id } = req.params;
+      await storage.deleteSystemAchievement(id);
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Delete achievement error:", error);
+      res.status(500).json({ error: "Failed to delete achievement" });
+    }
+  });
+
+  // Get student achievements
+  app.get("/api/students/:studentId/achievements", isAuthenticated, async (req: any, res) => {
+    try {
+      const { studentId } = req.params;
+      const achievements = await storage.getStudentAchievements(studentId);
+      res.json(achievements);
+    } catch (error) {
+      console.error("Get student achievements error:", error);
+      res.status(500).json({ error: "Failed to get student achievements" });
+    }
+  });
+
+  // Award achievement to student (educator/admin)
+  app.post("/api/students/:studentId/achievements", isAuthenticated, async (req: any, res) => {
+    try {
+      const user = req.user;
+      const role = user?.role || user?.claims?.role;
+      const userId = user?.claims?.sub || user?.id;
+      
+      if (!["site_admin", "system_admin", "campus_admin", "educator"].includes(role)) {
+        res.status(403).json({ error: "Educator or admin access required" });
+        return;
+      }
+      
+      const { studentId } = req.params;
+      const { insertStudentAchievementSchema } = await import("@shared/schema");
+      const parseResult = insertStudentAchievementSchema.safeParse({
+        ...req.body,
+        studentId,
+        awardedBy: userId,
+      });
+      
+      if (!parseResult.success) {
+        res.status(400).json({ error: "Invalid data", details: parseResult.error.format() });
+        return;
+      }
+      
+      const achievement = await storage.awardAchievement(parseResult.data);
+      res.status(201).json(achievement);
+    } catch (error) {
+      console.error("Award achievement error:", error);
+      res.status(500).json({ error: "Failed to award achievement" });
+    }
+  });
+
+  // Verify achievement (admin only)
+  app.post("/api/admin/achievements/:id/verify", isAuthenticated, async (req: any, res) => {
+    try {
+      const user = req.user;
+      const role = user?.role || user?.claims?.role;
+      const userId = user?.claims?.sub || user?.id;
+      
+      if (!["site_admin", "system_admin", "campus_admin"].includes(role)) {
+        res.status(403).json({ error: "Admin access required" });
+        return;
+      }
+      
+      const { id } = req.params;
+      const verified = await storage.verifyAchievement(id, userId);
+      if (!verified) {
+        res.status(404).json({ error: "Achievement not found" });
+        return;
+      }
+      res.json(verified);
+    } catch (error) {
+      console.error("Verify achievement error:", error);
+      res.status(500).json({ error: "Failed to verify achievement" });
+    }
+  });
+
+  // Revoke achievement (admin only)
+  app.post("/api/admin/achievements/:id/revoke", isAuthenticated, async (req: any, res) => {
+    try {
+      const user = req.user;
+      const role = user?.role || user?.claims?.role;
+      
+      if (!["site_admin", "system_admin", "campus_admin"].includes(role)) {
+        res.status(403).json({ error: "Admin access required" });
+        return;
+      }
+      
+      const { id } = req.params;
+      const { reason } = req.body;
+      
+      if (!reason) {
+        res.status(400).json({ error: "Reason is required for revocation" });
+        return;
+      }
+      
+      const revoked = await storage.revokeAchievement(id, reason);
+      if (!revoked) {
+        res.status(404).json({ error: "Achievement not found" });
+        return;
+      }
+      res.json(revoked);
+    } catch (error) {
+      console.error("Revoke achievement error:", error);
+      res.status(500).json({ error: "Failed to revoke achievement" });
+    }
+  });
+
+  // Get achievement statistics (admin)
+  app.get("/api/admin/achievements/stats", isAuthenticated, async (req: any, res) => {
+    try {
+      const user = req.user;
+      const role = user?.role || user?.claims?.role;
+      
+      if (!["site_admin", "system_admin"].includes(role)) {
+        res.status(403).json({ error: "System admin access required" });
+        return;
+      }
+      
+      const { organizationId, academicYear } = req.query;
+      const stats = await storage.getAchievementStats({
+        organizationId: organizationId as string,
+        academicYear: academicYear as string,
+      });
+      res.json(stats);
+    } catch (error) {
+      console.error("Get achievement stats error:", error);
+      res.status(500).json({ error: "Failed to get achievement stats" });
+    }
+  });
+
   // Affiliate System - Get or create affiliate profile
   app.get("/api/affiliate/me", isAuthenticated, async (req: any, res) => {
     try {
