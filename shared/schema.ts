@@ -1150,6 +1150,168 @@ export const insertStudentJourneyActivitySchema = createInsertSchema(studentJour
 export type InsertStudentJourneyActivity = z.infer<typeof insertStudentJourneyActivitySchema>;
 export type StudentJourneyActivity = typeof studentJourneyActivities.$inferSelect;
 
+// ================================
+// Student Matriculation & Achievement Tracking (System-Level)
+// ================================
+
+// Matriculation Event Types
+export const MATRICULATION_EVENT_TYPES = [
+  "enrollment", // Initial enrollment
+  "grade_promotion", // Moved to next grade
+  "grade_retention", // Held back a grade
+  "transfer_in", // Transferred in from another school
+  "transfer_out", // Transferred out to another school
+  "withdrawal", // Withdrawn from school
+  "graduation", // Completed program/graduated
+  "re_enrollment", // Re-enrolled after withdrawal
+  "status_change", // General status change
+] as const;
+export type MatriculationEventType = typeof MATRICULATION_EVENT_TYPES[number];
+
+// Student Matriculation History - tracks grade progression and enrollment changes
+export const studentMatriculationHistory = pgTable("student_matriculation_history", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  studentId: varchar("student_id").notNull(), // References students table
+  organizationId: varchar("organization_id"), // School/campus where event occurred
+  
+  eventType: text("event_type").notNull().$type<MatriculationEventType>(),
+  eventDate: timestamp("event_date").notNull().defaultNow(),
+  
+  // Grade level tracking
+  previousGradeLevel: text("previous_grade_level"),
+  newGradeLevel: text("new_grade_level"),
+  
+  // Academic year tracking
+  academicYear: text("academic_year"), // e.g., "2025-2026"
+  semester: text("semester"), // "fall", "spring", "summer"
+  
+  // For transfers
+  previousOrganizationId: varchar("previous_organization_id"),
+  newOrganizationId: varchar("new_organization_id"),
+  
+  // Status tracking
+  previousStatus: text("previous_status"),
+  newStatus: text("new_status"),
+  
+  // Additional info
+  reason: text("reason"), // Reason for the change
+  notes: text("notes"),
+  documentUrl: text("document_url"), // Supporting document
+  
+  // Approval tracking
+  approvedBy: varchar("approved_by"), // Admin who approved
+  approvedAt: timestamp("approved_at"),
+  
+  // Audit trail
+  createdBy: varchar("created_by").notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertStudentMatriculationHistorySchema = createInsertSchema(studentMatriculationHistory).omit({ 
+  id: true, createdAt: true 
+});
+export type InsertStudentMatriculationHistory = z.infer<typeof insertStudentMatriculationHistorySchema>;
+export type StudentMatriculationHistory = typeof studentMatriculationHistory.$inferSelect;
+
+// System Achievement Types
+export const ACHIEVEMENT_CATEGORIES = [
+  "academic", // GPA, honor roll, dean's list
+  "skill", // Skill mastery, competency
+  "behavior", // Attendance, citizenship
+  "extracurricular", // Sports, clubs, activities
+  "career", // Career readiness, certifications
+  "bkd", // Be-Know-Do framework achievements
+  "custom", // Custom achievements
+] as const;
+export type AchievementCategory = typeof ACHIEVEMENT_CATEGORIES[number];
+
+// System Achievements - defines available achievements
+export const systemAchievements = pgTable("system_achievements", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  
+  // Basic info
+  name: text("name").notNull(),
+  description: text("description"),
+  category: text("category").notNull().$type<AchievementCategory>(),
+  
+  // Visual elements
+  badgeImageUrl: text("badge_image_url"),
+  iconName: text("icon_name"), // Lucide icon name
+  color: text("color"), // Badge color
+  
+  // Criteria
+  criteria: jsonb("criteria").$type<{
+    type: "automatic" | "manual"; // Automatic based on rules, or manually awarded
+    rules?: {
+      metric: string; // e.g., "gpa", "attendance_rate", "be_score"
+      operator: "gte" | "lte" | "eq" | "gt" | "lt";
+      value: number;
+    }[];
+    requiresEvidence?: boolean;
+  }>(),
+  
+  // Points/rewards
+  pointValue: integer("point_value").default(0),
+  
+  // Scope
+  isSystemWide: boolean("is_system_wide").default(true), // Available to all organizations
+  organizationId: varchar("organization_id"), // If org-specific
+  gradeLevels: jsonb("grade_levels").$type<string[]>(), // Which grade levels can earn this
+  
+  // Status
+  isActive: boolean("is_active").default(true),
+  
+  // Audit
+  createdBy: varchar("created_by").notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertSystemAchievementSchema = createInsertSchema(systemAchievements).omit({ 
+  id: true, createdAt: true, updatedAt: true 
+});
+export type InsertSystemAchievement = z.infer<typeof insertSystemAchievementSchema>;
+export type SystemAchievement = typeof systemAchievements.$inferSelect;
+
+// Student Achievements - records of achievements earned by students
+export const studentAchievements = pgTable("student_achievements", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  studentId: varchar("student_id").notNull(), // References students table
+  achievementId: varchar("achievement_id").notNull(), // References system_achievements
+  
+  // When/where earned
+  earnedAt: timestamp("earned_at").notNull().defaultNow(),
+  academicYear: text("academic_year"),
+  organizationId: varchar("organization_id"), // Where it was earned
+  
+  // Evidence/verification
+  evidence: jsonb("evidence").$type<{
+    type: string; // "document", "grade_report", "certificate", etc.
+    url?: string;
+    description?: string;
+  }[]>(),
+  
+  // Verification status
+  status: text("status").default("pending").$type<"pending" | "verified" | "revoked">(),
+  verifiedBy: varchar("verified_by"),
+  verifiedAt: timestamp("verified_at"),
+  revokedReason: text("revoked_reason"),
+  
+  // Additional context
+  notes: text("notes"),
+  metadata: jsonb("metadata").$type<Record<string, any>>(), // Flexible additional data
+  
+  // Audit
+  awardedBy: varchar("awarded_by").notNull(), // Who awarded it (can be system or user)
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertStudentAchievementSchema = createInsertSchema(studentAchievements).omit({ 
+  id: true, createdAt: true 
+});
+export type InsertStudentAchievement = z.infer<typeof insertStudentAchievementSchema>;
+export type StudentAchievement = typeof studentAchievements.$inferSelect;
+
 // Entity Shares - for sharing classroom data across organizations
 export type EntitySharePermission = "view" | "edit" | "copy";
 export type ShareableEntityType = "class" | "student" | "assignment" | "lesson" | "scope_sequence";
