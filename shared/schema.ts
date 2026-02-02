@@ -2520,6 +2520,24 @@ export const insertSystemLessonAuthorSchema = createInsertSchema(systemLessonAut
 export type InsertSystemLessonAuthor = z.infer<typeof insertSystemLessonAuthorSchema>;
 export type SystemLessonAuthor = typeof systemLessonAuthors.$inferSelect;
 
+// Campus Lesson Authors - Educators authorized to create/influence lessons at campus level
+export const campusLessonAuthors = pgTable("campus_lesson_authors", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull(),
+  organizationId: varchar("organization_id").notNull(), // Campus they are authorized for
+  authorizedBy: varchar("authorized_by").notNull(), // Campus admin who granted permission
+  specializations: jsonb("specializations").$type<string[]>().default([]),
+  bio: text("bio"),
+  status: text("status").notNull().default("active"), // active, suspended, revoked
+  lessonsCreated: integer("lessons_created").default(0),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertCampusLessonAuthorSchema = createInsertSchema(campusLessonAuthors).omit({ id: true, createdAt: true, updatedAt: true, lessonsCreated: true });
+export type InsertCampusLessonAuthor = z.infer<typeof insertCampusLessonAuthorSchema>;
+export type CampusLessonAuthor = typeof campusLessonAuthors.$inferSelect;
+
 // Master Lessons - System-level authoritative lessons that influence AI generation
 export const masterLessons = pgTable("master_lessons", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
