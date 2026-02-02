@@ -551,6 +551,55 @@ function StudentDashboard({ studentData, isLoading }: { studentData: StudentData
                 </CardContent>
               </Card>
 
+              {/* Learning Alignment - How lessons connect to learning goals */}
+              <Card className="border-blue-200 dark:border-blue-800 bg-blue-50/50 dark:bg-blue-950/20" data-testid="card-learning-alignment">
+                <CardHeader className="pb-2">
+                  <CardTitle className="flex items-center gap-2 text-lg">
+                    <BookOpen className="h-5 w-5 text-blue-600" />
+                    Learning Alignment
+                  </CardTitle>
+                  <CardDescription>
+                    How assignments connect to learning goals and career preparation
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="grid gap-4 sm:grid-cols-3">
+                    <div className="text-center p-3 rounded-md bg-background" data-testid="stat-be-focus">
+                      <div className="flex items-center justify-center gap-1 mb-1">
+                        <Heart className="h-4 w-4 text-red-500" />
+                        <span className="text-xs font-medium uppercase">BE</span>
+                      </div>
+                      <p className="text-lg font-bold">{journeyProgress?.beScore || 0}%</p>
+                      <p className="text-xs text-muted-foreground">Identity & Values</p>
+                    </div>
+                    <div className="text-center p-3 rounded-md bg-background" data-testid="stat-know-focus">
+                      <div className="flex items-center justify-center gap-1 mb-1">
+                        <Brain className="h-4 w-4 text-purple-500" />
+                        <span className="text-xs font-medium uppercase">KNOW</span>
+                      </div>
+                      <p className="text-lg font-bold">{journeyProgress?.knowScore || 0}%</p>
+                      <p className="text-xs text-muted-foreground">Skills & Knowledge</p>
+                    </div>
+                    <div className="text-center p-3 rounded-md bg-background" data-testid="stat-do-focus">
+                      <div className="flex items-center justify-center gap-1 mb-1">
+                        <Target className="h-4 w-4 text-green-500" />
+                        <span className="text-xs font-medium uppercase">DO</span>
+                      </div>
+                      <p className="text-lg font-bold">{journeyProgress?.doScore || 0}%</p>
+                      <p className="text-xs text-muted-foreground">Actions & Goals</p>
+                    </div>
+                  </div>
+                  <div className="space-y-2">
+                    <p className="text-sm font-medium">Learning Journey Progress</p>
+                    <Progress value={journeyProgress?.overallScore || 0} className="h-2" />
+                    <p className="text-xs text-muted-foreground">
+                      This shows how well your child is developing across BE (identity), KNOW (skills), 
+                      and DO (actions) - the foundation for career readiness.
+                    </p>
+                  </div>
+                </CardContent>
+              </Card>
+
               {/* Saved Careers Grid */}
               <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
                 {savedCareers.map((career, idx) => (

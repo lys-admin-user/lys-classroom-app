@@ -317,6 +317,186 @@ export async function registerRoutes(
     }
   });
 
+  // ===========================================
+  // ALIGNMENT DASHBOARD API
+  // ===========================================
+  
+  // Get alignment data for a specific lesson
+  app.get("/api/alignment/:lessonId", isAuthenticated, async (req: any, res) => {
+    try {
+      const lessonId = req.params.lessonId;
+      const lesson = await storage.getLesson(lessonId);
+      
+      if (!lesson) {
+        return res.status(404).json({ error: "Lesson not found" });
+      }
+      
+      // Get all alignments for this lesson
+      const alignments = await storage.getAlignmentsByLesson(lessonId);
+      const objectives = (lesson.objectives as string[]) || [];
+      
+      // Calculate coverage for each objective
+      const objectiveCoverage = objectives.map((obj, idx) => {
+        const alignment = alignments.find(a => a.objectiveIndex === idx);
+        return {
+          objectiveIndex: idx,
+          objectiveText: obj,
+          questionCount: alignment?.questionCount || 0,
+          coveragePercentage: alignment?.coveragePercentage || 0,
+          bkdFocus: alignment?.bkdFocus || lesson.bkdFocus,
+          assessmentTypes: [],
+        };
+      });
+      
+      const coveredObjectives = objectiveCoverage.filter(o => o.questionCount > 0).length;
+      const averageCoverage = objectives.length > 0 
+        ? Math.round(objectiveCoverage.reduce((sum, o) => sum + o.coveragePercentage, 0) / objectives.length)
+        : 0;
+        
+      const missingCoverage = objectiveCoverage
+        .filter(o => o.coveragePercentage < 50)
+        .map(o => o.objectiveText);
+      
+      // Calculate BKD distribution from alignments
+      const bkdCounts = { be: 0, know: 0, do: 0 };
+      alignments.forEach(a => {
+        if (a.bkdFocus && a.bkdFocus in bkdCounts) {
+          bkdCounts[a.bkdFocus as keyof typeof bkdCounts] += a.questionCount || 0;
+        }
+      });
+      const totalQuestions = bkdCounts.be + bkdCounts.know + bkdCounts.do || 1;
+      
+      res.json({
+        lessonId,
+        lessonTitle: lesson.title,
+        totalObjectives: objectives.length,
+        coveredObjectives,
+        averageCoverage,
+        bkdDistribution: {
+          be: Math.round((bkdCounts.be / totalQuestions) * 100),
+          know: Math.round((bkdCounts.know / totalQuestions) * 100),
+          do: Math.round((bkdCounts.do / totalQuestions) * 100),
+        },
+        objectives: objectiveCoverage,
+        missingCoverage,
+      });
+    } catch (error) {
+      console.error("Alignment fetch error:", error);
+      res.status(500).json({ error: "Failed to fetch alignment data" });
+    }
+  });
+
+  // ===========================================
+  // QUESTION BANK API
+  // ===========================================
+  
+  app.get("/api/question-bank", isAuthenticated, async (req: any, res) => {
+    try {
+      const { subject, gradeLevel, topic, difficulty, bkdFocus } = req.query;
+      const questions = await storage.getQuestionBankItems({
+        subject: subject as string,
+        gradeLevel: gradeLevel as string,
+        topic: topic as string,
+        difficulty: difficulty as string,
+        bkdFocus: bkdFocus as string,
+      });
+      res.json(questions);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch question bank" });
+    }
+  });
+  
+  app.post("/api/question-bank", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user?.claims?.sub;
+      const question = await storage.createQuestionBankItem({
+        ...req.body,
+        creatorId: userId,
+      });
+      res.json(question);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to create question" });
+    }
+  });
+
+  // ===========================================
+  // AUTHOR QUALITY METRICS API
+  // ===========================================
+  
+  app.get("/api/author-metrics/:authorId", isAuthenticated, async (req: any, res) => {
+    try {
+      const authorId = req.params.authorId;
+      const metrics = await storage.getAuthorQualityMetrics(authorId);
+      res.json(metrics);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch author metrics" });
+    }
+  });
+  
+  app.get("/api/author-metrics/:authorId/latest", isAuthenticated, async (req: any, res) => {
+    try {
+      const authorId = req.params.authorId;
+      const metrics = await storage.getLatestAuthorMetrics(authorId);
+      res.json(metrics || null);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch latest metrics" });
+    }
+  });
+
+  // ===========================================
+  // STANDARDS AUTO-MATCHING API
+  // ===========================================
+  
+  const autoMatchSchema = z.object({
+    topic: z.string().min(1, "Topic is required"),
+    gradeLevel: z.string().min(1, "Grade level is required"),
+    subject: z.string().optional(),
+    objectives: z.array(z.string()).optional(),
+    standardSetId: z.string().uuid("Valid standard set ID is required"),
+  });
+
+  app.post("/api/standards/auto-match", isAuthenticated, async (req: any, res) => {
+    try {
+      const validationResult = autoMatchSchema.safeParse(req.body);
+      if (!validationResult.success) {
+        return res.status(400).json({ 
+          error: "Invalid request", 
+          details: validationResult.error.errors 
+        });
+      }
+      
+      const { topic, gradeLevel, subject, objectives, standardSetId } = validationResult.data;
+      
+      const { autoMatchStandards } = await import("./standardsAutoMatch");
+      const matches = await autoMatchStandards({
+        topic,
+        gradeLevel,
+        subject,
+        objectives,
+        standardSetId,
+      });
+      
+      res.json(matches);
+    } catch (error) {
+      console.error("Standards auto-match error:", error);
+      res.status(500).json({ error: "Failed to auto-match standards" });
+    }
+  });
+  
+  app.post("/api/standards/validate-alignment", isAuthenticated, async (req: any, res) => {
+    try {
+      const { objectives, standardCodes } = req.body;
+      
+      const { validateStandardAlignment } = await import("./standardsAutoMatch");
+      const result = await validateStandardAlignment(objectives, standardCodes);
+      
+      res.json(result);
+    } catch (error) {
+      console.error("Validate alignment error:", error);
+      res.status(500).json({ error: "Failed to validate alignment" });
+    }
+  });
+
   // Lesson Templates - for one-click lesson creation
   app.get("/api/templates", isAuthenticated, async (req: any, res) => {
     try {

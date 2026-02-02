@@ -346,9 +346,81 @@ export const generateLessonRequestSchema = z.object({
   }),
   duration: z.string().optional().default("45 minutes"),
   lessonPart: z.string().optional(),
+  skipValidation: z.boolean().optional(), // Skip quality validation loop for faster generation
 });
 
 export type GenerateLessonRequest = z.infer<typeof generateLessonRequestSchema>;
+
+// Question Bank System - Reusable questions for assignments
+export const questionBanks = pgTable("question_banks", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  creatorId: varchar("creator_id").notNull(),
+  subject: text("subject").notNull(),
+  gradeLevel: text("grade_level").notNull(),
+  topic: text("topic").notNull(),
+  questionType: text("question_type").notNull(), // multiple_choice, short_answer, essay, etc.
+  bkdFocus: text("bkd_focus"), // be, know, do
+  difficulty: text("difficulty").notNull(), // easy, medium, hard
+  stimulus: text("stimulus"), // The prompt/context
+  question: text("question").notNull(),
+  options: jsonb("options").$type<string[]>(),
+  correctAnswer: text("correct_answer"),
+  rubric: jsonb("rubric").$type<{ criteria: string; points: number }[]>(),
+  distractorFeedback: jsonb("distractor_feedback").$type<{ option: string; feedback: string }[]>(),
+  standardMappings: jsonb("standard_mappings").$type<{ code: string; description: string }[]>(),
+  bloomsLevel: text("blooms_level"), // remember, understand, apply, analyze, evaluate, create
+  depthOfKnowledge: integer("depth_of_knowledge"), // 1-4
+  usageCount: integer("usage_count").default(0),
+  visibility: text("visibility").notNull().default("personal"), // personal, campus, district, system
+  organizationId: varchar("organization_id"),
+  status: text("status").notNull().default("active"), // active, archived
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertQuestionBankSchema = createInsertSchema(questionBanks).omit({ id: true, createdAt: true, updatedAt: true, usageCount: true });
+export type InsertQuestionBank = z.infer<typeof insertQuestionBankSchema>;
+export type QuestionBank = typeof questionBanks.$inferSelect;
+
+// Author Quality Metrics - Track lesson author performance over time
+export const authorQualityMetrics = pgTable("author_quality_metrics", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  authorId: varchar("author_id").notNull(),
+  periodStart: timestamp("period_start").notNull(),
+  periodEnd: timestamp("period_end").notNull(),
+  lessonsCreated: integer("lessons_created").default(0),
+  lessonsApproved: integer("lessons_approved").default(0),
+  averageQualityScore: integer("average_quality_score").default(0),
+  distinguishedCount: integer("distinguished_count").default(0),
+  accomplishedCount: integer("accomplished_count").default(0),
+  acceptableCount: integer("acceptable_count").default(0),
+  needsImprovementCount: integer("needs_improvement_count").default(0),
+  totalObjectivesCovered: integer("total_objectives_covered").default(0),
+  standardsCoverage: jsonb("standards_coverage").$type<{ standardCode: string; count: number }[]>(),
+  bkdDistribution: jsonb("bkd_distribution").$type<{ be: number; know: number; do: number }>(),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertAuthorQualityMetricsSchema = createInsertSchema(authorQualityMetrics).omit({ id: true, createdAt: true });
+export type InsertAuthorQualityMetrics = z.infer<typeof insertAuthorQualityMetricsSchema>;
+export type AuthorQualityMetrics = typeof authorQualityMetrics.$inferSelect;
+
+// Assignment Alignment Tracking - Links assignments to lesson objectives
+export const assignmentAlignments = pgTable("assignment_alignments", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  assignmentId: varchar("assignment_id").notNull(),
+  lessonId: varchar("lesson_id").notNull(),
+  objectiveIndex: integer("objective_index").notNull(), // Which lesson objective
+  questionCount: integer("question_count").default(0), // Questions aligned to this objective
+  coveragePercentage: integer("coverage_percentage").default(0),
+  bkdFocus: text("bkd_focus"), // be, know, do
+  standardMappings: jsonb("standard_mappings").$type<{ code: string; alignmentStrength: number }[]>(),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertAssignmentAlignmentSchema = createInsertSchema(assignmentAlignments).omit({ id: true, createdAt: true });
+export type InsertAssignmentAlignment = z.infer<typeof insertAssignmentAlignmentSchema>;
+export type AssignmentAlignment = typeof assignmentAlignments.$inferSelect;
 
 // Scope Visibility Levels - defines inheritance hierarchy
 export const SCOPE_VISIBILITY = {

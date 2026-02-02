@@ -47,6 +47,7 @@ import Gradebook from "@/pages/Gradebook";
 import LessonAuthoring from "@/pages/LessonAuthoring";
 import KnowResourcesAdmin from "@/pages/KnowResourcesAdmin";
 import MatriculationAchievementAdmin from "@/pages/MatriculationAchievementAdmin";
+import AlignmentDashboard from "@/pages/AlignmentDashboard";
 import NotFound from "@/pages/not-found";
 import { EmbedRouter } from "@/pages/EmbedRouter";
 
@@ -138,6 +139,7 @@ function Router() {
       <Route path="/lesson-authoring" component={LessonAuthoring} />
       <Route path="/admin/know-resources" component={KnowResourcesAdmin} />
       <Route path="/admin/matriculation" component={MatriculationAchievementAdmin} />
+      <Route path="/alignment-dashboard" component={AlignmentDashboard} />
       <Route component={NotFound} />
     </Switch>
   );

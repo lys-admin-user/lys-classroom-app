@@ -1,6 +1,8 @@
 import OpenAI from "openai";
 import type { GenerateLessonRequest } from "@shared/schema";
 import { AI_LESSON_RUBRIC_PROMPT } from "@shared/lessonRubric";
+import { calculateLessonQualityScore, getQualityLevel } from "./lessonQualityScorer";
+import { storage } from "./storage";
 
 const openai = process.env.OPENAI_API_KEY 
   ? new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
@@ -105,6 +107,10 @@ QUALITY CHECK BEFORE OUTPUT:
 
 IMPORTANT: Respond ONLY with a valid JSON object, no additional text.`;
 
+  // Get master lesson examples for AI guidance
+  const subject = request.course || request.topic;
+  const masterExamples = await getMasterLessonExamples(subject, request.gradeLevel);
+
   const userPrompt = `Create a complete lesson plan with these specifications:
 - Topic: ${request.topic}
 ${request.course ? `- Course: ${request.course}` : ""}
@@ -114,6 +120,7 @@ ${request.unit ? `- Unit: ${request.unit}` : ""}
 - Duration: ${request.duration}
 ${request.lessonPart ? `- Lesson Part: ${request.lessonPart}` : ""}
 ${standardsInfo}
+${masterExamples}
 
 Generate a complete LYS lesson plan in JSON format. Include:
 1. A compelling title
@@ -181,14 +188,86 @@ JSON structure:
     }
 
     const lessonPlan = JSON.parse(content);
-    return {
+    const generatedLesson = {
       id: crypto.randomUUID(),
       ...lessonPlan,
       standards: request.standards,
     };
+    
+    // VALIDATION LOOP: Check quality score and regenerate if below Distinguished
+    const qualityResult = calculateLessonQualityScore(generatedLesson);
+    const qualityLevel = getQualityLevel(qualityResult.percentage);
+    
+    if (qualityResult.percentage < 90 && !request.skipValidation) {
+      console.log(`Lesson quality ${qualityResult.percentage}% (${qualityLevel}) - regenerating for Distinguished level...`);
+      
+      // Try one more time with enhanced prompt
+      const retryPrompt = `${userPrompt}
+
+CRITICAL: The previous attempt scored ${qualityResult.percentage}% quality. 
+Missing requirements:
+${qualityResult.breakdown.filter(b => b.score < b.maxScore).map(b => `- ${b.category}: ${b.score}/${b.maxScore}`).join('\n')}
+
+You MUST address these gaps to achieve Distinguished level (90%+).`;
+
+      const retryResponse = await openai.chat.completions.create({
+        model: "gpt-4o",
+        messages: [
+          { role: "system", content: systemPrompt },
+          { role: "user", content: retryPrompt },
+        ],
+        response_format: { type: "json_object" },
+        max_tokens: 3000,
+      });
+
+      const retryContent = retryResponse.choices[0].message.content;
+      if (retryContent) {
+        const retryPlan = JSON.parse(retryContent);
+        const improvedLesson = {
+          id: crypto.randomUUID(),
+          ...retryPlan,
+          standards: request.standards,
+        };
+        
+        const retryQuality = calculateLessonQualityScore(improvedLesson);
+        console.log(`Retry lesson quality: ${retryQuality.percentage}% (${getQualityLevel(retryQuality.percentage)})`);
+        
+        if (retryQuality.percentage > qualityResult.percentage) {
+          return improvedLesson;
+        }
+      }
+    }
+    
+    return generatedLesson;
   } catch (error) {
     console.error("Error generating lesson plan:", error);
     return generateMockLessonPlan(request);
+  }
+}
+
+// Fetch approved master lessons to use as AI examples
+async function getMasterLessonExamples(subject: string, gradeLevel: string, limit: number = 3): Promise<string> {
+  try {
+    const masterLessons = await storage.getMasterLessons({ 
+      status: "approved",
+      subject,
+      limit 
+    });
+    
+    if (masterLessons.length === 0) return "";
+    
+    return `
+
+REFERENCE EXAMPLES (Distinguished-level lessons to emulate):
+${masterLessons.map((lesson, i) => `
+Example ${i + 1}: "${lesson.title}"
+- Objectives: ${(lesson.objectives as string[]).slice(0, 2).join('; ')}
+- BKD Focus: ${lesson.bkdFocus}
+- Quality Score: ${lesson.qualityScore || 90}%
+`).join('')}
+Emulate the quality and structure of these approved lessons.`;
+  } catch (error) {
+    return "";
   }
 }
 

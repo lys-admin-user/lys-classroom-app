@@ -245,6 +245,15 @@ import {
   type LessonBulkImport,
   type InsertLessonBulkImport,
   lessonBulkImports,
+  type QuestionBank,
+  type InsertQuestionBank,
+  questionBanks,
+  type AuthorQualityMetrics,
+  type InsertAuthorQualityMetrics,
+  authorQualityMetrics,
+  type AssignmentAlignment,
+  type InsertAssignmentAlignment,
+  assignmentAlignments,
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, desc, and, asc, gte, sql } from "drizzle-orm";
@@ -730,7 +739,7 @@ export interface IStorage {
   decrementAuthorLessonCount(userId: string): Promise<void>;
   
   // Master Lessons Repository
-  getMasterLessons(filters?: { subject?: string; gradeLevel?: string; status?: string }): Promise<MasterLesson[]>;
+  getMasterLessons(filters?: { subject?: string; gradeLevel?: string; status?: string; limit?: number }): Promise<MasterLesson[]>;
   getMasterLesson(id: string): Promise<MasterLesson | undefined>;
   getMasterLessonsByAuthor(authorId: string): Promise<MasterLesson[]>;
   getApprovedMasterLessons(filters?: { subject?: string; gradeLevel?: string; bkdFocus?: string }): Promise<MasterLesson[]>;
@@ -755,6 +764,25 @@ export interface IStorage {
   getLessonBulkImport(id: string): Promise<LessonBulkImport | undefined>;
   createLessonBulkImport(importRecord: InsertLessonBulkImport): Promise<LessonBulkImport>;
   updateLessonBulkImport(id: string, updates: Partial<LessonBulkImport>): Promise<LessonBulkImport | undefined>;
+  
+  // Question Bank System
+  getQuestionBankItems(filters?: { subject?: string; gradeLevel?: string; topic?: string; difficulty?: string; bkdFocus?: string; visibility?: string }): Promise<QuestionBank[]>;
+  getQuestionBankItem(id: string): Promise<QuestionBank | undefined>;
+  createQuestionBankItem(item: InsertQuestionBank): Promise<QuestionBank>;
+  updateQuestionBankItem(id: string, updates: Partial<QuestionBank>): Promise<QuestionBank | undefined>;
+  deleteQuestionBankItem(id: string): Promise<boolean>;
+  incrementQuestionUsage(id: string): Promise<void>;
+  
+  // Author Quality Metrics
+  getAuthorQualityMetrics(authorId: string): Promise<AuthorQualityMetrics[]>;
+  getLatestAuthorMetrics(authorId: string): Promise<AuthorQualityMetrics | undefined>;
+  createAuthorQualityMetrics(metrics: InsertAuthorQualityMetrics): Promise<AuthorQualityMetrics>;
+  updateAuthorQualityMetrics(id: string, updates: Partial<AuthorQualityMetrics>): Promise<AuthorQualityMetrics | undefined>;
+  
+  // Assignment Alignments
+  getAssignmentAlignments(assignmentId: string): Promise<AssignmentAlignment[]>;
+  createAssignmentAlignment(alignment: InsertAssignmentAlignment): Promise<AssignmentAlignment>;
+  getAlignmentsByLesson(lessonId: string): Promise<AssignmentAlignment[]>;
   
   // KNOW Resources (Admin-managed educational resources)
   getKnowResources(filters?: { resourceType?: string; category?: string; isActive?: boolean; featured?: boolean }): Promise<KnowResource[]>;
@@ -5800,8 +5828,7 @@ export class DatabaseStorage implements IStorage {
   // MASTER LESSONS REPOSITORY
   // ===========================================
   
-  async getMasterLessons(filters?: { subject?: string; gradeLevel?: string; status?: string }): Promise<MasterLesson[]> {
-    let query = db.select().from(masterLessons);
+  async getMasterLessons(filters?: { subject?: string; gradeLevel?: string; status?: string; limit?: number }): Promise<MasterLesson[]> {
     const conditions: any[] = [];
     
     if (filters?.subject) {
@@ -5814,10 +5841,17 @@ export class DatabaseStorage implements IStorage {
       conditions.push(eq(masterLessons.status, filters.status));
     }
     
+    let query;
     if (conditions.length > 0) {
-      return db.select().from(masterLessons).where(and(...conditions)).orderBy(desc(masterLessons.createdAt));
+      query = db.select().from(masterLessons).where(and(...conditions)).orderBy(desc(masterLessons.createdAt));
+    } else {
+      query = db.select().from(masterLessons).orderBy(desc(masterLessons.createdAt));
     }
-    return db.select().from(masterLessons).orderBy(desc(masterLessons.createdAt));
+    
+    if (filters?.limit) {
+      return query.limit(filters.limit);
+    }
+    return query;
   }
   
   async getMasterLesson(id: string): Promise<MasterLesson | undefined> {
@@ -5982,6 +6016,116 @@ export class DatabaseStorage implements IStorage {
       .where(eq(lessonBulkImports.id, id))
       .returning();
     return updated;
+  }
+
+  // ===========================================
+  // QUESTION BANK SYSTEM
+  // ===========================================
+  
+  async getQuestionBankItems(filters?: { subject?: string; gradeLevel?: string; topic?: string; difficulty?: string; bkdFocus?: string; visibility?: string }): Promise<QuestionBank[]> {
+    const conditions: any[] = [eq(questionBanks.status, 'active')];
+    
+    if (filters?.subject) {
+      conditions.push(eq(questionBanks.subject, filters.subject));
+    }
+    if (filters?.gradeLevel) {
+      conditions.push(eq(questionBanks.gradeLevel, filters.gradeLevel));
+    }
+    if (filters?.topic) {
+      conditions.push(eq(questionBanks.topic, filters.topic));
+    }
+    if (filters?.difficulty) {
+      conditions.push(eq(questionBanks.difficulty, filters.difficulty));
+    }
+    if (filters?.bkdFocus) {
+      conditions.push(eq(questionBanks.bkdFocus, filters.bkdFocus));
+    }
+    if (filters?.visibility) {
+      conditions.push(eq(questionBanks.visibility, filters.visibility));
+    }
+    
+    return db.select().from(questionBanks).where(and(...conditions)).orderBy(desc(questionBanks.usageCount));
+  }
+  
+  async getQuestionBankItem(id: string): Promise<QuestionBank | undefined> {
+    const [item] = await db.select().from(questionBanks).where(eq(questionBanks.id, id));
+    return item;
+  }
+  
+  async createQuestionBankItem(item: InsertQuestionBank): Promise<QuestionBank> {
+    const [newItem] = await db.insert(questionBanks).values(item).returning();
+    return newItem;
+  }
+  
+  async updateQuestionBankItem(id: string, updates: Partial<QuestionBank>): Promise<QuestionBank | undefined> {
+    const [updated] = await db.update(questionBanks)
+      .set({ ...updates, updatedAt: new Date() })
+      .where(eq(questionBanks.id, id))
+      .returning();
+    return updated;
+  }
+  
+  async deleteQuestionBankItem(id: string): Promise<boolean> {
+    const result = await db.delete(questionBanks).where(eq(questionBanks.id, id));
+    return true;
+  }
+  
+  async incrementQuestionUsage(id: string): Promise<void> {
+    await db.update(questionBanks)
+      .set({ usageCount: sql`${questionBanks.usageCount} + 1` })
+      .where(eq(questionBanks.id, id));
+  }
+
+  // ===========================================
+  // AUTHOR QUALITY METRICS
+  // ===========================================
+  
+  async getAuthorQualityMetrics(authorId: string): Promise<AuthorQualityMetrics[]> {
+    return db.select().from(authorQualityMetrics)
+      .where(eq(authorQualityMetrics.authorId, authorId))
+      .orderBy(desc(authorQualityMetrics.periodEnd));
+  }
+  
+  async getLatestAuthorMetrics(authorId: string): Promise<AuthorQualityMetrics | undefined> {
+    const [metrics] = await db.select().from(authorQualityMetrics)
+      .where(eq(authorQualityMetrics.authorId, authorId))
+      .orderBy(desc(authorQualityMetrics.periodEnd))
+      .limit(1);
+    return metrics;
+  }
+  
+  async createAuthorQualityMetrics(metrics: InsertAuthorQualityMetrics): Promise<AuthorQualityMetrics> {
+    const [newMetrics] = await db.insert(authorQualityMetrics).values(metrics).returning();
+    return newMetrics;
+  }
+  
+  async updateAuthorQualityMetrics(id: string, updates: Partial<AuthorQualityMetrics>): Promise<AuthorQualityMetrics | undefined> {
+    const [updated] = await db.update(authorQualityMetrics)
+      .set(updates)
+      .where(eq(authorQualityMetrics.id, id))
+      .returning();
+    return updated;
+  }
+
+  // ===========================================
+  // ASSIGNMENT ALIGNMENTS
+  // ===========================================
+  
+  async getAssignmentAlignments(assignmentId: string): Promise<AssignmentAlignment[]> {
+    return db.select().from(assignmentAlignments)
+      .where(eq(assignmentAlignments.assignmentId, assignmentId))
+      .orderBy(asc(assignmentAlignments.objectiveIndex));
+  }
+  
+  async createAssignmentAlignment(alignment: InsertAssignmentAlignment): Promise<AssignmentAlignment> {
+    const [newAlignment] = await db.insert(assignmentAlignments).values(alignment).returning();
+    return newAlignment;
+  }
+  
+  async getAlignmentsByLesson(lessonId: string): Promise<AssignmentAlignment[]> {
+    return db.select().from(assignmentAlignments)
+      .where(eq(assignmentAlignments.lessonId, lessonId))
+      .orderBy(asc(assignmentAlignments.objectiveIndex));
   }
 }
 

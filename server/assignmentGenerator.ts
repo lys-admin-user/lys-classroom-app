@@ -39,7 +39,45 @@ interface GenerateAssignmentRequest {
   accommodationTypes?: string[];
   accommodationNotes?: string;
   projectTemplate?: ProjectTemplateType;
+  differentiationLevel?: "standard" | "scaffolded" | "enrichment"; // Tiered question generation
 }
+
+// Differentiation level configurations
+interface DifferentiationConfig {
+  bloomsLevels: string[];
+  dokLevels: number[];
+  scaffoldingRequired: boolean;
+  extendedThinking: boolean;
+  vocabularyLevel: "basic" | "grade-level" | "advanced";
+  questionComplexity: "simplified" | "standard" | "complex";
+}
+
+const DIFFERENTIATION_CONFIGS: Record<string, DifferentiationConfig> = {
+  scaffolded: {
+    bloomsLevels: ["remember", "understand"],
+    dokLevels: [1, 2],
+    scaffoldingRequired: true,
+    extendedThinking: false,
+    vocabularyLevel: "basic",
+    questionComplexity: "simplified",
+  },
+  standard: {
+    bloomsLevels: ["understand", "apply", "analyze"],
+    dokLevels: [2, 3],
+    scaffoldingRequired: false,
+    extendedThinking: false,
+    vocabularyLevel: "grade-level",
+    questionComplexity: "standard",
+  },
+  enrichment: {
+    bloomsLevels: ["analyze", "evaluate", "create"],
+    dokLevels: [3, 4],
+    scaffoldingRequired: false,
+    extendedThinking: true,
+    vocabularyLevel: "advanced",
+    questionComplexity: "complex",
+  },
+};
 
 // Polymorphic Question Schema following Learning Standard Schema best practices
 interface QuestionRubric {
@@ -521,7 +559,24 @@ export async function generateAssignment(request: GenerateAssignmentRequest): Pr
     ? `\n\nIMPORTANT ACCOMMODATION REQUIREMENTS:\n${request.accommodationTypes.map(t => `- ${accommodationGuidelines[t] || t}`).join('\n')}\n${request.accommodationNotes ? `Additional notes: ${request.accommodationNotes}` : ""}`
     : "";
 
+  // Get differentiation config based on difficulty level
+  const differentiationLevel = request.difficulty === "easy" ? "scaffolded" 
+    : request.difficulty === "hard" ? "enrichment" 
+    : "standard";
+  const diffConfig = DIFFERENTIATION_CONFIGS[differentiationLevel];
+  
+  const differentiationContext = `
+DIFFERENTIATION LEVEL: ${differentiationLevel.toUpperCase()}
+- Target Bloom's Levels: ${diffConfig.bloomsLevels.join(", ")}
+- Depth of Knowledge: Levels ${diffConfig.dokLevels.join("-")}
+- Vocabulary: ${diffConfig.vocabularyLevel}
+- Question Complexity: ${diffConfig.questionComplexity}
+${diffConfig.scaffoldingRequired ? "- REQUIRED: Include scaffolding (sentence starters, word banks, visual supports)" : ""}
+${diffConfig.extendedThinking ? "- REQUIRED: Include extended thinking opportunities (multi-step reasoning, open-ended synthesis)" : ""}
+`;
+
   const systemPrompt = `You are a master educator creating DISTINGUISHED-LEVEL ${request.assignmentType} assignments that align perfectly with LYS lesson plans.
+${differentiationContext}
 
 CRITICAL ALIGNMENT REQUIREMENTS:
 Your assignments MUST directly align with the lesson's:
