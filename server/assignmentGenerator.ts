@@ -410,8 +410,9 @@ function generateProjectFromTemplate(
 
   // Generate reflection prompts incorporating Socratic, Hebraic, and Be-Know-Do styles
   // Connected to learning objectives and essential questions
-  const contentObjective = lesson.contentObjective || `understanding ${lesson.topic}`;
-  const lessonObjective = lesson.lessonObjective || `mastering concepts in ${lesson.topic}`;
+  const objectives = lesson.objectives as string[] || [];
+  const contentObjective = objectives[0] || `understanding ${lesson.topic}`;
+  const lessonObjective = objectives.length > 1 ? objectives[1] : `mastering concepts in ${lesson.topic}`;
   
   const reflectionPrompts: ReflectionPrompt[] = [
     // SOCRATIC STYLE - Questioning to illuminate understanding
@@ -520,66 +521,112 @@ export async function generateAssignment(request: GenerateAssignmentRequest): Pr
     ? `\n\nIMPORTANT ACCOMMODATION REQUIREMENTS:\n${request.accommodationTypes.map(t => `- ${accommodationGuidelines[t] || t}`).join('\n')}\n${request.accommodationNotes ? `Additional notes: ${request.accommodationNotes}` : ""}`
     : "";
 
-  const systemPrompt = `You are an expert educator creating ${request.assignmentType} assignments based on lesson plans.
-Your assignments should be engaging, pedagogically sound, and aligned with the lesson objectives.
+  const systemPrompt = `You are a master educator creating DISTINGUISHED-LEVEL ${request.assignmentType} assignments that align perfectly with LYS lesson plans.
 
-For the Be-Know-Do framework:
-- BE questions focus on identity, values, self-reflection, and personal application
-- KNOW questions focus on knowledge, facts, concepts, and understanding
-- DO questions focus on skills, action steps, and practical application
+CRITICAL ALIGNMENT REQUIREMENTS:
+Your assignments MUST directly align with the lesson's:
+1. Learning OBJECTIVES - Every question should assess one or more lesson objectives
+2. ESSENTIAL QUESTIONS - Include questions that address the lesson's essential questions
+3. LYS METHODOLOGY (BE-KNOW-DO) - Balance questions across all three pillars
+4. LIFE DIMENSIONS - For reflection/essay questions, connect to the 7 life dimensions (Educational, Social, Cultural, Financial, Health, Vocational, Spiritual)
 
-${request.includeBeKnowDo ? "Include questions from all three pillars (BE, KNOW, DO)." : "Focus primarily on KNOW and DO questions."}
+BE-KNOW-DO FRAMEWORK:
+- BE questions: Identity, values, character development, self-reflection, personal growth
+- KNOW questions: Knowledge, facts, concepts, understanding, resource awareness
+- DO questions: Skills, action steps, practical application, execution with excellence
+
+${request.includeBeKnowDo ? "Include questions from ALL three pillars (BE, KNOW, DO) with clear balance." : "Focus primarily on KNOW and DO questions."}
 ${accommodationContext}
+
+DISTINGUISHED-LEVEL QUALITY STANDARDS:
+[x] Every question directly ties to a lesson objective or essential question
+[x] Questions require higher-order thinking (analyze, evaluate, create) not just recall
+[x] Stimuli provide real-world context that connects to students' lives
+[x] Distractors address common misconceptions with educational feedback
+[x] Include at least one question connecting to character/values (BE)
+[x] Include at least one question requiring practical application (DO)
+[x] For essays/reflections: prompt students to connect learning to life dimensions
 
 Create ${request.questionCount} questions at ${request.difficulty} difficulty level.
 Mix question types appropriately for a ${request.assignmentType}.
 
-IMPORTANT: Use the Polymorphic Question Schema for each question:
-- Each question must have a "stimulus" (context/scenario the student reads first)
+POLYMORPHIC QUESTION SCHEMA:
+- Each question must have a "stimulus" (real-world context/scenario presented first)
 - Each question must have a "rubric" object with:
   - "correctAnswer": the correct answer
   - "distractors": array of {option, feedback} for wrong answers explaining WHY it's wrong
 - Include "bloomsLevel" (remember/understand/apply/analyze/evaluate/create)
 - Include "depthOfKnowledge" (1-4) using Webb's DOK levels
+- Include "objectiveAlignment" - which lesson objective this question assesses
 
-For multiple choice questions, provide 4 options with specific feedback for each distractor.
-This feedback helps students understand their misconceptions.
+For multiple choice questions, provide 4 options with specific educational feedback for each distractor.
 
 Return JSON with this structure:
 {
   "title": "string",
-  "description": "string",
-  "instructions": "string",
+  "description": "string - include how this assignment reinforces lesson objectives",
+  "instructions": "string - include BE-KNOW-DO focus and expectations",
   "questions": [
     {
       "type": "multiple_choice|short_answer|essay|true_false|matching|drag_drop",
-      "stimulus": "Context or scenario presented first",
-      "question": "The actual question",
+      "stimulus": "Real-world context or scenario that engages students",
+      "question": "The actual question tied to lesson objectives",
       "options": ["A", "B", "C", "D"] (for MC/TF),
       "rubric": {
         "correctAnswer": "A",
         "distractors": [
-          {"option": "B", "feedback": "Why this is incorrect"},
-          {"option": "C", "feedback": "Why this is incorrect"},
-          {"option": "D", "feedback": "Why this is incorrect"}
+          {"option": "B", "feedback": "Educational feedback on why this is incorrect"},
+          {"option": "C", "feedback": "Educational feedback on why this is incorrect"},
+          {"option": "D", "feedback": "Educational feedback on why this is incorrect"}
         ]
       },
       "points": 10,
       "bkdFocus": "be|know|do",
       "bloomsLevel": "remember|understand|apply|analyze|evaluate|create",
-      "depthOfKnowledge": 1-4
+      "depthOfKnowledge": 1-4,
+      "objectiveAlignment": "Which lesson objective this assesses"
     }
-  ]
+  ],
+  "lifeDimensionConnections": {
+    "educational": "How assignment connects to learning journey",
+    "vocational": "Career relevance of skills assessed",
+    "social": "How this connects to relationships/collaboration"
+  }
 }`;
 
+  // Extract lesson components for alignment
+  const lessonObjectives = request.lesson.objectives as string[] || [];
+  const lessonActivities = request.lesson.activities as { title: string; description: string; type: string }[] || [];
+  const lessonMaterials = request.lesson.materials as string[] || [];
+  const lysMethodology = (request.lesson as any).lysMethodology as { be?: { focus: string; description: string }; know?: { focus: string; description: string }; do?: { focus: string; description: string } } || {};
+  
   const lessonContext = `
-Lesson Title: ${request.lesson.title}
-Topic: ${request.lesson.topic}
-Grade Level: ${request.lesson.gradeLevel}
-BKD Focus: ${request.lesson.bkdFocus}
-Objectives: ${(request.lesson.objectives as string[]).join(", ")}
-Assessment: ${request.lesson.assessment}
-`;
+=== LESSON ALIGNMENT DATA ===
+
+LESSON TITLE: ${request.lesson.title}
+TOPIC: ${request.lesson.topic}
+GRADE LEVEL: ${request.lesson.gradeLevel}
+DURATION: ${request.lesson.duration || "45 minutes"}
+PRIMARY BKD FOCUS: ${request.lesson.bkdFocus?.toUpperCase()}
+
+LEARNING OBJECTIVES (Questions MUST assess these):
+${lessonObjectives.map((obj, i) => `${i + 1}. ${obj}`).join('\n')}
+
+LYS METHODOLOGY COMPONENTS:
+- BE (Character/Values): ${lysMethodology.be?.focus || "Identity development"} - ${lysMethodology.be?.description || "Character growth through learning"}
+- KNOW (Resources/Knowledge): ${lysMethodology.know?.focus || "Skill development"} - ${lysMethodology.know?.description || "Building understanding"}
+- DO (Execute/Excellence): ${lysMethodology.do?.focus || "Action steps"} - ${lysMethodology.do?.description || "Practical application"}
+
+LESSON ACTIVITIES (for context):
+${lessonActivities.map(a => `- ${a.title} (${a.type}): ${a.description}`).join('\n')}
+
+MATERIALS USED: ${lessonMaterials.join(', ')}
+
+ASSESSMENT APPROACH: ${request.lesson.assessment}
+
+=== END LESSON DATA ===
+
+Create a ${request.assignmentType} that directly assesses mastery of the above objectives while reinforcing the BE-KNOW-DO methodology.`;
 
   try {
     const response = await openai.chat.completions.create({
@@ -599,24 +646,36 @@ Assessment: ${request.lesson.assessment}
 
     const parsed = JSON.parse(content);
     
-    const questions: AssignmentQuestion[] = (parsed.questions || []).map((q: any, i: number) => ({
-      id: randomUUID(),
-      type: q.type || "short_answer",
-      stimulus: q.stimulus || "",
-      question: q.question,
-      options: q.options,
-      rubric: q.rubric || {
-        correctAnswer: q.correctAnswer || "",
-        distractors: q.options?.filter((o: string) => o !== q.correctAnswer).map((o: string) => ({
-          option: o,
-          feedback: "This answer is not correct."
-        })) || []
-      },
-      points: q.points || 10,
-      bkdFocus: q.bkdFocus,
-      bloomsLevel: q.bloomsLevel || "understand",
-      depthOfKnowledge: q.depthOfKnowledge || 2,
-    }));
+    const questions: AssignmentQuestion[] = (parsed.questions || []).map((q: any, i: number) => {
+      // Map objectives to standards format for alignment tracking
+      const objectiveAlignment = q.objectiveAlignment || lessonObjectives[i % lessonObjectives.length] || "";
+      const standardMappings: StandardMapping[] = objectiveAlignment ? [{
+        standardId: randomUUID(),
+        humanCoding: `OBJ-${i + 1}`,
+        fullStatement: objectiveAlignment,
+        alignmentStrength: 1.0
+      }] : [];
+
+      return {
+        id: randomUUID(),
+        type: q.type || "short_answer",
+        stimulus: q.stimulus || "",
+        question: q.question,
+        options: q.options,
+        rubric: q.rubric || {
+          correctAnswer: q.correctAnswer || "",
+          distractors: q.options?.filter((o: string) => o !== q.correctAnswer).map((o: string) => ({
+            option: o,
+            feedback: "This answer is not correct."
+          })) || []
+        },
+        points: q.points || 10,
+        bkdFocus: q.bkdFocus,
+        standardMappings,
+        bloomsLevel: q.bloomsLevel || "understand",
+        depthOfKnowledge: q.depthOfKnowledge || 2,
+      };
+    });
 
     return {
       title: parsed.title || `${request.lesson.title} - ${request.assignmentType.charAt(0).toUpperCase() + request.assignmentType.slice(1)}`,
@@ -739,6 +798,10 @@ function generateMockAssignment(request: GenerateAssignmentRequest): GeneratedAs
       : typeStr === "matching" ? 2 
       : 1) as 1 | 2 | 3 | 4;
     
+    // Extract objective for alignment
+    const lessonObjectives = request.lesson.objectives as string[] || [];
+    const alignedObjective = lessonObjectives[i % lessonObjectives.length] || `Understanding ${request.lesson.topic}`;
+    
     const question: AssignmentQuestion = {
       id: randomUUID(),
       type,
@@ -748,6 +811,12 @@ function generateMockAssignment(request: GenerateAssignmentRequest): GeneratedAs
       bkdFocus,
       bloomsLevel,
       depthOfKnowledge,
+      standardMappings: [{
+        standardId: randomUUID(),
+        humanCoding: `OBJ-${i + 1}`,
+        fullStatement: alignedObjective,
+        alignmentStrength: 1.0
+      }],
       rubric: {
         correctAnswer: "",
         distractors: []
