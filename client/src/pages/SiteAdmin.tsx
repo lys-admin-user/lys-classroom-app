@@ -2000,8 +2000,8 @@ export default function SiteAdminPage() {
         <TabsContent value="lesson-authors" className="space-y-4">
           <div className="flex items-center justify-between gap-4 flex-wrap">
             <div>
-              <h2 className="font-oswald text-xl">System Lesson Authors</h2>
-              <p className="text-sm text-muted-foreground">Educators authorized to create master lessons for the system repository</p>
+              <h2 className="font-oswald text-xl">System-Level Lesson Authors</h2>
+              <p className="text-sm text-muted-foreground">Educators authorized to create master lessons that influence AI-generated content across the <strong>entire system</strong>. Campus-level authors are managed by campus admins.</p>
             </div>
             <Dialog open={isAddAuthorOpen} onOpenChange={setIsAddAuthorOpen}>
               <DialogTrigger asChild>

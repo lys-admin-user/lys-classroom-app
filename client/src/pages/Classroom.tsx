@@ -101,7 +101,7 @@ const ACCOMMODATION_LABELS: Record<AccommodationType, string> = {
 export default function Classroom() {
   const { user, isLoading: authLoading } = useAuth();
   const { toast } = useToast();
-  const [activeTab, setActiveTab] = useState<"classes" | "students">("classes");
+  const [activeTab, setActiveTab] = useState<"classes" | "students" | "lesson-authors">("classes");
   const [isCreateClassOpen, setIsCreateClassOpen] = useState(false);
   const [isCreateStudentOpen, setIsCreateStudentOpen] = useState(false);
   const [editingClass, setEditingClass] = useState<Class | null>(null);
@@ -137,6 +137,12 @@ export default function Classroom() {
   const [transferReason, setTransferReason] = useState("");
   const [transferNotes, setTransferNotes] = useState("");
 
+  // Campus Lesson Authors state
+  const [isAddCampusAuthorOpen, setIsAddCampusAuthorOpen] = useState(false);
+  const [selectedAuthorUserId, setSelectedAuthorUserId] = useState("");
+  const [campusAuthorSpecializations, setCampusAuthorSpecializations] = useState<string[]>([]);
+  const [campusAuthorBio, setCampusAuthorBio] = useState("");
+
   const isCampusAdmin = user?.role === "campus_admin";
   
   const { data: userOrgs = [] } = useQuery<OrgWithDetails[]>({
@@ -147,6 +153,76 @@ export default function Classroom() {
   const { data: allOrgs = [] } = useQuery<Organization[]>({
     queryKey: ["/api/organizations"],
     enabled: !!user && isCampusAdmin,
+  });
+
+  // Campus Lesson Authors types and queries
+  type CampusLessonAuthor = {
+    id: string;
+    userId: string;
+    organizationId: string;
+    authorizedBy: string;
+    specializations: string[];
+    bio: string | null;
+    status: string;
+    lessonsCreated: number;
+    createdAt: string;
+    userName: string;
+    userEmail: string;
+  };
+
+  const { data: campusLessonAuthors = [], isLoading: campusAuthorsLoading } = useQuery<CampusLessonAuthor[]>({
+    queryKey: ["/api/campus/lesson-authors", selectedOrgId],
+    queryFn: async () => {
+      if (!selectedOrgId) return [];
+      const res = await fetch(`/api/campus/lesson-authors?organizationId=${selectedOrgId}`, { credentials: "include" });
+      if (!res.ok) throw new Error("Failed to fetch campus lesson authors");
+      return res.json();
+    },
+    enabled: !!selectedOrgId && isCampusAdmin,
+  });
+
+  const { data: orgEducators = [] } = useQuery<any[]>({
+    queryKey: ["/api/organizations", selectedOrgId, "members"],
+    queryFn: async () => {
+      if (!selectedOrgId) return [];
+      const res = await fetch(`/api/organizations/${selectedOrgId}/members`, { credentials: "include" });
+      if (!res.ok) return [];
+      return res.json();
+    },
+    enabled: !!selectedOrgId && isCampusAdmin && activeTab === "lesson-authors",
+  });
+
+  const createCampusAuthorMutation = useMutation({
+    mutationFn: async (data: { userId: string; specializations: string[]; bio: string }) => {
+      return await apiRequest("POST", "/api/campus/lesson-authors", {
+        ...data,
+        organizationId: selectedOrgId,
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/campus/lesson-authors", selectedOrgId] });
+      setIsAddCampusAuthorOpen(false);
+      setSelectedAuthorUserId("");
+      setCampusAuthorSpecializations([]);
+      setCampusAuthorBio("");
+      toast({ title: "Success", description: "Campus lesson author added successfully" });
+    },
+    onError: (error: any) => {
+      toast({ title: "Error", description: error.message || "Failed to add author", variant: "destructive" });
+    },
+  });
+
+  const deleteCampusAuthorMutation = useMutation({
+    mutationFn: async (userId: string) => {
+      return await apiRequest("DELETE", `/api/campus/lesson-authors/${userId}/${selectedOrgId}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/campus/lesson-authors", selectedOrgId] });
+      toast({ title: "Success", description: "Campus lesson author removed" });
+    },
+    onError: (error: any) => {
+      toast({ title: "Error", description: error.message || "Failed to remove author", variant: "destructive" });
+    },
   });
 
   type EntityShare = {
@@ -640,6 +716,12 @@ export default function Classroom() {
             <Users className="h-4 w-4 mr-2" />
             Students ({students.length})
           </TabsTrigger>
+          {isCampusAdmin && selectedOrgId && (
+            <TabsTrigger value="lesson-authors" data-testid="tab-lesson-authors">
+              <GraduationCap className="h-4 w-4 mr-2" />
+              Lesson Authors ({campusLessonAuthors.length})
+            </TabsTrigger>
+          )}
         </TabsList>
 
         {/* Classes Tab */}
@@ -1241,6 +1323,151 @@ export default function Classroom() {
             </div>
           )}
         </TabsContent>
+
+        {/* Campus Lesson Authors Tab */}
+        {isCampusAdmin && selectedOrgId && (
+          <TabsContent value="lesson-authors" className="space-y-4">
+            <div className="flex items-center justify-between gap-4 flex-wrap">
+              <div>
+                <h2 className="font-oswald text-xl">Campus-Level Lesson Authors</h2>
+                <p className="text-sm text-muted-foreground">
+                  Educators authorized to create lessons that influence AI-generated content for <strong>this campus</strong>. 
+                  System-level authors (managed by site admins) influence content across the entire system.
+                </p>
+              </div>
+              <Dialog open={isAddCampusAuthorOpen} onOpenChange={setIsAddCampusAuthorOpen}>
+                <DialogTrigger asChild>
+                  <Button className="bg-lys-teal hover:bg-lys-teal/90" data-testid="button-add-campus-author">
+                    <Plus className="h-4 w-4 mr-2" />
+                    Add Author
+                  </Button>
+                </DialogTrigger>
+                <DialogContent>
+                  <DialogHeader>
+                    <DialogTitle>Add Campus Lesson Author</DialogTitle>
+                    <DialogDescription>
+                      Grant an educator permission to create lessons that influence AI-generated content for this campus.
+                    </DialogDescription>
+                  </DialogHeader>
+                  <div className="grid gap-4 py-4">
+                    <div className="grid gap-2">
+                      <Label htmlFor="campus-author-user">Select Educator</Label>
+                      <Select value={selectedAuthorUserId} onValueChange={setSelectedAuthorUserId}>
+                        <SelectTrigger data-testid="select-campus-author-user">
+                          <SelectValue placeholder="Choose an educator..." />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {orgEducators
+                            .filter((m: any) => !campusLessonAuthors.some(a => a.userId === m.userId))
+                            .map((member: any) => (
+                              <SelectItem key={member.userId} value={member.userId}>
+                                {member.user?.firstName || "User"} {member.user?.lastName || ""} ({member.user?.email || member.userId})
+                              </SelectItem>
+                            ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="grid gap-2">
+                      <Label htmlFor="campus-author-specializations">Specializations (comma-separated)</Label>
+                      <Input
+                        id="campus-author-specializations"
+                        placeholder="e.g., math, elementary, stem"
+                        onChange={(e) => setCampusAuthorSpecializations(e.target.value.split(",").map(s => s.trim()).filter(Boolean))}
+                        data-testid="input-campus-author-specializations"
+                      />
+                    </div>
+                    <div className="grid gap-2">
+                      <Label htmlFor="campus-author-bio">Bio (optional)</Label>
+                      <Textarea
+                        id="campus-author-bio"
+                        placeholder="Brief description of the author's expertise..."
+                        value={campusAuthorBio}
+                        onChange={(e) => setCampusAuthorBio(e.target.value)}
+                        data-testid="input-campus-author-bio"
+                      />
+                    </div>
+                  </div>
+                  <DialogFooter>
+                    <Button
+                      onClick={() => createCampusAuthorMutation.mutate({ 
+                        userId: selectedAuthorUserId, 
+                        specializations: campusAuthorSpecializations, 
+                        bio: campusAuthorBio 
+                      })}
+                      disabled={!selectedAuthorUserId || createCampusAuthorMutation.isPending}
+                      data-testid="button-submit-campus-author"
+                    >
+                      {createCampusAuthorMutation.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+                      Add Author
+                    </Button>
+                  </DialogFooter>
+                </DialogContent>
+              </Dialog>
+            </div>
+
+            {campusAuthorsLoading ? (
+              <div className="space-y-2">
+                {[1, 2, 3].map(i => (
+                  <div key={i} className="h-20 bg-muted animate-pulse rounded" />
+                ))}
+              </div>
+            ) : campusLessonAuthors.length === 0 ? (
+              <Card>
+                <CardContent className="py-8 text-center">
+                  <GraduationCap className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
+                  <p className="text-muted-foreground">No campus lesson authors yet. Add your first author to start influencing AI-generated lessons for this campus.</p>
+                </CardContent>
+              </Card>
+            ) : (
+              <div className="grid gap-4">
+                {campusLessonAuthors.map((author) => (
+                  <Card key={author.id} data-testid={`campus-author-card-${author.userId}`}>
+                    <CardContent className="py-4">
+                      <div className="flex items-center justify-between gap-4 flex-wrap">
+                        <div className="flex items-center gap-4">
+                          <div className="w-12 h-12 rounded-full bg-lys-teal/20 flex items-center justify-center">
+                            <GraduationCap className="h-6 w-6 text-lys-teal" />
+                          </div>
+                          <div>
+                            <p className="font-semibold">{author.userName || "Unknown User"}</p>
+                            <p className="text-sm text-muted-foreground">{author.userEmail}</p>
+                            {author.bio && (
+                              <p className="text-sm mt-1">{author.bio}</p>
+                            )}
+                            {author.specializations && author.specializations.length > 0 && (
+                              <div className="flex gap-1 mt-2">
+                                {author.specializations.map((spec, idx) => (
+                                  <Badge key={idx} variant="secondary" className="text-xs">{spec}</Badge>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <Badge variant={author.status === "active" ? "default" : "secondary"}>
+                            {author.status}
+                          </Badge>
+                          <span className="text-sm text-muted-foreground">
+                            {author.lessonsCreated || 0} lessons
+                          </span>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => deleteCampusAuthorMutation.mutate(author.userId)}
+                            disabled={deleteCampusAuthorMutation.isPending}
+                            data-testid={`button-remove-campus-author-${author.userId}`}
+                          >
+                            <Trash2 className="h-4 w-4 text-destructive" />
+                          </Button>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            )}
+          </TabsContent>
+        )}
       </Tabs>
 
       {/* Edit Class Dialog */}
