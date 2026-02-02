@@ -195,10 +195,13 @@ import {
   type InsertStudentJourneyActivity,
   type StudentJourneyEntry,
   type InsertStudentJourneyEntry,
+  type StudentJourneyProgressHistory,
+  type InsertStudentJourneyProgressHistory,
   studentJourneyProgress,
   studentJourneyMilestones,
   studentJourneyActivities,
   studentJourneyEntries,
+  studentJourneyProgressHistory,
   type LessonTemplate,
   type InsertLessonTemplate,
   lessonTemplates,
@@ -663,6 +666,11 @@ export interface IStorage {
   // Student Journey Activities
   getStudentJourneyActivities(journeyProgressId: string, limit?: number): Promise<StudentJourneyActivity[]>;
   createStudentJourneyActivity(activity: InsertStudentJourneyActivity): Promise<StudentJourneyActivity>;
+  
+  // Student Journey Progress History
+  getStudentJourneyProgressHistory(journeyProgressId: string, limit?: number): Promise<StudentJourneyProgressHistory[]>;
+  getStudentJourneyProgressHistoryByStudent(studentId: string, limit?: number): Promise<StudentJourneyProgressHistory[]>;
+  createStudentJourneyProgressHistory(history: InsertStudentJourneyProgressHistory): Promise<StudentJourneyProgressHistory>;
   
   // Student Digital Portfolio
   getStudentPortfolio(userId: string): Promise<StudentPortfolio | undefined>;
@@ -5010,6 +5018,26 @@ export class DatabaseStorage implements IStorage {
   async deleteStudentJourneyEntry(id: string): Promise<boolean> {
     const result = await db.delete(studentJourneyEntries).where(eq(studentJourneyEntries.id, id));
     return (result.rowCount ?? 0) > 0;
+  }
+
+  // Student Journey Progress History
+  async getStudentJourneyProgressHistory(journeyProgressId: string, limit: number = 100): Promise<StudentJourneyProgressHistory[]> {
+    return await db.select().from(studentJourneyProgressHistory)
+      .where(eq(studentJourneyProgressHistory.journeyProgressId, journeyProgressId))
+      .orderBy(desc(studentJourneyProgressHistory.createdAt))
+      .limit(limit);
+  }
+
+  async getStudentJourneyProgressHistoryByStudent(studentId: string, limit: number = 100): Promise<StudentJourneyProgressHistory[]> {
+    return await db.select().from(studentJourneyProgressHistory)
+      .where(eq(studentJourneyProgressHistory.studentId, studentId))
+      .orderBy(desc(studentJourneyProgressHistory.createdAt))
+      .limit(limit);
+  }
+
+  async createStudentJourneyProgressHistory(history: InsertStudentJourneyProgressHistory): Promise<StudentJourneyProgressHistory> {
+    const [created] = await db.insert(studentJourneyProgressHistory).values(history as any).returning();
+    return created;
   }
 
   // ================================

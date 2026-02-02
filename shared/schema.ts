@@ -1222,6 +1222,34 @@ export const insertStudentJourneyActivitySchema = createInsertSchema(studentJour
 export type InsertStudentJourneyActivity = z.infer<typeof insertStudentJourneyActivitySchema>;
 export type StudentJourneyActivity = typeof studentJourneyActivities.$inferSelect;
 
+// Student Journey Progress History - tracks Be-Know-Do score snapshots over time
+export const studentJourneyProgressHistory = pgTable("student_journey_progress_history", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  studentId: varchar("student_id").notNull(),
+  journeyProgressId: varchar("journey_progress_id").notNull(),
+  
+  // Snapshot scores at this point in time
+  beScore: integer("be_score").notNull(),
+  knowScore: integer("know_score").notNull(),
+  doScore: integer("do_score").notNull(),
+  overallScore: integer("overall_score").notNull(),
+  
+  // Context for the snapshot
+  snapshotType: text("snapshot_type").notNull().$type<"assessment" | "milestone" | "weekly" | "monthly" | "manual">(),
+  triggerEvent: text("trigger_event"), // What triggered this snapshot (e.g., "completed_assessment", "milestone_achieved")
+  notes: text("notes"),
+  
+  // Cumulative stats at snapshot time
+  totalMilestonesCompleted: integer("total_milestones_completed").default(0),
+  totalActivitiesLogged: integer("total_activities_logged").default(0),
+  
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertStudentJourneyProgressHistorySchema = createInsertSchema(studentJourneyProgressHistory).omit({ id: true, createdAt: true });
+export type InsertStudentJourneyProgressHistory = z.infer<typeof insertStudentJourneyProgressHistorySchema>;
+export type StudentJourneyProgressHistory = typeof studentJourneyProgressHistory.$inferSelect;
+
 // ================================
 // Student Matriculation & Achievement Tracking (System-Level)
 // ================================

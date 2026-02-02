@@ -42,7 +42,8 @@ import {
   FolderOpen,
   ExternalLink
 } from "lucide-react";
-import type { StudentJourneyProgress, StudentJourneyMilestone, StudentJourneyActivity, StudentJourneyEntry, Career } from "@shared/schema";
+import type { StudentJourneyProgress, StudentJourneyMilestone, StudentJourneyActivity, StudentJourneyEntry, StudentJourneyProgressHistory, Career } from "@shared/schema";
+import { JourneyProgressChart } from "@/components/JourneyProgressChart";
 
 interface JourneyData {
   progress: StudentJourneyProgress;
@@ -690,6 +691,11 @@ export default function MyJourney() {
     enabled: isAuthenticated,
   });
 
+  const { data: progressHistory = [], isLoading: historyLoading } = useQuery<StudentJourneyProgressHistory[]>({
+    queryKey: ["/api/my-journey/history"],
+    enabled: isAuthenticated,
+  });
+
   const addMilestoneMutation = useMutation({
     mutationFn: (milestone: { title: string; description: string; category: string }) =>
       apiRequest("POST", "/api/my-journey/milestones", milestone),
@@ -734,12 +740,27 @@ export default function MyJourney() {
     },
   });
 
+  const takeSnapshotMutation = useMutation({
+    mutationFn: () => apiRequest("POST", "/api/my-journey/history", { notes: "Manual progress checkpoint" }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/my-journey/history"] });
+      toast({ title: "Snapshot saved", description: "Your progress has been recorded for tracking." });
+    },
+    onError: () => {
+      toast({ title: "Error", description: "Failed to save snapshot", variant: "destructive" });
+    },
+  });
+
   const handleUpdateMilestone = (id: string, updates: Partial<StudentJourneyMilestone>) => {
     updateMilestoneMutation.mutate({ id, updates });
   };
 
   const handleAddReflection = (text: string) => {
     addReflectionMutation.mutate(text);
+  };
+
+  const handleTakeSnapshot = () => {
+    takeSnapshotMutation.mutate();
   };
 
   if (!isAuthenticated) {
@@ -918,7 +939,7 @@ export default function MyJourney() {
       </div>
 
       <Tabs defaultValue="milestones" className="space-y-6">
-        <TabsList>
+        <TabsList className="flex-wrap">
           <TabsTrigger value="milestones" data-testid="tab-milestones">
             <Trophy className="w-4 h-4 mr-2" />
             Milestones ({milestones.length})
@@ -926,6 +947,10 @@ export default function MyJourney() {
           <TabsTrigger value="activities" data-testid="tab-activities">
             <Clock className="w-4 h-4 mr-2" />
             Recent Activity ({activities.length})
+          </TabsTrigger>
+          <TabsTrigger value="progress-history" data-testid="tab-progress-history">
+            <TrendingUp className="w-4 h-4 mr-2" />
+            Progress History
           </TabsTrigger>
           <TabsTrigger value="portfolio" data-testid="tab-portfolio">
             <Briefcase className="w-4 h-4 mr-2" />
@@ -1110,6 +1135,14 @@ export default function MyJourney() {
               </CardContent>
             </Card>
           </div>
+        </TabsContent>
+
+        <TabsContent value="progress-history">
+          <JourneyProgressChart 
+            history={progressHistory} 
+            onTakeSnapshot={handleTakeSnapshot}
+            isLoading={historyLoading || takeSnapshotMutation.isPending}
+          />
         </TabsContent>
 
         <TabsContent value="portfolio">

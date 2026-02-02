@@ -77,6 +77,10 @@ const createGoalSchema = z.object({
   })).optional().default([]),
 });
 
+const manualSnapshotSchema = z.object({
+  notes: z.string().max(500).optional(),
+});
+
 const updateGoalSchema = z.object({
   title: z.string().min(1).optional(),
   description: z.string().optional(),
@@ -7973,6 +7977,23 @@ export async function registerRoutes(
         metadata: assessmentResult,
       });
       
+      // Create a progress history snapshot for tracking over time
+      const milestones = await storage.getStudentJourneyMilestones(progress.id);
+      const activities = await storage.getStudentJourneyActivities(progress.id, 1000);
+      await storage.createStudentJourneyProgressHistory({
+        studentId: userId,
+        journeyProgressId: progress.id,
+        beScore,
+        knowScore,
+        doScore,
+        overallScore,
+        snapshotType: "assessment",
+        triggerEvent: "completed_assessment",
+        notes: `Self-Discovery Assessment: BE ${beScore}%, KNOW ${knowScore}%, DO ${doScore}%`,
+        totalMilestonesCompleted: milestones.filter(m => m.status === "completed" || m.status === "mastered").length,
+        totalActivitiesLogged: activities.length,
+      });
+      
       res.json(updated);
     } catch (error) {
       console.error("Failed to record assessment:", error);
@@ -8514,6 +8535,115 @@ export async function registerRoutes(
     } catch (error) {
       console.error("Failed to fetch journey summary:", error);
       res.status(500).json({ error: "Failed to fetch journey summary" });
+    }
+  });
+
+  // Get progress history for current user's journey (for tracking over time)
+  app.get("/api/my-journey/history", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user?.claims?.sub;
+      const limit = parseInt(req.query.limit as string) || 100;
+      
+      const progress = await storage.getStudentJourneyProgressByUserId(userId);
+      if (!progress) {
+        res.json([]);
+        return;
+      }
+      
+      const history = await storage.getStudentJourneyProgressHistory(progress.id, limit);
+      res.json(history);
+    } catch (error) {
+      console.error("Failed to fetch progress history:", error);
+      res.status(500).json({ error: "Failed to fetch progress history" });
+    }
+  });
+
+  // Create a manual progress history snapshot
+  app.post("/api/my-journey/history", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user?.claims?.sub;
+      
+      const parseResult = manualSnapshotSchema.safeParse(req.body);
+      if (!parseResult.success) {
+        res.status(400).json({ error: "Invalid request body", details: parseResult.error.errors });
+        return;
+      }
+      const { notes } = parseResult.data;
+      
+      const progress = await storage.getStudentJourneyProgressByUserId(userId);
+      if (!progress) {
+        res.status(404).json({ error: "Journey not found" });
+        return;
+      }
+      
+      const milestones = await storage.getStudentJourneyMilestones(progress.id);
+      const activities = await storage.getStudentJourneyActivities(progress.id, 1000);
+      
+      const snapshot = await storage.createStudentJourneyProgressHistory({
+        studentId: userId,
+        journeyProgressId: progress.id,
+        beScore: progress.beScore,
+        knowScore: progress.knowScore,
+        doScore: progress.doScore,
+        overallScore: progress.overallScore,
+        snapshotType: "manual",
+        triggerEvent: "manual_snapshot",
+        notes: notes || "Manual progress snapshot",
+        totalMilestonesCompleted: milestones.filter(m => m.status === "completed" || m.status === "mastered").length,
+        totalActivitiesLogged: activities.length,
+      });
+      
+      res.status(201).json(snapshot);
+    } catch (error) {
+      console.error("Failed to create progress snapshot:", error);
+      res.status(500).json({ error: "Failed to create progress snapshot" });
+    }
+  });
+
+  // Get progress history for a specific student (for educators/admins)
+  app.get("/api/student-journey/:studentId/history", isAuthenticated, async (req: any, res) => {
+    try {
+      const { studentId } = req.params;
+      const userId = req.user?.claims?.sub;
+      const limit = parseInt(req.query.limit as string) || 100;
+      
+      // Authorization: user can only access their own history, or must be educator/admin
+      const user = await storage.getUser(userId);
+      if (!user) {
+        res.status(401).json({ error: "User not found" });
+        return;
+      }
+      
+      const isOwnHistory = userId === studentId;
+      const isEducatorOrAdmin = ["educator", "campus_admin", "district_admin", "site_admin", "system_admin"].includes(user.role || "");
+      
+      if (!isOwnHistory && !isEducatorOrAdmin) {
+        res.status(403).json({ error: "Unauthorized to access this student's history" });
+        return;
+      }
+      
+      // If educator, verify they have access to this student (through their organization/class)
+      if (!isOwnHistory && user.role === "educator") {
+        const educatorProfile = await storage.getEducatorProfile(userId);
+        if (educatorProfile) {
+          const studentProgress = await storage.getStudentJourneyProgress(studentId);
+          if (studentProgress && studentProgress.educatorUserId !== userId) {
+            // Check if student is in educator's organization
+            const studentJourney = await storage.getStudentJourneyProgressByUserId(studentId);
+            if (studentJourney && educatorProfile.organizationId && 
+                studentJourney.organizationId !== educatorProfile.organizationId) {
+              res.status(403).json({ error: "Student not in your organization" });
+              return;
+            }
+          }
+        }
+      }
+      
+      const history = await storage.getStudentJourneyProgressHistoryByStudent(studentId, limit);
+      res.json(history);
+    } catch (error) {
+      console.error("Failed to fetch student progress history:", error);
+      res.status(500).json({ error: "Failed to fetch student progress history" });
     }
   });
 
