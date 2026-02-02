@@ -3736,9 +3736,25 @@ export async function registerRoutes(
   // Educational Standards Admin API
   // ================================
 
+  // Helper to check site admin for standards admin routes
+  const requireSiteAdminForStandards = async (req: any, res: any): Promise<boolean> => {
+    const userId = req.user?.claims?.sub;
+    if (!userId) {
+      res.status(401).json({ error: "Unauthorized" });
+      return false;
+    }
+    const isSiteAdminUser = await storage.isSiteAdmin(userId);
+    if (!isSiteAdminUser) {
+      res.status(403).json({ error: "Standards administration requires system-level admin access" });
+      return false;
+    }
+    return true;
+  };
+
   // Get sync status and statistics
   app.get("/api/admin/standards/status", isAuthenticated, async (req: any, res) => {
     try {
+      if (!await requireSiteAdminForStandards(req, res)) return;
       const status = await getSyncStatus();
       res.json(status);
     } catch (error) {
@@ -3762,6 +3778,7 @@ export async function registerRoutes(
   // Get all jurisdictions (from database) - admin version
   app.get("/api/admin/standards/jurisdictions", isAuthenticated, async (req: any, res) => {
     try {
+      if (!await requireSiteAdminForStandards(req, res)) return;
       const country = req.query.country as string | undefined;
       const jurisdictions = await storage.getJurisdictions(country);
       res.json(jurisdictions);
@@ -3774,6 +3791,7 @@ export async function registerRoutes(
   // Get standard sets for a jurisdiction
   app.get("/api/admin/standards/jurisdictions/:id/sets", isAuthenticated, async (req: any, res) => {
     try {
+      if (!await requireSiteAdminForStandards(req, res)) return;
       const { id } = req.params;
       const sets = await storage.getStandardSets(id);
       res.json(sets);
@@ -3786,6 +3804,7 @@ export async function registerRoutes(
   // Get individual standards for a standard set
   app.get("/api/admin/standards/sets/:id/standards", isAuthenticated, async (req: any, res) => {
     try {
+      if (!await requireSiteAdminForStandards(req, res)) return;
       const { id } = req.params;
       const standards = await storage.getEducationalStandards(id);
       res.json(standards);
@@ -3798,6 +3817,7 @@ export async function registerRoutes(
   // Sync jurisdictions from CSP (Tier 1)
   app.post("/api/admin/standards/sync/jurisdictions", isAuthenticated, async (req: any, res) => {
     try {
+      if (!await requireSiteAdminForStandards(req, res)) return;
       const userId = req.user?.claims?.sub;
       const result = await syncJurisdictionsFromCSP(userId);
       res.json(result);
@@ -3810,6 +3830,7 @@ export async function registerRoutes(
   // Sync a specific standard set from CSP
   app.post("/api/admin/standards/sync/standard-set", isAuthenticated, async (req: any, res) => {
     try {
+      if (!await requireSiteAdminForStandards(req, res)) return;
       const userId = req.user?.claims?.sub;
       const { externalSetId, jurisdictionId } = req.body;
       
@@ -3829,6 +3850,7 @@ export async function registerRoutes(
   // Get available jurisdictions from CSP API (for discovery)
   app.get("/api/admin/standards/csp/jurisdictions", isAuthenticated, async (req: any, res) => {
     try {
+      if (!await requireSiteAdminForStandards(req, res)) return;
       const jurisdictions = await fetchCSPJurisdictions();
       res.json(jurisdictions);
     } catch (error) {
@@ -3840,6 +3862,7 @@ export async function registerRoutes(
   // Get sync logs
   app.get("/api/admin/standards/sync-logs", isAuthenticated, async (req: any, res) => {
     try {
+      if (!await requireSiteAdminForStandards(req, res)) return;
       const limit = parseInt(req.query.limit as string) || 20;
       const logs = await storage.getLatestSyncLogs(limit);
       res.json(logs);
@@ -3852,6 +3875,7 @@ export async function registerRoutes(
   // Full import of all standards from all jurisdictions
   app.post("/api/admin/standards/sync/full-import", isAuthenticated, async (req: any, res) => {
     try {
+      if (!await requireSiteAdminForStandards(req, res)) return;
       const userId = req.user?.claims?.sub;
       // Start import in background and return immediately
       syncAllStandardsFromCSP(userId).catch(err => {
@@ -3870,6 +3894,7 @@ export async function registerRoutes(
   // Get import progress
   app.get("/api/admin/standards/import-progress", isAuthenticated, async (req: any, res) => {
     try {
+      if (!await requireSiteAdminForStandards(req, res)) return;
       const progress = getImportProgress();
       res.json(progress);
     } catch (error) {
@@ -4146,6 +4171,7 @@ export async function registerRoutes(
   // Get staging standards (pending, approved, rejected)
   app.get("/api/admin/standards/staging", isAuthenticated, async (req: any, res) => {
     try {
+      if (!await requireSiteAdminForStandards(req, res)) return;
       const status = req.query.status as string | undefined;
       const staging = await storage.getStagingStandards(status);
       res.json(staging);
@@ -4158,6 +4184,7 @@ export async function registerRoutes(
   // Approve a staging standard
   app.post("/api/admin/standards/staging/:id/approve", isAuthenticated, async (req: any, res) => {
     try {
+      if (!await requireSiteAdminForStandards(req, res)) return;
       const userId = req.user?.claims?.sub;
       const { id } = req.params;
       const result = await storage.approveStagingStandard(id, userId);
@@ -4175,6 +4202,7 @@ export async function registerRoutes(
   // Reject a staging standard
   app.post("/api/admin/standards/staging/:id/reject", isAuthenticated, async (req: any, res) => {
     try {
+      if (!await requireSiteAdminForStandards(req, res)) return;
       const userId = req.user?.claims?.sub;
       const { id } = req.params;
       const { reason } = req.body;
@@ -4193,6 +4221,7 @@ export async function registerRoutes(
   // Bulk approve staging standards
   app.post("/api/admin/standards/staging/bulk-approve", isAuthenticated, async (req: any, res) => {
     try {
+      if (!await requireSiteAdminForStandards(req, res)) return;
       const userId = req.user?.claims?.sub;
       const { ids } = req.body;
       if (!Array.isArray(ids) || ids.length === 0) {
@@ -4218,6 +4247,7 @@ export async function registerRoutes(
   // Extract standards from text using LLM
   app.post("/api/admin/standards/extract", isAuthenticated, async (req: any, res) => {
     try {
+      if (!await requireSiteAdminForStandards(req, res)) return;
       const { rawText, jurisdictionName, subject, gradeLevel } = req.body;
       if (!rawText || !jurisdictionName) {
         res.status(400).json({ error: "Missing rawText or jurisdictionName" });
@@ -4234,6 +4264,7 @@ export async function registerRoutes(
   // Process a PDF import
   app.post("/api/admin/standards/pdf/:id/process", isAuthenticated, async (req: any, res) => {
     try {
+      if (!await requireSiteAdminForStandards(req, res)) return;
       const { id } = req.params;
       const result = await processPdfImport(id);
       res.json(result);
@@ -4250,6 +4281,7 @@ export async function registerRoutes(
   // Check a source URL for changes
   app.post("/api/admin/standards/check-source", isAuthenticated, async (req: any, res) => {
     try {
+      if (!await requireSiteAdminForStandards(req, res)) return;
       const { sourceUrl } = req.body;
       if (!sourceUrl) {
         res.status(400).json({ error: "Missing sourceUrl" });
@@ -4266,6 +4298,7 @@ export async function registerRoutes(
   // Get all sources with detected changes
   app.get("/api/admin/standards/changed-sources", isAuthenticated, async (req: any, res) => {
     try {
+      if (!await requireSiteAdminForStandards(req, res)) return;
       const sources = await storage.getChangedSources();
       res.json(sources);
     } catch (error) {
@@ -4277,6 +4310,7 @@ export async function registerRoutes(
   // Deprecate a standard (soft delete)
   app.post("/api/admin/standards/:id/deprecate", isAuthenticated, async (req: any, res) => {
     try {
+      if (!await requireSiteAdminForStandards(req, res)) return;
       const { id } = req.params;
       const result = await storage.deprecateStandard(id);
       if (!result) {
