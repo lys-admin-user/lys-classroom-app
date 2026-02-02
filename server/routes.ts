@@ -4648,8 +4648,184 @@ export async function registerRoutes(
       res.status(500).json({ error: "Failed to remove lesson author" });
     }
   });
+
+  // ===========================================
+  // CAMPUS LESSON AUTHORS (Campus Admin Only)
+  // ===========================================
+
+  // Get campus lesson authors for an organization
+  app.get("/api/campus/lesson-authors", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user?.claims?.sub;
+      const user = await storage.getUser(userId);
+      if (!user) {
+        res.status(401).json({ error: "Unauthorized" });
+        return;
+      }
+      
+      const isSiteAdminUser = await storage.isSiteAdmin(userId);
+      const isCampusAdmin = user.role === "campus_admin" || user.role === "district_admin";
+      
+      if (!isSiteAdminUser && !isCampusAdmin) {
+        res.status(403).json({ error: "Campus admin access required" });
+        return;
+      }
+      
+      // Get organization from user's membership or query param
+      const organizationId = req.query.organizationId as string;
+      if (!organizationId) {
+        res.status(400).json({ error: "Organization ID required" });
+        return;
+      }
+      
+      const authors = await storage.getCampusLessonAuthors(organizationId);
+      // Enrich with user info
+      const enrichedAuthors = await Promise.all(
+        authors.map(async (author) => {
+          const authorUser = await storage.getUser(author.userId);
+          return {
+            ...author,
+            userName: authorUser ? `${authorUser.firstName || ""} ${authorUser.lastName || ""}`.trim() : "Unknown",
+            userEmail: authorUser?.email || "",
+          };
+        })
+      );
+      res.json(enrichedAuthors);
+    } catch (error) {
+      console.error("Error fetching campus lesson authors:", error);
+      res.status(500).json({ error: "Failed to fetch campus lesson authors" });
+    }
+  });
+
+  // Create a campus lesson author
+  app.post("/api/campus/lesson-authors", isAuthenticated, async (req: any, res) => {
+    try {
+      const adminUserId = req.user?.claims?.sub;
+      const user = await storage.getUser(adminUserId);
+      if (!user) {
+        res.status(401).json({ error: "Unauthorized" });
+        return;
+      }
+      
+      const isSiteAdminUser = await storage.isSiteAdmin(adminUserId);
+      const isCampusAdmin = user.role === "campus_admin" || user.role === "district_admin";
+      
+      if (!isSiteAdminUser && !isCampusAdmin) {
+        res.status(403).json({ error: "Campus admin access required" });
+        return;
+      }
+      
+      const { userId, organizationId, specializations, bio } = req.body;
+      
+      if (!userId || !organizationId) {
+        res.status(400).json({ error: "User ID and Organization ID required" });
+        return;
+      }
+      
+      // Check if already an author for this campus
+      const existing = await storage.getCampusLessonAuthor(userId, organizationId);
+      if (existing) {
+        res.status(400).json({ error: "User is already a campus lesson author for this organization" });
+        return;
+      }
+      
+      const author = await storage.createCampusLessonAuthor({
+        userId,
+        organizationId,
+        authorizedBy: adminUserId,
+        specializations: specializations || [],
+        bio: bio || null,
+        status: "active",
+      });
+      
+      res.status(201).json(author);
+    } catch (error) {
+      console.error("Error creating campus lesson author:", error);
+      res.status(500).json({ error: "Failed to create campus lesson author" });
+    }
+  });
+
+  // Update a campus lesson author
+  app.patch("/api/campus/lesson-authors/:userId/:organizationId", isAuthenticated, async (req: any, res) => {
+    try {
+      const adminUserId = req.user?.claims?.sub;
+      const user = await storage.getUser(adminUserId);
+      if (!user) {
+        res.status(401).json({ error: "Unauthorized" });
+        return;
+      }
+      
+      const isSiteAdminUser = await storage.isSiteAdmin(adminUserId);
+      const isCampusAdmin = user.role === "campus_admin" || user.role === "district_admin";
+      
+      if (!isSiteAdminUser && !isCampusAdmin) {
+        res.status(403).json({ error: "Campus admin access required" });
+        return;
+      }
+      
+      const { userId, organizationId } = req.params;
+      const updates = req.body;
+      
+      const updated = await storage.updateCampusLessonAuthor(userId, organizationId, updates);
+      if (!updated) {
+        res.status(404).json({ error: "Campus lesson author not found" });
+        return;
+      }
+      res.json(updated);
+    } catch (error) {
+      console.error("Error updating campus lesson author:", error);
+      res.status(500).json({ error: "Failed to update campus lesson author" });
+    }
+  });
+
+  // Delete a campus lesson author
+  app.delete("/api/campus/lesson-authors/:userId/:organizationId", isAuthenticated, async (req: any, res) => {
+    try {
+      const adminUserId = req.user?.claims?.sub;
+      const user = await storage.getUser(adminUserId);
+      if (!user) {
+        res.status(401).json({ error: "Unauthorized" });
+        return;
+      }
+      
+      const isSiteAdminUser = await storage.isSiteAdmin(adminUserId);
+      const isCampusAdmin = user.role === "campus_admin" || user.role === "district_admin";
+      
+      if (!isSiteAdminUser && !isCampusAdmin) {
+        res.status(403).json({ error: "Campus admin access required" });
+        return;
+      }
+      
+      const { userId, organizationId } = req.params;
+      await storage.deleteCampusLessonAuthor(userId, organizationId);
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Error removing campus lesson author:", error);
+      res.status(500).json({ error: "Failed to remove campus lesson author" });
+    }
+  });
+
+  // Check if current user is a campus lesson author
+  app.get("/api/campus/lesson-author/status", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user?.claims?.sub;
+      const organizationId = req.query.organizationId as string | undefined;
+      
+      const isAuthor = await storage.isCampusLessonAuthor(userId, organizationId);
+      let author = null;
+      if (isAuthor) {
+        author = organizationId 
+          ? await storage.getCampusLessonAuthor(userId, organizationId)
+          : await storage.getCampusLessonAuthorByUserId(userId);
+      }
+      res.json({ isAuthor, author });
+    } catch (error) {
+      console.error("Error checking campus author status:", error);
+      res.status(500).json({ error: "Failed to check campus author status" });
+    }
+  });
   
-  // Check if current user is a lesson author
+  // Check if current user is a lesson author (system-level)
   app.get("/api/lesson-author/status", isAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user?.claims?.sub;

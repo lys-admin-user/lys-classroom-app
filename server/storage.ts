@@ -5913,7 +5913,7 @@ export class DatabaseStorage implements IStorage {
   async deleteCampusLessonAuthor(userId: string, organizationId: string): Promise<boolean> {
     const result = await db.delete(campusLessonAuthors)
       .where(and(eq(campusLessonAuthors.userId, userId), eq(campusLessonAuthors.organizationId, organizationId)));
-    return result.rowCount > 0;
+    return (result.rowCount ?? 0) > 0;
   }
 
   async incrementCampusAuthorLessonCount(userId: string, organizationId: string): Promise<void> {
