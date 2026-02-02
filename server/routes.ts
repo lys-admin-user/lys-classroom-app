@@ -4678,6 +4678,15 @@ export async function registerRoutes(
         return;
       }
       
+      // Verify campus admin is a member of this organization (site admins can access any)
+      if (!isSiteAdminUser) {
+        const membership = await storage.getOrganizationMembership(userId, organizationId);
+        if (!membership || !["admin", "owner"].includes(membership.role)) {
+          res.status(403).json({ error: "You must be an admin of this organization to manage lesson authors" });
+          return;
+        }
+      }
+      
       const authors = await storage.getCampusLessonAuthors(organizationId);
       // Enrich with user info
       const enrichedAuthors = await Promise.all(
@@ -4720,6 +4729,15 @@ export async function registerRoutes(
       if (!userId || !organizationId) {
         res.status(400).json({ error: "User ID and Organization ID required" });
         return;
+      }
+      
+      // Verify campus admin is a member of this organization (site admins can manage any)
+      if (!isSiteAdminUser) {
+        const membership = await storage.getOrganizationMembership(adminUserId, organizationId);
+        if (!membership || !["admin", "owner"].includes(membership.role)) {
+          res.status(403).json({ error: "You must be an admin of this organization to add lesson authors" });
+          return;
+        }
       }
       
       // Check if already an author for this campus
@@ -4766,6 +4784,15 @@ export async function registerRoutes(
       const { userId, organizationId } = req.params;
       const updates = req.body;
       
+      // Verify campus admin is a member of this organization (site admins can manage any)
+      if (!isSiteAdminUser) {
+        const membership = await storage.getOrganizationMembership(adminUserId, organizationId);
+        if (!membership || !["admin", "owner"].includes(membership.role)) {
+          res.status(403).json({ error: "You must be an admin of this organization to update lesson authors" });
+          return;
+        }
+      }
+      
       const updated = await storage.updateCampusLessonAuthor(userId, organizationId, updates);
       if (!updated) {
         res.status(404).json({ error: "Campus lesson author not found" });
@@ -4797,6 +4824,15 @@ export async function registerRoutes(
       }
       
       const { userId, organizationId } = req.params;
+      
+      // Verify campus admin is a member of this organization (site admins can manage any)
+      if (!isSiteAdminUser) {
+        const membership = await storage.getOrganizationMembership(adminUserId, organizationId);
+        if (!membership || !["admin", "owner"].includes(membership.role)) {
+          res.status(403).json({ error: "You must be an admin of this organization to remove lesson authors" });
+          return;
+        }
+      }
       await storage.deleteCampusLessonAuthor(userId, organizationId);
       res.json({ success: true });
     } catch (error) {
