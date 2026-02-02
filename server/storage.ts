@@ -239,6 +239,9 @@ import {
   type SystemLessonAuthor,
   type InsertSystemLessonAuthor,
   systemLessonAuthors,
+  type CampusLessonAuthor,
+  type InsertCampusLessonAuthor,
+  campusLessonAuthors,
   type MasterLesson,
   type InsertMasterLesson,
   masterLessons,
@@ -745,6 +748,17 @@ export interface IStorage {
   deleteSystemLessonAuthor(userId: string): Promise<boolean>;
   incrementAuthorLessonCount(userId: string): Promise<void>;
   decrementAuthorLessonCount(userId: string): Promise<void>;
+  
+  // Campus Lesson Authors
+  getCampusLessonAuthors(organizationId: string): Promise<CampusLessonAuthor[]>;
+  getCampusLessonAuthor(userId: string, organizationId: string): Promise<CampusLessonAuthor | undefined>;
+  getCampusLessonAuthorByUserId(userId: string): Promise<CampusLessonAuthor | undefined>;
+  isCampusLessonAuthor(userId: string, organizationId?: string): Promise<boolean>;
+  createCampusLessonAuthor(author: InsertCampusLessonAuthor): Promise<CampusLessonAuthor>;
+  updateCampusLessonAuthor(userId: string, organizationId: string, updates: Partial<CampusLessonAuthor>): Promise<CampusLessonAuthor | undefined>;
+  deleteCampusLessonAuthor(userId: string, organizationId: string): Promise<boolean>;
+  incrementCampusAuthorLessonCount(userId: string, organizationId: string): Promise<void>;
+  decrementCampusAuthorLessonCount(userId: string, organizationId: string): Promise<void>;
   
   // Master Lessons Repository
   getMasterLessons(filters?: { subject?: string; gradeLevel?: string; status?: string; limit?: number }): Promise<MasterLesson[]>;
@@ -5850,6 +5864,68 @@ export class DatabaseStorage implements IStorage {
     await db.update(systemLessonAuthors)
       .set({ lessonsCreated: sql`GREATEST(${systemLessonAuthors.lessonsCreated} - 1, 0)`, updatedAt: new Date() })
       .where(eq(systemLessonAuthors.userId, userId));
+  }
+
+  // ===========================================
+  // CAMPUS LESSON AUTHORS
+  // ===========================================
+
+  async getCampusLessonAuthors(organizationId: string): Promise<CampusLessonAuthor[]> {
+    return db.select().from(campusLessonAuthors)
+      .where(eq(campusLessonAuthors.organizationId, organizationId))
+      .orderBy(desc(campusLessonAuthors.createdAt));
+  }
+
+  async getCampusLessonAuthor(userId: string, organizationId: string): Promise<CampusLessonAuthor | undefined> {
+    const [author] = await db.select().from(campusLessonAuthors)
+      .where(and(eq(campusLessonAuthors.userId, userId), eq(campusLessonAuthors.organizationId, organizationId)));
+    return author;
+  }
+
+  async getCampusLessonAuthorByUserId(userId: string): Promise<CampusLessonAuthor | undefined> {
+    const [author] = await db.select().from(campusLessonAuthors)
+      .where(eq(campusLessonAuthors.userId, userId));
+    return author;
+  }
+
+  async isCampusLessonAuthor(userId: string, organizationId?: string): Promise<boolean> {
+    if (organizationId) {
+      const author = await this.getCampusLessonAuthor(userId, organizationId);
+      return author?.status === "active";
+    }
+    const author = await this.getCampusLessonAuthorByUserId(userId);
+    return author?.status === "active";
+  }
+
+  async createCampusLessonAuthor(author: InsertCampusLessonAuthor): Promise<CampusLessonAuthor> {
+    const [newAuthor] = await db.insert(campusLessonAuthors).values(author).returning();
+    return newAuthor;
+  }
+
+  async updateCampusLessonAuthor(userId: string, organizationId: string, updates: Partial<CampusLessonAuthor>): Promise<CampusLessonAuthor | undefined> {
+    const [updated] = await db.update(campusLessonAuthors)
+      .set({ ...updates, updatedAt: new Date() })
+      .where(and(eq(campusLessonAuthors.userId, userId), eq(campusLessonAuthors.organizationId, organizationId)))
+      .returning();
+    return updated;
+  }
+
+  async deleteCampusLessonAuthor(userId: string, organizationId: string): Promise<boolean> {
+    const result = await db.delete(campusLessonAuthors)
+      .where(and(eq(campusLessonAuthors.userId, userId), eq(campusLessonAuthors.organizationId, organizationId)));
+    return result.rowCount > 0;
+  }
+
+  async incrementCampusAuthorLessonCount(userId: string, organizationId: string): Promise<void> {
+    await db.update(campusLessonAuthors)
+      .set({ lessonsCreated: sql`${campusLessonAuthors.lessonsCreated} + 1`, updatedAt: new Date() })
+      .where(and(eq(campusLessonAuthors.userId, userId), eq(campusLessonAuthors.organizationId, organizationId)));
+  }
+
+  async decrementCampusAuthorLessonCount(userId: string, organizationId: string): Promise<void> {
+    await db.update(campusLessonAuthors)
+      .set({ lessonsCreated: sql`GREATEST(${campusLessonAuthors.lessonsCreated} - 1, 0)`, updatedAt: new Date() })
+      .where(and(eq(campusLessonAuthors.userId, userId), eq(campusLessonAuthors.organizationId, organizationId)));
   }
 
   // ===========================================
