@@ -298,50 +298,105 @@ export function getRubricLevelColor(level: RubricLevel): string {
 }
 
 export const AI_LESSON_RUBRIC_PROMPT = `
-When generating lesson plans, adhere to the LYS Lesson Plan Rubric standards to ensure Distinguished-level quality:
+CRITICAL: Generate ONLY Distinguished-level lesson plans. Every lesson MUST meet these exact Distinguished criteria:
 
-## LESSON OBJECTIVES
-- State instructional goals and objectives clearly so learners understand expectations
-- Ensure learners can determine what they should know and be able to do
-- Align and logically sequence objectives to the lesson's goal
-- Make activities and assessments relevant to real-world applications
-- Integrate concepts from other disciplines
-- Accommodate diverse learners
+## LESSON OBJECTIVES (25% of score) - DISTINGUISHED REQUIREMENTS:
+[x] Instructional goals and objectives are CLEARLY stated with no ambiguity
+[x] Learners have a CLEAR understanding of what is expected of them
+[x] Learners can DETERMINE what they should know and be able to do as a result
+[x] Objectives are ALIGNED and LOGICALLY SEQUENCED to the lesson's goal
+[x] Provide RELEVANT and ENRICHING extensions beyond the basic content
+[x] ALL activities, materials, and assessments are LOGICALLY SEQUENCED
+[x] Content is RELEVANT to student's prior understanding and REAL-WORLD applications
+[x] INTEGRATE concepts from OTHER DISCIPLINES (cross-curricular connections)
+[x] Content is APPROPRIATE for DIVERSE learners (differentiation built-in)
 
-## ESSENTIAL QUESTIONS
-- Create clearly stated, appropriate questions aligned with standards and objectives
-- Design questions that invite inquiry and deeper thinking
-- Include creative, evaluative, or analytical questions for broader understanding
+## ESSENTIAL QUESTIONS (10% of score) - DISTINGUISHED REQUIREMENTS:
+[x] Questions are CLEARLY stated with no confusion about their meaning
+[x] Questions are APPROPRIATE and THOROUGHLY aligned with standards and objectives
+[x] Questions are DESIGNED TO INVITE INQUIRY (not just recall)
+[x] Questions are CREATIVE, EVALUATIVE, or require ANALYSIS
+[x] Questions PROMOTE DEEPER LEARNING and BROADER UNDERSTANDING
 
-## LYS BE-KNOW-DO METHODOLOGY
-### BE (Character/Values/Principles)
-- Integrate character development and values exploration
-- Help students reflect on who they are becoming through learning
+## LYS BE-KNOW-DO METHODOLOGY (40% of score) - DISTINGUISHED REQUIREMENTS:
 
-### KNOW (Resources/Knowledge Access)
-- Provide comprehensive resources with clear guidance
-- Explain how students can access and leverage resources effectively
+### BE Component - Character/Values/Principles:
+[x] FULLY INTEGRATES character development throughout the lesson
+[x] Includes VALUES EXPLORATION tied to lesson content
+[x] Incorporates PRINCIPLE-BASED LEARNING
+[x] Students REFLECT on WHO THEY ARE BECOMING through the learning process
 
-### DO (Execute with Excellence)
-- Create multiple opportunities for students to apply learning
-- Set clear performance expectations and pathways to demonstrate mastery
+### KNOW Component - Resources/Knowledge Access:
+[x] COMPREHENSIVE resources are provided (not just 1-2)
+[x] CLEAR GUIDANCE on how to access each resource
+[x] CLEAR GUIDANCE on how to apply each resource
+[x] Students understand WHAT resources are available
+[x] Students understand HOW TO LEVERAGE resources effectively
 
-## INSTRUCTIONAL INPUT
-### Anticipatory Set (Introduction)
-- Capture student attention and connect to prior knowledge
-- Set clear purpose for learning
+### DO Component - Execute with Excellence:
+[x] MULTIPLE opportunities for students to execute learning (not just one)
+[x] CLEAR performance expectations stated explicitly
+[x] PATHWAYS to demonstrate mastery are defined
+[x] Excellence standards are communicated to students
 
-### Modeling (I Do)
-- Demonstrate thinking processes with multiple representations
-- Address potential misconceptions
+### LYS Standards Alignment:
+[x] ALL goals are RIGOROUS and MEASURABLE
+[x] ALL goals aligned to LYS standards
+[x] Activities/materials RELEVANT to prior understanding
+[x] Real-world applications are EXPLICIT
+[x] INTEGRATE concepts from other disciplines
+[x] PROVIDE TIME FOR REFLECTION built into lesson
+[x] DEEPEN understanding of unit/course objectives
+[x] VERTICALLY ALIGNED to state standards
 
-### Guided Practice (We Do)
-- Actively engage all students with formative assessment checkpoints
-- Differentiate based on student needs
+## RESOURCES & TECHNOLOGY (5% of score) - DISTINGUISHED REQUIREMENTS:
+[x] Technology selection is APPROPRIATE for learning environment
+[x] Technologies ENHANCE learning (not just supplementary)
+[x] Access to technological resources is READILY AVAILABLE for ALL students
+[x] Technologies provide opportunities to establish HIGH academic expectations
+[x] Technologies provide opportunities for SOCIAL-EMOTIONAL expectations
 
-## LESSON CLOSE
-- Connect closure activities to essential questions
-- Address multiple life dimensions: Educational, Social, Cultural, Financial, Health, Vocational, and Spiritual
-- Provide time for student reflection
-- Integrate technology to enhance mastery
+## INSTRUCTIONAL INPUT (20% of score) - DISTINGUISHED REQUIREMENTS:
+
+### Anticipatory Set (Introduction):
+[x] STRONG hook that captures student attention immediately
+[x] CONNECTS to prior knowledge explicitly
+[x] Sets CLEAR PURPOSE for learning
+
+### Modeling (I Do):
+[x] CLEAR, EXPLICIT modeling of concepts
+[x] Demonstrates THINKING PROCESSES aloud
+[x] Uses MULTIPLE REPRESENTATIONS (visual, verbal, kinesthetic)
+[x] ADDRESSES potential misconceptions proactively
+
+### Guided Practice (We Do):
+[x] ACTIVELY ENGAGE ALL students (no passive observers)
+[x] Include FORMATIVE ASSESSMENT CHECKPOINTS throughout
+[x] DIFFERENTIATE based on student needs
+
+### Instructional Strategies:
+[x] Strategies APPROPRIATE for learning outcomes
+[x] Based on PRACTICAL EXPERIENCE, THEORY, RESEARCH, and DOCUMENTED BEST PRACTICE
+[x] Activities, resources, and materials are VARIED
+[x] APPROPRIATE to different ability levels
+[x] ACTIVELY ENGAGE students in OWNERSHIP of their learning
+
+## LESSON CLOSE (5% of score) - DISTINGUISHED REQUIREMENTS:
+[x] Closure activities are RELEVANT to students' prior understanding
+[x] REAL-WORLD applications are explicitly connected
+[x] INTEGRATE concepts from other disciplines
+[x] PROVIDE TIME FOR REFLECTION (not rushed)
+[x] DEEPEN understanding of unit/course objectives
+[x] VERTICALLY ALIGNED to state standards
+[x] INTEGRATE TECHNOLOGY to enhance mastery
+[x] Answers essential question addressing ALL 7 LIFE DIMENSIONS:
+    - EDUCATIONAL: How does this apply to learning journey?
+    - SOCIAL: How does this affect relationships and confidence?
+    - CULTURAL: How does this connect to heritage and community?
+    - FINANCIAL: How does this relate to money and resources?
+    - HEALTH: How does this impact well-being?
+    - VOCATIONAL: How does this prepare for career?
+    - SPIRITUAL: How does this connect to purpose and meaning?
+
+QUALITY ASSURANCE: Before generating, verify EVERY checkbox above is addressed in the lesson plan.
 `;

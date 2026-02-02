@@ -79,7 +79,10 @@ export async function generateLessonPlan(request: GenerateLessonRequest): Promis
     ? `Standards: ${request.standards.standardsName} - ${request.standards.codes.map(c => `${c.code}: ${c.description}`).join("; ")}`
     : "";
 
-  const systemPrompt = `You are an expert educator creating lesson plans for the LYS (Laddering Your Success) platform. 
+  const systemPrompt = `You are a master educator creating DISTINGUISHED-level lesson plans for the LYS (Laddering Your Success) platform.
+
+QUALITY MANDATE: Every lesson you generate MUST score at the DISTINGUISHED level (90%+ quality score) on the LYS Rubric. Do not generate Accomplished, Acceptable, or Needs Improvement lessons. Only Distinguished quality is acceptable.
+
 The LYS methodology uses the "Be-Know-Do" framework to develop the whole student:
 - BE: ${bkdDescriptions.be}
 - KNOW: ${bkdDescriptions.know}  
@@ -88,8 +91,17 @@ The LYS methodology uses the "Be-Know-Do" framework to develop the whole student
 Create engaging, student-centered lessons that incorporate all three aspects while emphasizing the primary focus.
 The lesson should be warm, encouraging, and focused on student growth.
 Always connect the lesson to real-world applications in the Lesson Close section.
+ALWAYS include ALL 7 life dimensions in the Lesson Close: Educational, Social, Cultural, Financial, Health, Vocational, and Spiritual.
 
 ${AI_LESSON_RUBRIC_PROMPT}
+
+QUALITY CHECK BEFORE OUTPUT:
+1. Are ALL objectives clearly stated with measurable outcomes?
+2. Do essential questions require analysis, evaluation, or creative thinking?
+3. Is BE-KNOW-DO methodology FULLY integrated (not just mentioned)?
+4. Are there MULTIPLE resources with CLEAR guidance on access and application?
+5. Does the lesson have differentiation for diverse learners?
+6. Does the Lesson Close address ALL 7 life dimensions?
 
 IMPORTANT: Respond ONLY with a valid JSON object, no additional text.`;
 
@@ -144,7 +156,11 @@ JSON structure:
   "lessonClose": {
     "educational": "How this applies to education journey",
     "social": "How this applies to relationships/confidence",
-    "vocational": "How this applies to career/work"
+    "cultural": "How this connects to heritage and community",
+    "financial": "How this relates to money management and resources",
+    "health": "How this impacts well-being and healthy choices",
+    "vocational": "How this applies to career/work",
+    "spiritual": "How this connects to purpose and meaning"
   }
 }`;
 
@@ -265,9 +281,13 @@ function generateMockLessonPlan(request: GenerateLessonRequest): GeneratedLesson
     ],
     assessment: "Formative assessment through observation, exit tickets, and completed practice activities. Students demonstrate understanding through both written and verbal responses.",
     lessonClose: {
-      educational: `This skill is essential as you progress through school. Understanding ${request.topic} will help you in future classes and standardized tests.`,
-      social: `Learning to work through challenging material builds confidence. You're developing skills that make you a stronger collaborator and communicator.`,
-      vocational: `In the workplace, you'll often encounter situations where you need these skills. The ability to ${request.topic.toLowerCase()} is valued by employers.`,
+      educational: `This skill is essential as you progress through school. Understanding ${request.topic} will help you in future classes and standardized tests. You're building a foundation for lifelong learning.`,
+      social: `Learning to work through challenging material builds confidence. You're developing skills that make you a stronger collaborator and communicator. These relationships will support your success.`,
+      cultural: `Understanding ${request.topic} connects you to broader human knowledge and diverse perspectives. You become part of a community of learners across cultures and backgrounds.`,
+      financial: `The skills you develop today have real economic value. Understanding ${request.topic} can open career opportunities and help you make informed decisions about resources.`,
+      health: `Mastering challenging content builds mental resilience and reduces stress about learning. A growth mindset contributes to overall well-being and healthy self-esteem.`,
+      vocational: `In the workplace, you'll often encounter situations where you need these skills. The ability to understand ${request.topic.toLowerCase()} is valued by employers across many fields.`,
+      spiritual: `Learning connects you to something larger than yourself. Understanding ${request.topic} helps you discover your purpose and how you can contribute meaningfully to the world.`,
     },
     reflection: `What did you learn about yourself today? How will you apply the ${request.bkdFocus.toUpperCase()} mindset this week?`,
   };
