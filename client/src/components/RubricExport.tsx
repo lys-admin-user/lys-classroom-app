@@ -4,8 +4,9 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Di
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Download, FileText, Printer, Copy, CheckCircle } from "lucide-react";
+import { Download, FileText, Printer, Copy, CheckCircle, Eye } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/hooks/use-auth";
 
 interface RubricCriteria {
   name: string;
@@ -36,6 +37,12 @@ export function RubricExport({
 }: RubricExportProps) {
   const [copied, setCopied] = useState(false);
   const { toast } = useToast();
+  const { user } = useAuth();
+  
+  // Only system admins can export rubrics
+  const canExport = user?.role === "system_admin" || user?.role === "site_admin";
+  // Campus and district admins can view but not export
+  const canView = canExport || user?.role === "campus_admin" || user?.role === "district_admin";
 
   const generatePrintableHTML = () => {
     return `
@@ -148,36 +155,55 @@ export function RubricExport({
     });
   };
 
+  // Don't render if user cannot view rubrics
+  if (!canView) {
+    return null;
+  }
+
   return (
     <Dialog>
       <DialogTrigger asChild>
-        <Button variant="outline" size="sm" data-testid="button-export-rubric">
-          <FileText className="h-4 w-4 mr-2" />
-          Export Rubric
+        <Button variant="outline" size="sm" data-testid="button-view-rubric">
+          {canExport ? (
+            <>
+              <FileText className="h-4 w-4 mr-2" />
+              Export Rubric
+            </>
+          ) : (
+            <>
+              <Eye className="h-4 w-4 mr-2" />
+              View Rubric
+            </>
+          )}
         </Button>
       </DialogTrigger>
       <DialogContent className="max-w-4xl max-h-[80vh] overflow-auto">
         <DialogHeader>
-          <DialogTitle>Export Scoring Rubric</DialogTitle>
+          <DialogTitle>{canExport ? "Export Scoring Rubric" : "View Scoring Rubric"}</DialogTitle>
           <DialogDescription>
-            Download or print the scoring rubric for {assignmentTitle}
+            {canExport 
+              ? `Download or print the scoring rubric for ${assignmentTitle}`
+              : `Scoring rubric for ${assignmentTitle} (view only)`
+            }
           </DialogDescription>
         </DialogHeader>
         
-        <div className="flex items-center gap-2 mb-4">
-          <Button onClick={handlePrint} variant="outline" size="sm" data-testid="button-print-rubric">
-            <Printer className="h-4 w-4 mr-2" />
-            Print
-          </Button>
-          <Button onClick={handleDownload} variant="outline" size="sm" data-testid="button-download-rubric">
-            <Download className="h-4 w-4 mr-2" />
-            Download HTML
-          </Button>
-          <Button onClick={handleCopy} variant="outline" size="sm" data-testid="button-copy-rubric">
-            {copied ? <CheckCircle className="h-4 w-4 mr-2" /> : <Copy className="h-4 w-4 mr-2" />}
-            {copied ? "Copied!" : "Copy Text"}
-          </Button>
-        </div>
+        {canExport && (
+          <div className="flex items-center gap-2 mb-4">
+            <Button onClick={handlePrint} variant="outline" size="sm" data-testid="button-print-rubric">
+              <Printer className="h-4 w-4 mr-2" />
+              Print
+            </Button>
+            <Button onClick={handleDownload} variant="outline" size="sm" data-testid="button-download-rubric">
+              <Download className="h-4 w-4 mr-2" />
+              Download HTML
+            </Button>
+            <Button onClick={handleCopy} variant="outline" size="sm" data-testid="button-copy-rubric">
+              {copied ? <CheckCircle className="h-4 w-4 mr-2" /> : <Copy className="h-4 w-4 mr-2" />}
+              {copied ? "Copied!" : "Copy Text"}
+            </Button>
+          </div>
+        )}
         
         <Tabs defaultValue="preview">
           <TabsList>

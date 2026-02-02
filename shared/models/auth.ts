@@ -26,7 +26,10 @@ export type UserTier = "free" | "pro" | "campus" | "enterprise";
 // student: K-12 or higher ed student using self-discovery and career tools
 // educator: teacher creating lessons and scope/sequence
 // campus_admin: school/district admin managing multiple educators
-export type UserRole = "student" | "educator" | "campus_admin";
+// district_admin: district-level admin managing multiple campuses
+// site_admin: platform-level admin with full access
+// system_admin: complete platform oversight and configuration
+export type UserRole = "student" | "educator" | "campus_admin" | "district_admin" | "site_admin" | "system_admin";
 
 // User storage table.
 // (IMPORTANT) This table is mandatory for Replit Auth, don't drop it.
