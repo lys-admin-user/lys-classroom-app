@@ -398,13 +398,13 @@ export default function Gradebook() {
                     <Label htmlFor="grade-category">Category (Optional)</Label>
                     <Select
                       value={newGrade.categoryId || ""}
-                      onValueChange={(v) => setNewGrade({ ...newGrade, categoryId: v || undefined })}
+                      onValueChange={(v) => setNewGrade({ ...newGrade, categoryId: v === "__none__" ? undefined : v || undefined })}
                     >
                       <SelectTrigger data-testid="select-grade-category">
                         <SelectValue placeholder="Select category" />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="">No Category</SelectItem>
+                        <SelectItem value="__none__">No Category</SelectItem>
                         {categories.map((cat) => (
                           <SelectItem key={cat.id} value={cat.id}>
                             {cat.name} ({cat.weight}%)

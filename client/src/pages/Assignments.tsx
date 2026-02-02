@@ -255,7 +255,7 @@ export default function Assignments() {
       setGeneratedAssignment(updatedData);
       
       // Auto-populate worksheet header from user profile and selected class
-      const selectedClass = classes?.find(c => c.id === selectedClassId);
+      const selectedClass = selectedClassId && selectedClassId !== "__none__" ? classes?.find(c => c.id === selectedClassId) : undefined;
       setWorksheetHeader({
         date: new Date().toLocaleDateString(),
         teacherName: user ? `${user.firstName || ''} ${user.lastName || ''}`.trim() : "",
@@ -546,7 +546,7 @@ export default function Assignments() {
                           <SelectValue placeholder="Select a class (optional)" />
                         </SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="">No class selected</SelectItem>
+                          <SelectItem value="__none__">No class selected</SelectItem>
                           {classes.map((c) => (
                             <SelectItem key={c.id} value={c.id}>
                               {c.name} {c.period ? `- Period ${c.period}` : ""}

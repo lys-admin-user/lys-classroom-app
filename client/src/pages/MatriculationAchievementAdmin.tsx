@@ -269,10 +269,12 @@ export default function MatriculationAchievementAdmin() {
 
   const isAdmin = adminCheck?.isSiteAdmin;
 
+  const effectiveYear = selectedYear && selectedYear !== "__all__" ? selectedYear : "";
+
   const { data: matriculationStats, isLoading: matriculationLoading } = useQuery<MatriculationStats>({
-    queryKey: ["/api/admin/matriculation/stats", selectedYear],
+    queryKey: ["/api/admin/matriculation/stats", effectiveYear],
     queryFn: async () => {
-      const params = selectedYear ? `?academicYear=${selectedYear}` : "";
+      const params = effectiveYear ? `?academicYear=${effectiveYear}` : "";
       const res = await fetch(`/api/admin/matriculation/stats${params}`, { credentials: "include" });
       if (!res.ok) throw new Error("Failed to fetch matriculation stats");
       return res.json();
@@ -281,9 +283,9 @@ export default function MatriculationAchievementAdmin() {
   });
 
   const { data: achievementStats, isLoading: achievementLoading } = useQuery<AchievementStats>({
-    queryKey: ["/api/admin/achievements/stats", selectedYear],
+    queryKey: ["/api/admin/achievements/stats", effectiveYear],
     queryFn: async () => {
-      const params = selectedYear ? `?academicYear=${selectedYear}` : "";
+      const params = effectiveYear ? `?academicYear=${effectiveYear}` : "";
       const res = await fetch(`/api/admin/achievements/stats${params}`, { credentials: "include" });
       if (!res.ok) throw new Error("Failed to fetch achievement stats");
       return res.json();
@@ -386,7 +388,7 @@ export default function MatriculationAchievementAdmin() {
               <SelectValue placeholder="All Years" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="">All Years</SelectItem>
+              <SelectItem value="__all__">All Years</SelectItem>
               {academicYears.map((year) => (
                 <SelectItem key={year} value={year}>{year}</SelectItem>
               ))}
