@@ -260,6 +260,27 @@ import {
   type AssignmentAlignment,
   type InsertAssignmentAlignment,
   assignmentAlignments,
+  type ResourceRating,
+  type InsertResourceRating,
+  resourceRatings,
+  type StudentNarrative,
+  type InsertStudentNarrative,
+  studentNarratives,
+  type StrengthsInventory,
+  type InsertStrengthsInventory,
+  strengthsInventory,
+  type CampusActivity,
+  type InsertCampusActivity,
+  campusActivities,
+  type ScholarshipApplication,
+  type InsertScholarshipApplication,
+  scholarshipApplications,
+  type MentorProfile,
+  type InsertMentorProfile,
+  mentorProfiles,
+  type MentorConnection,
+  type InsertMentorConnection,
+  mentorConnections,
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, desc, and, asc, gte, sql } from "drizzle-orm";
@@ -836,6 +857,49 @@ export interface IStorage {
   revokeAchievement(id: string, reason: string): Promise<StudentAchievement | undefined>;
   getAchievementsByOrg(organizationId: string): Promise<StudentAchievement[]>;
   getAchievementStats(filters?: { organizationId?: string; academicYear?: string }): Promise<AchievementStats>;
+
+  // Resource Ratings
+  getResourceRatings(resourceId: string): Promise<ResourceRating[]>;
+  getUserResourceRating(resourceId: string, userId: string): Promise<ResourceRating | undefined>;
+  createResourceRating(rating: InsertResourceRating): Promise<ResourceRating>;
+  getAverageRating(resourceId: string): Promise<{ average: number; count: number }>;
+
+  // Student Narratives (BE Pillar)
+  getStudentNarratives(userId: string): Promise<StudentNarrative[]>;
+  getStudentNarrative(id: string): Promise<StudentNarrative | undefined>;
+  createStudentNarrative(narrative: InsertStudentNarrative): Promise<StudentNarrative>;
+  updateStudentNarrative(id: string, updates: Partial<StudentNarrative>, userId: string): Promise<StudentNarrative | undefined>;
+  deleteStudentNarrative(id: string, userId: string): Promise<boolean>;
+
+  // Strengths Inventory (BE Pillar)
+  getStrengthsInventory(userId: string): Promise<StrengthsInventory[]>;
+  createStrength(strength: InsertStrengthsInventory): Promise<StrengthsInventory>;
+  updateStrength(id: string, updates: Partial<StrengthsInventory>, userId: string): Promise<StrengthsInventory | undefined>;
+  deleteStrength(id: string, userId: string): Promise<boolean>;
+
+  // Campus Activities (DO Pillar)
+  getCampusActivities(userId: string): Promise<CampusActivity[]>;
+  createCampusActivity(activity: InsertCampusActivity): Promise<CampusActivity>;
+  updateCampusActivity(id: string, updates: Partial<CampusActivity>, userId: string): Promise<CampusActivity | undefined>;
+  deleteCampusActivity(id: string, userId: string): Promise<boolean>;
+
+  // Scholarship Applications (DO Pillar - Planner)
+  getScholarshipApplications(userId: string): Promise<ScholarshipApplication[]>;
+  getScholarshipApplication(id: string): Promise<ScholarshipApplication | undefined>;
+  createScholarshipApplication(app: InsertScholarshipApplication): Promise<ScholarshipApplication>;
+  updateScholarshipApplication(id: string, updates: Partial<ScholarshipApplication>, userId: string): Promise<ScholarshipApplication | undefined>;
+  deleteScholarshipApplication(id: string, userId: string): Promise<boolean>;
+
+  // Mentor System
+  getMentorProfiles(filters?: { careerField?: string; isAvailable?: boolean }): Promise<MentorProfile[]>;
+  getMentorProfile(id: string): Promise<MentorProfile | undefined>;
+  getMentorProfileByUser(userId: string): Promise<MentorProfile | undefined>;
+  createMentorProfile(profile: InsertMentorProfile): Promise<MentorProfile>;
+  updateMentorProfile(id: string, updates: Partial<MentorProfile>, userId: string): Promise<MentorProfile | undefined>;
+  getMentorConnections(userId: string): Promise<MentorConnection[]>;
+  getMentorConnectionsForMentor(mentorId: string): Promise<MentorConnection[]>;
+  createMentorConnection(connection: InsertMentorConnection): Promise<MentorConnection>;
+  updateMentorConnection(id: string, updates: Partial<MentorConnection>): Promise<MentorConnection | undefined>;
 }
 
 // Performance Analytics Types
@@ -6230,6 +6294,215 @@ export class DatabaseStorage implements IStorage {
     return db.select().from(assignmentAlignments)
       .where(eq(assignmentAlignments.lessonId, lessonId))
       .orderBy(asc(assignmentAlignments.objectiveIndex));
+  }
+
+  // Resource Ratings
+  async getResourceRatings(resourceId: string): Promise<ResourceRating[]> {
+    return db.select().from(resourceRatings)
+      .where(eq(resourceRatings.resourceId, resourceId))
+      .orderBy(desc(resourceRatings.createdAt));
+  }
+
+  async getUserResourceRating(resourceId: string, userId: string): Promise<ResourceRating | undefined> {
+    const [rating] = await db.select().from(resourceRatings)
+      .where(and(eq(resourceRatings.resourceId, resourceId), eq(resourceRatings.userId, userId)));
+    return rating;
+  }
+
+  async createResourceRating(rating: InsertResourceRating): Promise<ResourceRating> {
+    const [newRating] = await db.insert(resourceRatings).values(rating).returning();
+    return newRating;
+  }
+
+  async getAverageRating(resourceId: string): Promise<{ average: number; count: number }> {
+    const ratings = await db.select().from(resourceRatings)
+      .where(eq(resourceRatings.resourceId, resourceId));
+    if (ratings.length === 0) {
+      return { average: 0, count: 0 };
+    }
+    const sum = ratings.reduce((acc, r) => acc + r.rating, 0);
+    return { average: sum / ratings.length, count: ratings.length };
+  }
+
+  // Student Narratives (BE Pillar)
+  async getStudentNarratives(userId: string): Promise<StudentNarrative[]> {
+    return db.select().from(studentNarratives)
+      .where(eq(studentNarratives.userId, userId))
+      .orderBy(desc(studentNarratives.createdAt));
+  }
+
+  async getStudentNarrative(id: string): Promise<StudentNarrative | undefined> {
+    const [narrative] = await db.select().from(studentNarratives)
+      .where(eq(studentNarratives.id, id));
+    return narrative;
+  }
+
+  async createStudentNarrative(narrative: InsertStudentNarrative): Promise<StudentNarrative> {
+    const [newNarrative] = await db.insert(studentNarratives).values(narrative).returning();
+    return newNarrative;
+  }
+
+  async updateStudentNarrative(id: string, updates: Partial<StudentNarrative>, userId: string): Promise<StudentNarrative | undefined> {
+    const [updated] = await db.update(studentNarratives)
+      .set({ ...updates, lastEditedAt: new Date() })
+      .where(and(eq(studentNarratives.id, id), eq(studentNarratives.userId, userId)))
+      .returning();
+    return updated;
+  }
+
+  async deleteStudentNarrative(id: string, userId: string): Promise<boolean> {
+    const result = await db.delete(studentNarratives)
+      .where(and(eq(studentNarratives.id, id), eq(studentNarratives.userId, userId)));
+    return (result.rowCount ?? 0) > 0;
+  }
+
+  // Strengths Inventory (BE Pillar)
+  async getStrengthsInventory(userId: string): Promise<StrengthsInventory[]> {
+    return db.select().from(strengthsInventory)
+      .where(eq(strengthsInventory.userId, userId))
+      .orderBy(desc(strengthsInventory.createdAt));
+  }
+
+  async createStrength(strength: InsertStrengthsInventory): Promise<StrengthsInventory> {
+    const [newStrength] = await db.insert(strengthsInventory).values(strength).returning();
+    return newStrength;
+  }
+
+  async updateStrength(id: string, updates: Partial<StrengthsInventory>, userId: string): Promise<StrengthsInventory | undefined> {
+    const [updated] = await db.update(strengthsInventory)
+      .set({ ...updates, updatedAt: new Date() })
+      .where(and(eq(strengthsInventory.id, id), eq(strengthsInventory.userId, userId)))
+      .returning();
+    return updated;
+  }
+
+  async deleteStrength(id: string, userId: string): Promise<boolean> {
+    const result = await db.delete(strengthsInventory)
+      .where(and(eq(strengthsInventory.id, id), eq(strengthsInventory.userId, userId)));
+    return (result.rowCount ?? 0) > 0;
+  }
+
+  // Campus Activities (DO Pillar)
+  async getCampusActivities(userId: string): Promise<CampusActivity[]> {
+    return db.select().from(campusActivities)
+      .where(eq(campusActivities.userId, userId))
+      .orderBy(desc(campusActivities.createdAt));
+  }
+
+  async createCampusActivity(activity: InsertCampusActivity): Promise<CampusActivity> {
+    const [newActivity] = await db.insert(campusActivities).values(activity).returning();
+    return newActivity;
+  }
+
+  async updateCampusActivity(id: string, updates: Partial<CampusActivity>, userId: string): Promise<CampusActivity | undefined> {
+    const [updated] = await db.update(campusActivities)
+      .set(updates)
+      .where(and(eq(campusActivities.id, id), eq(campusActivities.userId, userId)))
+      .returning();
+    return updated;
+  }
+
+  async deleteCampusActivity(id: string, userId: string): Promise<boolean> {
+    const result = await db.delete(campusActivities)
+      .where(and(eq(campusActivities.id, id), eq(campusActivities.userId, userId)));
+    return (result.rowCount ?? 0) > 0;
+  }
+
+  // Scholarship Applications (DO Pillar - Planner)
+  async getScholarshipApplications(userId: string): Promise<ScholarshipApplication[]> {
+    return db.select().from(scholarshipApplications)
+      .where(eq(scholarshipApplications.userId, userId))
+      .orderBy(desc(scholarshipApplications.createdAt));
+  }
+
+  async getScholarshipApplication(id: string): Promise<ScholarshipApplication | undefined> {
+    const [app] = await db.select().from(scholarshipApplications)
+      .where(eq(scholarshipApplications.id, id));
+    return app;
+  }
+
+  async createScholarshipApplication(app: InsertScholarshipApplication): Promise<ScholarshipApplication> {
+    const [newApp] = await db.insert(scholarshipApplications).values(app).returning();
+    return newApp;
+  }
+
+  async updateScholarshipApplication(id: string, updates: Partial<ScholarshipApplication>, userId: string): Promise<ScholarshipApplication | undefined> {
+    const [updated] = await db.update(scholarshipApplications)
+      .set({ ...updates, updatedAt: new Date() })
+      .where(and(eq(scholarshipApplications.id, id), eq(scholarshipApplications.userId, userId)))
+      .returning();
+    return updated;
+  }
+
+  async deleteScholarshipApplication(id: string, userId: string): Promise<boolean> {
+    const result = await db.delete(scholarshipApplications)
+      .where(and(eq(scholarshipApplications.id, id), eq(scholarshipApplications.userId, userId)));
+    return (result.rowCount ?? 0) > 0;
+  }
+
+  // Mentor System
+  async getMentorProfiles(filters?: { careerField?: string; isAvailable?: boolean }): Promise<MentorProfile[]> {
+    const conditions = [];
+    if (filters?.isAvailable !== undefined) {
+      conditions.push(eq(mentorProfiles.isAvailable, filters.isAvailable));
+    }
+    if (filters?.careerField) {
+      conditions.push(sql`${mentorProfiles.careerFields}::jsonb @> ${JSON.stringify([filters.careerField])}::jsonb`);
+    }
+    if (conditions.length > 0) {
+      return db.select().from(mentorProfiles).where(and(...conditions));
+    }
+    return db.select().from(mentorProfiles);
+  }
+
+  async getMentorProfile(id: string): Promise<MentorProfile | undefined> {
+    const [profile] = await db.select().from(mentorProfiles)
+      .where(eq(mentorProfiles.id, id));
+    return profile;
+  }
+
+  async getMentorProfileByUser(userId: string): Promise<MentorProfile | undefined> {
+    const [profile] = await db.select().from(mentorProfiles)
+      .where(eq(mentorProfiles.userId, userId));
+    return profile;
+  }
+
+  async createMentorProfile(profile: InsertMentorProfile): Promise<MentorProfile> {
+    const [newProfile] = await db.insert(mentorProfiles).values(profile).returning();
+    return newProfile;
+  }
+
+  async updateMentorProfile(id: string, updates: Partial<MentorProfile>, userId: string): Promise<MentorProfile | undefined> {
+    const [updated] = await db.update(mentorProfiles)
+      .set(updates)
+      .where(and(eq(mentorProfiles.id, id), eq(mentorProfiles.userId, userId)))
+      .returning();
+    return updated;
+  }
+
+  async getMentorConnections(userId: string): Promise<MentorConnection[]> {
+    return db.select().from(mentorConnections)
+      .where(eq(mentorConnections.studentUserId, userId))
+      .orderBy(desc(mentorConnections.createdAt));
+  }
+
+  async getMentorConnectionsForMentor(mentorId: string): Promise<MentorConnection[]> {
+    return db.select().from(mentorConnections)
+      .where(eq(mentorConnections.mentorId, mentorId))
+      .orderBy(desc(mentorConnections.createdAt));
+  }
+
+  async createMentorConnection(connection: InsertMentorConnection): Promise<MentorConnection> {
+    const [newConnection] = await db.insert(mentorConnections).values(connection).returning();
+    return newConnection;
+  }
+
+  async updateMentorConnection(id: string, updates: Partial<MentorConnection>): Promise<MentorConnection | undefined> {
+    const [updated] = await db.update(mentorConnections)
+      .set(updates)
+      .where(eq(mentorConnections.id, id))
+      .returning();
+    return updated;
   }
 }
 

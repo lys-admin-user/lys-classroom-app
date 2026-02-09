@@ -1805,7 +1805,7 @@ export type InsertResourceLike = z.infer<typeof insertResourceLikeSchema>;
 export type ResourceLike = typeof resourceLikes.$inferSelect;
 
 // KNOW Resources Table - Admin-managed educational resources for career exploration
-export const KNOW_RESOURCE_TYPES = ["book", "ebook", "youtube_channel", "podcast", "whatsapp_channel", "website", "course"] as const;
+export const KNOW_RESOURCE_TYPES = ["book", "ebook", "youtube_channel", "podcast", "whatsapp_channel", "website", "course", "scholarship", "financial_guide", "essay_template"] as const;
 export type KnowResourceType = typeof KNOW_RESOURCE_TYPES[number];
 
 export const knowResources = pgTable("know_resources", {
@@ -1836,6 +1836,18 @@ export const knowResources = pgTable("know_resources", {
   
   // WhatsApp specific
   whatsappLink: text("whatsapp_link"),
+  
+  // Scholarship specific
+  scholarshipType: text("scholarship_type"), // merit, need, both
+  scholarshipAmount: text("scholarship_amount"), // e.g., "$5,000", "$40,000/year", "Varies"
+  scholarshipDeadline: text("scholarship_deadline"), // deadline date string
+  scholarshipSeason: text("scholarship_season"), // early_fall, late_fall, early_spring, late_spring
+  eligibilityCriteria: jsonb("eligibility_criteria").$type<string[]>().default([]),
+  applicationUrl: text("application_url"),
+  isRecurring: boolean("is_recurring").default(false), // can reapply each year
+  gpaRequirement: text("gpa_requirement"), // e.g., "3.5", "2.5", "None"
+  studentLevel: text("student_level"), // high_school, undergraduate, graduate, all
+  firstGenFriendly: boolean("first_gen_friendly").default(false),
   
   // Metadata
   tags: jsonb("tags").$type<string[]>().default([]),
@@ -2633,4 +2645,205 @@ export const lessonBulkImports = pgTable("lesson_bulk_imports", {
 export const insertLessonBulkImportSchema = createInsertSchema(lessonBulkImports).omit({ id: true, createdAt: true, completedAt: true });
 export type InsertLessonBulkImport = z.infer<typeof insertLessonBulkImportSchema>;
 export type LessonBulkImport = typeof lessonBulkImports.$inferSelect;
+
+// ===========================================
+// RESOURCE RATINGS
+// ===========================================
+export const resourceRatings = pgTable("resource_ratings", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  resourceId: varchar("resource_id").notNull(),
+  userId: varchar("user_id").notNull(),
+  rating: integer("rating").notNull(), // 1-5 stars
+  review: text("review"),
+  helpful: boolean("helpful").default(true),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertResourceRatingSchema = createInsertSchema(resourceRatings).omit({ id: true, createdAt: true });
+export type InsertResourceRating = z.infer<typeof insertResourceRatingSchema>;
+export type ResourceRating = typeof resourceRatings.$inferSelect;
+
+// ===========================================
+// STUDENT NARRATIVES (BE Pillar - Personal Journey Storytelling)
+// ===========================================
+export const studentNarratives = pgTable("student_narratives", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull(),
+  title: text("title").notNull(),
+  narrativeType: text("narrative_type").notNull(), // personal_journey, strengths_story, career_vision, scholarship_essay, gratitude
+  content: text("content").notNull(),
+  bkdPillar: text("bkd_pillar"), // be, know, do
+  tags: jsonb("tags").$type<string[]>().default([]),
+  isPublic: boolean("is_public").default(false),
+  wordCount: integer("word_count").default(0),
+  lastEditedAt: timestamp("last_edited_at").defaultNow(),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertStudentNarrativeSchema = createInsertSchema(studentNarratives).omit({ id: true, createdAt: true });
+export type InsertStudentNarrative = z.infer<typeof insertStudentNarrativeSchema>;
+export type StudentNarrative = typeof studentNarratives.$inferSelect;
+
+// ===========================================
+// STRENGTHS INVENTORY (BE Pillar - from Self-Discovery)
+// ===========================================
+export const strengthsInventory = pgTable("strengths_inventory", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull(),
+  strengthCategory: text("strength_category").notNull(), // identity, purpose, academic, social, leadership, resilience, creativity
+  strengthTitle: text("strength_title").notNull(),
+  description: text("description"),
+  evidence: text("evidence"), // how they demonstrated this strength
+  source: text("source"), // assessment, self_reported, educator_noted, activity
+  relatedCareerFields: jsonb("related_career_fields").$type<string[]>().default([]),
+  confidenceLevel: integer("confidence_level").default(3), // 1-5
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertStrengthsInventorySchema = createInsertSchema(strengthsInventory).omit({ id: true, createdAt: true, updatedAt: true });
+export type InsertStrengthsInventory = z.infer<typeof insertStrengthsInventorySchema>;
+export type StrengthsInventory = typeof strengthsInventory.$inferSelect;
+
+// ===========================================
+// CAMPUS ACTIVITIES (DO Pillar - Activity Tracker)
+// ===========================================
+export const ACTIVITY_TYPES = ["club", "honor_society", "sports", "volunteer", "leadership", "work", "internship", "research", "arts", "other"] as const;
+export type ActivityType = typeof ACTIVITY_TYPES[number];
+
+export const campusActivities = pgTable("campus_activities", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull(),
+  activityName: text("activity_name").notNull(),
+  activityType: text("activity_type").notNull().$type<ActivityType>(),
+  organization: text("organization"), // school/campus name
+  role: text("role"), // member, officer, president, captain, etc.
+  description: text("description"),
+  startDate: timestamp("start_date"),
+  endDate: timestamp("end_date"),
+  hoursPerWeek: integer("hours_per_week"),
+  isActive: boolean("is_active").default(true),
+  achievements: jsonb("achievements").$type<string[]>().default([]),
+  relatedCareerFields: jsonb("related_career_fields").$type<string[]>().default([]),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertCampusActivitySchema = createInsertSchema(campusActivities).omit({ id: true, createdAt: true });
+export type InsertCampusActivity = z.infer<typeof insertCampusActivitySchema>;
+export type CampusActivity = typeof campusActivities.$inferSelect;
+
+// ===========================================
+// SCHOLARSHIP APPLICATIONS (DO Pillar - Scholarship Planner)
+// ===========================================
+export const SCHOLARSHIP_SEASONS = ["early_fall", "late_fall", "early_spring", "late_spring"] as const;
+export type ScholarshipSeason = typeof SCHOLARSHIP_SEASONS[number];
+
+export const APPLICATION_STATUSES = ["planned", "in_progress", "submitted", "awarded", "rejected", "waitlisted"] as const;
+export type ApplicationStatus = typeof APPLICATION_STATUSES[number];
+
+export const scholarshipApplications = pgTable("scholarship_applications", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull(),
+  scholarshipName: text("scholarship_name").notNull(),
+  scholarshipUrl: text("scholarship_url"),
+  resourceId: varchar("resource_id"), // links to knowResources if exists
+  amount: text("amount"),
+  deadline: text("deadline"),
+  season: text("season").$type<ScholarshipSeason>(),
+  scholarshipType: text("scholarship_type"), // merit, need, both
+  status: text("status").notNull().default("planned").$type<ApplicationStatus>(),
+  essayRequired: boolean("essay_required").default(false),
+  essayDraftId: varchar("essay_draft_id"), // links to studentNarratives
+  transcriptRequired: boolean("transcript_required").default(false),
+  referencesRequired: integer("references_required").default(0),
+  checklist: jsonb("checklist").$type<{
+    item: string;
+    completed: boolean;
+  }[]>().default([]),
+  notes: text("notes"),
+  awardedAmount: text("awarded_amount"),
+  submittedAt: timestamp("submitted_at"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertScholarshipApplicationSchema = createInsertSchema(scholarshipApplications).omit({ id: true, createdAt: true, updatedAt: true });
+export type InsertScholarshipApplication = z.infer<typeof insertScholarshipApplicationSchema>;
+export type ScholarshipApplication = typeof scholarshipApplications.$inferSelect;
+
+// ===========================================
+// MENTOR CONNECTIONS
+// ===========================================
+export const mentorProfiles = pgTable("mentor_profiles", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull(),
+  bio: text("bio"),
+  expertise: jsonb("expertise").$type<string[]>().default([]),
+  careerFields: jsonb("career_fields").$type<string[]>().default([]),
+  yearsExperience: integer("years_experience"),
+  maxMentees: integer("max_mentees").default(5),
+  currentMentees: integer("current_mentees").default(0),
+  isAvailable: boolean("is_available").default(true),
+  mentorType: text("mentor_type"), // educator, professional, alumni, community_leader
+  organization: text("organization"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertMentorProfileSchema = createInsertSchema(mentorProfiles).omit({ id: true, createdAt: true });
+export type InsertMentorProfile = z.infer<typeof insertMentorProfileSchema>;
+export type MentorProfile = typeof mentorProfiles.$inferSelect;
+
+export const mentorConnections = pgTable("mentor_connections", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  mentorId: varchar("mentor_id").notNull(), // mentorProfiles.id
+  studentUserId: varchar("student_user_id").notNull(),
+  status: text("status").notNull().default("pending"), // pending, active, completed, declined
+  message: text("message"), // student's request message
+  careerInterest: text("career_interest"),
+  startedAt: timestamp("started_at"),
+  endedAt: timestamp("ended_at"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertMentorConnectionSchema = createInsertSchema(mentorConnections).omit({ id: true, createdAt: true });
+export type InsertMentorConnection = z.infer<typeof insertMentorConnectionSchema>;
+export type MentorConnection = typeof mentorConnections.$inferSelect;
+
+// ===========================================
+// SCHOLARSHIP CATEGORY CONSTANTS
+// ===========================================
+export const SCHOLARSHIP_CATEGORIES = [
+  "Foundation & Corporate",
+  "Federal Government",
+  "Upper-class & Graduate",
+  "Scholarship Searches",
+  "HBCU",
+  "Military",
+  "STEM",
+  "Arts & Humanities",
+  "Athletic",
+  "Religious",
+  "Local & Community",
+  "International",
+  "First-Generation",
+  "Minority",
+  "Honor Society",
+] as const;
+
+export const ESSAY_TYPES = ["topical", "personal"] as const;
+export type EssayType = typeof ESSAY_TYPES[number];
+
+export const STRENGTH_CATEGORIES = [
+  "identity",
+  "purpose",
+  "academic",
+  "social",
+  "leadership",
+  "resilience",
+  "creativity",
+  "communication",
+  "problem_solving",
+  "teamwork",
+] as const;
+export type StrengthCategory = typeof STRENGTH_CATEGORIES[number];
 

@@ -48,6 +48,11 @@ import LessonAuthoring from "@/pages/LessonAuthoring";
 import KnowResourcesAdmin from "@/pages/KnowResourcesAdmin";
 import MatriculationAchievementAdmin from "@/pages/MatriculationAchievementAdmin";
 import AlignmentDashboard from "@/pages/AlignmentDashboard";
+import ScholarshipPlanner from "@/pages/ScholarshipPlanner";
+import EssayBuilder from "@/pages/EssayBuilder";
+import CampusActivities from "@/pages/CampusActivities";
+import StrengthsInventory from "@/pages/StrengthsInventory";
+import MentorConnect from "@/pages/MentorConnect";
 import NotFound from "@/pages/not-found";
 import { EmbedRouter } from "@/pages/EmbedRouter";
 
@@ -140,6 +145,11 @@ function Router() {
       <Route path="/admin/know-resources" component={KnowResourcesAdmin} />
       <Route path="/admin/matriculation" component={MatriculationAchievementAdmin} />
       <Route path="/alignment-dashboard" component={AlignmentDashboard} />
+      <Route path="/scholarship-planner" component={ScholarshipPlanner} />
+      <Route path="/essay-builder" component={EssayBuilder} />
+      <Route path="/campus-activities" component={CampusActivities} />
+      <Route path="/strengths-inventory" component={StrengthsInventory} />
+      <Route path="/mentor-connect" component={MentorConnect} />
       <Route component={NotFound} />
     </Switch>
   );

@@ -10468,5 +10468,370 @@ export async function registerRoutes(
     }
   });
 
+  // ===========================================
+  // RESOURCE RATINGS
+  // ===========================================
+  
+  // Get ratings for a resource
+  app.get("/api/resources/:resourceId/ratings", async (req: any, res) => {
+    try {
+      const ratings = await storage.getResourceRatings(req.params.resourceId);
+      const avgData = await storage.getAverageRating(req.params.resourceId);
+      res.json({ ratings, average: avgData.average, count: avgData.count });
+    } catch (e) {
+      res.status(500).json({ error: "Failed to fetch ratings" });
+    }
+  });
+
+  // Create/update rating (authenticated)
+  app.post("/api/resources/:resourceId/ratings", isAuthenticated, async (req: any, res) => {
+    try {
+      const existing = await storage.getUserResourceRating(req.params.resourceId, req.user.id);
+      if (existing) {
+        res.status(400).json({ error: "You have already rated this resource" });
+        return;
+      }
+      const rating = await storage.createResourceRating({
+        resourceId: req.params.resourceId,
+        userId: req.user.id,
+        rating: req.body.rating,
+        review: req.body.review,
+        helpful: req.body.helpful ?? true,
+      });
+      res.json(rating);
+    } catch (e) {
+      res.status(500).json({ error: "Failed to create rating" });
+    }
+  });
+
+  // ===========================================
+  // STUDENT NARRATIVES (BE Pillar)
+  // ===========================================
+  
+  app.get("/api/narratives", isAuthenticated, async (req: any, res) => {
+    try {
+      const narratives = await storage.getStudentNarratives(req.user.id);
+      res.json(narratives);
+    } catch (e) {
+      res.status(500).json({ error: "Failed to fetch narratives" });
+    }
+  });
+
+  app.get("/api/narratives/:id", isAuthenticated, async (req: any, res) => {
+    try {
+      const narrative = await storage.getStudentNarrative(req.params.id);
+      if (!narrative || narrative.userId !== req.user.id) {
+        res.status(404).json({ error: "Narrative not found" });
+        return;
+      }
+      res.json(narrative);
+    } catch (e) {
+      res.status(500).json({ error: "Failed to fetch narrative" });
+    }
+  });
+
+  app.post("/api/narratives", isAuthenticated, async (req: any, res) => {
+    try {
+      const narrative = await storage.createStudentNarrative({
+        ...req.body,
+        userId: req.user.id,
+        wordCount: req.body.content ? req.body.content.split(/\s+/).filter(Boolean).length : 0,
+      });
+      res.json(narrative);
+    } catch (e) {
+      res.status(500).json({ error: "Failed to create narrative" });
+    }
+  });
+
+  app.patch("/api/narratives/:id", isAuthenticated, async (req: any, res) => {
+    try {
+      const updates = { ...req.body };
+      if (updates.content) {
+        updates.wordCount = updates.content.split(/\s+/).filter(Boolean).length;
+      }
+      const narrative = await storage.updateStudentNarrative(req.params.id, updates, req.user.id);
+      if (!narrative) {
+        res.status(404).json({ error: "Narrative not found" });
+        return;
+      }
+      res.json(narrative);
+    } catch (e) {
+      res.status(500).json({ error: "Failed to update narrative" });
+    }
+  });
+
+  app.delete("/api/narratives/:id", isAuthenticated, async (req: any, res) => {
+    try {
+      const success = await storage.deleteStudentNarrative(req.params.id, req.user.id);
+      if (!success) {
+        res.status(404).json({ error: "Narrative not found" });
+        return;
+      }
+      res.json({ success: true });
+    } catch (e) {
+      res.status(500).json({ error: "Failed to delete narrative" });
+    }
+  });
+
+  // ===========================================
+  // STRENGTHS INVENTORY (BE Pillar)
+  // ===========================================
+  
+  app.get("/api/strengths", isAuthenticated, async (req: any, res) => {
+    try {
+      const strengths = await storage.getStrengthsInventory(req.user.id);
+      res.json(strengths);
+    } catch (e) {
+      res.status(500).json({ error: "Failed to fetch strengths" });
+    }
+  });
+
+  app.post("/api/strengths", isAuthenticated, async (req: any, res) => {
+    try {
+      const strength = await storage.createStrength({
+        ...req.body,
+        userId: req.user.id,
+      });
+      res.json(strength);
+    } catch (e) {
+      res.status(500).json({ error: "Failed to create strength" });
+    }
+  });
+
+  app.patch("/api/strengths/:id", isAuthenticated, async (req: any, res) => {
+    try {
+      const strength = await storage.updateStrength(req.params.id, req.body, req.user.id);
+      if (!strength) {
+        res.status(404).json({ error: "Strength not found" });
+        return;
+      }
+      res.json(strength);
+    } catch (e) {
+      res.status(500).json({ error: "Failed to update strength" });
+    }
+  });
+
+  app.delete("/api/strengths/:id", isAuthenticated, async (req: any, res) => {
+    try {
+      const success = await storage.deleteStrength(req.params.id, req.user.id);
+      if (!success) {
+        res.status(404).json({ error: "Strength not found" });
+        return;
+      }
+      res.json({ success: true });
+    } catch (e) {
+      res.status(500).json({ error: "Failed to delete strength" });
+    }
+  });
+
+  // ===========================================
+  // CAMPUS ACTIVITIES (DO Pillar)
+  // ===========================================
+  
+  app.get("/api/campus-activities", isAuthenticated, async (req: any, res) => {
+    try {
+      const activities = await storage.getCampusActivities(req.user.id);
+      res.json(activities);
+    } catch (e) {
+      res.status(500).json({ error: "Failed to fetch activities" });
+    }
+  });
+
+  app.post("/api/campus-activities", isAuthenticated, async (req: any, res) => {
+    try {
+      const activity = await storage.createCampusActivity({
+        ...req.body,
+        userId: req.user.id,
+      });
+      res.json(activity);
+    } catch (e) {
+      res.status(500).json({ error: "Failed to create activity" });
+    }
+  });
+
+  app.patch("/api/campus-activities/:id", isAuthenticated, async (req: any, res) => {
+    try {
+      const activity = await storage.updateCampusActivity(req.params.id, req.body, req.user.id);
+      if (!activity) {
+        res.status(404).json({ error: "Activity not found" });
+        return;
+      }
+      res.json(activity);
+    } catch (e) {
+      res.status(500).json({ error: "Failed to update activity" });
+    }
+  });
+
+  app.delete("/api/campus-activities/:id", isAuthenticated, async (req: any, res) => {
+    try {
+      const success = await storage.deleteCampusActivity(req.params.id, req.user.id);
+      if (!success) {
+        res.status(404).json({ error: "Activity not found" });
+        return;
+      }
+      res.json({ success: true });
+    } catch (e) {
+      res.status(500).json({ error: "Failed to delete activity" });
+    }
+  });
+
+  // ===========================================
+  // SCHOLARSHIP APPLICATIONS (Planner)
+  // ===========================================
+  
+  app.get("/api/scholarship-applications", isAuthenticated, async (req: any, res) => {
+    try {
+      const applications = await storage.getScholarshipApplications(req.user.id);
+      res.json(applications);
+    } catch (e) {
+      res.status(500).json({ error: "Failed to fetch applications" });
+    }
+  });
+
+  app.get("/api/scholarship-applications/:id", isAuthenticated, async (req: any, res) => {
+    try {
+      const application = await storage.getScholarshipApplication(req.params.id);
+      if (!application || application.userId !== req.user.id) {
+        res.status(404).json({ error: "Application not found" });
+        return;
+      }
+      res.json(application);
+    } catch (e) {
+      res.status(500).json({ error: "Failed to fetch application" });
+    }
+  });
+
+  app.post("/api/scholarship-applications", isAuthenticated, async (req: any, res) => {
+    try {
+      const application = await storage.createScholarshipApplication({
+        ...req.body,
+        userId: req.user.id,
+      });
+      res.json(application);
+    } catch (e) {
+      res.status(500).json({ error: "Failed to create application" });
+    }
+  });
+
+  app.patch("/api/scholarship-applications/:id", isAuthenticated, async (req: any, res) => {
+    try {
+      const application = await storage.updateScholarshipApplication(req.params.id, req.body, req.user.id);
+      if (!application) {
+        res.status(404).json({ error: "Application not found" });
+        return;
+      }
+      res.json(application);
+    } catch (e) {
+      res.status(500).json({ error: "Failed to update application" });
+    }
+  });
+
+  app.delete("/api/scholarship-applications/:id", isAuthenticated, async (req: any, res) => {
+    try {
+      const success = await storage.deleteScholarshipApplication(req.params.id, req.user.id);
+      if (!success) {
+        res.status(404).json({ error: "Application not found" });
+        return;
+      }
+      res.json({ success: true });
+    } catch (e) {
+      res.status(500).json({ error: "Failed to delete application" });
+    }
+  });
+
+  // ===========================================
+  // MENTOR SYSTEM
+  // ===========================================
+  
+  app.get("/api/mentors", async (req: any, res) => {
+    try {
+      const filters: any = {};
+      if (req.query.careerField) filters.careerField = req.query.careerField;
+      if (req.query.available === "true") filters.isAvailable = true;
+      const mentors = await storage.getMentorProfiles(filters);
+      res.json(mentors);
+    } catch (e) {
+      res.status(500).json({ error: "Failed to fetch mentors" });
+    }
+  });
+
+  app.get("/api/mentors/me", isAuthenticated, async (req: any, res) => {
+    try {
+      const profile = await storage.getMentorProfileByUser(req.user.id);
+      res.json(profile || null);
+    } catch (e) {
+      res.status(500).json({ error: "Failed to fetch mentor profile" });
+    }
+  });
+
+  app.post("/api/mentors", isAuthenticated, async (req: any, res) => {
+    try {
+      const profile = await storage.createMentorProfile({
+        ...req.body,
+        userId: req.user.id,
+      });
+      res.json(profile);
+    } catch (e) {
+      res.status(500).json({ error: "Failed to create mentor profile" });
+    }
+  });
+
+  app.patch("/api/mentors/:id", isAuthenticated, async (req: any, res) => {
+    try {
+      const profile = await storage.updateMentorProfile(req.params.id, req.body, req.user.id);
+      if (!profile) {
+        res.status(404).json({ error: "Mentor profile not found" });
+        return;
+      }
+      res.json(profile);
+    } catch (e) {
+      res.status(500).json({ error: "Failed to update mentor profile" });
+    }
+  });
+
+  // Mentor connections
+  app.get("/api/mentor-connections", isAuthenticated, async (req: any, res) => {
+    try {
+      const connections = await storage.getMentorConnections(req.user.id);
+      res.json(connections);
+    } catch (e) {
+      res.status(500).json({ error: "Failed to fetch connections" });
+    }
+  });
+
+  app.get("/api/mentor-connections/mentor/:mentorId", isAuthenticated, async (req: any, res) => {
+    try {
+      const connections = await storage.getMentorConnectionsForMentor(req.params.mentorId);
+      res.json(connections);
+    } catch (e) {
+      res.status(500).json({ error: "Failed to fetch mentor connections" });
+    }
+  });
+
+  app.post("/api/mentor-connections", isAuthenticated, async (req: any, res) => {
+    try {
+      const connection = await storage.createMentorConnection({
+        ...req.body,
+        studentUserId: req.user.id,
+      });
+      res.json(connection);
+    } catch (e) {
+      res.status(500).json({ error: "Failed to create connection" });
+    }
+  });
+
+  app.patch("/api/mentor-connections/:id", isAuthenticated, async (req: any, res) => {
+    try {
+      const connection = await storage.updateMentorConnection(req.params.id, req.body);
+      if (!connection) {
+        res.status(404).json({ error: "Connection not found" });
+        return;
+      }
+      res.json(connection);
+    } catch (e) {
+      res.status(500).json({ error: "Failed to update connection" });
+    }
+  });
+
   return httpServer;
 }

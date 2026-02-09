@@ -43,6 +43,9 @@ import {
   Presentation,
   Link2,
   PenTool,
+  Trophy,
+  DollarSign,
+  UserPlus,
 } from "lucide-react";
 
 interface NavItem {
@@ -73,6 +76,8 @@ const navigationGroups: NavGroup[] = [
     colorClass: "text-lys-red",
     items: [
       { title: "Self Discovery", url: "/self-discovery", icon: Heart },
+      { title: "Strengths Inventory", url: "/strengths-inventory", icon: Sparkles, requiresAuth: true },
+      { title: "Essay Builder", url: "/essay-builder", icon: PenTool, requiresAuth: true },
       { title: "My Portfolio", url: "/portfolio", icon: UserCircle, requiresAuth: true },
       { title: "Milestones", url: "/milestones", icon: Milestone, requiresAuth: true },
     ],
@@ -83,6 +88,8 @@ const navigationGroups: NavGroup[] = [
     items: [
       { title: "Career Explorer", url: "/careers", icon: Briefcase },
       { title: "Resources", url: "/resources", icon: Library },
+      { title: "Scholarship Planner", url: "/scholarship-planner", icon: GraduationCap, requiresAuth: true },
+      { title: "Mentor Connect", url: "/mentor-connect", icon: UserPlus, requiresAuth: true },
     ],
   },
   {
@@ -90,6 +97,7 @@ const navigationGroups: NavGroup[] = [
     colorClass: "text-lys-teal",
     items: [
       { title: "Action Plans", url: "/action-plans", icon: Target, requiresAuth: true },
+      { title: "Campus Activities", url: "/campus-activities", icon: Trophy, requiresAuth: true },
       { title: "Assignments", url: "/assignments", icon: ClipboardList, requiresAuth: true, roles: ["educator", "campus_admin"] },
     ],
   },

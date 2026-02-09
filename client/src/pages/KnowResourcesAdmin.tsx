@@ -12,7 +12,7 @@ import { Switch } from "@/components/ui/switch";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Plus, Pencil, Trash2, Book, Youtube, Podcast, MessageCircle, FileText, ExternalLink, Star, Eye, EyeOff } from "lucide-react";
+import { Plus, Pencil, Trash2, Book, Youtube, Podcast, MessageCircle, FileText, ExternalLink, Star, Eye, EyeOff, GraduationCap, DollarSign, PenTool } from "lucide-react";
 import type { KnowResource, InsertKnowResource, KnowResourceType } from "@shared/schema";
 
 const RESOURCE_TYPES = [
@@ -23,6 +23,9 @@ const RESOURCE_TYPES = [
   { value: "whatsapp_channel", label: "WhatsApp Channel", icon: MessageCircle },
   { value: "website", label: "Website", icon: ExternalLink },
   { value: "course", label: "Course", icon: Book },
+  { value: "scholarship", label: "Scholarship", icon: GraduationCap },
+  { value: "financial_guide", label: "Financial Guide", icon: DollarSign },
+  { value: "essay_template", label: "Essay Template", icon: PenTool },
 ] as const;
 
 const CATEGORIES = [
@@ -36,6 +39,8 @@ const CATEGORIES = [
   "Engineering",
   "Science",
   "Mathematics",
+  "Financial Literacy",
+  "Scholarships",
 ];
 
 const TARGET_AUDIENCES = ["students", "educators", "parents"];
@@ -77,6 +82,13 @@ function ResourceForm({
     tags: string[];
     targetAudience: string[];
     careerFields: string[];
+    scholarshipAmount: number | undefined;
+    scholarshipDeadline: string;
+    gpaRequirement: string;
+    eligibilityCriteria: string;
+    applicationSeason: string;
+    isFirstGenFriendly: boolean;
+    isRecurring: boolean;
     isActive: boolean;
     featured: boolean;
     sortOrder: number;
@@ -100,6 +112,13 @@ function ResourceForm({
     tags: resource?.tags || [],
     targetAudience: resource?.targetAudience || [],
     careerFields: resource?.careerFields || [],
+    scholarshipAmount: (resource as any)?.scholarshipAmount || undefined,
+    scholarshipDeadline: (resource as any)?.scholarshipDeadline || "",
+    gpaRequirement: (resource as any)?.gpaRequirement || "",
+    eligibilityCriteria: (resource as any)?.eligibilityCriteria || "",
+    applicationSeason: (resource as any)?.applicationSeason || "",
+    isFirstGenFriendly: (resource as any)?.isFirstGenFriendly ?? false,
+    isRecurring: (resource as any)?.isRecurring ?? false,
     isActive: resource?.isActive ?? true,
     featured: resource?.featured ?? false,
     sortOrder: resource?.sortOrder ?? 0,
@@ -132,6 +151,15 @@ function ResourceForm({
       isActive: formData.isActive,
       featured: formData.featured,
       sortOrder: formData.sortOrder,
+      ...(formData.resourceType === "scholarship" ? {
+        scholarshipAmount: formData.scholarshipAmount || null,
+        scholarshipDeadline: formData.scholarshipDeadline || null,
+        gpaRequirement: formData.gpaRequirement || null,
+        eligibilityCriteria: formData.eligibilityCriteria || null,
+        applicationSeason: formData.applicationSeason || null,
+        isFirstGenFriendly: formData.isFirstGenFriendly,
+        isRecurring: formData.isRecurring,
+      } : {}),
     };
     onSubmit(submitData);
   };
@@ -368,6 +396,96 @@ function ResourceForm({
             placeholder="https://whatsapp.com/channel/..."
             data-testid="input-whatsapp-link"
           />
+        </div>
+      )}
+
+      {formData.resourceType === "scholarship" && (
+        <div className="space-y-4 border-t pt-4">
+          <Label className="text-base font-semibold">Scholarship Details</Label>
+          <div className="grid gap-4 md:grid-cols-3">
+            <div className="space-y-2">
+              <Label htmlFor="scholarshipAmount">Amount ($)</Label>
+              <Input
+                id="scholarshipAmount"
+                type="number"
+                value={formData.scholarshipAmount || ""}
+                onChange={(e) => setFormData({ ...formData, scholarshipAmount: parseInt(e.target.value) || undefined })}
+                placeholder="e.g., 5000"
+                data-testid="input-scholarship-amount"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="scholarshipDeadline">Deadline</Label>
+              <Input
+                id="scholarshipDeadline"
+                type="date"
+                value={formData.scholarshipDeadline}
+                onChange={(e) => setFormData({ ...formData, scholarshipDeadline: e.target.value })}
+                data-testid="input-scholarship-deadline"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="gpaRequirement">GPA Requirement</Label>
+              <Input
+                id="gpaRequirement"
+                value={formData.gpaRequirement}
+                onChange={(e) => setFormData({ ...formData, gpaRequirement: e.target.value })}
+                placeholder="e.g., 3.0"
+                data-testid="input-gpa-requirement"
+              />
+            </div>
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="eligibilityCriteria">Eligibility Criteria</Label>
+            <Textarea
+              id="eligibilityCriteria"
+              value={formData.eligibilityCriteria}
+              onChange={(e) => setFormData({ ...formData, eligibilityCriteria: e.target.value })}
+              placeholder="Describe eligibility requirements..."
+              rows={3}
+              data-testid="input-eligibility-criteria"
+            />
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="applicationSeason">Season</Label>
+            <Select
+              value={formData.applicationSeason}
+              onValueChange={(value) => setFormData({ ...formData, applicationSeason: value })}
+            >
+              <SelectTrigger data-testid="select-application-season">
+                <SelectValue placeholder="Select season" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="early_fall">Early Fall</SelectItem>
+                <SelectItem value="late_fall">Late Fall</SelectItem>
+                <SelectItem value="spring">Spring</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div className="flex items-center gap-6">
+            <div className="flex items-center gap-2">
+              <Switch
+                id="isFirstGenFriendly"
+                checked={formData.isFirstGenFriendly}
+                onCheckedChange={(checked) => setFormData({ ...formData, isFirstGenFriendly: checked })}
+                data-testid="switch-first-gen-friendly"
+              />
+              <Label htmlFor="isFirstGenFriendly">First-Gen Friendly</Label>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <Switch
+                id="isRecurring"
+                checked={formData.isRecurring}
+                onCheckedChange={(checked) => setFormData({ ...formData, isRecurring: checked })}
+                data-testid="switch-is-recurring"
+              />
+              <Label htmlFor="isRecurring">Recurring Annual Scholarship</Label>
+            </div>
+          </div>
         </div>
       )}
 
