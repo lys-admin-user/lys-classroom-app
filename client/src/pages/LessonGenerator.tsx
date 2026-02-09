@@ -63,6 +63,8 @@ export default function LessonGenerator() {
   const [showAssignmentOption, setShowAssignmentOption] = useState(false);
   const [assignmentType, setAssignmentType] = useState<"quiz" | "worksheet" | "project" | "discussion" | "reflection">("quiz");
   const [generatedAssignment, setGeneratedAssignment] = useState<any>(null);
+  const [assignmentQuestionCount, setAssignmentQuestionCount] = useState(5);
+  const [assignmentDifficulty, setAssignmentDifficulty] = useState<"easy" | "medium" | "hard">("medium");
   
   // Educational Resources state
   const [addedResources, setAddedResources] = useState<EducationalResource[]>([]);
@@ -343,10 +345,17 @@ export default function LessonGenerator() {
       queryClient.invalidateQueries({ queryKey: ["/api/lessons"] });
       toast({
         title: "Lesson Saved!",
-        description: "Your lesson has been added to your library.",
+        description: "Now you can create an aligned assignment from this lesson. Scroll down to get started.",
       });
       // Show assignment generation option with a slight delay for smooth animation
-      setTimeout(() => setShowAssignmentOption(true), 500);
+      setTimeout(() => {
+        setShowAssignmentOption(true);
+        // Auto-scroll to the assignment panel
+        setTimeout(() => {
+          const panel = document.querySelector('[data-testid="assignment-generation-panel"]');
+          panel?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }, 300);
+      }, 500);
     },
     onError: (error: Error) => {
       toast({
@@ -364,8 +373,8 @@ export default function LessonGenerator() {
       const response = await apiRequest("POST", "/api/assignments/generate", {
         lessonId: savedLessonId,
         assignmentType,
-        questionCount: assignmentType === "quiz" ? 10 : 5,
-        difficulty: "medium",
+        questionCount: assignmentQuestionCount,
+        difficulty: assignmentDifficulty,
         includeBeKnowDo: true,
       });
       return await response.json();
@@ -898,6 +907,22 @@ ${addedResources.length > 0 ? addedResources.map(r => `- ${r.title}: ${r.url}`).
                         {isSaved ? "Saved" : "Save to Library"}
                       </Button>
                     )}
+                    {isSaved && showAssignmentOption && !generatedAssignment && (
+                      <Button 
+                        variant="outline"
+                        size="sm"
+                        onClick={() => {
+                          const panel = document.querySelector('[data-testid="assignment-generation-panel"]');
+                          panel?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                        }}
+                        className="gap-1 font-roboto border-lys-teal/30 text-lys-teal"
+                        data-testid="button-scroll-to-assignment"
+                      >
+                        <ClipboardList className="h-4 w-4" />
+                        Create Assignment
+                        <ChevronDown className="h-3 w-3" />
+                      </Button>
+                    )}
                     <Button variant="outline" size="sm" onClick={copyToClipboard} className="gap-1 font-roboto" data-testid="button-copy-lesson">
                       <Copy className="h-4 w-4" />
                       Copy
@@ -1347,58 +1372,176 @@ ${addedResources.length > 0 ? addedResources.map(r => `- ${r.title}: ${r.url}`).
                         )}
                       </div>
 
-                      {/* Subtle Assignment Generation Option - appears after saving */}
+                      {/* Next Step: Assignment Generation - appears after saving */}
                       {showAssignmentOption && isSaved && (
                         <div 
                           className="mt-6 animate-in slide-in-from-bottom-4 fade-in duration-500"
                           data-testid="assignment-generation-panel"
                         >
-                          <Separator className="mb-6" />
+                          <Separator className="mb-4" />
+
+                          {/* Step indicator */}
+                          <div className="flex items-center gap-2 mb-4">
+                            <div className="flex items-center gap-1.5">
+                              <div className="flex h-6 w-6 items-center justify-center rounded-full bg-green-500/20 text-green-600 text-xs font-bold">
+                                1
+                              </div>
+                              <span className="text-xs font-roboto text-muted-foreground">Generated</span>
+                            </div>
+                            <div className="h-px flex-1 bg-green-500/30 max-w-6" />
+                            <div className="flex items-center gap-1.5">
+                              <div className="flex h-6 w-6 items-center justify-center rounded-full bg-green-500/20 text-green-600 text-xs font-bold">
+                                2
+                              </div>
+                              <span className="text-xs font-roboto text-muted-foreground">Saved</span>
+                            </div>
+                            <div className="h-px flex-1 bg-muted-foreground/20 max-w-6" />
+                            <div className="flex items-center gap-1.5">
+                              <div className={`flex h-6 w-6 items-center justify-center rounded-full text-xs font-bold ${generatedAssignment ? 'bg-green-500/20 text-green-600' : 'bg-lys-teal/20 text-lys-teal animate-pulse'}`}>
+                                3
+                              </div>
+                              <span className={`text-xs font-roboto ${generatedAssignment ? 'text-muted-foreground' : 'text-lys-teal font-medium'}`}>
+                                {generatedAssignment ? 'Assignment Created' : 'Create Assignment'}
+                              </span>
+                            </div>
+                          </div>
                           
                           {!generatedAssignment ? (
-                            <div className="relative overflow-hidden rounded-lg border border-dashed border-muted-foreground/20 bg-gradient-to-br from-muted/30 via-background to-muted/20 p-6">
-                              {/* Decorative sparkle */}
-                              <div className="absolute -right-4 -top-4 h-24 w-24 rounded-full bg-lys-yellow/10 blur-2xl" />
+                            <div className="relative overflow-hidden rounded-lg border border-lys-teal/20 bg-gradient-to-br from-lys-teal/5 via-background to-muted/20 p-6">
+                              <div className="absolute -right-4 -top-4 h-24 w-24 rounded-full bg-lys-teal/5 blur-2xl" />
                               
                               <div className="relative">
-                                <div className="flex items-center gap-3 mb-4">
-                                  <div className="flex h-10 w-10 items-center justify-center rounded-full bg-lys-yellow/10">
-                                    <ClipboardList className="h-5 w-5 text-lys-yellow" />
+                                <div className="flex items-center gap-3 mb-2">
+                                  <div className="flex h-10 w-10 items-center justify-center rounded-full bg-lys-teal/10">
+                                    <ClipboardList className="h-5 w-5 text-lys-teal" />
                                   </div>
                                   <div>
-                                    <h4 className="font-oswald text-base font-semibold">Create an Assignment</h4>
-                                    <p className="text-sm text-muted-foreground font-roboto">Turn this lesson into a ready-to-use assignment</p>
+                                    <h4 className="font-oswald text-base font-semibold">Next Step: Create an Assignment</h4>
+                                    <p className="text-sm text-muted-foreground font-roboto">
+                                      AI will generate questions aligned to your lesson's objectives and standards
+                                    </p>
                                   </div>
                                 </div>
 
-                                <div className="flex flex-wrap gap-2 mb-4">
-                                  {[
-                                    { value: "quiz", label: "Quiz", icon: Brain, description: "Multiple choice & short answer" },
-                                    { value: "worksheet", label: "Worksheet", icon: PenLine, description: "Practice problems & exercises" },
-                                    { value: "project", label: "Project", icon: Award, description: "Hands-on learning activity" },
-                                    { value: "discussion", label: "Discussion", icon: MessageSquare, description: "Collaborative questions" },
-                                    { value: "reflection", label: "Reflection", icon: Heart, description: "Personal growth journaling" },
-                                  ].map((type) => (
-                                    <button
-                                      key={type.value}
-                                      onClick={() => setAssignmentType(type.value as any)}
-                                      className={`group flex items-center gap-2 rounded-md border px-3 py-2 text-sm font-roboto transition-all hover-elevate ${
-                                        assignmentType === type.value 
-                                          ? "border-lys-teal bg-lys-teal/10 text-lys-teal" 
-                                          : "border-muted-foreground/20 text-muted-foreground"
-                                      }`}
-                                      data-testid={`assignment-type-${type.value}`}
-                                    >
-                                      <type.icon className="h-4 w-4" />
-                                      {type.label}
-                                    </button>
-                                  ))}
+                                {/* Alignment context from the lesson */}
+                                {generatedLesson && (
+                                  <div className="mb-4 p-3 rounded-md bg-muted/30 border border-muted/40">
+                                    <p className="text-xs font-oswald text-muted-foreground mb-2 uppercase tracking-wide">Your assignment will be aligned to:</p>
+                                    <div className="space-y-1.5">
+                                      {generatedLesson.objectives && generatedLesson.objectives.length > 0 && (
+                                        <div className="flex items-start gap-2">
+                                          <Target className="h-3.5 w-3.5 text-lys-red flex-shrink-0 mt-0.5" />
+                                          <p className="text-xs font-roboto text-muted-foreground">
+                                            <span className="font-medium text-foreground">{generatedLesson.objectives.length} Learning Objective{generatedLesson.objectives.length !== 1 ? 's' : ''}</span>
+                                            {' '}&mdash; {generatedLesson.objectives[0]?.substring(0, 80)}{(generatedLesson.objectives[0]?.length || 0) > 80 ? '...' : ''}
+                                          </p>
+                                        </div>
+                                      )}
+                                      {generatedLesson.standards && (
+                                        <div className="flex items-start gap-2">
+                                          <GraduationCap className="h-3.5 w-3.5 text-lys-teal flex-shrink-0 mt-0.5" />
+                                          <p className="text-xs font-roboto text-muted-foreground">
+                                            <span className="font-medium text-foreground">{generatedLesson.standards.standardsName}</span>
+                                            {' '}&mdash; {generatedLesson.standards.codes.map(c => c.code).join(', ')}
+                                          </p>
+                                        </div>
+                                      )}
+                                      <div className="flex items-start gap-2">
+                                        <Heart className="h-3.5 w-3.5 text-lys-yellow flex-shrink-0 mt-0.5" />
+                                        <p className="text-xs font-roboto text-muted-foreground">
+                                          <span className="font-medium text-foreground">Be-Know-Do</span>
+                                          {' '}&mdash; Questions include identity reflection (BE), knowledge checks (KNOW), and application tasks (DO)
+                                        </p>
+                                      </div>
+                                    </div>
+                                  </div>
+                                )}
+
+                                {/* Assignment type selector with descriptions */}
+                                <div className="mb-4">
+                                  <Label className="text-xs font-oswald text-muted-foreground uppercase tracking-wide mb-2 block">Assignment Type</Label>
+                                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                                    {[
+                                      { value: "quiz", label: "Quiz", icon: Brain, description: "Multiple choice, short answer, and matching questions" },
+                                      { value: "worksheet", label: "Worksheet", icon: PenLine, description: "Structured practice problems and exercises" },
+                                      { value: "project", label: "Project", icon: Award, description: "Hands-on learning activity with rubric" },
+                                      { value: "discussion", label: "Discussion", icon: MessageSquare, description: "Collaborative prompts for group dialogue" },
+                                      { value: "reflection", label: "Reflection", icon: Heart, description: "Personal growth and self-discovery journaling" },
+                                    ].map((type) => (
+                                      <button
+                                        key={type.value}
+                                        onClick={() => setAssignmentType(type.value as any)}
+                                        className={`group flex flex-col items-start gap-1 rounded-md border p-3 text-left font-roboto toggle-elevate ${
+                                          assignmentType === type.value 
+                                            ? "toggle-elevated border-lys-teal bg-lys-teal/10" 
+                                            : "border-muted-foreground/20"
+                                        }`}
+                                        data-testid={`assignment-type-${type.value}`}
+                                      >
+                                        <div className={`flex items-center gap-2 text-sm font-medium ${assignmentType === type.value ? 'text-lys-teal' : 'text-foreground'}`}>
+                                          <type.icon className="h-4 w-4" />
+                                          {type.label}
+                                        </div>
+                                        <p className="text-[11px] leading-tight text-muted-foreground">{type.description}</p>
+                                      </button>
+                                    ))}
+                                  </div>
+                                </div>
+
+                                {/* Question count and difficulty controls */}
+                                <div className="flex flex-wrap gap-4 mb-4">
+                                  <div className="flex-1 min-w-[140px]">
+                                    <Label className="text-xs font-oswald text-muted-foreground uppercase tracking-wide mb-1.5 block">
+                                      Number of Questions
+                                    </Label>
+                                    <div className="flex items-center gap-2">
+                                      {[3, 5, 10, 15].map((count) => (
+                                        <button
+                                          key={count}
+                                          onClick={() => setAssignmentQuestionCount(count)}
+                                          className={`rounded-md border px-3 py-1.5 text-sm font-roboto toggle-elevate ${
+                                            assignmentQuestionCount === count
+                                              ? "toggle-elevated border-lys-teal bg-lys-teal/10 text-lys-teal font-medium"
+                                              : "border-muted-foreground/20 text-muted-foreground"
+                                          }`}
+                                          data-testid={`question-count-${count}`}
+                                        >
+                                          {count}
+                                        </button>
+                                      ))}
+                                    </div>
+                                  </div>
+                                  <div className="flex-1 min-w-[140px]">
+                                    <Label className="text-xs font-oswald text-muted-foreground uppercase tracking-wide mb-1.5 block">
+                                      Difficulty Level
+                                    </Label>
+                                    <div className="flex items-center gap-2">
+                                      {([
+                                        { value: "easy", label: "Easy" },
+                                        { value: "medium", label: "Medium" },
+                                        { value: "hard", label: "Challenging" },
+                                      ] as const).map((diff) => (
+                                        <button
+                                          key={diff.value}
+                                          onClick={() => setAssignmentDifficulty(diff.value)}
+                                          className={`rounded-md border px-3 py-1.5 text-sm font-roboto toggle-elevate ${
+                                            assignmentDifficulty === diff.value
+                                              ? "toggle-elevated border-lys-teal bg-lys-teal/10 text-lys-teal font-medium"
+                                              : "border-muted-foreground/20 text-muted-foreground"
+                                          }`}
+                                          data-testid={`difficulty-${diff.value}`}
+                                        >
+                                          {diff.label}
+                                        </button>
+                                      ))}
+                                    </div>
+                                  </div>
                                 </div>
 
                                 <Button 
                                   onClick={() => assignmentMutation.mutate()}
                                   disabled={assignmentMutation.isPending}
-                                  className="gap-2 bg-gradient-to-r from-lys-teal to-lys-teal/90 hover:from-lys-teal/90 hover:to-lys-teal text-white font-roboto"
+                                  className="gap-2 bg-lys-teal border-lys-teal text-white font-roboto w-full sm:w-auto"
                                   data-testid="button-generate-assignment"
                                 >
                                   {assignmentMutation.isPending ? (
@@ -1409,7 +1552,7 @@ ${addedResources.length > 0 ? addedResources.map(r => `- ${r.title}: ${r.url}`).
                                   ) : (
                                     <>
                                       <Sparkles className="h-4 w-4" />
-                                      Generate {assignmentType.charAt(0).toUpperCase() + assignmentType.slice(1)}
+                                      Generate {assignmentType.charAt(0).toUpperCase() + assignmentType.slice(1)} ({assignmentQuestionCount} questions, {assignmentDifficulty})
                                       <ChevronRight className="h-4 w-4" />
                                     </>
                                   )}
@@ -1425,22 +1568,55 @@ ${addedResources.length > 0 ? addedResources.map(r => `- ${r.title}: ${r.url}`).
                                   </div>
                                   <div>
                                     <h4 className="font-oswald text-base font-semibold">{generatedAssignment.title}</h4>
-                                    <p className="text-sm text-muted-foreground font-roboto">Your {assignmentType} is ready</p>
+                                    <p className="text-sm text-muted-foreground font-roboto">
+                                      {generatedAssignment.questions?.length || 0} questions &middot; {assignmentDifficulty} difficulty &middot; {assignmentType}
+                                    </p>
                                   </div>
                                 </div>
-                                <div className="flex items-center gap-2">
+                                <div className="flex items-center gap-2 flex-wrap">
                                   <Button
                                     variant="outline"
                                     size="sm"
                                     onClick={() => {
-                                      navigator.clipboard.writeText(JSON.stringify(generatedAssignment, null, 2));
-                                      toast({ title: "Copied!", description: "Assignment copied to clipboard" });
+                                      const lines: string[] = [];
+                                      lines.push(generatedAssignment.title || 'Assignment');
+                                      lines.push('='.repeat(40));
+                                      if (generatedAssignment.questions) {
+                                        generatedAssignment.questions.forEach((q: any, i: number) => {
+                                          lines.push('');
+                                          lines.push(`${i + 1}. ${q.question}`);
+                                          if (q.type) lines.push(`   Type: ${q.type} | Points: ${q.points || 0}`);
+                                          if (q.bkdPillar) lines.push(`   BKD Pillar: ${q.bkdPillar.toUpperCase()}`);
+                                          if (q.options) {
+                                            q.options.forEach((opt: string, j: number) => {
+                                              lines.push(`   ${String.fromCharCode(65 + j)}. ${opt}`);
+                                            });
+                                          }
+                                          if (q.correctAnswer !== undefined) {
+                                            lines.push(`   Answer: ${typeof q.correctAnswer === 'number' ? String.fromCharCode(65 + q.correctAnswer) : q.correctAnswer}`);
+                                          }
+                                        });
+                                      }
+                                      lines.push('');
+                                      lines.push(`Total Points: ${generatedAssignment.totalPoints || 0}`);
+                                      navigator.clipboard.writeText(lines.join('\n'));
+                                      toast({ title: "Copied!", description: "Assignment copied as readable text" });
                                     }}
                                     className="gap-1"
                                     data-testid="button-copy-assignment"
                                   >
                                     <Copy className="h-4 w-4" />
                                     Copy
+                                  </Button>
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => setLocation(`/assignments`)}
+                                    className="gap-1"
+                                    data-testid="button-edit-assignment"
+                                  >
+                                    <PenLine className="h-4 w-4" />
+                                    Edit & Assign
                                   </Button>
                                   <Button
                                     size="sm"
@@ -1454,17 +1630,54 @@ ${addedResources.length > 0 ? addedResources.map(r => `- ${r.title}: ${r.url}`).
                                 </div>
                               </div>
 
+                              {/* Alignment summary */}
+                              {generatedAssignment.questions && (
+                                <div className="mb-4 p-3 rounded-md bg-green-500/5 border border-green-500/10">
+                                  <div className="flex flex-wrap gap-3 text-xs font-roboto">
+                                    <span className="text-muted-foreground">
+                                      <span className="font-medium text-foreground">{generatedAssignment.questions.length}</span> questions
+                                    </span>
+                                    <span className="text-muted-foreground">
+                                      <span className="font-medium text-foreground">{generatedAssignment.totalPoints || 0}</span> total points
+                                    </span>
+                                    {(() => {
+                                      const bkd = { be: 0, know: 0, do: 0 } as Record<string, number>;
+                                      generatedAssignment.questions.forEach((q: any) => { if (q.bkdPillar && bkd[q.bkdPillar] !== undefined) bkd[q.bkdPillar]++; });
+                                      return Object.entries(bkd).filter(([, v]) => v > 0).map(([k, v]) => (
+                                        <span key={k} className="text-muted-foreground">
+                                          <span className="font-medium text-foreground">{v}</span> {k.toUpperCase()}
+                                        </span>
+                                      ));
+                                    })()}
+                                  </div>
+                                </div>
+                              )}
+
                               {generatedAssignment.questions && (
                                 <div className="space-y-3 max-h-[300px] overflow-y-auto scrollbar-always-visible pr-2">
                                   {generatedAssignment.questions.slice(0, 5).map((q: any, i: number) => (
                                     <div key={i} className="p-3 rounded-md bg-muted/30 border border-muted/50">
-                                      <p className="font-roboto text-sm font-medium mb-1">
-                                        {i + 1}. {q.question}
-                                      </p>
+                                      <div className="flex items-center justify-between gap-2 mb-1 flex-wrap">
+                                        <p className="font-roboto text-sm font-medium">
+                                          {i + 1}. {q.question}
+                                        </p>
+                                        <div className="flex items-center gap-1.5">
+                                          {q.bkdPillar && (
+                                            <Badge variant="outline" className="text-[10px] px-1.5 py-0">
+                                              {q.bkdPillar.toUpperCase()}
+                                            </Badge>
+                                          )}
+                                          {q.points !== undefined && (
+                                            <Badge variant="secondary" className="text-[10px] px-1.5 py-0">
+                                              {q.points}pt{q.points !== 1 ? 's' : ''}
+                                            </Badge>
+                                          )}
+                                        </div>
+                                      </div>
                                       {q.options && (
                                         <div className="ml-4 space-y-1">
                                           {q.options.map((opt: string, j: number) => (
-                                            <p key={j} className="text-sm text-muted-foreground font-roboto">
+                                            <p key={j} className={`text-sm font-roboto ${j === q.correctAnswer ? 'text-green-600 font-medium' : 'text-muted-foreground'}`}>
                                               {String.fromCharCode(65 + j)}. {opt}
                                             </p>
                                           ))}
@@ -1474,7 +1687,7 @@ ${addedResources.length > 0 ? addedResources.map(r => `- ${r.title}: ${r.url}`).
                                   ))}
                                   {generatedAssignment.questions.length > 5 && (
                                     <p className="text-sm text-muted-foreground text-center py-2 font-roboto">
-                                      + {generatedAssignment.questions.length - 5} more questions
+                                      + {generatedAssignment.questions.length - 5} more questions &mdash; view all in Assignments
                                     </p>
                                   )}
                                 </div>
