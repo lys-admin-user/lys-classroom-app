@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useAuth } from "@/hooks/use-auth";
@@ -284,7 +284,12 @@ export default function Classroom() {
 
   // Query for class attendance
   const { data: classAttendance = [] } = useQuery<AttendanceRecord[]>({
-    queryKey: ["/api/classes", attendanceClass?.id, "attendance"],
+    queryKey: ["/api/classes", attendanceClass?.id, "attendance", attendanceDate],
+    queryFn: async () => {
+      const res = await fetch(`/api/classes/${attendanceClass!.id}/attendance?date=${attendanceDate}`, { credentials: "include" });
+      if (!res.ok) throw new Error("Failed to fetch attendance");
+      return res.json();
+    },
     enabled: !!attendanceClass,
   });
 
@@ -293,6 +298,16 @@ export default function Classroom() {
     queryKey: ["/api/classes", attendanceClass?.id, "students"],
     enabled: !!attendanceClass,
   });
+
+  useEffect(() => {
+    if (classAttendance.length > 0) {
+      const savedRecords: Record<string, string> = {};
+      classAttendance.forEach((r) => {
+        savedRecords[r.studentId] = r.status;
+      });
+      setAttendanceRecords(prev => ({ ...prev, ...savedRecords }));
+    }
+  }, [classAttendance]);
 
   // Personal classes/students queries
   const { data: personalClasses = [], isLoading: classesLoading } = useQuery<Class[]>({
@@ -605,6 +620,44 @@ export default function Classroom() {
     link.download = `students_${new Date().toISOString().split('T')[0]}.csv`;
     link.click();
     toast({ title: "Students exported to CSV" });
+  };
+
+  const downloadAttendanceRoster = () => {
+    if (!attendanceClass || attendanceClassStudents.length === 0) return;
+    const dateFormatted = new Date(attendanceDate + "T00:00:00").toLocaleDateString("en-US", {
+      weekday: "long", year: "numeric", month: "long", day: "numeric"
+    });
+    const headers = ["#", "First Name", "Last Name", "Student ID", "Grade Level", "Attendance Status", "Notes"];
+    const rows = attendanceClassStudents.map((s, i) => {
+      const status = attendanceRecords[s.id] || "present";
+      const statusLabel = status.charAt(0).toUpperCase() + status.slice(1);
+      return [
+        i + 1,
+        s.firstName,
+        s.lastName,
+        s.studentId || "",
+        s.gradeLevel || "",
+        statusLabel,
+        ""
+      ].map(field => `"${field}"`).join(",");
+    });
+    const csvContent = [
+      `"Class: ${attendanceClass.name}"`,
+      `"Date: ${dateFormatted}"`,
+      `"Subject: ${attendanceClass.subject || "N/A"}"`,
+      `"Period: ${attendanceClass.period || "N/A"}"`,
+      `"Total Students: ${attendanceClassStudents.length}"`,
+      "",
+      headers.join(","),
+      ...rows
+    ].join("\n");
+    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+    const link = document.createElement("a");
+    link.href = URL.createObjectURL(blob);
+    const safeName = attendanceClass.name.replace(/[^a-zA-Z0-9]/g, "_");
+    link.download = `attendance_${safeName}_${attendanceDate}.csv`;
+    link.click();
+    toast({ title: "Attendance roster downloaded", description: `${attendanceClassStudents.length} students for ${dateFormatted}` });
   };
 
   if (authLoading) {
@@ -2080,15 +2133,27 @@ Jane,Smith,12346,10th Grade
           </DialogHeader>
           
           <div className="space-y-4">
-            <div className="flex items-center gap-4">
-              <Label>Date</Label>
-              <Input
-                type="date"
-                value={attendanceDate}
-                onChange={(e) => setAttendanceDate(e.target.value)}
-                className="w-[180px]"
-                data-testid="input-attendance-date"
-              />
+            <div className="flex items-center justify-between gap-3 flex-wrap">
+              <div className="flex items-center gap-3">
+                <Label>Date</Label>
+                <Input
+                  type="date"
+                  value={attendanceDate}
+                  onChange={(e) => setAttendanceDate(e.target.value)}
+                  className="w-[180px]"
+                  data-testid="input-attendance-date"
+                />
+              </div>
+              <Button
+                variant="outline"
+                onClick={downloadAttendanceRoster}
+                disabled={attendanceClassStudents.length === 0}
+                className="gap-1"
+                data-testid="button-download-attendance-roster"
+              >
+                <Download className="h-4 w-4" />
+                Download Roster
+              </Button>
             </div>
 
             <div className="max-h-[50vh] overflow-y-auto space-y-2">
