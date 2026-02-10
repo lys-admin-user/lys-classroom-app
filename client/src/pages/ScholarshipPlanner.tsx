@@ -11,7 +11,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Skeleton } from "@/components/ui/skeleton";
-import { GraduationCap, Calendar, CheckCircle, Clock, Plus, Trash2, ExternalLink, DollarSign, Search, Star, BookOpen } from "lucide-react";
+import { GraduationCap, Calendar, CheckCircle, Clock, Plus, Trash2, DollarSign } from "lucide-react";
 
 type ScholarshipApplication = {
   id: string;
@@ -25,20 +25,6 @@ type ScholarshipApplication = {
   resourceId: string | null;
 };
 
-type KnowResource = {
-  id: number;
-  title: string;
-  description: string | null;
-  url: string | null;
-  resourceType: string;
-  category: string | null;
-  scholarshipAmount: string | null;
-  scholarshipDeadline: string | null;
-  applicationSeason: string | null;
-  eligibilityCriteria: string[] | null;
-  gpaRequirement: string | null;
-  firstGenFriendly: boolean | null;
-};
 
 const STATUS_CONFIG: Record<string, { label: string; variant?: "default" | "secondary" | "destructive" | "outline"; className?: string }> = {
   planned: { label: "Planned", variant: "secondary" },
@@ -270,160 +256,6 @@ function ApplicationsTab({ applications }: { applications: ScholarshipApplicatio
   );
 }
 
-function DiscoverTab({ applications }: { applications: ScholarshipApplication[] }) {
-  const { toast } = useToast();
-  const [searchTerm, setSearchTerm] = useState("");
-  const { data: resources, isLoading } = useQuery<KnowResource[]>({
-    queryKey: ["/api/know-resources?type=scholarship"],
-  });
-
-  const addToPlanner = useMutation({
-    mutationFn: (data: Record<string, unknown>) => apiRequest("POST", "/api/scholarship-applications", data),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/scholarship-applications"] });
-      toast({ title: "Added to your planner!" });
-    },
-    onError: () => toast({ title: "Failed to add scholarship", variant: "destructive" }),
-  });
-
-  const handleAddToPlanner = (resource: KnowResource) => {
-    const notesParts: string[] = [];
-    if (resource.gpaRequirement) notesParts.push(`GPA Requirement: ${resource.gpaRequirement}`);
-    if (resource.eligibilityCriteria?.length) notesParts.push(`Eligibility: ${resource.eligibilityCriteria.join(", ")}`);
-    if (resource.firstGenFriendly) notesParts.push("First-generation student friendly");
-
-    addToPlanner.mutate({
-      scholarshipName: resource.title,
-      scholarshipUrl: resource.url || null,
-      resourceId: String(resource.id),
-      amount: resource.scholarshipAmount || null,
-      deadline: resource.scholarshipDeadline || null,
-      season: resource.applicationSeason || "early_fall",
-      status: "planned",
-      essayRequired: false,
-      notes: notesParts.length > 0 ? notesParts.join(" | ") : null,
-    });
-  };
-
-  const trackedResourceIds = new Set(
-    applications.filter((a) => a.resourceId).map((a) => String(a.resourceId))
-  );
-
-  const scholarships = (resources || []).filter((r) =>
-    !searchTerm || r.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    (r.description && r.description.toLowerCase().includes(searchTerm.toLowerCase()))
-  );
-
-  if (isLoading) {
-    return (
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-        {[1, 2, 3].map((i) => <Skeleton key={i} className="h-40 rounded-md" />)}
-      </div>
-    );
-  }
-
-  return (
-    <div className="space-y-4">
-      <div className="flex items-center gap-4 flex-wrap">
-        <div className="flex items-center gap-2 flex-1 min-w-[200px]">
-          <Search className="w-4 h-4 text-muted-foreground" />
-          <Input
-            placeholder="Search scholarships..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            data-testid="input-search-scholarships"
-          />
-        </div>
-        <span className="text-sm text-muted-foreground">{scholarships.length} scholarship{scholarships.length !== 1 ? "s" : ""} available</span>
-      </div>
-      {scholarships.length === 0 ? (
-        <Card>
-          <CardContent className="py-8 text-center">
-            <GraduationCap className="w-10 h-10 mx-auto text-muted-foreground mb-2" />
-            <p className="text-muted-foreground">
-              {searchTerm ? "No scholarships match your search." : "No scholarships available yet. Check back later!"}
-            </p>
-          </CardContent>
-        </Card>
-      ) : (
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-          {scholarships.map((r) => {
-            const alreadyAdded = trackedResourceIds.has(String(r.id));
-            return (
-              <Card key={r.id} className="hover-elevate flex flex-col" data-testid={`card-resource-${r.id}`}>
-                <CardHeader>
-                  <CardTitle className="text-base flex items-center gap-2">
-                    <GraduationCap className="w-4 h-4 shrink-0" />
-                    <span className="line-clamp-2">{r.title}</span>
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-3 flex-1 flex flex-col">
-                  {r.description && <p className="text-sm text-muted-foreground line-clamp-3">{r.description}</p>}
-                  <div className="flex items-center gap-2 flex-wrap">
-                    {r.scholarshipAmount && (
-                      <Badge variant="secondary">
-                        <DollarSign className="w-3 h-3 mr-1" />{r.scholarshipAmount}
-                      </Badge>
-                    )}
-                    {r.applicationSeason && <Badge variant="outline">{r.applicationSeason.replace("_", " ")}</Badge>}
-                    {r.firstGenFriendly && (
-                      <Badge variant="outline" className="text-green-600 border-green-300">
-                        <Star className="w-3 h-3 mr-1" />First-Gen Friendly
-                      </Badge>
-                    )}
-                  </div>
-                  {r.gpaRequirement && (
-                    <p className="text-xs text-muted-foreground flex items-center gap-1">
-                      <BookOpen className="w-3 h-3" />GPA: {r.gpaRequirement}+
-                    </p>
-                  )}
-                  {r.scholarshipDeadline && (
-                    <p className="text-xs text-muted-foreground flex items-center gap-1">
-                      <Clock className="w-3 h-3" />Deadline: {r.scholarshipDeadline}
-                    </p>
-                  )}
-                  {r.eligibilityCriteria && r.eligibilityCriteria.length > 0 && (
-                    <div className="text-xs text-muted-foreground">
-                      <span className="font-medium">Eligibility:</span>
-                      <ul className="list-disc list-inside mt-1 space-y-0.5">
-                        {r.eligibilityCriteria.slice(0, 3).map((c, i) => <li key={i}>{c}</li>)}
-                        {r.eligibilityCriteria.length > 3 && <li>+{r.eligibilityCriteria.length - 3} more</li>}
-                      </ul>
-                    </div>
-                  )}
-                  <div className="flex items-center gap-2 flex-wrap mt-auto pt-3">
-                    {alreadyAdded ? (
-                      <Badge variant="secondary" data-testid={`badge-added-${r.id}`}>
-                        <CheckCircle className="w-3 h-3 mr-1" />In Your Planner
-                      </Badge>
-                    ) : (
-                      <Button
-                        size="sm"
-                        onClick={() => handleAddToPlanner(r)}
-                        disabled={addToPlanner.isPending}
-                        data-testid={`button-add-to-planner-${r.id}`}
-                      >
-                        <Plus className="w-3 h-3 mr-1" />Add to Planner
-                      </Button>
-                    )}
-                    {r.url && (
-                      <Button variant="outline" size="sm" asChild data-testid={`link-resource-${r.id}`}>
-                        <a href={r.url} target="_blank" rel="noopener noreferrer">
-                          <ExternalLink className="w-3 h-3 mr-1" />Learn More
-                        </a>
-                      </Button>
-                    )}
-                  </div>
-                </CardContent>
-              </Card>
-            );
-          })}
-        </div>
-      )}
-    </div>
-  );
-}
-
 export default function ScholarshipPlanner() {
   const { data: applications, isLoading } = useQuery<ScholarshipApplication[]>({
     queryKey: ["/api/scholarship-applications"],
@@ -444,7 +276,6 @@ export default function ScholarshipPlanner() {
         <TabsList>
           <TabsTrigger value="timeline" data-testid="tab-timeline"><Calendar className="w-4 h-4 mr-1" />Timeline</TabsTrigger>
           <TabsTrigger value="applications" data-testid="tab-applications"><CheckCircle className="w-4 h-4 mr-1" />My Applications</TabsTrigger>
-          <TabsTrigger value="discover" data-testid="tab-discover"><Search className="w-4 h-4 mr-1" />Discover</TabsTrigger>
         </TabsList>
 
         <TabsContent value="timeline" className="mt-4">
@@ -463,9 +294,6 @@ export default function ScholarshipPlanner() {
           )}
         </TabsContent>
 
-        <TabsContent value="discover" className="mt-4">
-          <DiscoverTab applications={apps} />
-        </TabsContent>
       </Tabs>
     </div>
   );
