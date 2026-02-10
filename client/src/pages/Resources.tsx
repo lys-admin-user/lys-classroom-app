@@ -309,7 +309,7 @@ export default function Resources() {
               <p className="font-roboto text-sm text-muted-foreground mb-4">
                 Understanding budgeting, saving, and investing early sets you up for lifelong financial success.
               </p>
-              <Button variant="outline" className="font-oswald gap-2 border-lys-yellow text-lys-yellow hover:bg-lys-yellow/10">
+              <Button variant="outline" className="font-oswald gap-2 border-lys-yellow text-lys-yellow hover:bg-lys-yellow/10" onClick={() => { setSelectedCategory("financial"); window.scrollTo({ top: 0, behavior: "smooth" }); }} data-testid="button-explore-financial">
                 Explore Guides
                 <ArrowRight className="h-4 w-4" />
               </Button>
@@ -330,7 +330,7 @@ export default function Resources() {
               <p className="font-roboto text-sm text-muted-foreground mb-4">
                 Explore military career options, benefits, and educational opportunities through service.
               </p>
-              <Button variant="outline" className="font-oswald gap-2 border-lys-teal text-lys-teal hover:bg-lys-teal/10">
+              <Button variant="outline" className="font-oswald gap-2 border-lys-teal text-lys-teal hover:bg-lys-teal/10" onClick={() => { setSelectedCategory("military"); window.scrollTo({ top: 0, behavior: "smooth" }); }} data-testid="button-explore-military">
                 Learn More
                 <ArrowRight className="h-4 w-4" />
               </Button>
