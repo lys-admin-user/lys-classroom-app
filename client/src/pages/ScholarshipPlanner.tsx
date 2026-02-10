@@ -11,18 +11,18 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Skeleton } from "@/components/ui/skeleton";
-import { GraduationCap, Calendar, CheckCircle, Clock, Plus, Trash2, ExternalLink, DollarSign, Search } from "lucide-react";
+import { GraduationCap, Calendar, CheckCircle, Clock, Plus, Trash2, ExternalLink, DollarSign, Search, Star, BookOpen } from "lucide-react";
 
 type ScholarshipApplication = {
   id: string;
   scholarshipName: string;
-  amount: number | null;
+  amount: string | null;
   deadline: string | null;
   season: string | null;
   status: string;
-  requirements: string | null;
   essayRequired: boolean | null;
   notes: string | null;
+  resourceId: string | null;
 };
 
 type KnowResource = {
@@ -32,16 +32,19 @@ type KnowResource = {
   url: string | null;
   resourceType: string;
   category: string | null;
-  scholarshipAmount: number | null;
+  scholarshipAmount: string | null;
   scholarshipDeadline: string | null;
   applicationSeason: string | null;
+  eligibilityCriteria: string[] | null;
+  gpaRequirement: string | null;
+  firstGenFriendly: boolean | null;
 };
 
 const STATUS_CONFIG: Record<string, { label: string; variant?: "default" | "secondary" | "destructive" | "outline"; className?: string }> = {
-  not_started: { label: "Not Started", variant: "secondary" },
+  planned: { label: "Planned", variant: "secondary" },
   in_progress: { label: "In Progress", variant: "default" },
   submitted: { label: "Submitted", variant: "outline" },
-  accepted: { label: "Accepted", className: "bg-green-600 text-white no-default-hover-elevate" },
+  awarded: { label: "Awarded", className: "bg-green-600 text-white no-default-hover-elevate" },
   rejected: { label: "Rejected", variant: "destructive" },
   waitlisted: { label: "Waitlisted", className: "bg-yellow-500 text-white no-default-hover-elevate" },
 };
@@ -53,7 +56,7 @@ const SEASONS = [
 ];
 
 function StatusBadge({ status }: { status: string }) {
-  const config = STATUS_CONFIG[status] || STATUS_CONFIG.not_started;
+  const config = STATUS_CONFIG[status] || STATUS_CONFIG.planned;
   return (
     <Badge variant={config.variant} className={config.className} data-testid={`badge-status-${status}`}>
       {config.label}
@@ -64,7 +67,7 @@ function StatusBadge({ status }: { status: string }) {
 function AddApplicationDialog({ onClose }: { onClose: () => void }) {
   const { toast } = useToast();
   const [open, setOpen] = useState(false);
-  const [form, setForm] = useState({ scholarshipName: "", amount: "", deadline: "", season: "early_fall", requirements: "", essayRequired: false, notes: "" });
+  const [form, setForm] = useState({ scholarshipName: "", amount: "", deadline: "", season: "early_fall", essayRequired: false, notes: "" });
 
   const createMutation = useMutation({
     mutationFn: (data: Record<string, unknown>) => apiRequest("POST", "/api/scholarship-applications", data),
@@ -72,7 +75,7 @@ function AddApplicationDialog({ onClose }: { onClose: () => void }) {
       queryClient.invalidateQueries({ queryKey: ["/api/scholarship-applications"] });
       toast({ title: "Application added" });
       setOpen(false);
-      setForm({ scholarshipName: "", amount: "", deadline: "", season: "early_fall", requirements: "", essayRequired: false, notes: "" });
+      setForm({ scholarshipName: "", amount: "", deadline: "", season: "early_fall", essayRequired: false, notes: "" });
       onClose();
     },
     onError: () => toast({ title: "Failed to add application", variant: "destructive" }),
@@ -82,11 +85,10 @@ function AddApplicationDialog({ onClose }: { onClose: () => void }) {
     e.preventDefault();
     createMutation.mutate({
       scholarshipName: form.scholarshipName,
-      amount: form.amount ? parseInt(form.amount) : null,
+      amount: form.amount || null,
       deadline: form.deadline || null,
       season: form.season,
-      status: "not_started",
-      requirements: form.requirements || null,
+      status: "planned",
       essayRequired: form.essayRequired,
       notes: form.notes || null,
     });
@@ -125,10 +127,6 @@ function AddApplicationDialog({ onClose }: { onClose: () => void }) {
                 {SEASONS.map((s) => <SelectItem key={s.value} value={s.value}>{s.label}</SelectItem>)}
               </SelectContent>
             </Select>
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="requirements">Requirements</Label>
-            <Input id="requirements" value={form.requirements} onChange={(e) => setForm({ ...form, requirements: e.target.value })} data-testid="input-requirements" />
           </div>
           <div className="flex items-center gap-2">
             <input type="checkbox" id="essayRequired" checked={form.essayRequired} onChange={(e) => setForm({ ...form, essayRequired: e.target.checked })} data-testid="checkbox-essay-required" />
@@ -171,7 +169,7 @@ function TimelineTab({ applications }: { applications: ScholarshipApplication[] 
                       <div className="flex items-center gap-2 flex-wrap">
                         <GraduationCap className="w-4 h-4 text-muted-foreground" />
                         <span className="font-medium text-sm">{app.scholarshipName}</span>
-                        {app.amount && <span className="text-sm text-muted-foreground">${app.amount.toLocaleString()}</span>}
+                        {app.amount && <span className="text-sm text-muted-foreground">${app.amount}</span>}
                       </div>
                       <div className="flex items-center gap-2 flex-wrap">
                         {app.deadline && (
@@ -231,7 +229,7 @@ function ApplicationsTab({ applications }: { applications: ScholarshipApplicatio
               <CardHeader className="flex flex-row items-start justify-between gap-2 flex-wrap">
                 <div>
                   <CardTitle className="text-base">{app.scholarshipName}</CardTitle>
-                  {app.amount && <p className="text-sm text-muted-foreground mt-1"><DollarSign className="w-3 h-3 inline" />{app.amount.toLocaleString()}</p>}
+                  {app.amount && <p className="text-sm text-muted-foreground mt-1"><DollarSign className="w-3 h-3 inline" />{app.amount}</p>}
                 </div>
                 <div className="flex items-center gap-1">
                   <StatusBadge status={app.status} />
@@ -251,7 +249,6 @@ function ApplicationsTab({ applications }: { applications: ScholarshipApplicatio
                     <CheckCircle className="w-3 h-3" />Essay required
                   </p>
                 )}
-                {app.requirements && <p className="text-sm text-muted-foreground">{app.requirements}</p>}
                 {app.notes && <p className="text-sm text-muted-foreground italic">{app.notes}</p>}
                 <div className="pt-2">
                   <Label className="text-xs">Update Status</Label>
@@ -273,10 +270,49 @@ function ApplicationsTab({ applications }: { applications: ScholarshipApplicatio
   );
 }
 
-function DiscoverTab() {
+function DiscoverTab({ applications }: { applications: ScholarshipApplication[] }) {
+  const { toast } = useToast();
+  const [searchTerm, setSearchTerm] = useState("");
   const { data: resources, isLoading } = useQuery<KnowResource[]>({
     queryKey: ["/api/know-resources?type=scholarship"],
   });
+
+  const addToPlanner = useMutation({
+    mutationFn: (data: Record<string, unknown>) => apiRequest("POST", "/api/scholarship-applications", data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/scholarship-applications"] });
+      toast({ title: "Added to your planner!" });
+    },
+    onError: () => toast({ title: "Failed to add scholarship", variant: "destructive" }),
+  });
+
+  const handleAddToPlanner = (resource: KnowResource) => {
+    const notesParts: string[] = [];
+    if (resource.gpaRequirement) notesParts.push(`GPA Requirement: ${resource.gpaRequirement}`);
+    if (resource.eligibilityCriteria?.length) notesParts.push(`Eligibility: ${resource.eligibilityCriteria.join(", ")}`);
+    if (resource.firstGenFriendly) notesParts.push("First-generation student friendly");
+
+    addToPlanner.mutate({
+      scholarshipName: resource.title,
+      scholarshipUrl: resource.url || null,
+      resourceId: String(resource.id),
+      amount: resource.scholarshipAmount || null,
+      deadline: resource.scholarshipDeadline || null,
+      season: resource.applicationSeason || "early_fall",
+      status: "planned",
+      essayRequired: false,
+      notes: notesParts.length > 0 ? notesParts.join(" | ") : null,
+    });
+  };
+
+  const trackedResourceIds = new Set(
+    applications.filter((a) => a.resourceId).map((a) => String(a.resourceId))
+  );
+
+  const scholarships = (resources || []).filter((r) =>
+    !searchTerm || r.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    (r.description && r.description.toLowerCase().includes(searchTerm.toLowerCase()))
+  );
 
   if (isLoading) {
     return (
@@ -286,52 +322,102 @@ function DiscoverTab() {
     );
   }
 
-  const scholarships = resources || [];
-
   return (
     <div className="space-y-4">
-      <div className="flex items-center gap-2">
-        <Search className="w-4 h-4 text-muted-foreground" />
-        <span className="text-sm text-muted-foreground">{scholarships.length} scholarship{scholarships.length !== 1 ? "s" : ""} found</span>
+      <div className="flex items-center gap-4 flex-wrap">
+        <div className="flex items-center gap-2 flex-1 min-w-[200px]">
+          <Search className="w-4 h-4 text-muted-foreground" />
+          <Input
+            placeholder="Search scholarships..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            data-testid="input-search-scholarships"
+          />
+        </div>
+        <span className="text-sm text-muted-foreground">{scholarships.length} scholarship{scholarships.length !== 1 ? "s" : ""} available</span>
       </div>
       {scholarships.length === 0 ? (
         <Card>
           <CardContent className="py-8 text-center">
             <GraduationCap className="w-10 h-10 mx-auto text-muted-foreground mb-2" />
-            <p className="text-muted-foreground">No scholarships available yet. Check back later!</p>
+            <p className="text-muted-foreground">
+              {searchTerm ? "No scholarships match your search." : "No scholarships available yet. Check back later!"}
+            </p>
           </CardContent>
         </Card>
       ) : (
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-          {scholarships.map((r) => (
-            <Card key={r.id} className="hover-elevate" data-testid={`card-resource-${r.id}`}>
-              <CardHeader>
-                <CardTitle className="text-base flex items-center gap-2">
-                  <GraduationCap className="w-4 h-4" />
-                  {r.title}
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-2">
-                {r.description && <p className="text-sm text-muted-foreground line-clamp-2">{r.description}</p>}
-                <div className="flex items-center gap-2 flex-wrap">
-                  {r.scholarshipAmount && <Badge variant="secondary"><DollarSign className="w-3 h-3 mr-1" />{r.scholarshipAmount.toLocaleString()}</Badge>}
-                  {r.applicationSeason && <Badge variant="outline">{r.applicationSeason}</Badge>}
-                </div>
-                {r.scholarshipDeadline && (
-                  <p className="text-xs text-muted-foreground flex items-center gap-1">
-                    <Clock className="w-3 h-3" />Deadline: {new Date(r.scholarshipDeadline).toLocaleDateString()}
-                  </p>
-                )}
-                {r.url && (
-                  <Button variant="outline" size="sm" asChild data-testid={`link-resource-${r.id}`}>
-                    <a href={r.url} target="_blank" rel="noopener noreferrer">
-                      <ExternalLink className="w-3 h-3 mr-1" />Learn More
-                    </a>
-                  </Button>
-                )}
-              </CardContent>
-            </Card>
-          ))}
+          {scholarships.map((r) => {
+            const alreadyAdded = trackedResourceIds.has(String(r.id));
+            return (
+              <Card key={r.id} className="hover-elevate flex flex-col" data-testid={`card-resource-${r.id}`}>
+                <CardHeader>
+                  <CardTitle className="text-base flex items-center gap-2">
+                    <GraduationCap className="w-4 h-4 shrink-0" />
+                    <span className="line-clamp-2">{r.title}</span>
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-3 flex-1 flex flex-col">
+                  {r.description && <p className="text-sm text-muted-foreground line-clamp-3">{r.description}</p>}
+                  <div className="flex items-center gap-2 flex-wrap">
+                    {r.scholarshipAmount && (
+                      <Badge variant="secondary">
+                        <DollarSign className="w-3 h-3 mr-1" />{r.scholarshipAmount}
+                      </Badge>
+                    )}
+                    {r.applicationSeason && <Badge variant="outline">{r.applicationSeason.replace("_", " ")}</Badge>}
+                    {r.firstGenFriendly && (
+                      <Badge variant="outline" className="text-green-600 border-green-300">
+                        <Star className="w-3 h-3 mr-1" />First-Gen Friendly
+                      </Badge>
+                    )}
+                  </div>
+                  {r.gpaRequirement && (
+                    <p className="text-xs text-muted-foreground flex items-center gap-1">
+                      <BookOpen className="w-3 h-3" />GPA: {r.gpaRequirement}+
+                    </p>
+                  )}
+                  {r.scholarshipDeadline && (
+                    <p className="text-xs text-muted-foreground flex items-center gap-1">
+                      <Clock className="w-3 h-3" />Deadline: {r.scholarshipDeadline}
+                    </p>
+                  )}
+                  {r.eligibilityCriteria && r.eligibilityCriteria.length > 0 && (
+                    <div className="text-xs text-muted-foreground">
+                      <span className="font-medium">Eligibility:</span>
+                      <ul className="list-disc list-inside mt-1 space-y-0.5">
+                        {r.eligibilityCriteria.slice(0, 3).map((c, i) => <li key={i}>{c}</li>)}
+                        {r.eligibilityCriteria.length > 3 && <li>+{r.eligibilityCriteria.length - 3} more</li>}
+                      </ul>
+                    </div>
+                  )}
+                  <div className="flex items-center gap-2 flex-wrap mt-auto pt-3">
+                    {alreadyAdded ? (
+                      <Badge variant="secondary" data-testid={`badge-added-${r.id}`}>
+                        <CheckCircle className="w-3 h-3 mr-1" />In Your Planner
+                      </Badge>
+                    ) : (
+                      <Button
+                        size="sm"
+                        onClick={() => handleAddToPlanner(r)}
+                        disabled={addToPlanner.isPending}
+                        data-testid={`button-add-to-planner-${r.id}`}
+                      >
+                        <Plus className="w-3 h-3 mr-1" />Add to Planner
+                      </Button>
+                    )}
+                    {r.url && (
+                      <Button variant="outline" size="sm" asChild data-testid={`link-resource-${r.id}`}>
+                        <a href={r.url} target="_blank" rel="noopener noreferrer">
+                          <ExternalLink className="w-3 h-3 mr-1" />Learn More
+                        </a>
+                      </Button>
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
+            );
+          })}
         </div>
       )}
     </div>
@@ -378,7 +464,7 @@ export default function ScholarshipPlanner() {
         </TabsContent>
 
         <TabsContent value="discover" className="mt-4">
-          <DiscoverTab />
+          <DiscoverTab applications={apps} />
         </TabsContent>
       </Tabs>
     </div>
