@@ -95,6 +95,8 @@ export default function Assignments() {
   const [suggestionsDialogOpen, setSuggestionsDialogOpen] = useState(false);
 
   const isPaidUser = user?.tier === "pro" || user?.tier === "campus";
+  const isStudent = user?.role === "student";
+  const isParent = user?.role === "parent";
   const [isEditing, setIsEditing] = useState(false);
   const [selectedClassId, setSelectedClassId] = useState<string>("");
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
@@ -378,10 +380,14 @@ export default function Assignments() {
       <div className="max-w-7xl mx-auto px-4 py-8">
         <div className="flex items-center justify-between gap-4 mb-8 flex-wrap">
           <div>
-            <h1 className="text-3xl font-marker text-foreground">Assignment Generator</h1>
-            <p className="text-muted-foreground mt-1">Create engaging assessments from your lesson plans</p>
+            <h1 className="text-3xl font-marker text-foreground">
+              {isStudent || isParent ? "My Assignments" : "Assignment Generator"}
+            </h1>
+            <p className="text-muted-foreground mt-1">
+              {isStudent ? "View and complete your assigned work" : isParent ? "View your student's assignments" : "Create engaging assessments from your lesson plans"}
+            </p>
           </div>
-          {!isPaidUser && (
+          {!isPaidUser && !isStudent && !isParent && (
             <Badge variant="outline" className="gap-1">
               <Lock className="h-3 w-3" />
               Pro Feature
@@ -389,9 +395,11 @@ export default function Assignments() {
           )}
         </div>
 
-        <Tabs defaultValue="generate" className="space-y-6">
+        <Tabs defaultValue={isStudent || isParent ? "saved" : "generate"} className="space-y-6">
           <TabsList>
-            <TabsTrigger value="generate" data-testid="tab-generate">Generate New</TabsTrigger>
+            {!isStudent && !isParent && (
+              <TabsTrigger value="generate" data-testid="tab-generate">Generate New</TabsTrigger>
+            )}
             <TabsTrigger value="saved" data-testid="tab-saved">My Assignments</TabsTrigger>
           </TabsList>
 
