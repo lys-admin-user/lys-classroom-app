@@ -782,6 +782,7 @@ export async function registerRoutes(
     schoolName: z.string().optional(),
     gradeLevels: z.array(z.string()).optional().default([]),
     subjects: z.array(z.string()).optional().default([]),
+    preferredSubject: z.string().optional(),
     preferredStandardCodes: z.array(z.object({
       code: z.string(),
       description: z.string(),

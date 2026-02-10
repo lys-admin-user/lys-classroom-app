@@ -92,6 +92,7 @@ export const educatorProfiles = pgTable("educator_profiles", {
   schoolName: varchar("school_name"),
   gradeLevels: jsonb("grade_levels").$type<string[]>().default([]),
   subjects: jsonb("subjects").$type<string[]>().default([]),
+  preferredSubject: varchar("preferred_subject"),
   preferredStandardCodes: jsonb("preferred_standard_codes").$type<{ code: string; description: string }[]>().default([]),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
