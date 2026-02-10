@@ -112,6 +112,7 @@ export default function LessonGenerator() {
     if (educatorProfile && !profileApplied) {
       if (educatorProfile.country) setSelectedCountry(educatorProfile.country);
       if (educatorProfile.state) setSelectedState(educatorProfile.state);
+      if (educatorProfile.preferredSubject) setSelectedSubject(educatorProfile.preferredSubject);
       if (educatorProfile.preferredStandardCodes && (educatorProfile.preferredStandardCodes as StandardCode[]).length > 0) {
         setSelectedStandardCodes(educatorProfile.preferredStandardCodes as StandardCode[]);
       }

@@ -54,7 +54,7 @@ export default function EducatorProfileForm({ onComplete, isOnboarding = false, 
   const [selectedStandardCodes, setSelectedStandardCodes] = useState<{ code: string; description: string }[]>(
     existingProfile?.preferredStandardCodes as { code: string; description: string }[] || []
   );
-  const [standardsSubject, setStandardsSubject] = useState("");
+  const [standardsSubject, setStandardsSubject] = useState(existingProfile?.preferredSubject || "");
 
   // Use comprehensive country list from country-region-data
   const countries = useMemo(() => 
@@ -99,6 +99,7 @@ export default function EducatorProfileForm({ onComplete, isOnboarding = false, 
       setSelectedGradeLevels(existingProfile.gradeLevels as string[] || []);
       setSelectedSubjects(existingProfile.subjects as string[] || []);
       setSelectedStandardCodes(existingProfile.preferredStandardCodes as { code: string; description: string }[] || []);
+      if (existingProfile.preferredSubject) setStandardsSubject(existingProfile.preferredSubject);
     }
   }, [existingProfile]);
 
@@ -148,6 +149,7 @@ export default function EducatorProfileForm({ onComplete, isOnboarding = false, 
         schoolName,
         gradeLevels: selectedGradeLevels,
         subjects: selectedSubjects,
+        preferredSubject: standardsSubject || undefined,
         preferredStandardCodes: selectedStandardCodes,
       });
       return await response.json() as EducatorProfile;
