@@ -532,6 +532,23 @@ ${addedResources.length > 0 ? addedResources.map(r => `- ${r.title}: ${r.url}`).
           </Alert>
         )}
 
+        {isAuthenticated && (
+          <Alert className="mb-6 border-lys-red/30 bg-lys-red/5" data-testid="alert-assignment-reminder">
+            <ClipboardList className="h-4 w-4 text-lys-red" />
+            <AlertDescription className="flex items-center justify-between gap-4 flex-wrap">
+              <span className="font-roboto">
+                <strong className="font-oswald">Tip:</strong> After generating and saving a lesson, create matching assignments using the <strong>Assignment Generator</strong>.
+              </span>
+              <Link href="/assignments">
+                <Button variant="outline" size="sm" className="gap-1" data-testid="button-go-to-assignments">
+                  <ClipboardList className="h-3 w-3" />
+                  Go to Assignments
+                </Button>
+              </Link>
+            </AlertDescription>
+          </Alert>
+        )}
+
         {showAds && (
           <AdBanner position="inline" className="mb-6" />
         )}

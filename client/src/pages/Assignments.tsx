@@ -98,6 +98,53 @@ export default function Assignments() {
   const isStudent = user?.role === "student";
   const isParent = user?.role === "parent";
   const [isEditing, setIsEditing] = useState(false);
+
+  const [manualTitle, setManualTitle] = useState("");
+  const [manualDescription, setManualDescription] = useState("");
+  const [manualInstructions, setManualInstructions] = useState("");
+  const [manualDueDate, setManualDueDate] = useState("");
+  const [manualClassId, setManualClassId] = useState("");
+  const [manualQuestions, setManualQuestions] = useState<{
+    type: "multiple_choice" | "short_answer" | "essay" | "true_false";
+    question: string;
+    options: string[];
+    correctAnswer: string;
+    points: number;
+    bkdFocus: "be" | "know" | "do";
+  }[]>([]);
+
+  const addManualQuestion = () => {
+    setManualQuestions(prev => [...prev, {
+      type: "short_answer",
+      question: "",
+      options: ["", "", "", ""],
+      correctAnswer: "",
+      points: 10,
+      bkdFocus: "know",
+    }]);
+  };
+
+  const updateManualQuestion = (index: number, field: string, value: any) => {
+    setManualQuestions(prev => {
+      const updated = [...prev];
+      updated[index] = { ...updated[index], [field]: value };
+      return updated;
+    });
+  };
+
+  const updateManualQuestionOption = (qIndex: number, optIndex: number, value: string) => {
+    setManualQuestions(prev => {
+      const updated = [...prev];
+      const options = [...updated[qIndex].options];
+      options[optIndex] = value;
+      updated[qIndex] = { ...updated[qIndex], options };
+      return updated;
+    });
+  };
+
+  const removeManualQuestion = (index: number) => {
+    setManualQuestions(prev => prev.filter((_, i) => i !== index));
+  };
   const [selectedClassId, setSelectedClassId] = useState<string>("");
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [expandedQuestionDetails, setExpandedQuestionDetails] = useState<Set<number>>(new Set());
@@ -292,6 +339,55 @@ export default function Assignments() {
     },
   });
 
+  const manualSaveMutation = useMutation({
+    mutationFn: (data: any) => apiRequest("POST", "/api/assignments", data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/assignments"] });
+      toast({ title: "Assignment Created", description: "Your assignment has been saved successfully." });
+      setManualTitle("");
+      setManualDescription("");
+      setManualInstructions("");
+      setManualDueDate("");
+      setManualClassId("");
+      setManualQuestions([]);
+    },
+    onError: () => {
+      toast({ title: "Error", description: "Failed to create assignment", variant: "destructive" });
+    },
+  });
+
+  const handleManualSave = () => {
+    if (!manualTitle.trim()) {
+      toast({ title: "Title Required", description: "Please enter a title for your assignment.", variant: "destructive" });
+      return;
+    }
+    if (manualQuestions.length === 0) {
+      toast({ title: "Questions Required", description: "Please add at least one question.", variant: "destructive" });
+      return;
+    }
+    const hasEmptyQuestions = manualQuestions.some(q => !q.question.trim());
+    if (hasEmptyQuestions) {
+      toast({ title: "Incomplete Questions", description: "Please fill in all question text.", variant: "destructive" });
+      return;
+    }
+    const totalPoints = manualQuestions.reduce((sum, q) => sum + q.points, 0);
+    manualSaveMutation.mutate({
+      title: manualTitle,
+      description: manualDescription || undefined,
+      instructions: manualInstructions || undefined,
+      questions: manualQuestions.map((q, i) => ({
+        id: `q-${i + 1}`,
+        ...q,
+        options: q.type === "multiple_choice" ? q.options.filter(o => o.trim()) : undefined,
+      })),
+      totalPoints,
+      dueDate: manualDueDate ? new Date(manualDueDate).toISOString() : undefined,
+      classId: manualClassId || undefined,
+      assignmentType: "individual",
+      status: "draft",
+    });
+  };
+
   const assignMutation = useMutation({
     mutationFn: (data: { id: string; recipientType: string; recipientIds: string[] }) => 
       apiRequest("POST", `/api/assignments/${data.id}/assign`, { recipientType: data.recipientType, recipientIds: data.recipientIds }),
@@ -398,7 +494,16 @@ export default function Assignments() {
         <Tabs defaultValue={isStudent || isParent ? "saved" : "generate"} className="space-y-6">
           <TabsList>
             {!isStudent && !isParent && (
-              <TabsTrigger value="generate" data-testid="tab-generate">Generate New</TabsTrigger>
+              <>
+                <TabsTrigger value="generate" data-testid="tab-generate">
+                  <Sparkles className="h-4 w-4 mr-1" />
+                  AI Generate
+                </TabsTrigger>
+                <TabsTrigger value="create" data-testid="tab-create">
+                  <Plus className="h-4 w-4 mr-1" />
+                  Create New
+                </TabsTrigger>
+              </>
             )}
             <TabsTrigger value="saved" data-testid="tab-saved">My Assignments</TabsTrigger>
           </TabsList>
@@ -1437,6 +1542,281 @@ export default function Assignments() {
                 </Card>
               </div>
             )}
+          </TabsContent>
+
+          <TabsContent value="create" className="space-y-6">
+            <Card>
+              <CardHeader>
+                <CardTitle className="font-oswald flex items-center gap-2">
+                  <Pencil className="h-5 w-5" />
+                  Create New Assignment
+                </CardTitle>
+                <CardDescription>Build your own assignment from scratch with custom questions</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-6">
+                <div className="grid md:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="manual-title">Assignment Title *</Label>
+                    <Input
+                      id="manual-title"
+                      placeholder="Enter assignment title"
+                      value={manualTitle}
+                      onChange={(e) => setManualTitle(e.target.value)}
+                      data-testid="input-manual-title"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="manual-class">Class (optional)</Label>
+                    <Select value={manualClassId} onValueChange={setManualClassId}>
+                      <SelectTrigger data-testid="select-manual-class">
+                        <SelectValue placeholder="Select a class" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {classes?.map((cls) => (
+                          <SelectItem key={cls.id} value={cls.id}>{cls.name}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="manual-description">Description</Label>
+                  <Textarea
+                    id="manual-description"
+                    placeholder="Brief description of this assignment"
+                    value={manualDescription}
+                    onChange={(e) => setManualDescription(e.target.value)}
+                    className="resize-none"
+                    data-testid="input-manual-description"
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="manual-instructions">Instructions</Label>
+                  <Textarea
+                    id="manual-instructions"
+                    placeholder="Detailed instructions for students"
+                    value={manualInstructions}
+                    onChange={(e) => setManualInstructions(e.target.value)}
+                    className="resize-none"
+                    data-testid="input-manual-instructions"
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="manual-due-date">Due Date (optional)</Label>
+                  <Input
+                    id="manual-due-date"
+                    type="date"
+                    value={manualDueDate}
+                    onChange={(e) => setManualDueDate(e.target.value)}
+                    data-testid="input-manual-due-date"
+                  />
+                </div>
+
+                <Separator />
+
+                <div>
+                  <div className="flex items-center justify-between gap-2 mb-4 flex-wrap">
+                    <div>
+                      <h3 className="font-oswald text-lg font-semibold">Questions</h3>
+                      <p className="text-sm text-muted-foreground">Add questions to your assignment</p>
+                    </div>
+                    <Button onClick={addManualQuestion} variant="outline" data-testid="button-add-question">
+                      <Plus className="h-4 w-4 mr-1" />
+                      Add Question
+                    </Button>
+                  </div>
+
+                  {manualQuestions.length === 0 ? (
+                    <div className="text-center py-12 border rounded-md border-dashed">
+                      <FileText className="h-10 w-10 mx-auto text-muted-foreground mb-3" />
+                      <p className="text-muted-foreground font-roboto">No questions yet</p>
+                      <p className="text-sm text-muted-foreground font-roboto mt-1">Click "Add Question" to get started</p>
+                    </div>
+                  ) : (
+                    <div className="space-y-4">
+                      {manualQuestions.map((q, index) => (
+                        <Card key={index}>
+                          <CardHeader className="pb-2">
+                            <div className="flex items-center justify-between gap-2 flex-wrap">
+                              <CardTitle className="font-oswald text-base">Question {index + 1}</CardTitle>
+                              <Button
+                                size="icon"
+                                variant="ghost"
+                                onClick={() => removeManualQuestion(index)}
+                                data-testid={`button-remove-question-${index}`}
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
+                            </div>
+                          </CardHeader>
+                          <CardContent className="space-y-3">
+                            <div className="grid md:grid-cols-3 gap-3">
+                              <div className="space-y-1">
+                                <Label className="text-xs">Type</Label>
+                                <Select
+                                  value={q.type}
+                                  onValueChange={(v) => updateManualQuestion(index, "type", v)}
+                                >
+                                  <SelectTrigger data-testid={`select-question-type-${index}`}>
+                                    <SelectValue />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    <SelectItem value="multiple_choice">Multiple Choice</SelectItem>
+                                    <SelectItem value="short_answer">Short Answer</SelectItem>
+                                    <SelectItem value="essay">Essay</SelectItem>
+                                    <SelectItem value="true_false">True/False</SelectItem>
+                                  </SelectContent>
+                                </Select>
+                              </div>
+                              <div className="space-y-1">
+                                <Label className="text-xs">Be-Know-Do Focus</Label>
+                                <Select
+                                  value={q.bkdFocus}
+                                  onValueChange={(v) => updateManualQuestion(index, "bkdFocus", v)}
+                                >
+                                  <SelectTrigger data-testid={`select-question-bkd-${index}`}>
+                                    <SelectValue />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    <SelectItem value="be">BE (Identity)</SelectItem>
+                                    <SelectItem value="know">KNOW (Knowledge)</SelectItem>
+                                    <SelectItem value="do">DO (Action)</SelectItem>
+                                  </SelectContent>
+                                </Select>
+                              </div>
+                              <div className="space-y-1">
+                                <Label className="text-xs">Points</Label>
+                                <Input
+                                  type="number"
+                                  min={1}
+                                  value={q.points}
+                                  onChange={(e) => updateManualQuestion(index, "points", parseInt(e.target.value) || 1)}
+                                  data-testid={`input-question-points-${index}`}
+                                />
+                              </div>
+                            </div>
+
+                            <div className="space-y-1">
+                              <Label className="text-xs">Question Text *</Label>
+                              <Textarea
+                                placeholder="Enter your question"
+                                value={q.question}
+                                onChange={(e) => updateManualQuestion(index, "question", e.target.value)}
+                                className="resize-none"
+                                data-testid={`input-question-text-${index}`}
+                              />
+                            </div>
+
+                            {q.type === "multiple_choice" && (
+                              <div className="space-y-2">
+                                <Label className="text-xs">Answer Options</Label>
+                                {q.options.map((opt, optIdx) => (
+                                  <div key={optIdx} className="flex items-center gap-2">
+                                    <Badge variant="outline" className="shrink-0">{String.fromCharCode(65 + optIdx)}</Badge>
+                                    <Input
+                                      placeholder={`Option ${String.fromCharCode(65 + optIdx)}`}
+                                      value={opt}
+                                      onChange={(e) => updateManualQuestionOption(index, optIdx, e.target.value)}
+                                      data-testid={`input-option-${index}-${optIdx}`}
+                                    />
+                                  </div>
+                                ))}
+                                <div className="space-y-1 mt-2">
+                                  <Label className="text-xs">Correct Answer</Label>
+                                  <Select
+                                    value={q.correctAnswer}
+                                    onValueChange={(v) => updateManualQuestion(index, "correctAnswer", v)}
+                                  >
+                                    <SelectTrigger data-testid={`select-correct-answer-${index}`}>
+                                      <SelectValue placeholder="Select correct answer" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                      {q.options.filter(o => o.trim()).map((opt, i) => (
+                                        <SelectItem key={i} value={opt}>{String.fromCharCode(65 + i)}: {opt}</SelectItem>
+                                      ))}
+                                    </SelectContent>
+                                  </Select>
+                                </div>
+                              </div>
+                            )}
+
+                            {q.type === "true_false" && (
+                              <div className="space-y-1">
+                                <Label className="text-xs">Correct Answer</Label>
+                                <Select
+                                  value={q.correctAnswer}
+                                  onValueChange={(v) => updateManualQuestion(index, "correctAnswer", v)}
+                                >
+                                  <SelectTrigger data-testid={`select-tf-answer-${index}`}>
+                                    <SelectValue placeholder="Select correct answer" />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    <SelectItem value="True">True</SelectItem>
+                                    <SelectItem value="False">False</SelectItem>
+                                  </SelectContent>
+                                </Select>
+                              </div>
+                            )}
+
+                            {(q.type === "short_answer" || q.type === "essay") && (
+                              <div className="space-y-1">
+                                <Label className="text-xs">Sample Answer (optional)</Label>
+                                <Input
+                                  placeholder="Expected answer or key points"
+                                  value={q.correctAnswer}
+                                  onChange={(e) => updateManualQuestion(index, "correctAnswer", e.target.value)}
+                                  data-testid={`input-sample-answer-${index}`}
+                                />
+                              </div>
+                            )}
+                          </CardContent>
+                        </Card>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                {manualQuestions.length > 0 && (
+                  <div className="flex items-center justify-between gap-4 flex-wrap pt-4 border-t">
+                    <div className="flex items-center gap-3">
+                      <Badge variant="secondary">
+                        {manualQuestions.length} question{manualQuestions.length !== 1 ? "s" : ""}
+                      </Badge>
+                      <Badge variant="outline">
+                        {manualQuestions.reduce((sum, q) => sum + q.points, 0)} total points
+                      </Badge>
+                    </div>
+                    <Button
+                      onClick={handleManualSave}
+                      disabled={manualSaveMutation.isPending}
+                      data-testid="button-save-manual-assignment"
+                    >
+                      {manualSaveMutation.isPending ? (
+                        <RefreshCw className="h-4 w-4 mr-1 animate-spin" />
+                      ) : (
+                        <Check className="h-4 w-4 mr-1" />
+                      )}
+                      Save Assignment
+                    </Button>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+
+            <Card className="border-dashed">
+              <CardContent className="flex items-center gap-4 py-4">
+                <Sparkles className="h-8 w-8 text-muted-foreground shrink-0" />
+                <div className="flex-1">
+                  <h3 className="font-oswald text-base">Want AI to create questions for you?</h3>
+                  <p className="text-sm text-muted-foreground">
+                    Switch to the "AI Generate" tab to automatically create aligned questions from your lesson plans.
+                  </p>
+                </div>
+              </CardContent>
+            </Card>
           </TabsContent>
 
           <TabsContent value="saved">
