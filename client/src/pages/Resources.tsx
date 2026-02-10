@@ -32,8 +32,31 @@ import type { Resource } from "@shared/schema";
 import { useTier } from "@/hooks/use-tier";
 import { AdBanner } from "@/components/AdBanner";
 
+type KnowResourceData = {
+  id: string;
+  title: string;
+  description: string | null;
+  resourceType: string;
+  category: string | null;
+  url: string | null;
+  applicationUrl: string | null;
+  scholarshipType: string | null;
+  scholarshipAmount: string | null;
+  scholarshipDeadline: string | null;
+  scholarshipSeason: string | null;
+  eligibilityCriteria: string[] | null;
+  gpaRequirement: string | null;
+  studentLevel: string | null;
+  firstGenFriendly: boolean | null;
+  isRecurring: boolean | null;
+  tags: string[] | null;
+  careerFields: string[] | null;
+};
+
 const typeConfig = {
   scholarship: { label: "Scholarship", icon: DollarSign, color: "bg-green-500/10 text-green-600" },
+  financial_guide: { label: "Financial Guide", icon: FileText, color: "bg-blue-500/10 text-blue-600" },
+  essay_template: { label: "Essay Guide", icon: FileText, color: "bg-amber-500/10 text-amber-600" },
   guide: { label: "Guide", icon: FileText, color: "bg-blue-500/10 text-blue-600" },
   video: { label: "Video", icon: Video, color: "bg-red-500/10 text-red-600" },
   tool: { label: "Tool", icon: Wrench, color: "bg-purple-500/10 text-purple-600" },
@@ -48,23 +71,107 @@ const categoryConfig = {
   life_skills: { label: "Life Skills", icon: Lightbulb },
 };
 
+type DisplayResource = {
+  id: string;
+  title: string;
+  description: string;
+  type: string;
+  category: string;
+  url?: string;
+  imageUrl?: string;
+  amount?: string;
+  deadline?: string;
+  eligibility?: string[];
+  tags: string[];
+  scholarshipType?: string;
+  gpaRequirement?: string;
+  studentLevel?: string;
+  firstGenFriendly?: boolean;
+  isRecurring?: boolean;
+  applicationUrl?: string;
+};
+
+function normalizeKnowResource(kr: KnowResourceData): DisplayResource {
+  const mapCategory = (cat: string | null): string => {
+    if (!cat) return "college";
+    const lower = cat.toLowerCase();
+    if (lower === "general") return "college";
+    if (lower === "stem" || lower === "agriculture") return "career";
+    if (lower === "business") return "career";
+    if (lower === "arts") return "life_skills";
+    if (lower === "government") return "career";
+    if (lower === "healthcare") return "career";
+    return "college";
+  };
+
+  return {
+    id: `know-${kr.id}`,
+    title: kr.title,
+    description: kr.description || "",
+    type: kr.resourceType,
+    category: mapCategory(kr.category),
+    url: kr.applicationUrl || kr.url || undefined,
+    amount: kr.scholarshipAmount || undefined,
+    deadline: kr.scholarshipDeadline || undefined,
+    eligibility: kr.eligibilityCriteria || undefined,
+    tags: kr.tags || [],
+    scholarshipType: kr.scholarshipType || undefined,
+    gpaRequirement: kr.gpaRequirement || undefined,
+    studentLevel: kr.studentLevel || undefined,
+    firstGenFriendly: kr.firstGenFriendly || undefined,
+    isRecurring: kr.isRecurring || undefined,
+    applicationUrl: kr.applicationUrl || kr.url || undefined,
+  };
+}
+
 export default function Resources() {
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedCategory, setSelectedCategory] = useState<string>("all");
-  const [selectedResource, setSelectedResource] = useState<Resource | null>(null);
+  const [selectedResource, setSelectedResource] = useState<DisplayResource | null>(null);
   const [detailsOpen, setDetailsOpen] = useState(false);
   const { showAds } = useTier();
 
-  const openResourceDetails = (resource: Resource) => {
+  const openResourceDetails = (resource: DisplayResource) => {
     setSelectedResource(resource);
     setDetailsOpen(true);
   };
 
-  const { data: resources = [], isLoading } = useQuery<Resource[]>({
+  const { data: resources = [], isLoading: loadingResources } = useQuery<Resource[]>({
     queryKey: ["/api/resources"],
   });
 
-  const filteredResources = resources.filter((resource) => {
+  const { data: knowResources = [], isLoading: loadingKnow } = useQuery<KnowResourceData[]>({
+    queryKey: ["/api/know-resources"],
+  });
+
+  const isLoading = loadingResources || loadingKnow;
+
+  const allResources: DisplayResource[] = [
+    ...resources.map((r): DisplayResource => ({
+      id: r.id,
+      title: r.title,
+      description: r.description,
+      type: r.type,
+      category: r.category,
+      url: r.url,
+      imageUrl: r.imageUrl,
+      amount: r.amount ? String(r.amount) : undefined,
+      deadline: r.deadline,
+      eligibility: r.eligibility,
+      tags: r.tags,
+    })),
+    ...knowResources.map(normalizeKnowResource),
+  ];
+
+  const seenTitles = new Set<string>();
+  const deduped = allResources.filter((r) => {
+    const key = r.title.toLowerCase();
+    if (seenTitles.has(key)) return false;
+    seenTitles.add(key);
+    return true;
+  });
+
+  const filteredResources = deduped.filter((resource) => {
     const matchesSearch = resource.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
       resource.description.toLowerCase().includes(searchQuery.toLowerCase()) ||
       resource.tags.some(tag => tag.toLowerCase().includes(searchQuery.toLowerCase()));
@@ -75,8 +182,9 @@ export default function Resources() {
   const scholarships = filteredResources.filter(r => r.type === "scholarship");
   const otherResources = filteredResources.filter(r => r.type !== "scholarship");
 
-  const formatAmount = (amount?: number) => {
+  const formatAmount = (amount?: string | number) => {
     if (!amount) return "Varies";
+    if (typeof amount === "string") return amount;
     return new Intl.NumberFormat("en-US", {
       style: "currency",
       currency: "USD",
@@ -185,17 +293,23 @@ export default function Resources() {
                   {scholarships.map((scholarship) => (
                     <Card key={scholarship.id} className="hover-elevate">
                       <CardHeader className="pb-2">
-                        <div className="flex items-start justify-between gap-2">
+                        <div className="flex items-start justify-between gap-2 flex-wrap">
                           <Badge className="bg-green-500/10 text-green-600 border-green-500/20">
                             <DollarSign className="h-3 w-3 mr-1" />
                             {formatAmount(scholarship.amount)}
                           </Badge>
-                          {scholarship.deadline && (
-                            <Badge variant="outline" className="text-xs font-roboto">
-                              <Calendar className="h-3 w-3 mr-1" />
-                              {new Date(scholarship.deadline).toLocaleDateString()}
-                            </Badge>
-                          )}
+                          <div className="flex items-center gap-1 flex-wrap">
+                            {scholarship.scholarshipType && (
+                              <Badge variant="outline" className="text-xs font-roboto capitalize">
+                                {scholarship.scholarshipType}
+                              </Badge>
+                            )}
+                            {scholarship.firstGenFriendly && (
+                              <Badge variant="outline" className="text-xs font-roboto text-green-600 border-green-300">
+                                <Star className="h-3 w-3 mr-1" />1st Gen
+                              </Badge>
+                            )}
+                          </div>
                         </div>
                         <CardTitle className="font-oswald text-lg mt-2">{scholarship.title}</CardTitle>
                         <CardDescription className="font-roboto text-sm line-clamp-2">
@@ -203,6 +317,11 @@ export default function Resources() {
                         </CardDescription>
                       </CardHeader>
                       <CardContent>
+                        {scholarship.gpaRequirement && (
+                          <p className="text-xs text-muted-foreground font-roboto mb-2 flex items-center gap-1">
+                            <GraduationCap className="h-3 w-3" />GPA: {scholarship.gpaRequirement}+
+                          </p>
+                        )}
                         {scholarship.eligibility && scholarship.eligibility.length > 0 && (
                           <div className="mb-3">
                             <p className="text-xs text-muted-foreground font-roboto mb-1">Eligibility:</p>
@@ -246,8 +365,8 @@ export default function Resources() {
                 </div>
                 <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
                   {otherResources.map((resource) => {
-                    const typeConf = typeConfig[resource.type];
-                    const catConf = categoryConfig[resource.category];
+                    const typeConf = typeConfig[resource.type as keyof typeof typeConfig] || typeConfig.guide;
+                    const catConf = categoryConfig[resource.category as keyof typeof categoryConfig] || categoryConfig.college;
 
                     return (
                       <Card key={resource.id} className="hover-elevate">
@@ -369,7 +488,7 @@ export default function Resources() {
 
               <div className="space-y-4 mt-4">
                 {/* Scholarship-specific details */}
-                {selectedResource.type === "scholarship" && (
+                {(selectedResource.type === "scholarship" || selectedResource.type === "financial_guide" || selectedResource.type === "essay_template") && (
                   <>
                     <div className="grid grid-cols-2 gap-4">
                       {selectedResource.amount && (
@@ -381,16 +500,37 @@ export default function Resources() {
                           <p className="font-oswald text-lg mt-1">{formatAmount(selectedResource.amount)}</p>
                         </div>
                       )}
-                      {selectedResource.deadline && (
-                        <div className="p-3 rounded-md bg-amber-50 dark:bg-amber-950 border border-amber-200 dark:border-amber-800">
-                          <div className="flex items-center gap-2 text-amber-700 dark:text-amber-400">
-                            <Calendar className="h-4 w-4" />
-                            <span className="text-sm font-medium">Deadline</span>
+                      {selectedResource.scholarshipType && (
+                        <div className="p-3 rounded-md bg-blue-50 dark:bg-blue-950 border border-blue-200 dark:border-blue-800">
+                          <div className="flex items-center gap-2 text-blue-700 dark:text-blue-400">
+                            <GraduationCap className="h-4 w-4" />
+                            <span className="text-sm font-medium">Type</span>
                           </div>
-                          <p className="font-oswald text-lg mt-1">
-                            {new Date(selectedResource.deadline).toLocaleDateString()}
-                          </p>
+                          <p className="font-oswald text-lg mt-1 capitalize">{selectedResource.scholarshipType === "both" ? "Merit & Need-Based" : `${selectedResource.scholarshipType}-Based`}</p>
                         </div>
+                      )}
+                    </div>
+
+                    <div className="flex items-center gap-2 flex-wrap">
+                      {selectedResource.gpaRequirement && (
+                        <Badge variant="secondary" className="font-roboto">
+                          <GraduationCap className="h-3 w-3 mr-1" />GPA: {selectedResource.gpaRequirement}+
+                        </Badge>
+                      )}
+                      {selectedResource.studentLevel && selectedResource.studentLevel !== "all" && (
+                        <Badge variant="secondary" className="font-roboto capitalize">
+                          {selectedResource.studentLevel.replace("_", " ")}
+                        </Badge>
+                      )}
+                      {selectedResource.firstGenFriendly && (
+                        <Badge variant="outline" className="font-roboto text-green-600 border-green-300">
+                          <Star className="h-3 w-3 mr-1" />First-Gen Friendly
+                        </Badge>
+                      )}
+                      {selectedResource.isRecurring && (
+                        <Badge variant="outline" className="font-roboto">
+                          <Clock className="h-3 w-3 mr-1" />Recurring
+                        </Badge>
                       )}
                     </div>
 
@@ -447,14 +587,16 @@ export default function Resources() {
 
                 {/* Action buttons */}
                 <div className="flex gap-3">
-                  {selectedResource.url && (
+                  {(selectedResource.applicationUrl || selectedResource.url) && (
                     <Button 
                       className="flex-1 font-oswald gap-2" 
-                      onClick={() => window.open(selectedResource.url, "_blank")}
+                      onClick={() => window.open(selectedResource.applicationUrl || selectedResource.url, "_blank")}
                       data-testid="button-open-resource"
                     >
                       <ExternalLink className="h-4 w-4" />
                       {selectedResource.type === "scholarship" ? "Apply Now" : 
+                       selectedResource.type === "financial_guide" ? "Open Guide" :
+                       selectedResource.type === "essay_template" ? "View Template" :
                        selectedResource.type === "video" ? "Watch Video" : "Open Resource"}
                     </Button>
                   )}
