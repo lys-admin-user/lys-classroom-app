@@ -85,6 +85,7 @@ export type UserPreferences = typeof userPreferences.$inferSelect;
 export const educatorProfiles = pgTable("educator_profiles", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   userId: varchar("user_id").notNull().unique().references(() => users.id),
+  educatorType: varchar("educator_type").$type<"teacher" | "homeschooling_parent" | "micro_school">(),
   country: varchar("country"),
   state: varchar("state"),
   standardsName: varchar("standards_name"),

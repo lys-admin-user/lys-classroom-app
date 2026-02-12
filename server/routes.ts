@@ -10,7 +10,8 @@ import {
   insertSequenceUnitSchema, 
   insertScopeChangeRequestSchema, 
   insertKnowResourceSchema,
-  users, 
+  users,
+  sessions,
   insertFeatureFlagSchema, 
   insertEmailTemplateSchema, 
   insertStudentJourneyEntrySchema,
@@ -775,6 +776,7 @@ export async function registerRoutes(
 
   // Educator Profiles - requires authentication
   const educatorProfileSchema = z.object({
+    educatorType: z.enum(["teacher", "homeschooling_parent", "micro_school"]).optional(),
     country: z.string().optional(),
     state: z.string().optional(),
     standardsName: z.string().optional(),
@@ -6485,6 +6487,81 @@ export async function registerRoutes(
     } catch (error) {
       console.error("System performance error:", error);
       res.status(500).json({ error: "Failed to fetch system-wide performance stats" });
+    }
+  });
+
+  app.get("/api/admin/performance/educator-types", isAuthenticated, isSiteAdmin, async (req: any, res) => {
+    try {
+      const allEducatorUsers = await db.select({
+        id: users.id,
+      }).from(users).where(eq(users.role, "educator"));
+
+      const profileRows = await db.select({
+        userId: educatorProfiles.userId,
+        educatorType: educatorProfiles.educatorType,
+      }).from(educatorProfiles);
+
+      const profileMap = new Map(profileRows.map(p => [p.userId, p.educatorType]));
+
+      const allSessions = await db.select({
+        sid: sessions.sid,
+        sess: sessions.sess,
+        expire: sessions.expire,
+      }).from(sessions);
+
+      const now = new Date();
+      const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+      const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+
+      const educatorIds = new Set(allEducatorUsers.map(u => u.id));
+      const lastActivityMap = new Map<string, Date>();
+
+      for (const session of allSessions) {
+        const sessData = session.sess as any;
+        const userId = sessData?.passport?.user?.claims?.sub || sessData?.passport?.user?.id;
+        if (userId && educatorIds.has(userId)) {
+          const sessionExpire = new Date(session.expire);
+          const existing = lastActivityMap.get(userId);
+          if (!existing || sessionExpire > existing) {
+            lastActivityMap.set(userId, sessionExpire);
+          }
+        }
+      }
+
+      const typeStats: Record<string, { total: number; activeLast7Days: number; activeLast30Days: number }> = {
+        teacher: { total: 0, activeLast7Days: 0, activeLast30Days: 0 },
+        homeschooling_parent: { total: 0, activeLast7Days: 0, activeLast30Days: 0 },
+        micro_school: { total: 0, activeLast7Days: 0, activeLast30Days: 0 },
+        unspecified: { total: 0, activeLast7Days: 0, activeLast30Days: 0 },
+      };
+
+      for (const edu of allEducatorUsers) {
+        const type = profileMap.get(edu.id) || "unspecified";
+        if (!typeStats[type]) typeStats[type] = { total: 0, activeLast7Days: 0, activeLast30Days: 0 };
+        typeStats[type].total++;
+
+        const lastActivity = lastActivityMap.get(edu.id);
+        if (lastActivity) {
+          if (lastActivity >= sevenDaysAgo) typeStats[type].activeLast7Days++;
+          if (lastActivity >= thirtyDaysAgo) typeStats[type].activeLast30Days++;
+        }
+      }
+
+      const totalEducators = allEducatorUsers.length;
+      const totalWithType = allEducatorUsers.filter(u => profileMap.has(u.id) && profileMap.get(u.id)).length;
+
+      res.json({
+        breakdown: Object.entries(typeStats).map(([type, stats]) => ({
+          type,
+          label: type === "teacher" ? "Teacher" : type === "homeschooling_parent" ? "Homeschooling Parent" : type === "micro_school" ? "Micro School" : "Not Set",
+          ...stats,
+        })),
+        totalEducators,
+        totalWithType,
+      });
+    } catch (error) {
+      console.error("Educator type analytics error:", error);
+      res.status(500).json({ error: "Failed to fetch educator type analytics" });
     }
   });
 

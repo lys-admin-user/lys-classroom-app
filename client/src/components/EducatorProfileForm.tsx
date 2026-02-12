@@ -45,6 +45,7 @@ export default function EducatorProfileForm({ onComplete, isOnboarding = false, 
   const { toast } = useToast();
   const [step, setStep] = useState(1);
   
+  const [educatorType, setEducatorType] = useState<string>(existingProfile?.educatorType || "");
   const [selectedCountry, setSelectedCountry] = useState(existingProfile?.country || "");
   const [selectedState, setSelectedState] = useState(existingProfile?.state || "");
   const [schoolDistrict, setSchoolDistrict] = useState(existingProfile?.schoolDistrict || "");
@@ -92,6 +93,7 @@ export default function EducatorProfileForm({ onComplete, isOnboarding = false, 
 
   useEffect(() => {
     if (existingProfile) {
+      setEducatorType(existingProfile.educatorType || "");
       setSelectedCountry(existingProfile.country || "");
       setSelectedState(existingProfile.state || "");
       setSchoolDistrict(existingProfile.schoolDistrict || "");
@@ -142,6 +144,7 @@ export default function EducatorProfileForm({ onComplete, isOnboarding = false, 
     mutationFn: async () => {
       const stateData = hasStandardsSupport ? standardsStates.find((s: { abbreviation: string; standardsName: string }) => s.abbreviation === selectedState) : null;
       const response = await apiRequest("PATCH", "/api/educator-profile", {
+        educatorType: educatorType || undefined,
         country: selectedCountry,
         state: selectedState,
         standardsName: stateData?.standardsName || standardsName || null,
@@ -190,6 +193,22 @@ export default function EducatorProfileForm({ onComplete, isOnboarding = false, 
 
   const renderStep1 = () => (
     <div className="space-y-6">
+      <div className="space-y-2">
+        <Label className="text-base font-medium">I am a...</Label>
+        <Select value={educatorType} onValueChange={setEducatorType}>
+          <SelectTrigger data-testid="select-educator-type">
+            <SelectValue placeholder="Select your educator type" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="teacher">Teacher</SelectItem>
+            <SelectItem value="homeschooling_parent">Homeschooling Parent</SelectItem>
+            <SelectItem value="micro_school">Micro School</SelectItem>
+          </SelectContent>
+        </Select>
+      </div>
+
+      <Separator />
+
       <div className="space-y-2">
         <Label className="text-base font-medium">Country</Label>
         <Select value={selectedCountry} onValueChange={handleCountryChange}>

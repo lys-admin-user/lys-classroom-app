@@ -160,6 +160,25 @@ export default function SiteAdminPage() {
     enabled: adminCheck?.isSiteAdmin,
   });
 
+  type EducatorTypeBreakdown = {
+    type: string;
+    label: string;
+    total: number;
+    activeLast7Days: number;
+    activeLast30Days: number;
+  };
+
+  type EducatorTypeAnalytics = {
+    breakdown: EducatorTypeBreakdown[];
+    totalEducators: number;
+    totalWithType: number;
+  };
+
+  const { data: educatorTypeData, isLoading: educatorTypeLoading } = useQuery<EducatorTypeAnalytics>({
+    queryKey: ["/api/admin/performance/educator-types"],
+    enabled: adminCheck?.isSiteAdmin,
+  });
+
   const { data: educatorMetrics = [], isLoading: educatorMetricsLoading } = useQuery<EducatorPerformanceMetric[]>({
     queryKey: ["/api/admin/performance/educators"],
     enabled: adminCheck?.isSiteAdmin,
@@ -1768,6 +1787,62 @@ export default function SiteAdminPage() {
                   </CardContent>
                 </Card>
               </div>
+
+              {/* Educator Type Breakdown */}
+              <Card data-testid="card-educator-types">
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <Users className="h-5 w-5 text-lys-teal" />
+                    Educator Type Usage
+                  </CardTitle>
+                  <CardDescription>
+                    Who is using the platform most regularly
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  {educatorTypeLoading ? (
+                    <div className="h-32 bg-muted animate-pulse rounded" />
+                  ) : educatorTypeData ? (
+                    <div className="space-y-4">
+                      <div className="grid gap-4 md:grid-cols-3">
+                        {educatorTypeData.breakdown.filter(b => b.type !== "unspecified").map(item => {
+                          const percentage = educatorTypeData.totalEducators > 0 
+                            ? Math.round((item.total / educatorTypeData.totalEducators) * 100) 
+                            : 0;
+                          return (
+                            <Card key={item.type} data-testid={`educator-type-card-${item.type}`}>
+                              <CardContent className="pt-4 space-y-3">
+                                <div className="flex items-center justify-between gap-2 flex-wrap">
+                                  <span className="text-sm font-medium">{item.label}</span>
+                                  <Badge variant="secondary">{percentage}%</Badge>
+                                </div>
+                                <div className="text-2xl font-bold">{item.total}</div>
+                                <Progress value={percentage} className="h-2" />
+                                <div className="flex items-center justify-between gap-2 flex-wrap text-xs text-muted-foreground">
+                                  <span>Active last 7d: {item.activeLast7Days}</span>
+                                  <span>Active last 30d: {item.activeLast30Days}</span>
+                                </div>
+                              </CardContent>
+                            </Card>
+                          );
+                        })}
+                      </div>
+                      {educatorTypeData.totalEducators > 0 && (
+                        <div className="flex items-center gap-2 flex-wrap text-sm text-muted-foreground">
+                          <span>{educatorTypeData.totalWithType} of {educatorTypeData.totalEducators} educators have set their type</span>
+                          {educatorTypeData.breakdown.find(b => b.type === "unspecified")?.total ? (
+                            <Badge variant="outline">
+                              {educatorTypeData.breakdown.find(b => b.type === "unspecified")?.total} not set
+                            </Badge>
+                          ) : null}
+                        </div>
+                      )}
+                    </div>
+                  ) : (
+                    <p className="text-sm text-muted-foreground">No educator data available</p>
+                  )}
+                </CardContent>
+              </Card>
 
               {/* Top Educators Leaderboard */}
               <Card data-testid="card-educators-leaderboard">
