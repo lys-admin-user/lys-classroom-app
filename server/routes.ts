@@ -6899,8 +6899,8 @@ export async function registerRoutes(
       const userId = req.user?.claims?.sub;
       const link = await storage.getParentStudentLink(req.params.id);
       
-      if (!link || link.studentUserId !== userId) {
-        res.status(403).json({ error: "Only the student can update permissions" });
+      if (!link || (link.studentUserId !== userId && link.parentUserId !== userId)) {
+        res.status(403).json({ error: "Only the student or parent can update permissions" });
         return;
       }
       

@@ -993,9 +993,10 @@ export default function ParentPortal() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/parent-portal/links"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/parent-portal/student"] });
       toast({
         title: "Permissions Updated",
-        description: "Parent access permissions have been updated.",
+        description: "Access permissions have been updated.",
       });
     },
     onError: () => {
@@ -1573,57 +1574,100 @@ export default function ParentPortal() {
             )}
 
             {selectedStudent && studentData && (
-              <Card className="mt-4">
-                <CardHeader>
-                  <CardTitle className="text-lg flex items-center gap-2">
-                    <MessageSquare className="h-5 w-5" />
-                    Send a Note
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-3">
-                  <Select value={noteType} onValueChange={setNoteType}>
-                    <SelectTrigger data-testid="select-note-type">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="encouragement">
-                        <div className="flex items-center gap-2">
-                          <Heart className="h-4 w-4 text-lys-red" />
-                          Encouragement
-                        </div>
-                      </SelectItem>
-                      <SelectItem value="milestone_celebration">
-                        <div className="flex items-center gap-2">
-                          <Star className="h-4 w-4 text-lys-yellow" />
-                          Celebration
-                        </div>
-                      </SelectItem>
-                      <SelectItem value="general">
-                        <div className="flex items-center gap-2">
-                          <MessageSquare className="h-4 w-4" />
-                          General
-                        </div>
-                      </SelectItem>
-                    </SelectContent>
-                  </Select>
-                  <Textarea
-                    placeholder="Write an encouraging note..."
-                    value={noteContent}
-                    onChange={(e) => setNoteContent(e.target.value)}
-                    className="min-h-[80px]"
-                    data-testid="textarea-note-content"
-                  />
-                  <Button
-                    onClick={handleAddNote}
-                    disabled={!noteContent.trim() || addNoteMutation.isPending}
-                    className="w-full"
-                    data-testid="button-add-note"
-                  >
-                    <Send className="mr-2 h-4 w-4" />
-                    {addNoteMutation.isPending ? "Sending..." : "Send"}
-                  </Button>
-                </CardContent>
-              </Card>
+              <>
+                <Card className="mt-4">
+                  <CardHeader>
+                    <CardTitle className="text-lg flex items-center gap-2">
+                      <MessageSquare className="h-5 w-5" />
+                      Send a Note
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-3">
+                    <Select value={noteType} onValueChange={setNoteType}>
+                      <SelectTrigger data-testid="select-note-type">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="encouragement">
+                          <div className="flex items-center gap-2">
+                            <Heart className="h-4 w-4 text-lys-red" />
+                            Encouragement
+                          </div>
+                        </SelectItem>
+                        <SelectItem value="milestone_celebration">
+                          <div className="flex items-center gap-2">
+                            <Star className="h-4 w-4 text-lys-yellow" />
+                            Celebration
+                          </div>
+                        </SelectItem>
+                        <SelectItem value="general">
+                          <div className="flex items-center gap-2">
+                            <MessageSquare className="h-4 w-4" />
+                            General
+                          </div>
+                        </SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <Textarea
+                      placeholder="Write an encouraging note..."
+                      value={noteContent}
+                      onChange={(e) => setNoteContent(e.target.value)}
+                      className="min-h-[80px]"
+                      data-testid="textarea-note-content"
+                    />
+                    <Button
+                      onClick={handleAddNote}
+                      disabled={!noteContent.trim() || addNoteMutation.isPending}
+                      className="w-full"
+                      data-testid="button-add-note"
+                    >
+                      <Send className="mr-2 h-4 w-4" />
+                      {addNoteMutation.isPending ? "Sending..." : "Send"}
+                    </Button>
+                  </CardContent>
+                </Card>
+
+                {(() => {
+                  const selectedLink = parentLinks.find(l => l.studentUserId === selectedStudent);
+                  if (!selectedLink) return null;
+                  const perms = (selectedLink.permissions || {}) as ParentPermissions;
+                  return (
+                    <Card className="mt-4">
+                      <CardHeader>
+                        <CardTitle className="text-lg flex items-center gap-2">
+                          <Shield className="h-5 w-5" />
+                          My Visibility
+                        </CardTitle>
+                        <CardDescription>Choose what you see</CardDescription>
+                      </CardHeader>
+                      <CardContent className="space-y-2">
+                        {[
+                          { key: 'viewGoals' as const, label: 'Goals & Progress', icon: Target },
+                          { key: 'viewAssessments' as const, label: 'Assessments', icon: BookOpen },
+                          { key: 'viewCareers' as const, label: 'Saved Careers', icon: Briefcase },
+                          { key: 'viewMilestones' as const, label: 'Milestones', icon: Award },
+                          { key: 'viewActivities' as const, label: 'Activity Feed', icon: Activity },
+                          { key: 'viewPortfolio' as const, label: 'Portfolio', icon: GraduationCap },
+                          { key: 'viewAssignments' as const, label: 'Assignments', icon: FileText },
+                          { key: 'receiveNotifications' as const, label: 'Email Updates', icon: Mail },
+                        ].map(({ key, label, icon: Icon }) => (
+                          <div key={key} className="flex items-center justify-between">
+                            <div className="flex items-center gap-2 text-sm">
+                              <Icon className="h-4 w-4 text-muted-foreground" />
+                              {label}
+                            </div>
+                            <Switch
+                              checked={perms[key] ?? false}
+                              onCheckedChange={() => handlePermissionToggle(selectedLink, key)}
+                              data-testid={`switch-parent-permission-${key}`}
+                            />
+                          </div>
+                        ))}
+                      </CardContent>
+                    </Card>
+                  );
+                })()}
+              </>
             )}
           </div>
 
