@@ -2067,6 +2067,8 @@ export default function SiteAdminPage() {
                   )}
                 </CardContent>
               </Card>
+              {/* Lesson Cache Management */}
+              <LessonCacheSection isSiteAdmin={adminCheck?.isSiteAdmin} />
             </>
           )}
         </TabsContent>
@@ -2567,5 +2569,173 @@ export default function SiteAdminPage() {
         </TabsContent>
       </Tabs>
     </div>
+  );
+}
+
+function LessonCacheSection({ isSiteAdmin }: { isSiteAdmin?: boolean }) {
+  const { toast } = useToast();
+
+  type CacheEntry = {
+    id: string;
+    cacheKey: string;
+    topic: string;
+    course: string | null;
+    gradeLevel: string;
+    bkdFocus: string;
+    hitCount: number | null;
+    lastHitAt: string | null;
+    createdAt: string | null;
+    expiresAt: string | null;
+  };
+
+  type CacheData = {
+    entries: CacheEntry[];
+    stats: { totalEntries: number; totalHits: number; expired: number; active: number };
+  };
+
+  const { data: cacheData, isLoading } = useQuery<CacheData>({
+    queryKey: ["/api/admin/lesson-cache"],
+    enabled: !!isSiteAdmin,
+  });
+
+  const clearAllMutation = useMutation({
+    mutationFn: async () => {
+      const res = await apiRequest("DELETE", "/api/admin/lesson-cache");
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/lesson-cache"] });
+      toast({ title: "Cache Cleared", description: "All cached lesson plans have been removed." });
+    },
+  });
+
+  const clearExpiredMutation = useMutation({
+    mutationFn: async () => {
+      const res = await apiRequest("DELETE", "/api/admin/lesson-cache/expired");
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/lesson-cache"] });
+      toast({ title: "Expired Entries Cleared", description: "Expired cache entries have been removed." });
+    },
+  });
+
+  const deleteEntryMutation = useMutation({
+    mutationFn: async (id: string) => {
+      const res = await apiRequest("DELETE", `/api/admin/lesson-cache/${id}`);
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/lesson-cache"] });
+      toast({ title: "Entry Removed" });
+    },
+  });
+
+  const stats = cacheData?.stats;
+  const entries = cacheData?.entries || [];
+
+  return (
+    <Card data-testid="card-lesson-cache">
+      <CardHeader>
+        <div className="flex items-center justify-between gap-4 flex-wrap">
+          <div>
+            <CardTitle className="flex items-center gap-2">
+              <Library className="h-5 w-5 text-lys-yellow" />
+              Lesson Plan Cache
+            </CardTitle>
+            <CardDescription>
+              Cached AI-generated lesson plans to reduce duplicate API calls
+            </CardDescription>
+          </div>
+          <div className="flex items-center gap-2 flex-wrap">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => clearExpiredMutation.mutate()}
+              disabled={clearExpiredMutation.isPending || !stats?.expired}
+              data-testid="button-clear-expired-cache"
+            >
+              <Clock className="h-4 w-4 mr-1" />
+              Clear Expired
+            </Button>
+            <Button
+              variant="destructive"
+              size="sm"
+              onClick={() => clearAllMutation.mutate()}
+              disabled={clearAllMutation.isPending || !stats?.totalEntries}
+              data-testid="button-clear-all-cache"
+            >
+              <Trash2 className="h-4 w-4 mr-1" />
+              Clear All
+            </Button>
+          </div>
+        </div>
+      </CardHeader>
+      <CardContent>
+        {isLoading ? (
+          <div className="h-24 bg-muted animate-pulse rounded" />
+        ) : stats ? (
+          <div className="space-y-4">
+            <div className="grid gap-4 md:grid-cols-4">
+              <div className="text-center p-3 rounded-md bg-muted/50">
+                <p className="text-2xl font-bold" data-testid="stat-cache-total">{stats.totalEntries}</p>
+                <p className="text-xs text-muted-foreground">Total Cached</p>
+              </div>
+              <div className="text-center p-3 rounded-md bg-muted/50">
+                <p className="text-2xl font-bold text-green-600" data-testid="stat-cache-active">{stats.active}</p>
+                <p className="text-xs text-muted-foreground">Active</p>
+              </div>
+              <div className="text-center p-3 rounded-md bg-muted/50">
+                <p className="text-2xl font-bold text-lys-yellow" data-testid="stat-cache-hits">{stats.totalHits}</p>
+                <p className="text-xs text-muted-foreground">Total Hits</p>
+              </div>
+              <div className="text-center p-3 rounded-md bg-muted/50">
+                <p className="text-2xl font-bold text-muted-foreground" data-testid="stat-cache-expired">{stats.expired}</p>
+                <p className="text-xs text-muted-foreground">Expired</p>
+              </div>
+            </div>
+
+            {entries.length > 0 && (
+              <ScrollArea className="h-64">
+                <div className="space-y-2">
+                  {entries.slice(0, 20).map(entry => (
+                    <div
+                      key={entry.id}
+                      className="flex items-center justify-between gap-4 p-3 rounded-md border"
+                      data-testid={`cache-entry-${entry.id}`}
+                    >
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium truncate">{entry.topic}</p>
+                        <div className="flex items-center gap-2 flex-wrap text-xs text-muted-foreground">
+                          <Badge variant="secondary">{entry.gradeLevel}</Badge>
+                          <Badge variant="outline">{entry.bkdFocus.toUpperCase()}</Badge>
+                          {entry.course && <span>{entry.course}</span>}
+                          <span>{entry.hitCount || 0} hits</span>
+                        </div>
+                      </div>
+                      <Button
+                        size="icon"
+                        variant="ghost"
+                        className="text-destructive shrink-0"
+                        onClick={() => deleteEntryMutation.mutate(entry.id)}
+                        data-testid={`button-delete-cache-${entry.id}`}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  ))}
+                </div>
+              </ScrollArea>
+            )}
+
+            {entries.length === 0 && (
+              <p className="text-sm text-muted-foreground text-center py-4">
+                No cached lesson plans yet. They will appear here as educators generate lessons.
+              </p>
+            )}
+          </div>
+        ) : null}
+      </CardContent>
+    </Card>
   );
 }

@@ -12,6 +12,7 @@ import {
   insertKnowResourceSchema,
   users,
   sessions,
+  lessonPlanCache,
   insertFeatureFlagSchema, 
   insertEmailTemplateSchema, 
   insertStudentJourneyEntrySchema,
@@ -37,7 +38,7 @@ import { syncBlsData, getLastSyncStatus, getSyncHistory, startBlsScheduler, getS
 import * as hubspotService from "./services/hubspotService";
 import * as wordpressService from "./services/wordpressService";
 import { db } from "./db";
-import { eq, desc } from "drizzle-orm";
+import { eq, desc, sql as drizzleSql } from "drizzle-orm";
 
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 10 * 1024 * 1024 } });
 
@@ -6562,6 +6563,51 @@ export async function registerRoutes(
     } catch (error) {
       console.error("Educator type analytics error:", error);
       res.status(500).json({ error: "Failed to fetch educator type analytics" });
+    }
+  });
+
+  app.get("/api/admin/lesson-cache", isAuthenticated, isSiteAdmin, async (req: any, res) => {
+    try {
+      const allCached = await db.select().from(lessonPlanCache).orderBy(drizzleSql`${lessonPlanCache.hitCount} DESC`);
+      const totalEntries = allCached.length;
+      const totalHits = allCached.reduce((sum, c) => sum + (c.hitCount || 0), 0);
+      const expired = allCached.filter(c => c.expiresAt && new Date(c.expiresAt) < new Date()).length;
+      res.json({
+        entries: allCached,
+        stats: { totalEntries, totalHits, expired, active: totalEntries - expired },
+      });
+    } catch (error) {
+      console.error("Cache stats error:", error);
+      res.status(500).json({ error: "Failed to fetch cache data" });
+    }
+  });
+
+  app.delete("/api/admin/lesson-cache", isAuthenticated, isSiteAdmin, async (req: any, res) => {
+    try {
+      await db.delete(lessonPlanCache);
+      res.json({ success: true, message: "All cache entries cleared" });
+    } catch (error) {
+      console.error("Cache clear error:", error);
+      res.status(500).json({ error: "Failed to clear cache" });
+    }
+  });
+
+  app.delete("/api/admin/lesson-cache/expired", isAuthenticated, isSiteAdmin, async (req: any, res) => {
+    try {
+      const result = await db.delete(lessonPlanCache).where(drizzleSql`${lessonPlanCache.expiresAt} < NOW()`);
+      res.json({ success: true, message: "Expired cache entries cleared" });
+    } catch (error) {
+      console.error("Cache expired clear error:", error);
+      res.status(500).json({ error: "Failed to clear expired cache" });
+    }
+  });
+
+  app.delete("/api/admin/lesson-cache/:id", isAuthenticated, isSiteAdmin, async (req: any, res) => {
+    try {
+      await db.delete(lessonPlanCache).where(eq(lessonPlanCache.id, req.params.id));
+      res.json({ success: true });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to delete cache entry" });
     }
   });
 

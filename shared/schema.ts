@@ -351,6 +351,25 @@ export const generateLessonRequestSchema = z.object({
 
 export type GenerateLessonRequest = z.infer<typeof generateLessonRequestSchema>;
 
+export const lessonPlanCache = pgTable("lesson_plan_cache", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  cacheKey: varchar("cache_key").notNull().unique(),
+  topic: varchar("topic").notNull(),
+  course: varchar("course"),
+  unit: varchar("unit"),
+  gradeLevel: varchar("grade_level").notNull(),
+  bkdFocus: varchar("bkd_focus").notNull(),
+  duration: varchar("duration"),
+  standardsCodes: text("standards_codes"),
+  generatedPlan: jsonb("generated_plan").notNull(),
+  hitCount: integer("hit_count").default(0),
+  lastHitAt: timestamp("last_hit_at"),
+  createdAt: timestamp("created_at").defaultNow(),
+  expiresAt: timestamp("expires_at"),
+});
+
+export type LessonPlanCache = typeof lessonPlanCache.$inferSelect;
+
 // Question Bank System - Reusable questions for assignments
 export const questionBanks = pgTable("question_banks", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),

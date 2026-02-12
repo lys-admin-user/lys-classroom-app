@@ -1,8 +1,74 @@
 import OpenAI from "openai";
+import crypto from "crypto";
 import type { GenerateLessonRequest } from "@shared/schema";
+import { lessonPlanCache } from "@shared/schema";
 import { AI_LESSON_RUBRIC_PROMPT } from "@shared/lessonRubric";
 import { calculateLessonQualityScore, getQualityLevel } from "./lessonQualityScorer";
 import { storage } from "./storage";
+import { db } from "./db";
+import { eq, sql } from "drizzle-orm";
+
+function generateCacheKey(request: GenerateLessonRequest): string {
+  const normalizedParts = [
+    request.topic.toLowerCase().trim(),
+    (request.course || "").toLowerCase().trim(),
+    (request.unit || "").toLowerCase().trim(),
+    request.gradeLevel.toLowerCase().trim(),
+    request.bkdFocus,
+    (request.duration || "45 minutes").toLowerCase().trim(),
+    request.standards?.codes?.map(c => c.code).sort().join(",") || "",
+  ];
+  return crypto.createHash("sha256").update(normalizedParts.join("|")).digest("hex");
+}
+
+async function getCachedLesson(cacheKey: string): Promise<any | null> {
+  try {
+    const [cached] = await db.select().from(lessonPlanCache)
+      .where(eq(lessonPlanCache.cacheKey, cacheKey));
+    
+    if (!cached) return null;
+    
+    if (cached.expiresAt && new Date(cached.expiresAt) < new Date()) {
+      await db.delete(lessonPlanCache).where(eq(lessonPlanCache.id, cached.id));
+      return null;
+    }
+
+    await db.update(lessonPlanCache)
+      .set({ 
+        hitCount: sql`${lessonPlanCache.hitCount} + 1`,
+        lastHitAt: new Date(),
+      })
+      .where(eq(lessonPlanCache.id, cached.id));
+
+    return cached.generatedPlan;
+  } catch (error) {
+    console.error("Cache lookup error:", error);
+    return null;
+  }
+}
+
+async function saveLessonToCache(request: GenerateLessonRequest, cacheKey: string, plan: any): Promise<void> {
+  try {
+    const expiresAt = new Date();
+    expiresAt.setDate(expiresAt.getDate() + 30);
+    
+    await db.insert(lessonPlanCache).values({
+      cacheKey,
+      topic: request.topic,
+      course: request.course || null,
+      unit: request.unit || null,
+      gradeLevel: request.gradeLevel,
+      bkdFocus: request.bkdFocus,
+      duration: request.duration || "45 minutes",
+      standardsCodes: request.standards?.codes?.map(c => c.code).join(",") || null,
+      generatedPlan: plan,
+      hitCount: 0,
+      expiresAt,
+    }).onConflictDoNothing();
+  } catch (error) {
+    console.error("Cache save error:", error);
+  }
+}
 
 const openai = process.env.OPENAI_API_KEY 
   ? new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
@@ -72,10 +138,18 @@ const bkdDescriptions = {
   do: "Action & Impact - Focus on taking concrete steps, building habits, and making measurable progress. Execute with excellence.",
 };
 
-export async function generateLessonPlan(request: GenerateLessonRequest): Promise<GeneratedLessonPlan> {
+export async function generateLessonPlan(request: GenerateLessonRequest): Promise<GeneratedLessonPlan & { cacheHit?: boolean }> {
   if (!openai) {
     return generateMockLessonPlan(request);
   }
+
+  const cacheKey = generateCacheKey(request);
+  const cached = await getCachedLesson(cacheKey);
+  if (cached) {
+    console.log(`Cache HIT for lesson: "${request.topic}" [${request.gradeLevel}/${request.bkdFocus}]`);
+    return { ...cached, id: crypto.randomUUID(), cacheHit: true };
+  }
+  console.log(`Cache MISS for lesson: "${request.topic}" [${request.gradeLevel}/${request.bkdFocus}]`);
 
   const standardsInfo = request.standards 
     ? `Standards: ${request.standards.standardsName} - ${request.standards.codes.map(c => `${c.code}: ${c.description}`).join("; ")}`
@@ -233,12 +307,14 @@ You MUST address these gaps to achieve Distinguished level (90%+).`;
         console.log(`Retry lesson quality: ${retryQuality.percentage}% (${getQualityLevel(retryQuality.percentage)})`);
         
         if (retryQuality.percentage > qualityResult.percentage) {
-          return improvedLesson;
+          await saveLessonToCache(request, cacheKey, improvedLesson);
+          return { ...improvedLesson, cacheHit: false };
         }
       }
     }
     
-    return generatedLesson;
+    await saveLessonToCache(request, cacheKey, generatedLesson);
+    return { ...generatedLesson, cacheHit: false };
   } catch (error) {
     console.error("Error generating lesson plan:", error);
     return generateMockLessonPlan(request);
