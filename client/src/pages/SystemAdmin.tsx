@@ -18,7 +18,8 @@ import {
   Shield, Building2, Users, Trash2, BarChart3, AlertTriangle, Loader2, 
   TrendingUp, CreditCard, Share2, BookOpen, Target, UserCheck, 
   Eye, Edit2, Search, ChevronRight, Map, GraduationCap, DollarSign,
-  Activity, Globe, FileText, Award, Zap, ExternalLink, UserCog, Library, Plus
+  Activity, Globe, FileText, Award, Zap, ExternalLink, UserCog, Library, Plus,
+  Server, Database, Cpu, HardDrive, Wifi, Lock, Monitor, Code2, Layers
 } from "lucide-react";
 import type { Organization, User as UserType, Lesson } from "@shared/schema";
 
@@ -334,6 +335,10 @@ export default function SystemAdminPage() {
           <TabsTrigger value="datasync" className="gap-2" data-testid="tab-datasync">
             <Activity className="h-4 w-4" />
             <span className="hidden sm:inline">Data Sync</span>
+          </TabsTrigger>
+          <TabsTrigger value="techspecs" className="gap-2" data-testid="tab-techspecs">
+            <Server className="h-4 w-4" />
+            <span className="hidden sm:inline">Technical Specs</span>
           </TabsTrigger>
         </TabsList>
 
@@ -1132,8 +1137,392 @@ export default function SystemAdminPage() {
         <TabsContent value="datasync" className="space-y-6">
           <BlsSyncSection />
         </TabsContent>
+
+        <TabsContent value="techspecs" className="space-y-6">
+          <TechnicalSpecsSection />
+        </TabsContent>
       </Tabs>
     </div>
+  );
+}
+
+interface SpecSection {
+  icon: React.ComponentType<{ className?: string }>;
+  title: string;
+  items: { label: string; value: string }[];
+}
+
+function TechnicalSpecsSection() {
+  const platformArchitecture: SpecSection[] = [
+    {
+      icon: Code2,
+      title: "Frontend Stack",
+      items: [
+        { label: "Framework", value: "React 18 with TypeScript" },
+        { label: "Build Tool", value: "Vite 5.x with HMR" },
+        { label: "Routing", value: "Wouter (lightweight SPA router)" },
+        { label: "State Management", value: "TanStack React Query v5 (server state)" },
+        { label: "UI Components", value: "shadcn/ui built on Radix UI primitives" },
+        { label: "Styling", value: "Tailwind CSS with custom design tokens" },
+        { label: "Forms", value: "React Hook Form with Zod validation" },
+        { label: "Icons", value: "Lucide React, React Icons" },
+        { label: "Typography", value: "Permanent Marker (headers), Oswald (subheaders), Roboto (body)" },
+        { label: "Dark Mode", value: "Class-based toggle with CSS custom properties" },
+      ],
+    },
+    {
+      icon: Server,
+      title: "Backend Stack",
+      items: [
+        { label: "Runtime", value: "Node.js with TypeScript (tsx)" },
+        { label: "Framework", value: "Express.js with RESTful JSON API" },
+        { label: "API Prefix", value: "/api for all endpoints" },
+        { label: "Validation", value: "Zod schemas (shared between client and server)" },
+        { label: "Authentication", value: "Replit Auth (Google, GitHub, email) with express-session" },
+        { label: "Session Store", value: "PostgreSQL-backed via connect-pg-simple" },
+        { label: "File Uploads", value: "Multer with in-memory storage (10MB limit)" },
+        { label: "Real-Time", value: "WebSocket server for collaboration, presence, and chat" },
+      ],
+    },
+    {
+      icon: Database,
+      title: "Data Layer",
+      items: [
+        { label: "Database", value: "PostgreSQL (Neon-backed)" },
+        { label: "ORM", value: "Drizzle ORM with drizzle-zod for schema-to-validation" },
+        { label: "Schema Location", value: "shared/schema.ts (monorepo shared types)" },
+        { label: "Migrations", value: "Drizzle Kit with push strategy" },
+        { label: "Tables", value: "50+ tables covering users, lessons, organizations, standards, careers, portfolios, gradebook, and more" },
+        { label: "Session Storage", value: "PostgreSQL sessions table with TTL index" },
+        { label: "Caching", value: "Database-backed lesson plan cache with 30-day TTL and SHA-256 keys" },
+      ],
+    },
+    {
+      icon: Zap,
+      title: "AI Integration",
+      items: [
+        { label: "Provider", value: "OpenAI API (GPT-4o)" },
+        { label: "Lesson Generation", value: "AI lesson plans with rubric alignment and standards mapping" },
+        { label: "PD Recommendations", value: "Personalized professional development suggestions" },
+        { label: "Standards Extraction", value: "LLM-powered extraction from documents with human review" },
+        { label: "Assignment Generation", value: "AI assignments aligned with lesson objectives and BKD methodology" },
+        { label: "Fallback", value: "Mock data generation when API key unavailable" },
+        { label: "Response Format", value: "JSON structured output with Zod validation" },
+      ],
+    },
+    {
+      icon: Globe,
+      title: "External Integrations",
+      items: [
+        { label: "HubSpot CRM", value: "Contact, company, and deal sync via Replit connector" },
+        { label: "BLS Data", value: "Weekly automated sync with Bureau of Labor Statistics occupational data" },
+        { label: "CSP Standards", value: "Standards ingestion from Common Standards Project API" },
+        { label: "SIS Providers", value: "Clever, PowerSchool, Canvas LMS, Infinite Campus, Skyward, OneRoster" },
+        { label: "WordPress", value: "Full site embed via plugin with 22+ embeddable widgets" },
+        { label: "Payment", value: "Stripe integration (planned) via Replit connector" },
+      ],
+    },
+    {
+      icon: Shield,
+      title: "Security & Compliance",
+      items: [
+        { label: "Input Validation", value: "Server-side Zod validation on all endpoints" },
+        { label: "Ownership Checks", value: "User-scoped data access with server-side ID regeneration" },
+        { label: "COPPA Compliance", value: "Grade-level ad restriction (K-7 never see ads)" },
+        { label: "Session Security", value: "HTTP-only cookies, secure in production, 30-day max age" },
+        { label: "RBAC", value: "Role-based access: student, educator, campus_admin, district_admin, site_admin, system_admin" },
+        { label: "Secrets Management", value: "Replit secrets store for API keys and credentials" },
+      ],
+    },
+    {
+      icon: Layers,
+      title: "Architecture Patterns",
+      items: [
+        { label: "Monorepo", value: "/client (frontend), /server (backend), /shared (common types)" },
+        { label: "Multi-Tenancy", value: "Organization hierarchy with Country > State > District > School > Class" },
+        { label: "Governance Models", value: "Bottom-heavy (US), Top-down unitary (centralized), Federal hybrid" },
+        { label: "Tier System", value: "Free (ad-supported), Pro, Campus, Enterprise with feature gating" },
+        { label: "Be-Know-Do Framework", value: "Three-pillar methodology: Being (identity), Knowing (career), Doing (action)" },
+        { label: "Affiliate System", value: "Referral codes, social sharing, point-based educator rewards" },
+        { label: "Ad Monetization", value: "IAB standard sizes, sponsor categories, eCPM $8-15 range, tier-aware rendering" },
+        { label: "Global Pricing", value: "Country Affordability Index (CAI) across 120+ countries" },
+      ],
+    },
+  ];
+
+  const hardwareRequirements = [
+    {
+      tier: "Development / Small Deployment",
+      description: "Suitable for development, testing, or a single school with up to 500 users.",
+      icon: Monitor,
+      specs: [
+        { label: "CPU", value: "2 vCPUs (x86-64 or ARM64)" },
+        { label: "RAM", value: "4 GB minimum" },
+        { label: "Storage", value: "20 GB SSD (OS + application)" },
+        { label: "Database Storage", value: "5 GB PostgreSQL" },
+        { label: "Network", value: "100 Mbps with public IP or load balancer" },
+        { label: "OS", value: "Linux (NixOS, Ubuntu 22.04+, Debian 12+)" },
+      ],
+    },
+    {
+      tier: "Campus Deployment",
+      description: "Single campus or small district with 500-5,000 concurrent users.",
+      icon: Building2,
+      specs: [
+        { label: "CPU", value: "4 vCPUs (x86-64)" },
+        { label: "RAM", value: "8 GB minimum, 16 GB recommended" },
+        { label: "Storage", value: "50 GB SSD (OS + application + file uploads)" },
+        { label: "Database Storage", value: "20 GB PostgreSQL with automated backups" },
+        { label: "Network", value: "500 Mbps with TLS termination" },
+        { label: "OS", value: "Linux (Ubuntu 22.04 LTS or NixOS)" },
+        { label: "CDN", value: "Recommended for static asset delivery" },
+      ],
+    },
+    {
+      tier: "District Deployment",
+      description: "Multi-campus district with 5,000-50,000 concurrent users.",
+      icon: Globe,
+      specs: [
+        { label: "CPU", value: "8+ vCPUs across 2-4 application instances" },
+        { label: "RAM", value: "32 GB total across instances (8 GB per node)" },
+        { label: "Storage", value: "100 GB SSD per instance + shared file storage" },
+        { label: "Database", value: "Managed PostgreSQL with 50 GB, read replicas, point-in-time recovery" },
+        { label: "Network", value: "1 Gbps with load balancer, TLS, and DDoS protection" },
+        { label: "OS", value: "Linux with container orchestration (Docker/Kubernetes)" },
+        { label: "CDN", value: "Required for global asset delivery" },
+        { label: "Redis", value: "Recommended for session cache and rate limiting" },
+      ],
+    },
+    {
+      tier: "Enterprise / State-Level",
+      description: "State-wide or national deployment with 50,000+ concurrent users.",
+      icon: Server,
+      specs: [
+        { label: "CPU", value: "16+ vCPUs across 4-8+ auto-scaling application instances" },
+        { label: "RAM", value: "64 GB+ total (16 GB per node minimum)" },
+        { label: "Storage", value: "500 GB+ SSD with object storage for file uploads" },
+        { label: "Database", value: "Managed PostgreSQL cluster: 200 GB+, multi-AZ, read replicas, automated failover" },
+        { label: "Network", value: "10 Gbps backbone, global load balancing, WAF, DDoS protection" },
+        { label: "OS", value: "Linux with Kubernetes orchestration and auto-scaling" },
+        { label: "CDN", value: "Multi-region CDN with edge caching" },
+        { label: "Redis", value: "Redis cluster for sessions, rate limiting, and pub/sub" },
+        { label: "Monitoring", value: "APM, log aggregation, uptime monitoring, alerting" },
+        { label: "Backup", value: "Cross-region database replication, 30-day retention, RPO < 1 hour" },
+      ],
+    },
+  ];
+
+  const softwareDependencies = [
+    { label: "Node.js", value: "v20.x LTS or later" },
+    { label: "PostgreSQL", value: "v15+ (Neon-compatible)" },
+    { label: "npm", value: "v9+ (package management)" },
+    { label: "TypeScript", value: "v5.x (compile-time type safety)" },
+    { label: "OpenAI API Key", value: "Required for AI features (GPT-4o access)" },
+    { label: "SMTP Server", value: "Optional, for email notifications" },
+    { label: "Stripe Account", value: "Optional, for payment processing" },
+    { label: "HubSpot API Key", value: "Optional, for CRM integration" },
+  ];
+
+  const networkRequirements = [
+    { label: "HTTPS/TLS", value: "Required for all traffic (TLS 1.2+ minimum)" },
+    { label: "WebSocket Support", value: "Required for real-time collaboration features" },
+    { label: "DNS", value: "A/AAAA records pointing to application server or load balancer" },
+    { label: "Ports", value: "443 (HTTPS), 80 (HTTP redirect), 5432 (PostgreSQL internal)" },
+    { label: "Firewall", value: "Allow inbound 443, restrict database to internal network only" },
+    { label: "CORS", value: "Configured for same-origin; WordPress embeds require specific origins" },
+    { label: "Bandwidth", value: "~50 KB per page load (compressed), ~200 KB initial bundle" },
+  ];
+
+  return (
+    <>
+      <div className="mb-4">
+        <h2 className="font-oswald text-xl font-semibold">Technical Specifications</h2>
+        <p className="text-sm text-muted-foreground font-roboto">
+          Complete platform architecture, software dependencies, and hardware requirements for deployment planning.
+        </p>
+      </div>
+
+      <Card data-testid="card-platform-overview">
+        <CardHeader>
+          <CardTitle className="font-oswald flex items-center gap-2">
+            <Layers className="h-5 w-5 text-lys-teal" />
+            Platform Overview
+          </CardTitle>
+          <CardDescription>
+            LYS (Laddering Your Success) is a full-stack monorepo application built with React and Express.js, 
+            powered by PostgreSQL and OpenAI. It runs as a single deployable unit serving both the frontend SPA 
+            and backend API on port 5000.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+            <div className="p-3 bg-muted/30 rounded-lg text-center">
+              <p className="text-2xl font-bold font-oswald text-lys-red">50+</p>
+              <p className="text-xs text-muted-foreground">Database Tables</p>
+            </div>
+            <div className="p-3 bg-muted/30 rounded-lg text-center">
+              <p className="text-2xl font-bold font-oswald text-lys-yellow">30+</p>
+              <p className="text-xs text-muted-foreground">Pages / Routes</p>
+            </div>
+            <div className="p-3 bg-muted/30 rounded-lg text-center">
+              <p className="text-2xl font-bold font-oswald text-lys-teal">100+</p>
+              <p className="text-xs text-muted-foreground">API Endpoints</p>
+            </div>
+            <div className="p-3 bg-muted/30 rounded-lg text-center">
+              <p className="text-2xl font-bold font-oswald">6</p>
+              <p className="text-xs text-muted-foreground">User Roles</p>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      <div className="grid lg:grid-cols-2 gap-6">
+        {platformArchitecture.map((section) => {
+          const SectionIcon = section.icon;
+          return (
+            <Card key={section.title} data-testid={`card-spec-${section.title.toLowerCase().replace(/[^a-z0-9]+/g, '-')}`}>
+              <CardHeader className="pb-3">
+                <CardTitle className="text-base font-oswald flex items-center gap-2">
+                  <SectionIcon className="h-4 w-4 text-lys-teal" />
+                  {section.title}
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-2">
+                  {section.items.map((item) => (
+                    <div key={item.label} className="flex items-start gap-3 text-sm">
+                      <span className="text-muted-foreground min-w-[120px] shrink-0">{item.label}</span>
+                      <span className="font-medium">{item.value}</span>
+                    </div>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+          );
+        })}
+      </div>
+
+      <Card data-testid="card-software-dependencies">
+        <CardHeader>
+          <CardTitle className="font-oswald flex items-center gap-2">
+            <Code2 className="h-5 w-5 text-lys-yellow" />
+            Software Dependencies
+          </CardTitle>
+          <CardDescription>
+            Required and optional software for running the LYS platform.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="grid sm:grid-cols-2 gap-3">
+            {softwareDependencies.map((dep) => (
+              <div key={dep.label} className="flex items-center gap-3 p-3 bg-muted/30 rounded-lg">
+                <span className="font-medium text-sm min-w-[130px]">{dep.label}</span>
+                <span className="text-sm text-muted-foreground">{dep.value}</span>
+              </div>
+            ))}
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card data-testid="card-network-requirements">
+        <CardHeader>
+          <CardTitle className="font-oswald flex items-center gap-2">
+            <Wifi className="h-5 w-5 text-lys-teal" />
+            Network Requirements
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-2">
+            {networkRequirements.map((req) => (
+              <div key={req.label} className="flex items-start gap-3 text-sm">
+                <span className="text-muted-foreground min-w-[130px] shrink-0">{req.label}</span>
+                <span className="font-medium">{req.value}</span>
+              </div>
+            ))}
+          </div>
+        </CardContent>
+      </Card>
+
+      <div>
+        <h3 className="font-oswald text-lg font-semibold mb-4 flex items-center gap-2">
+          <HardDrive className="h-5 w-5 text-lys-red" />
+          Hardware Requirements by Deployment Tier
+        </h3>
+        <div className="grid lg:grid-cols-2 gap-6">
+          {hardwareRequirements.map((tier) => {
+            const TierIcon = tier.icon;
+            return (
+              <Card key={tier.tier} data-testid={`card-hw-${tier.tier.toLowerCase().replace(/[^a-z0-9]+/g, '-')}`}>
+                <CardHeader className="pb-3">
+                  <div className="flex items-center gap-3">
+                    <div className="p-2 bg-muted rounded-md">
+                      <TierIcon className="h-5 w-5 text-lys-red" />
+                    </div>
+                    <div>
+                      <CardTitle className="text-base font-oswald">{tier.tier}</CardTitle>
+                      <CardDescription className="text-xs">{tier.description}</CardDescription>
+                    </div>
+                  </div>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-2">
+                    {tier.specs.map((spec) => (
+                      <div key={spec.label} className="flex items-start gap-3 text-sm">
+                        <Badge variant="outline" className="text-[10px] min-w-[70px] justify-center shrink-0">
+                          {spec.label}
+                        </Badge>
+                        <span className="text-muted-foreground">{spec.value}</span>
+                      </div>
+                    ))}
+                  </div>
+                </CardContent>
+              </Card>
+            );
+          })}
+        </div>
+      </div>
+
+      <Card data-testid="card-deployment-notes">
+        <CardHeader>
+          <CardTitle className="font-oswald flex items-center gap-2">
+            <Lock className="h-5 w-5 text-lys-yellow" />
+            Deployment Notes
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="grid md:grid-cols-2 gap-4">
+            <div className="p-4 bg-muted/30 rounded-lg">
+              <h4 className="font-oswald font-semibold mb-2 text-sm">Replit Deployment</h4>
+              <ul className="text-sm space-y-1 text-muted-foreground">
+                <li>Hosted on Replit with built-in PostgreSQL (Neon)</li>
+                <li>Automatic TLS and domain management</li>
+                <li>Built-in secrets management for API keys</li>
+                <li>One-click publishing with health checks</li>
+                <li>Automatic scaling based on traffic</li>
+              </ul>
+            </div>
+            <div className="p-4 bg-muted/30 rounded-lg">
+              <h4 className="font-oswald font-semibold mb-2 text-sm">Self-Hosted Deployment</h4>
+              <ul className="text-sm space-y-1 text-muted-foreground">
+                <li>Clone repository and configure environment variables</li>
+                <li>Run npm install and npm run build</li>
+                <li>Configure PostgreSQL connection string (DATABASE_URL)</li>
+                <li>Set SESSION_SECRET and OPENAI_API_KEY</li>
+                <li>Run npm start on port 5000 behind a reverse proxy</li>
+              </ul>
+            </div>
+          </div>
+          <div className="flex items-start gap-2 p-3 bg-amber-50 dark:bg-amber-900/20 rounded-lg border border-amber-200 dark:border-amber-800">
+            <AlertTriangle className="h-5 w-5 text-amber-600 shrink-0 mt-0.5" />
+            <p className="text-sm text-amber-800 dark:text-amber-200 font-roboto">
+              For enterprise deployments handling sensitive student data, ensure compliance with FERPA, COPPA, 
+              and local data protection regulations. Database encryption at rest and in transit is strongly recommended. 
+              Consult your IT security team before deploying in production environments.
+            </p>
+          </div>
+        </CardContent>
+      </Card>
+    </>
   );
 }
 
