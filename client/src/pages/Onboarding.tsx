@@ -229,7 +229,7 @@ export default function Onboarding() {
       toast({ title: "Welcome to LYS!", description: "Your personalized experience is ready." });
       
       const redirectPath = getRecommendedPath();
-      setLocation(redirectPath);
+      setLocation(`${redirectPath}?tour=true&role=${encodeURIComponent(role)}&goal=${encodeURIComponent(primaryGoal)}`);
     },
     onError: () => {
       toast({ title: "Error", description: "Failed to complete onboarding", variant: "destructive" });

@@ -1,4 +1,4 @@
-import { Switch, Route, useLocation } from "wouter";
+import { Switch, Route, useLocation, useSearch } from "wouter";
 import { queryClient } from "./lib/queryClient";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
@@ -8,8 +8,9 @@ import { AppSidebar } from "@/components/AppSidebar";
 import { Header } from "@/components/Header";
 import { Footer } from "@/components/Footer";
 import { OnboardingReminderBanner } from "@/components/OnboardingReminderBanner";
+import { OnboardingTour } from "@/components/OnboardingTour";
 import { useAuth } from "@/hooks/use-auth";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import Dashboard from "@/pages/Dashboard";
 import LessonGenerator from "@/pages/LessonGenerator";
 import Assessments from "@/pages/Assessments";
@@ -155,6 +156,46 @@ function Router() {
   );
 }
 
+function TourManager() {
+  const searchString = useSearch();
+  const { user } = useAuth();
+  const [showTour, setShowTour] = useState(false);
+  const [tourRole, setTourRole] = useState("");
+  const [tourGoal, setTourGoal] = useState("");
+
+  useEffect(() => {
+    const params = new URLSearchParams(searchString);
+    if (params.get("tour") === "true") {
+      const alreadyCompleted = localStorage.getItem("lys_tour_completed") === "true";
+      if (alreadyCompleted) {
+        window.history.replaceState({}, "", window.location.pathname);
+        return;
+      }
+      const role = params.get("role") || user?.role || "student";
+      const goal = params.get("goal") || "";
+      setTourRole(role);
+      setTourGoal(goal);
+      setShowTour(true);
+
+      window.history.replaceState({}, "", window.location.pathname);
+    }
+  }, [searchString, user?.role]);
+
+  const handleTourComplete = () => {
+    setShowTour(false);
+  };
+
+  if (!showTour) return null;
+
+  return (
+    <OnboardingTour
+      role={tourRole}
+      primaryGoal={tourGoal}
+      onComplete={handleTourComplete}
+    />
+  );
+}
+
 function App() {
   const sidebarStyle = {
     "--sidebar-width": "16rem",
@@ -177,6 +218,7 @@ function App() {
                 <Footer />
               </SidebarInset>
             </div>
+            <TourManager />
           </SidebarProvider>
         </OnboardingGuard>
         <Toaster />
