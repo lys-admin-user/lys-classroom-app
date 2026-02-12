@@ -128,7 +128,7 @@ function ResourceForm({
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    const submitData: Partial<InsertKnowResource> = {
+    const submitData: any = {
       resourceType: formData.resourceType as KnowResourceType,
       title: formData.title,
       description: formData.description || null,

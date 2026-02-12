@@ -168,7 +168,7 @@ function AchievementForm({
           <Label htmlFor="category">Category</Label>
           <Select
             value={formData.category}
-            onValueChange={(value) => setFormData({ ...formData, category: value })}
+            onValueChange={(value: any) => setFormData({ ...formData, category: value })}
           >
             <SelectTrigger data-testid="select-achievement-category">
               <SelectValue />

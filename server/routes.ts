@@ -19,6 +19,7 @@ import {
   type Lesson, 
   type Goal,
   type User,
+  type UserRole,
   lessons,
   goals,
   educatorProfiles,
@@ -116,7 +117,7 @@ const updatePreferencesSchema = z.object({
 });
 
 const completeOnboardingSchema = z.object({
-  role: z.enum(["student", "educator", "campus_admin", "homeschool_parent"]).optional(),
+  role: z.enum(["student", "educator", "campus_admin", "district_admin", "site_admin", "system_admin", "homeschool_parent"]).optional(),
   preferences: z.object({
     language: z.string().optional(),
     country: z.string().optional(),
@@ -135,7 +136,7 @@ const completeOnboardingSchema = z.object({
 });
 
 const updateRoleSchema = z.object({
-  role: z.enum(["student", "educator", "campus_admin", "homeschool_parent"]),
+  role: z.enum(["student", "educator", "campus_admin", "district_admin", "site_admin", "system_admin", "homeschool_parent"]),
 });
 
 export async function registerRoutes(
@@ -477,7 +478,7 @@ export async function registerRoutes(
       const matches = await autoMatchStandards({
         topic,
         gradeLevel,
-        subject,
+        subject: subject || '',
         objectives,
         standardSetId,
       });
@@ -904,9 +905,9 @@ export async function registerRoutes(
       }
       
       // Import tier functions from shared schema
-      const { getFeaturesForTier, getNextTier, TIER_BENEFITS, UserTierType } = await import("@shared/schema");
+      const { getFeaturesForTier, getNextTier, TIER_BENEFITS, UserTier: UserTierConst } = await import("@shared/schema");
       
-      type TierType = typeof UserTierType[keyof typeof UserTierType];
+      type TierType = typeof UserTierConst[keyof typeof UserTierConst];
       const userTier = (user.tier || "free") as TierType;
       const { available, locked } = getFeaturesForTier(userTier);
       const nextTierKey = getNextTier(userTier);
@@ -974,7 +975,7 @@ export async function registerRoutes(
         return;
       }
       
-      const { TIER_FEATURES, tierHasAccess, UserTierType } = await import("@shared/schema");
+      const { TIER_FEATURES, tierHasAccess, UserTier: UserTierConst2 } = await import("@shared/schema");
       
       const feature = TIER_FEATURES.find(f => f.id === featureId);
       if (!feature) {
@@ -982,7 +983,7 @@ export async function registerRoutes(
         return;
       }
       
-      type TierType = typeof UserTierType[keyof typeof UserTierType];
+      type TierType = typeof UserTierConst2[keyof typeof UserTierConst2];
       const userTier = (user.tier || "free") as TierType;
       const hasAccess = tierHasAccess(userTier, feature.requiredTier);
       
@@ -1030,7 +1031,7 @@ export async function registerRoutes(
 
   app.get("/api/careers/recommended", async (req, res) => {
     try {
-      const userId = req.user?.claims?.sub;
+      const userId = (req as any).user?.claims?.sub;
       if (!userId) {
         return res.status(401).json({ error: "Authentication required" });
       }
@@ -1686,9 +1687,10 @@ export async function registerRoutes(
       const validated = completeOnboardingSchema.parse(req.body);
       const { role, preferences, needsAnalysis } = validated;
       
-      // Update user role
+      // Update user role (map homeschool_parent to educator for DB storage)
       if (role) {
-        await storage.updateUserRole(userId, role);
+        const dbRole = role === "homeschool_parent" ? "educator" : role;
+        await storage.updateUserRole(userId, dbRole as UserRole);
       }
       
       // Save preferences with needs analysis
@@ -1716,7 +1718,8 @@ export async function registerRoutes(
     try {
       const userId = req.user?.claims?.sub;
       const validated = updateRoleSchema.parse(req.body);
-      const user = await storage.updateUserRole(userId, validated.role);
+      const dbRole = validated.role === "homeschool_parent" ? "educator" : validated.role;
+      const user = await storage.updateUserRole(userId, dbRole as UserRole);
       res.json(user);
     } catch (error) {
       if (error instanceof z.ZodError) {
@@ -3185,7 +3188,7 @@ export async function registerRoutes(
         return;
       }
       
-      const updated = await storage.updateKnowResource(id, validationResult.data, userId);
+      const updated = await storage.updateKnowResource(id, validationResult.data as any, userId);
       if (!updated) {
         res.status(404).json({ error: "Resource not found" });
         return;
@@ -3388,7 +3391,7 @@ export async function registerRoutes(
         return;
       }
       
-      const updated = await storage.updateSystemAchievement(id, parseResult.data);
+      const updated = await storage.updateSystemAchievement(id, parseResult.data as any);
       if (!updated) {
         res.status(404).json({ error: "Achievement not found" });
         return;
@@ -4718,8 +4721,8 @@ export async function registerRoutes(
       
       // Verify campus admin is a member of this organization (site admins can access any)
       if (!isSiteAdminUser) {
-        const membership = await storage.getOrganizationMembership(userId, organizationId);
-        if (!membership || !["admin", "owner"].includes(membership.role)) {
+        const membership = await storage.getOrgMembership(organizationId, userId!);
+        if (!membership || !["admin", "owner"].includes(membership.role as string)) {
           res.status(403).json({ error: "You must be an admin of this organization to manage lesson authors" });
           return;
         }
@@ -4771,8 +4774,8 @@ export async function registerRoutes(
       
       // Verify campus admin is a member of this organization (site admins can manage any)
       if (!isSiteAdminUser) {
-        const membership = await storage.getOrganizationMembership(adminUserId, organizationId);
-        if (!membership || !["admin", "owner"].includes(membership.role)) {
+        const membership = await storage.getOrgMembership(organizationId, adminUserId!);
+        if (!membership || !["admin", "owner"].includes(membership.role as string)) {
           res.status(403).json({ error: "You must be an admin of this organization to add lesson authors" });
           return;
         }
@@ -4824,8 +4827,8 @@ export async function registerRoutes(
       
       // Verify campus admin is a member of this organization (site admins can manage any)
       if (!isSiteAdminUser) {
-        const membership = await storage.getOrganizationMembership(adminUserId, organizationId);
-        if (!membership || !["admin", "owner"].includes(membership.role)) {
+        const membership = await storage.getOrgMembership(organizationId, adminUserId!);
+        if (!membership || !["admin", "owner"].includes(membership.role as string)) {
           res.status(403).json({ error: "You must be an admin of this organization to update lesson authors" });
           return;
         }
@@ -4865,8 +4868,8 @@ export async function registerRoutes(
       
       // Verify campus admin is a member of this organization (site admins can manage any)
       if (!isSiteAdminUser) {
-        const membership = await storage.getOrganizationMembership(adminUserId, organizationId);
-        if (!membership || !["admin", "owner"].includes(membership.role)) {
+        const membership = await storage.getOrgMembership(organizationId, adminUserId!);
+        if (!membership || !["admin", "owner"].includes(membership.role as string)) {
           res.status(403).json({ error: "You must be an admin of this organization to remove lesson authors" });
           return;
         }
@@ -7228,7 +7231,7 @@ export async function registerRoutes(
       }
       
       // Get portfolio if permitted
-      if (permissions.viewPortfolio) {
+      if ((permissions as any).viewPortfolio) {
         try {
           const portfolio = await storage.getStudentPortfolio(studentId);
           if (portfolio) {
@@ -7244,15 +7247,15 @@ export async function registerRoutes(
       }
       
       // Get assignments for the student if permitted
-      if (permissions.viewAssignments) {
+      if ((permissions as any).viewAssignments) {
         try {
           const studentAssignments = await storage.getAssignmentsForStudent(studentId);
           studentData.assignments = studentAssignments.slice(0, 10).map(({ assignment, recipient }) => ({
             id: assignment.id,
             title: assignment.title,
-            type: assignment.type,
+            type: (assignment as any).type,
             status: recipient.status,
-            grade: recipient.grade,
+            grade: (recipient as any).grade,
             submittedAt: recipient.submittedAt,
             dueDate: assignment.dueDate,
             feedback: recipient.feedback,
@@ -7330,7 +7333,7 @@ export async function registerRoutes(
       
       // Verify educator has access to this student (enrolled in their class)
       const educator = await storage.getUser(educatorId);
-      if (!educator || (educator.role !== "educator" && educator.role !== "admin" && educator.role !== "campus_admin")) {
+      if (!educator || (educator.role !== "educator" && educator.role !== "campus_admin" && educator.role !== "district_admin")) {
         res.status(403).json({ error: "Only educators can invite parents" });
         return;
       }
@@ -7345,11 +7348,16 @@ export async function registerRoutes(
       // Verify student is in educator's class (unless campus admin)
       if (educator.role === "educator") {
         const educatorClasses = await storage.getClasses(educatorId);
-        const classIds = educatorClasses.map(c => c.id);
-        const enrollments = await db.select().from(classStudents)
-          .where(sql`${classStudents.classId} IN (${sql.join(classIds.map(id => sql`${id}`), sql`, `)}) AND ${classStudents.studentId} = ${studentId}`);
+        let studentInClass = false;
+        for (const cls of educatorClasses) {
+          const classStudentsList = await storage.getClassStudents(cls.id);
+          if (classStudentsList.some(cs => cs.studentId === studentId)) {
+            studentInClass = true;
+            break;
+          }
+        }
         
-        if (enrollments.length === 0) {
+        if (!studentInClass) {
           res.status(403).json({ error: "You can only invite parents for students in your classes" });
           return;
         }
@@ -7490,7 +7498,7 @@ export async function registerRoutes(
       const educatorId = req.user?.claims?.sub;
       const educator = await storage.getUser(educatorId);
       
-      if (!educator || (educator.role !== "educator" && educator.role !== "admin")) {
+      if (!educator || (educator.role !== "educator" && educator.role !== "campus_admin")) {
         res.status(403).json({ error: "Only educators can view parent requests" });
         return;
       }
@@ -7510,7 +7518,7 @@ export async function registerRoutes(
       const { action } = req.body; // "approve" or "reject"
       
       const educator = await storage.getUser(educatorId);
-      if (!educator || (educator.role !== "educator" && educator.role !== "admin")) {
+      if (!educator || (educator.role !== "educator" && educator.role !== "campus_admin")) {
         res.status(403).json({ error: "Only educators can respond to parent requests" });
         return;
       }
@@ -8063,7 +8071,7 @@ export async function registerRoutes(
       
       // Generate recommendations using AI
       const { generatePDRecommendations } = await import("./openai");
-      const recommendations = await generatePDRecommendations(userGoals, skillsForAI, profile);
+      const recommendations = await generatePDRecommendations(userGoals, skillsForAI, profile as any);
       
       // Clear old recommendations and save new ones
       await storage.clearUserPDRecommendations(userId);
@@ -9000,8 +9008,10 @@ export async function registerRoutes(
           if (studentProgress && studentProgress.educatorUserId !== userId) {
             // Check if student is in educator's organization
             const studentJourney = await storage.getStudentJourneyProgressByUserId(studentId);
-            if (studentJourney && educatorProfile.organizationId && 
-                studentJourney.organizationId !== educatorProfile.organizationId) {
+            const educatorOrgMembership = await storage.getUserOrganizations(userId);
+            const educatorOrgId = educatorOrgMembership.length > 0 ? educatorOrgMembership[0].organizationId : null;
+            if (studentJourney && educatorOrgId && 
+                studentJourney.organizationId !== educatorOrgId) {
               res.status(403).json({ error: "Student not in your organization" });
               return;
             }
@@ -9964,8 +9974,8 @@ export async function registerRoutes(
       const { organizationId } = req.params;
       
       // Verify user has access to this organization
-      const membership = await storage.getOrgMembership(organizationId, userId);
-      if (!membership || !["owner", "admin"].includes(membership.role)) {
+      const membership = await storage.getOrgMembership(organizationId, userId!);
+      if (!membership || !["owner", "admin"].includes(membership.role as string)) {
         res.status(403).json({ error: "Access denied" });
         return;
       }
@@ -10034,8 +10044,8 @@ export async function registerRoutes(
           syncGrades: false,
           syncAttendance: false,
         },
-        metadata: { baseUrl: validated.baseUrl },
-      });
+        metadata: { baseUrl: validated.baseUrl } as any,
+      } as any);
       
       res.json({
         ...connection,
@@ -10080,7 +10090,7 @@ export async function registerRoutes(
       
       const updated = await storage.updateSisConnection(id, {
         providerName: validated.providerName,
-        settings: validated.settings ? { ...connection.settings, ...validated.settings } : undefined,
+        settings: validated.settings ? { ...connection.settings, ...validated.settings } as any : undefined,
       });
       
       if (!updated) {
@@ -10438,8 +10448,8 @@ export async function registerRoutes(
       if (classData.userId !== userId) {
         // Check if user has access through organization membership
         if (classData.organizationId) {
-          const membership = await storage.getOrgMembership(classData.organizationId, userId);
-          if (!membership || !["owner", "admin", "educator"].includes(membership.role)) {
+          const membership = await storage.getOrgMembership(classData.organizationId, userId!);
+          if (!membership || !["owner", "admin", "educator"].includes(membership.role as string)) {
             res.status(403).json({ error: "Access denied to this class" });
             return;
           }

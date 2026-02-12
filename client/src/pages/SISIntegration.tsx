@@ -65,7 +65,7 @@ export default function SISIntegration() {
   const [selectedConnection, setSelectedConnection] = useState<any>(null);
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
 
-  const { data: providers } = useQuery({
+  const { data: providers } = useQuery<Record<string, any>>({
     queryKey: ["/api/integrations/sis/providers"],
   });
 
@@ -86,12 +86,9 @@ export default function SISIntegration() {
 
   const createConnectionMutation = useMutation({
     mutationFn: async (data: ConnectionFormData) => {
-      return await apiRequest("/api/integrations/sis/connections", {
-        method: "POST",
-        body: JSON.stringify({
-          ...data,
-          baseUrl: data.baseUrl || undefined,
-        }),
+      return await apiRequest("POST", "/api/integrations/sis/connections", {
+        ...data,
+        baseUrl: data.baseUrl || undefined,
       });
     },
     onSuccess: () => {
@@ -114,9 +111,7 @@ export default function SISIntegration() {
 
   const testConnectionMutation = useMutation({
     mutationFn: async (connectionId: string) => {
-      return await apiRequest(`/api/integrations/sis/connections/${connectionId}/test`, {
-        method: "POST",
-      });
+      return await apiRequest("POST", `/api/integrations/sis/connections/${connectionId}/test`);
     },
     onSuccess: (data: any) => {
       queryClient.invalidateQueries({ queryKey: ["/api/integrations/sis/connections"] });
@@ -137,10 +132,7 @@ export default function SISIntegration() {
 
   const syncMutation = useMutation({
     mutationFn: async ({ connectionId, syncType }: { connectionId: string; syncType: string }) => {
-      return await apiRequest(`/api/integrations/sis/connections/${connectionId}/sync`, {
-        method: "POST",
-        body: JSON.stringify({ syncType }),
-      });
+      return await apiRequest("POST", `/api/integrations/sis/connections/${connectionId}/sync`, { syncType });
     },
     onSuccess: (data: any) => {
       queryClient.invalidateQueries({ queryKey: ["/api/integrations/sis/connections"] });
@@ -160,9 +152,7 @@ export default function SISIntegration() {
 
   const deleteConnectionMutation = useMutation({
     mutationFn: async (connectionId: string) => {
-      return await apiRequest(`/api/integrations/sis/connections/${connectionId}`, {
-        method: "DELETE",
-      });
+      return await apiRequest("DELETE", `/api/integrations/sis/connections/${connectionId}`);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/integrations/sis/connections"] });
@@ -223,7 +213,7 @@ export default function SISIntegration() {
                           </SelectTrigger>
                         </FormControl>
                         <SelectContent>
-                          {providers && Object.entries(providers).map(([key, info]: [string, any]) => (
+                          {providers && Object.entries(providers as Record<string, any>).map(([key, info]: [string, any]) => (
                             <SelectItem key={key} value={key} data-testid={`option-provider-${key}`}>
                               <div className="flex items-center gap-2">
                                 {providerIcons[key]}
@@ -342,7 +332,7 @@ export default function SISIntegration() {
         <div className="flex items-center justify-center h-64">
           <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
         </div>
-      ) : !connections || connections.length === 0 ? (
+      ) : !connections || (connections as any[]).length === 0 ? (
         <Card>
           <CardContent className="flex flex-col items-center justify-center py-12">
             <School className="h-16 w-16 text-muted-foreground mb-4" />
@@ -358,7 +348,7 @@ export default function SISIntegration() {
         </Card>
       ) : (
         <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-          {connections.map((connection: any) => (
+          {(connections as any[]).map((connection: any) => (
             <Card 
               key={connection.id} 
               className={`cursor-pointer hover-elevate transition-all ${
@@ -375,7 +365,7 @@ export default function SISIntegration() {
                     </div>
                     <div>
                       <CardTitle className="text-base">
-                        {connection.providerName || providers?.[connection.provider]?.name}
+                        {connection.providerName || (providers as any)?.[connection.provider]?.name}
                       </CardTitle>
                       <CardDescription className="text-xs">
                         {connection.districtId || "No district ID"}
@@ -505,7 +495,7 @@ export default function SISIntegration() {
           </CardHeader>
           <CardContent>
             <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-              {providers && Object.entries(providers).map(([key, info]: [string, any]) => (
+              {providers && Object.entries(providers as Record<string, any>).map(([key, info]: [string, any]) => (
                 <div key={key} className="flex items-start gap-3 p-3 rounded-lg bg-muted/50">
                   <div className="p-2 rounded-md bg-background">
                     {providerIcons[key]}
@@ -696,10 +686,7 @@ function SisSettingsTab({ connection }: { connection: any }) {
 
   const updateSettingsMutation = useMutation({
     mutationFn: async (newSettings: any) => {
-      return await apiRequest(`/api/integrations/sis/connections/${connection.id}`, {
-        method: "PATCH",
-        body: JSON.stringify({ settings: newSettings }),
-      });
+      return await apiRequest("PATCH", `/api/integrations/sis/connections/${connection.id}`, { settings: newSettings });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/integrations/sis/connections"] });

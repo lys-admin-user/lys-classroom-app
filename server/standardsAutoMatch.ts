@@ -37,13 +37,13 @@ export async function autoMatchStandards(request: AutoMatchRequest): Promise<Sta
     const searchTerms = extractSearchTerms(topic, objectives);
     
     for (const standard of standards) {
-      const score = calculateMatchScore(standard, searchTerms, subject, gradeLevel);
+      const score = calculateMatchScore(standard as any, searchTerms, subject, gradeLevel);
       
       if (score > 0.3) {
         matches.push({
           standardId: standard.id,
           code: standard.humanCoding || '',
-          description: standard.fullStatement || '',
+          description: (standard as any).fullStatement || standard.statement || '',
           matchScore: score,
           matchReason: getMatchReason(score),
         });
@@ -185,7 +185,7 @@ export async function validateStandardAlignment(
     for (const objective of objectives) {
       const objLower = objective.toLowerCase();
       const isCovered = validStandards.some((std) => {
-        const desc = (std.fullStatement || '').toLowerCase();
+        const desc = ((std as any).fullStatement || std.statement || '').toLowerCase();
         const words = objLower.split(/\s+/).filter(w => w.length > 3);
         return words.some(word => desc.includes(word));
       });

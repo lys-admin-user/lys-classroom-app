@@ -283,7 +283,7 @@ import {
   mentorConnections,
 } from "@shared/schema";
 import { db } from "./db";
-import { eq, desc, and, asc, gte, sql } from "drizzle-orm";
+import { eq, desc, and, asc, gte, sql, or, inArray } from "drizzle-orm";
 import { randomUUID } from "crypto";
 
 export interface IStorage {
@@ -3865,7 +3865,7 @@ export class DatabaseStorage implements IStorage {
       conditions.push(eq(knowResources.featured, filters.featured));
     }
     if (filters?.resourceType) {
-      conditions.push(eq(knowResources.resourceType, filters.resourceType));
+      conditions.push(eq(knowResources.resourceType as any, filters.resourceType));
     }
     if (filters?.category) {
       conditions.push(eq(knowResources.category, filters.category));
@@ -3935,7 +3935,7 @@ export class DatabaseStorage implements IStorage {
 
   async getMatriculationEventsByType(eventType: string): Promise<StudentMatriculationHistory[]> {
     return await db.select().from(studentMatriculationHistory)
-      .where(eq(studentMatriculationHistory.eventType, eventType))
+      .where(eq(studentMatriculationHistory.eventType as any, eventType))
       .orderBy(desc(studentMatriculationHistory.eventDate));
   }
 
@@ -3998,7 +3998,7 @@ export class DatabaseStorage implements IStorage {
   async getSystemAchievements(filters?: { category?: string; isActive?: boolean; isSystemWide?: boolean }): Promise<SystemAchievement[]> {
     let conditions: any[] = [];
     if (filters?.category) {
-      conditions.push(eq(systemAchievements.category, filters.category));
+      conditions.push(eq(systemAchievements.category as any, filters.category));
     }
     if (filters?.isActive !== undefined) {
       conditions.push(eq(systemAchievements.isActive, filters.isActive));
@@ -5700,8 +5700,11 @@ export class DatabaseStorage implements IStorage {
       const avgOverallScore = journeyProgress.length > 0 ? journeyProgress.reduce((sum, p) => sum + p.overallScore, 0) / journeyProgress.length : 0;
       
       let orgName: string | null = null;
-      if (user.organizationId) {
-        const [org] = await db.select().from(organizations).where(eq(organizations.id, user.organizationId));
+      let userOrgId: string | null = null;
+      const userMemberships = await db.select().from(organizationMemberships).where(eq(organizationMemberships.userId, user.id));
+      if (userMemberships.length > 0) {
+        userOrgId = userMemberships[0].organizationId;
+        const [org] = await db.select().from(organizations).where(eq(organizations.id, userOrgId));
         orgName = org?.name || null;
       }
       
@@ -5710,7 +5713,7 @@ export class DatabaseStorage implements IStorage {
         firstName: user.firstName,
         lastName: user.lastName,
         email: user.email,
-        organizationId: user.organizationId,
+        organizationId: userOrgId,
         organizationName: orgName,
         goalsCompleted,
         goalsTotal,
@@ -5733,7 +5736,11 @@ export class DatabaseStorage implements IStorage {
     const metrics: CampusPerformanceMetric[] = [];
     
     for (const org of allOrgs) {
-      const orgUsers = await db.select().from(users).where(eq(users.organizationId, org.id));
+      const orgMembers = await db.select().from(organizationMemberships).where(eq(organizationMemberships.organizationId, org.id));
+      const memberUserIds = orgMembers.map(m => m.userId);
+      const orgUsers = memberUserIds.length > 0
+        ? await db.select().from(users).where(inArray(users.id, memberUserIds))
+        : [];
       const educatorIds = orgUsers.map(u => u.id);
       
       let goalsCompleted = 0;
@@ -5793,13 +5800,17 @@ export class DatabaseStorage implements IStorage {
     const metrics: OrganizationPerformanceMetric[] = [];
     
     for (const org of allOrgs) {
-      const childOrgs = await db.select().from(organizations).where(eq(organizations.parentId, org.id));
+      const childOrgs = await db.select().from(organizations).where(eq(organizations.parentOrganizationId, org.id));
       const campusesCount = childOrgs.filter(o => o.tier === 'campus').length;
       
       const allOrgIds = [org.id, ...childOrgs.map(o => o.id)];
-      const orgUsers = await db.select().from(users).where(
-        sql`${users.organizationId} IN (${allOrgIds.map(id => `'${id}'`).join(',')})`
+      const orgMemberships = await db.select().from(organizationMemberships).where(
+        inArray(organizationMemberships.organizationId, allOrgIds)
       );
+      const orgUserIds = Array.from(new Set(orgMemberships.map(m => m.userId)));
+      const orgUsers = orgUserIds.length > 0 
+        ? await db.select().from(users).where(inArray(users.id, orgUserIds))
+        : [];
       
       const educatorIds = orgUsers.filter(u => ['educator', 'campus_admin', 'district_admin'].includes(u.role || '')).map(u => u.id);
       const studentIds = orgUsers.filter(u => u.role === 'student').map(u => u.id);
@@ -5827,8 +5838,8 @@ export class DatabaseStorage implements IStorage {
       metrics.push({
         organizationId: org.id,
         organizationName: org.name,
-        organizationType: org.type,
-        tier: org.tier,
+        organizationType: org.type || 'school',
+        tier: org.tier || 'campus',
         campusesCount,
         educatorsCount: educatorIds.length,
         studentsCount: studentIds.length,
@@ -5901,7 +5912,7 @@ export class DatabaseStorage implements IStorage {
   }
   
   async createSystemLessonAuthor(author: InsertSystemLessonAuthor): Promise<SystemLessonAuthor> {
-    const [newAuthor] = await db.insert(systemLessonAuthors).values(author).returning();
+    const [newAuthor] = await db.insert(systemLessonAuthors).values(author as any).returning();
     return newAuthor;
   }
   
@@ -5962,7 +5973,7 @@ export class DatabaseStorage implements IStorage {
   }
 
   async createCampusLessonAuthor(author: InsertCampusLessonAuthor): Promise<CampusLessonAuthor> {
-    const [newAuthor] = await db.insert(campusLessonAuthors).values(author).returning();
+    const [newAuthor] = await db.insert(campusLessonAuthors).values(author as any).returning();
     return newAuthor;
   }
 
@@ -6048,7 +6059,7 @@ export class DatabaseStorage implements IStorage {
   }
   
   async createMasterLesson(lesson: InsertMasterLesson): Promise<MasterLesson> {
-    const [newLesson] = await db.insert(masterLessons).values(lesson).returning();
+    const [newLesson] = await db.insert(masterLessons).values(lesson as any).returning();
     return newLesson;
   }
   
@@ -6110,7 +6121,7 @@ export class DatabaseStorage implements IStorage {
     const conditions: any[] = [];
     
     if (filters?.contentType) {
-      conditions.push(eq(contentLibrary.contentType, filters.contentType));
+      conditions.push(eq(contentLibrary.contentType as any, filters.contentType));
     }
     if (filters?.isActive !== undefined) {
       conditions.push(eq(contentLibrary.isActive, filters.isActive));
@@ -6128,7 +6139,7 @@ export class DatabaseStorage implements IStorage {
   }
   
   async createContentLibraryItem(item: InsertContentLibrary): Promise<ContentLibraryItem> {
-    const [newItem] = await db.insert(contentLibrary).values(item).returning();
+    const [newItem] = await db.insert(contentLibrary).values(item as any).returning();
     return newItem;
   }
   
@@ -6174,7 +6185,7 @@ export class DatabaseStorage implements IStorage {
   }
   
   async createLessonBulkImport(importRecord: InsertLessonBulkImport): Promise<LessonBulkImport> {
-    const [newImport] = await db.insert(lessonBulkImports).values(importRecord).returning();
+    const [newImport] = await db.insert(lessonBulkImports).values(importRecord as any).returning();
     return newImport;
   }
   
@@ -6221,7 +6232,7 @@ export class DatabaseStorage implements IStorage {
   }
   
   async createQuestionBankItem(item: InsertQuestionBank): Promise<QuestionBank> {
-    const [newItem] = await db.insert(questionBanks).values(item).returning();
+    const [newItem] = await db.insert(questionBanks).values(item as any).returning();
     return newItem;
   }
   
@@ -6263,7 +6274,7 @@ export class DatabaseStorage implements IStorage {
   }
   
   async createAuthorQualityMetrics(metrics: InsertAuthorQualityMetrics): Promise<AuthorQualityMetrics> {
-    const [newMetrics] = await db.insert(authorQualityMetrics).values(metrics).returning();
+    const [newMetrics] = await db.insert(authorQualityMetrics).values(metrics as any).returning();
     return newMetrics;
   }
   
@@ -6286,7 +6297,7 @@ export class DatabaseStorage implements IStorage {
   }
   
   async createAssignmentAlignment(alignment: InsertAssignmentAlignment): Promise<AssignmentAlignment> {
-    const [newAlignment] = await db.insert(assignmentAlignments).values(alignment).returning();
+    const [newAlignment] = await db.insert(assignmentAlignments).values(alignment as any).returning();
     return newAlignment;
   }
   
@@ -6338,7 +6349,7 @@ export class DatabaseStorage implements IStorage {
   }
 
   async createStudentNarrative(narrative: InsertStudentNarrative): Promise<StudentNarrative> {
-    const [newNarrative] = await db.insert(studentNarratives).values(narrative).returning();
+    const [newNarrative] = await db.insert(studentNarratives).values(narrative as any).returning();
     return newNarrative;
   }
 
@@ -6364,7 +6375,7 @@ export class DatabaseStorage implements IStorage {
   }
 
   async createStrength(strength: InsertStrengthsInventory): Promise<StrengthsInventory> {
-    const [newStrength] = await db.insert(strengthsInventory).values(strength).returning();
+    const [newStrength] = await db.insert(strengthsInventory).values(strength as any).returning();
     return newStrength;
   }
 
@@ -6390,7 +6401,7 @@ export class DatabaseStorage implements IStorage {
   }
 
   async createCampusActivity(activity: InsertCampusActivity): Promise<CampusActivity> {
-    const [newActivity] = await db.insert(campusActivities).values(activity).returning();
+    const [newActivity] = await db.insert(campusActivities).values(activity as any).returning();
     return newActivity;
   }
 
@@ -6422,7 +6433,7 @@ export class DatabaseStorage implements IStorage {
   }
 
   async createScholarshipApplication(app: InsertScholarshipApplication): Promise<ScholarshipApplication> {
-    const [newApp] = await db.insert(scholarshipApplications).values(app).returning();
+    const [newApp] = await db.insert(scholarshipApplications).values(app as any).returning();
     return newApp;
   }
 
@@ -6468,7 +6479,7 @@ export class DatabaseStorage implements IStorage {
   }
 
   async createMentorProfile(profile: InsertMentorProfile): Promise<MentorProfile> {
-    const [newProfile] = await db.insert(mentorProfiles).values(profile).returning();
+    const [newProfile] = await db.insert(mentorProfiles).values(profile as any).returning();
     return newProfile;
   }
 

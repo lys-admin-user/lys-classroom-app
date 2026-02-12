@@ -144,7 +144,7 @@ const getAutoInterests = (role: string, primaryGoal: string): string[] => {
   if (primaryGoal === "lessons") interests.push("ai-lessons", "resources");
   if (primaryGoal === "curriculum") interests.push("scope-sequence", "analytics");
   
-  return [...new Set(interests)];
+  return Array.from(new Set(interests));
 };
 
 const GRADE_LEVELS = [

@@ -538,13 +538,13 @@ export default function StandardsAdmin() {
                                   {staging.humanCoding}
                                 </Badge>
                                 <Badge variant="secondary">
-                                  {staging.sourceType}
+                                  {(staging as any).sourceType || staging.source}
                                 </Badge>
                               </div>
                               <p className="text-sm text-foreground">{staging.statement}</p>
-                              {staging.jurisdictionName && (
+                              {(staging as any).jurisdictionName && (
                                 <p className="text-xs text-muted-foreground mt-1">
-                                  {staging.jurisdictionName} {staging.subject && `• ${staging.subject}`}
+                                  {(staging as any).jurisdictionName} {(staging as any).subject && `• ${(staging as any).subject}`}
                                 </p>
                               )}
                             </div>

@@ -2,6 +2,7 @@ import { WebSocketServer, WebSocket } from "ws";
 import { Server, IncomingMessage } from "http";
 import { storage } from "./storage";
 import { randomUUID } from "crypto";
+// @ts-ignore
 import { parse as parseCookie } from "cookie";
 
 interface CollaborationClient {

@@ -518,7 +518,7 @@ export default function MyLessons() {
                     <div className="flex items-start justify-between gap-2">
                       <CardTitle className="font-oswald text-lg">{assignment.title}</CardTitle>
                       {assignment.accommodationModified && (
-                        <Badge variant="outline">{assignment.accommodationType}</Badge>
+                        <Badge variant="outline">{(assignment as any).accommodationType || assignment.accommodationTypes}</Badge>
                       )}
                     </div>
                     <CardDescription className="line-clamp-2">{assignment.description}</CardDescription>

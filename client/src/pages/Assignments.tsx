@@ -96,7 +96,7 @@ export default function Assignments() {
 
   const isPaidUser = user?.tier === "pro" || user?.tier === "campus";
   const isStudent = user?.role === "student";
-  const isParent = user?.role === "parent";
+  const isParent = (user?.role as any) === "parent";
   const [isEditing, setIsEditing] = useState(false);
 
   const [manualTitle, setManualTitle] = useState("");

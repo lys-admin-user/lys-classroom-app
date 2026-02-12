@@ -488,8 +488,8 @@ export default function ActionPlans() {
                               >
                                 {milestone.title}
                               </span>
-                              {milestone.reflection && (
-                                <MessageSquare className="h-3 w-3 text-lys-yellow" title="Has reflection" />
+                              {(milestone as any).reflection && (
+                                <MessageSquare className="h-3 w-3 text-lys-yellow" />
                               )}
                             </li>
                           ))}
