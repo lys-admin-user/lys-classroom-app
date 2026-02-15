@@ -26,7 +26,8 @@ import {
   Wrench,
   Clock,
   CheckCircle,
-  AlertCircle
+  AlertCircle,
+  Globe
 } from "lucide-react";
 import type { Resource } from "@shared/schema";
 import { useTier } from "@/hooks/use-tier";
@@ -69,6 +70,7 @@ const categoryConfig = {
   career: { label: "Career Planning", icon: Briefcase },
   military: { label: "Military Pathways", icon: Shield },
   life_skills: { label: "Life Skills", icon: Lightbulb },
+  international: { label: "International Students", icon: Globe },
 };
 
 type DisplayResource = {
@@ -95,6 +97,7 @@ function normalizeKnowResource(kr: KnowResourceData): DisplayResource {
   const mapCategory = (cat: string | null): string => {
     if (!cat) return "college";
     const lower = cat.toLowerCase();
+    if (lower === "international" || lower === "study abroad" || lower === "global") return "international";
     if (lower === "general") return "college";
     if (lower === "stem" || lower === "agriculture") return "career";
     if (lower === "business") return "career";
@@ -413,7 +416,7 @@ export default function Resources() {
           </div>
         )}
 
-        <div className="mt-12 grid md:grid-cols-2 gap-6">
+        <div className="mt-12 grid md:grid-cols-3 gap-6">
           <Card className="bg-gradient-to-br from-lys-yellow/10 to-lys-red/10 border-lys-yellow/20">
             <CardContent className="p-6">
               <div className="flex items-center gap-4 mb-4">
@@ -428,7 +431,7 @@ export default function Resources() {
               <p className="font-roboto text-sm text-muted-foreground mb-4">
                 Understanding budgeting, saving, and investing early sets you up for lifelong financial success.
               </p>
-              <Button variant="outline" className="font-oswald gap-2 border-lys-yellow text-lys-yellow hover:bg-lys-yellow/10" onClick={() => { setSelectedCategory("financial"); window.scrollTo({ top: 0, behavior: "smooth" }); }} data-testid="button-explore-financial">
+              <Button variant="outline" className="font-oswald gap-2 border-lys-yellow text-lys-yellow" onClick={() => { setSelectedCategory("financial"); window.scrollTo({ top: 0, behavior: "smooth" }); }} data-testid="button-explore-financial">
                 Explore Guides
                 <ArrowRight className="h-4 w-4" />
               </Button>
@@ -449,8 +452,29 @@ export default function Resources() {
               <p className="font-roboto text-sm text-muted-foreground mb-4">
                 Explore military career options, benefits, and educational opportunities through service.
               </p>
-              <Button variant="outline" className="font-oswald gap-2 border-lys-teal text-lys-teal hover:bg-lys-teal/10" onClick={() => { setSelectedCategory("military"); window.scrollTo({ top: 0, behavior: "smooth" }); }} data-testid="button-explore-military">
+              <Button variant="outline" className="font-oswald gap-2 border-lys-teal text-lys-teal" onClick={() => { setSelectedCategory("military"); window.scrollTo({ top: 0, behavior: "smooth" }); }} data-testid="button-explore-military">
                 Learn More
+                <ArrowRight className="h-4 w-4" />
+              </Button>
+            </CardContent>
+          </Card>
+
+          <Card className="bg-gradient-to-br from-blue-500/10 to-indigo-500/10 border-blue-500/20 dark:border-blue-800/30">
+            <CardContent className="p-6">
+              <div className="flex items-center gap-4 mb-4">
+                <div className="w-12 h-12 rounded-md bg-blue-500/20 flex items-center justify-center">
+                  <Globe className="h-6 w-6 text-blue-600 dark:text-blue-400" />
+                </div>
+                <div>
+                  <h3 className="font-oswald text-lg font-semibold">International Students</h3>
+                  <p className="text-sm text-muted-foreground font-roboto">Global opportunities await</p>
+                </div>
+              </div>
+              <p className="font-roboto text-sm text-muted-foreground mb-4">
+                Discover scholarships, exchange programs, government-funded opportunities, and resources for studying abroad.
+              </p>
+              <Button variant="outline" className="font-oswald gap-2 border-blue-500 text-blue-600 dark:text-blue-400" onClick={() => { setSelectedCategory("international"); window.scrollTo({ top: 0, behavior: "smooth" }); }} data-testid="button-explore-international">
+                Explore Opportunities
                 <ArrowRight className="h-4 w-4" />
               </Button>
             </CardContent>

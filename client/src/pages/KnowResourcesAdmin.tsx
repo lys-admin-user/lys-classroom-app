@@ -41,6 +41,7 @@ const CATEGORIES = [
   "Mathematics",
   "Financial Literacy",
   "Scholarships",
+  "International",
 ];
 
 const TARGET_AUDIENCES = ["students", "educators", "parents"];
