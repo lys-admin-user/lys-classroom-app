@@ -2866,3 +2866,24 @@ export const STRENGTH_CATEGORIES = [
 ] as const;
 export type StrengthCategory = typeof STRENGTH_CATEGORIES[number];
 
+// Pricing Tiers - Admin-managed pricing configuration
+export const pricingTiers = pgTable("pricing_tiers", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  tierId: text("tier_id").notNull().unique(), // free, pro, campus, enterprise
+  name: text("name").notNull(),
+  basePrice: integer("base_price").notNull().default(0), // in cents
+  period: text("period").notNull().default("/month"), // /month, /year, forever
+  description: text("description"),
+  features: jsonb("features").$type<string[]>().default([]),
+  isActive: boolean("is_active").default(true),
+  maxStudentsPerClass: integer("max_students_per_class"),
+  maxAiLessons: integer("max_ai_lessons"), // null = unlimited
+  includesAds: boolean("includes_ads").default(false),
+  updatedAt: timestamp("updated_at").defaultNow(),
+  updatedBy: text("updated_by"),
+});
+
+export const insertPricingTierSchema = createInsertSchema(pricingTiers).omit({ id: true, updatedAt: true });
+export type InsertPricingTier = z.infer<typeof insertPricingTierSchema>;
+export type PricingTier = typeof pricingTiers.$inferSelect;
+

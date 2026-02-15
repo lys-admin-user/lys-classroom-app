@@ -19,7 +19,7 @@ import {
   TrendingUp, CreditCard, Share2, BookOpen, Target, UserCheck, 
   Eye, Edit2, Search, ChevronRight, Map, GraduationCap, DollarSign,
   Activity, Globe, FileText, Award, Zap, ExternalLink, UserCog, Library, Plus,
-  Server, Database, Cpu, HardDrive, Wifi, Lock, Monitor, Code2, Layers
+  Server, Database, Cpu, HardDrive, Wifi, Lock, Monitor, Code2, Layers, Check
 } from "lucide-react";
 import type { Organization, User as UserType, Lesson } from "@shared/schema";
 
@@ -102,6 +102,10 @@ export default function SystemAdminPage() {
   const [selectedUser, setSelectedUser] = useState<UserType | null>(null);
   const [editUserOpen, setEditUserOpen] = useState(false);
   const [editUserData, setEditUserData] = useState<Partial<UserType>>({});
+  const [createUserOpen, setCreateUserOpen] = useState(false);
+  const [newUserData, setNewUserData] = useState({ email: "", firstName: "", lastName: "", role: "student", tier: "free" });
+  const [editPricingOpen, setEditPricingOpen] = useState(false);
+  const [editingTier, setEditingTier] = useState<{ tierId: string; name: string; basePrice: number; period: string; description: string; isActive: boolean } | null>(null);
   const [addJurisdictionOpen, setAddJurisdictionOpen] = useState(false);
   const [newJurisdiction, setNewJurisdiction] = useState({ country: 'United States', name: '', abbreviation: '', standardsName: '' });
 
@@ -144,6 +148,40 @@ export default function SystemAdminPage() {
   const { data: organizations = [] } = useQuery<Organization[]>({
     queryKey: ["/api/admin/organizations"],
     enabled: adminCheck?.isSiteAdmin,
+  });
+
+  interface PricingTierData {
+    id: string;
+    tierId: string;
+    name: string;
+    basePrice: number;
+    period: string;
+    description: string | null;
+    features: string[];
+    isActive: boolean | null;
+    maxStudentsPerClass: number | null;
+    maxAiLessons: number | null;
+    includesAds: boolean | null;
+    updatedAt: string | null;
+    updatedBy: string | null;
+  }
+
+  const { data: pricingTiersData = [], isLoading: pricingLoading } = useQuery<PricingTierData[]>({
+    queryKey: ["/api/admin/pricing-tiers"],
+    enabled: adminCheck?.isSiteAdmin && activeTab === "billing",
+  });
+
+  const updatePricingMutation = useMutation({
+    mutationFn: async ({ tierId, updates }: { tierId: string; updates: Partial<PricingTierData> }) => {
+      return await apiRequest("PATCH", `/api/admin/pricing-tiers/${tierId}`, updates);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/pricing-tiers"] });
+      toast({ title: "Pricing updated successfully" });
+    },
+    onError: () => {
+      toast({ title: "Failed to update pricing", variant: "destructive" });
+    },
   });
 
   const { data: jurisdictions = [], isLoading: jurisdictionsLoading } = useQuery<{
@@ -198,6 +236,22 @@ export default function SystemAdminPage() {
     },
     onError: () => {
       toast({ title: "Failed to delete user", variant: "destructive" });
+    },
+  });
+
+  const createUserMutation = useMutation({
+    mutationFn: async (data: { email: string; firstName: string; lastName: string; role: string; tier: string }) => {
+      return await apiRequest("POST", "/api/admin/users", data);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/users"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/analytics"] });
+      setCreateUserOpen(false);
+      setNewUserData({ email: "", firstName: "", lastName: "", role: "student", tier: "free" });
+      toast({ title: "User created successfully" });
+    },
+    onError: (error: any) => {
+      toast({ title: error?.message || "Failed to create user", variant: "destructive" });
     },
   });
 
@@ -562,6 +616,9 @@ export default function SystemAdminPage() {
                 <SelectItem value="student">Student</SelectItem>
                 <SelectItem value="educator">Educator</SelectItem>
                 <SelectItem value="campus_admin">Campus Admin</SelectItem>
+                <SelectItem value="district_admin">District Admin</SelectItem>
+                <SelectItem value="site_admin">Site Admin</SelectItem>
+                <SelectItem value="system_admin">System Admin</SelectItem>
               </SelectContent>
             </Select>
             <Select value={userTierFilter} onValueChange={setUserTierFilter}>
@@ -576,6 +633,10 @@ export default function SystemAdminPage() {
                 <SelectItem value="enterprise">Enterprise</SelectItem>
               </SelectContent>
             </Select>
+            <Button onClick={() => setCreateUserOpen(true)} data-testid="button-create-user">
+              <Plus className="h-4 w-4 mr-2" />
+              Create User
+            </Button>
           </div>
 
           {usersLoading ? (
@@ -696,6 +757,9 @@ export default function SystemAdminPage() {
                         <SelectItem value="student">Student</SelectItem>
                         <SelectItem value="educator">Educator</SelectItem>
                         <SelectItem value="campus_admin">Campus Admin</SelectItem>
+                        <SelectItem value="district_admin">District Admin</SelectItem>
+                        <SelectItem value="site_admin">Site Admin</SelectItem>
+                        <SelectItem value="system_admin">System Admin</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
@@ -724,6 +788,90 @@ export default function SystemAdminPage() {
                 >
                   {updateUserMutation.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
                   Save Changes
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
+
+          <Dialog open={createUserOpen} onOpenChange={setCreateUserOpen}>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>Create New User</DialogTitle>
+                <DialogDescription>Add a new user to the platform with a specific role and tier</DialogDescription>
+              </DialogHeader>
+              <div className="grid gap-4 py-4">
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="grid gap-2">
+                    <Label>First Name</Label>
+                    <Input
+                      value={newUserData.firstName}
+                      onChange={(e) => setNewUserData({ ...newUserData, firstName: e.target.value })}
+                      placeholder="Enter first name"
+                      data-testid="input-create-first-name"
+                    />
+                  </div>
+                  <div className="grid gap-2">
+                    <Label>Last Name</Label>
+                    <Input
+                      value={newUserData.lastName}
+                      onChange={(e) => setNewUserData({ ...newUserData, lastName: e.target.value })}
+                      placeholder="Enter last name"
+                      data-testid="input-create-last-name"
+                    />
+                  </div>
+                </div>
+                <div className="grid gap-2">
+                  <Label>Email</Label>
+                  <Input
+                    type="email"
+                    value={newUserData.email}
+                    onChange={(e) => setNewUserData({ ...newUserData, email: e.target.value })}
+                    placeholder="user@example.com"
+                    data-testid="input-create-email"
+                  />
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="grid gap-2">
+                    <Label>Role</Label>
+                    <Select value={newUserData.role} onValueChange={(v) => setNewUserData({ ...newUserData, role: v })}>
+                      <SelectTrigger data-testid="select-create-role">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="student">Student</SelectItem>
+                        <SelectItem value="educator">Educator</SelectItem>
+                        <SelectItem value="campus_admin">Campus Admin</SelectItem>
+                        <SelectItem value="district_admin">District Admin</SelectItem>
+                        <SelectItem value="site_admin">Site Admin</SelectItem>
+                        <SelectItem value="system_admin">System Admin</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="grid gap-2">
+                    <Label>Tier</Label>
+                    <Select value={newUserData.tier} onValueChange={(v) => setNewUserData({ ...newUserData, tier: v })}>
+                      <SelectTrigger data-testid="select-create-tier">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="free">Free</SelectItem>
+                        <SelectItem value="pro">Pro</SelectItem>
+                        <SelectItem value="campus">Campus</SelectItem>
+                        <SelectItem value="enterprise">Enterprise</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+              </div>
+              <DialogFooter>
+                <Button variant="outline" onClick={() => setCreateUserOpen(false)}>Cancel</Button>
+                <Button
+                  onClick={() => createUserMutation.mutate(newUserData)}
+                  disabled={createUserMutation.isPending || !newUserData.email || !newUserData.firstName || !newUserData.lastName}
+                  data-testid="button-submit-create-user"
+                >
+                  {createUserMutation.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+                  Create User
                 </Button>
               </DialogFooter>
             </DialogContent>
@@ -958,6 +1106,168 @@ export default function SystemAdminPage() {
               )}
             </CardContent>
           </Card>
+
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between gap-4">
+              <div>
+                <CardTitle className="text-lg">Pricing Tiers</CardTitle>
+                <CardDescription>Manage subscription pricing and features</CardDescription>
+              </div>
+            </CardHeader>
+            <CardContent>
+              {pricingLoading ? (
+                <div className="flex items-center justify-center py-8">
+                  <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+                </div>
+              ) : pricingTiersData.length === 0 ? (
+                <p className="text-center text-muted-foreground py-4">No pricing tiers configured</p>
+              ) : (
+                <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+                  {pricingTiersData.map((tier) => (
+                    <div key={tier.tierId} className={`rounded-md border p-4 space-y-3 ${!tier.isActive ? 'opacity-60' : ''}`} data-testid={`card-pricing-${tier.tierId}`}>
+                      <div className="flex items-center justify-between gap-2">
+                        <h3 className="font-oswald text-lg font-bold">{tier.name}</h3>
+                        {!tier.isActive && <Badge variant="outline">Inactive</Badge>}
+                      </div>
+                      <div className="text-2xl font-bold">
+                        {tier.basePrice === 0 ? 'Free' : `$${(tier.basePrice / 100).toFixed(2)}`}
+                        {tier.basePrice > 0 && <span className="text-sm font-normal text-muted-foreground">/{tier.period}</span>}
+                      </div>
+                      {tier.description && <p className="text-sm text-muted-foreground">{tier.description}</p>}
+                      <div className="space-y-1">
+                        {tier.features?.slice(0, 3).map((feature, i) => (
+                          <p key={i} className="text-xs text-muted-foreground flex items-center gap-1">
+                            <Check className="h-3 w-3 text-green-500 shrink-0" /> {feature}
+                          </p>
+                        ))}
+                        {tier.features && tier.features.length > 3 && (
+                          <p className="text-xs text-muted-foreground">+{tier.features.length - 3} more</p>
+                        )}
+                      </div>
+                      <div className="grid grid-cols-2 gap-2 pt-2 border-t text-xs text-muted-foreground">
+                        <div>Students: {tier.maxStudentsPerClass ?? 'Unlimited'}</div>
+                        <div>AI Lessons: {tier.maxAiLessons ?? 'Unlimited'}</div>
+                        <div>Ads: {tier.includesAds ? 'Yes' : 'No'}</div>
+                      </div>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="w-full"
+                        data-testid={`button-edit-pricing-${tier.tierId}`}
+                        onClick={() => {
+                          setEditingTier({
+                            tierId: tier.tierId,
+                            name: tier.name,
+                            basePrice: tier.basePrice / 100,
+                            period: tier.period,
+                            description: tier.description || '',
+                            isActive: tier.isActive !== false,
+                          });
+                          setEditPricingOpen(true);
+                        }}
+                      >
+                        Edit Pricing
+                      </Button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          <Dialog open={editPricingOpen} onOpenChange={setEditPricingOpen}>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>Edit Pricing Tier</DialogTitle>
+                <DialogDescription>Update the pricing and settings for {editingTier?.name}</DialogDescription>
+              </DialogHeader>
+              {editingTier && (
+                <div className="grid gap-4 py-4">
+                  <div className="grid gap-2">
+                    <Label>Tier Name</Label>
+                    <Input
+                      value={editingTier.name}
+                      onChange={(e) => setEditingTier({ ...editingTier, name: e.target.value })}
+                      data-testid="input-pricing-name"
+                    />
+                  </div>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="grid gap-2">
+                      <Label>Price (USD)</Label>
+                      <Input
+                        type="number"
+                        step="0.01"
+                        min="0"
+                        value={editingTier.basePrice}
+                        onChange={(e) => setEditingTier({ ...editingTier, basePrice: parseFloat(e.target.value) || 0 })}
+                        data-testid="input-pricing-price"
+                      />
+                    </div>
+                    <div className="grid gap-2">
+                      <Label>Period</Label>
+                      <Select value={editingTier.period} onValueChange={(v) => setEditingTier({ ...editingTier, period: v })}>
+                        <SelectTrigger data-testid="select-pricing-period">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="monthly">Monthly</SelectItem>
+                          <SelectItem value="yearly">Yearly</SelectItem>
+                          <SelectItem value="lifetime">Lifetime</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+                  <div className="grid gap-2">
+                    <Label>Description</Label>
+                    <Input
+                      value={editingTier.description}
+                      onChange={(e) => setEditingTier({ ...editingTier, description: e.target.value })}
+                      placeholder="Brief description"
+                      data-testid="input-pricing-description"
+                    />
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Button
+                      variant={editingTier.isActive ? "default" : "outline"}
+                      size="sm"
+                      onClick={() => setEditingTier({ ...editingTier, isActive: !editingTier.isActive })}
+                      data-testid="button-pricing-active-toggle"
+                    >
+                      {editingTier.isActive ? 'Active' : 'Inactive'}
+                    </Button>
+                    <span className="text-sm text-muted-foreground">
+                      {editingTier.isActive ? 'Tier is visible to users' : 'Tier is hidden from users'}
+                    </span>
+                  </div>
+                </div>
+              )}
+              <DialogFooter>
+                <Button variant="outline" onClick={() => setEditPricingOpen(false)}>Cancel</Button>
+                <Button
+                  onClick={() => {
+                    if (editingTier) {
+                      updatePricingMutation.mutate({
+                        tierId: editingTier.tierId,
+                        updates: {
+                          name: editingTier.name,
+                          basePrice: Math.round(editingTier.basePrice * 100),
+                          period: editingTier.period,
+                          description: editingTier.description || null,
+                          isActive: editingTier.isActive,
+                        },
+                      });
+                      setEditPricingOpen(false);
+                    }
+                  }}
+                  disabled={updatePricingMutation.isPending}
+                  data-testid="button-save-pricing"
+                >
+                  {updatePricingMutation.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+                  Save Changes
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
         </TabsContent>
 
         <TabsContent value="standards" className="space-y-4">

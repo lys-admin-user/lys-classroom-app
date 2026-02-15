@@ -28,6 +28,7 @@ import {
   referralEvents,
   standardsJurisdictions,
   authorities as authoritiesTable,
+  pricingTiers,
 } from "@shared/schema";
 import { z } from "zod";
 import { setupAuth, registerAuthRoutes, isAuthenticated } from "./replit_integrations/auth";
@@ -6727,6 +6728,54 @@ export async function registerRoutes(
     }
   });
 
+  // Create user (site admin only)
+  app.post("/api/admin/users", isAuthenticated, isSiteAdmin, async (req: any, res) => {
+    try {
+      const { email, firstName, lastName, role, tier } = req.body;
+      
+      if (!email || !firstName || !lastName) {
+        res.status(400).json({ error: "Email, first name, and last name are required" });
+        return;
+      }
+
+      const validRoles = ["student", "educator", "campus_admin", "district_admin", "site_admin", "system_admin"];
+      if (role && !validRoles.includes(role)) {
+        res.status(400).json({ error: "Invalid role" });
+        return;
+      }
+
+      const validTiers = ["free", "pro", "campus", "enterprise"];
+      if (tier && !validTiers.includes(tier)) {
+        res.status(400).json({ error: "Invalid tier" });
+        return;
+      }
+
+      const existingUsers = await db.select().from(users).where(eq(users.email, email));
+      if (existingUsers.length > 0) {
+        res.status(409).json({ error: "A user with this email already exists" });
+        return;
+      }
+
+      const userId = randomUUID();
+      const [newUser] = await db.insert(users).values({
+        id: userId,
+        email,
+        firstName,
+        lastName,
+        role: role || "student",
+        tier: tier || "free",
+        onboardingCompleted: false,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      }).returning();
+
+      res.json(newUser);
+    } catch (error) {
+      console.error("Failed to create user:", error);
+      res.status(500).json({ error: "Failed to create user" });
+    }
+  });
+
   // Impersonate user (site admin only) - creates a session token
   app.post("/api/admin/users/:id/impersonate", isAuthenticated, isSiteAdmin, async (req: any, res) => {
     try {
@@ -7832,6 +7881,53 @@ export async function registerRoutes(
     } catch (error) {
       console.error("Failed to calculate CAI pricing:", error);
       res.status(500).json({ error: "Failed to calculate CAI pricing" });
+    }
+  });
+
+  // ================================
+  // Pricing Tiers Management (System Admin)
+  // ================================
+
+  app.get("/api/admin/pricing-tiers", isAuthenticated, isSiteAdmin, async (req: any, res) => {
+    try {
+      const tiers = await db.select().from(pricingTiers).orderBy(pricingTiers.basePrice);
+      res.json(tiers);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch pricing tiers" });
+    }
+  });
+
+  app.patch("/api/admin/pricing-tiers/:tierId", isAuthenticated, isSiteAdmin, async (req: any, res) => {
+    try {
+      const { tierId } = req.params;
+      const adminId = req.user?.claims?.sub;
+      const { name, basePrice, period, description, features, isActive, maxStudentsPerClass, maxAiLessons, includesAds } = req.body;
+
+      const updates: any = { updatedAt: new Date(), updatedBy: adminId };
+      if (name !== undefined) updates.name = name;
+      if (basePrice !== undefined) updates.basePrice = basePrice;
+      if (period !== undefined) updates.period = period;
+      if (description !== undefined) updates.description = description;
+      if (features !== undefined) updates.features = features;
+      if (isActive !== undefined) updates.isActive = isActive;
+      if (maxStudentsPerClass !== undefined) updates.maxStudentsPerClass = maxStudentsPerClass;
+      if (maxAiLessons !== undefined) updates.maxAiLessons = maxAiLessons;
+      if (includesAds !== undefined) updates.includesAds = includesAds;
+
+      const [updated] = await db.update(pricingTiers)
+        .set(updates)
+        .where(eq(pricingTiers.tierId, tierId))
+        .returning();
+
+      if (!updated) {
+        res.status(404).json({ error: "Pricing tier not found" });
+        return;
+      }
+
+      res.json(updated);
+    } catch (error) {
+      console.error("Failed to update pricing tier:", error);
+      res.status(500).json({ error: "Failed to update pricing tier" });
     }
   });
 
