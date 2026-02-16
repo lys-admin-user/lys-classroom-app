@@ -13,7 +13,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Checkbox } from "@/components/ui/checkbox";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
-import { Plus, ArrowLeft, Calendar, BookOpen, Target, Trash2, Edit, ChevronRight, Save, Clock, GraduationCap, CheckCircle, FileText, BookMarked } from "lucide-react";
+import { Progress } from "@/components/ui/progress";
+import { Plus, ArrowLeft, Calendar, BookOpen, Target, Trash2, Edit, ChevronRight, Save, Clock, GraduationCap, CheckCircle, FileText, BookMarked, AlertTriangle, TrendingUp, Loader2 } from "lucide-react";
 import { useAuth } from "@/hooks/use-auth";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
@@ -238,6 +239,81 @@ export default function ScopeEditor() {
         ?.standards || []
     : [];
 
+  const syncStandardsMutation = useMutation({
+    mutationFn: async () => {
+      const response = await apiRequest("POST", `/api/scopes/${id}/sync-standards`);
+      return await response.json();
+    },
+    onSuccess: (data: any) => {
+      toast({
+        title: "Standards synced to your profile",
+        description: `${data.count || 0} standard codes saved to your profile settings.`,
+      });
+    },
+    onError: () => {
+      toast({ title: "Failed to sync standards", variant: "destructive" });
+    },
+  });
+
+  const getSchoolYearDates = (schoolYear: string) => {
+    const parts = schoolYear.split("-");
+    const startYear = parseInt(parts[0]);
+    if (isNaN(startYear)) return null;
+    const start = new Date(startYear, 7, 12);
+    const end = new Date(startYear + 1, 4, 23);
+    return { start, end };
+  };
+
+  const getCurrentWeek = (scope: ScopeSequence): number | null => {
+    const dates = getSchoolYearDates(scope.schoolYear);
+    if (!dates) return null;
+    const now = new Date();
+    if (now < dates.start) return 0;
+    if (now > dates.end) return (scope.totalWeeks || 36) + 1;
+    const msPerWeek = 7 * 24 * 60 * 60 * 1000;
+    const weeksSinceStart = Math.ceil((now.getTime() - dates.start.getTime()) / msPerWeek);
+    return Math.min(weeksSinceStart, scope.totalWeeks || 36);
+  };
+
+  type UnitPacingStatus = "completed" | "current" | "upcoming";
+
+  const getUnitStatus = (unit: SequenceUnit, currentWeek: number | null): UnitPacingStatus => {
+    if (currentWeek === null || currentWeek === 0) return "upcoming";
+    if (currentWeek >= unit.startWeek && currentWeek <= unit.endWeek) return "current";
+    if (currentWeek > unit.endWeek) return "completed";
+    return "upcoming";
+  };
+
+  const currentWeek = data?.scope ? getCurrentWeek(data.scope) : null;
+  const totalWeeks = data?.scope?.totalWeeks || 36;
+  const progressPercent = currentWeek !== null ? Math.min(100, Math.max(0, (currentWeek / totalWeeks) * 100)) : 0;
+
+  const currentUnit = data?.units?.find(u => {
+    const status = getUnitStatus(u, currentWeek);
+    return status === "current";
+  });
+
+  const completedUnits = data?.units?.filter(u => getUnitStatus(u, currentWeek) === "completed").length || 0;
+  const totalUnits = data?.units?.length || 0;
+
+  const getOverallStatus = (): { label: string; color: string; icon: typeof CheckCircle } => {
+    if (currentWeek === null || !data?.units?.length) return { label: "Not Started", color: "text-muted-foreground", icon: Clock };
+    if (currentWeek === 0) return { label: "School Year Hasn't Started", color: "text-muted-foreground", icon: Clock };
+    if (currentWeek > totalWeeks) return { label: "School Year Complete", color: "text-green-600", icon: CheckCircle };
+    if (currentUnit) return { label: "On Track", color: "text-green-600", icon: CheckCircle };
+    const upcomingUnits = data.units.filter(u => getUnitStatus(u, currentWeek) === "upcoming");
+    if (upcomingUnits.length > 0 && completedUnits === totalUnits - upcomingUnits.length) {
+      return { label: "On Track", color: "text-green-600", icon: CheckCircle };
+    }
+    return { label: "Review Pacing", color: "text-yellow-600", icon: AlertTriangle };
+  };
+
+  const overallStatus = getOverallStatus();
+  const OverallIcon = overallStatus.icon;
+
+  const allScopeStandards = data?.units?.flatMap(u => (u.standardCodes as { code: string; description: string }[]) || [])
+    .filter((std, i, arr) => arr.findIndex(s => s.code === std.code) === i) || [];
+
   if (isLoading) {
     return (
       <div className="min-h-screen bg-background p-6">
@@ -296,6 +372,91 @@ export default function ScopeEditor() {
             </Button>
           )}
         </div>
+
+        {units.length > 0 && currentWeek !== null && (
+          <Card data-testid="card-pacing-tracker">
+            <CardHeader className="pb-2">
+              <div className="flex items-center justify-between gap-4 flex-wrap">
+                <CardTitle className="font-oswald flex items-center gap-2">
+                  <TrendingUp className="h-5 w-5 text-lys-teal" />
+                  Pacing Tracker
+                </CardTitle>
+                <div className="flex items-center gap-2">
+                  <OverallIcon className={`h-4 w-4 ${overallStatus.color}`} />
+                  <span className={`text-sm font-medium ${overallStatus.color}`} data-testid="text-pacing-status">
+                    {overallStatus.label}
+                  </span>
+                </div>
+              </div>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="space-y-2">
+                <div className="flex items-center justify-between text-sm">
+                  <span className="text-muted-foreground">
+                    Week {Math.min(currentWeek, totalWeeks)} of {totalWeeks}
+                  </span>
+                  <span className="font-medium">{Math.round(progressPercent)}% of school year</span>
+                </div>
+                <Progress value={progressPercent} className="h-2" />
+              </div>
+
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                <div className="rounded-md border p-3 text-center">
+                  <p className="text-2xl font-bold" data-testid="text-current-week">{Math.min(currentWeek, totalWeeks)}</p>
+                  <p className="text-xs text-muted-foreground">Current Week</p>
+                </div>
+                <div className="rounded-md border p-3 text-center">
+                  <p className="text-2xl font-bold text-green-600" data-testid="text-completed-units">{completedUnits}</p>
+                  <p className="text-xs text-muted-foreground">Units Done</p>
+                </div>
+                <div className="rounded-md border p-3 text-center">
+                  <p className="text-2xl font-bold text-lys-teal" data-testid="text-current-unit">
+                    {currentUnit ? currentUnit.unitNumber : "-"}
+                  </p>
+                  <p className="text-xs text-muted-foreground">Current Unit</p>
+                </div>
+                <div className="rounded-md border p-3 text-center">
+                  <p className="text-2xl font-bold" data-testid="text-remaining-units">{totalUnits - completedUnits}</p>
+                  <p className="text-xs text-muted-foreground">Remaining</p>
+                </div>
+              </div>
+
+              {currentUnit && (
+                <div className="rounded-md bg-lys-teal/10 p-3 flex items-start gap-3">
+                  <Calendar className="h-5 w-5 text-lys-teal shrink-0 mt-0.5" />
+                  <div>
+                    <p className="text-sm font-medium">Now Teaching: Unit {currentUnit.unitNumber} - {currentUnit.title}</p>
+                    <p className="text-xs text-muted-foreground">
+                      Weeks {currentUnit.startWeek}-{currentUnit.endWeek} ({currentUnit.endWeek - currentUnit.startWeek + 1} weeks)
+                    </p>
+                  </div>
+                </div>
+              )}
+
+              {allScopeStandards.length > 0 && (
+                <div className="flex items-center justify-between gap-4 pt-2 border-t flex-wrap">
+                  <div className="text-sm text-muted-foreground">
+                    {allScopeStandards.length} standard{allScopeStandards.length !== 1 ? "s" : ""} across all units
+                  </div>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => syncStandardsMutation.mutate()}
+                    disabled={syncStandardsMutation.isPending}
+                    data-testid="button-sync-standards"
+                  >
+                    {syncStandardsMutation.isPending ? (
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    ) : (
+                      <GraduationCap className="h-4 w-4 mr-2" />
+                    )}
+                    Sync Standards to Profile
+                  </Button>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        )}
 
         <Card>
           <CardHeader>
@@ -548,12 +709,16 @@ export default function ScopeEditor() {
               </div>
             ) : (
               <div className="space-y-4">
-                {units.map((unit) => (
-                  <Card key={unit.id} className="border-l-4 border-l-lys-teal" data-testid={`card-unit-${unit.id}`}>
+                {units.map((unit) => {
+                  const unitStatus = getUnitStatus(unit, currentWeek);
+                  const accentColor = unitStatus === "current" ? "bg-lys-yellow" : unitStatus === "completed" ? "bg-green-500" : "bg-lys-teal";
+                  return (
+                  <Card key={unit.id} className="overflow-hidden" data-testid={`card-unit-${unit.id}`}>
+                    <div className={`${accentColor} h-1 w-full`} />
                     <CardHeader className="pb-2">
                       <div className="flex items-start justify-between gap-4">
                         <div>
-                          <div className="flex items-center gap-2 mb-1">
+                          <div className="flex items-center gap-2 mb-1 flex-wrap">
                             <Badge variant="outline" className="font-mono">
                               Unit {unit.unitNumber}
                             </Badge>
@@ -563,6 +728,21 @@ export default function ScopeEditor() {
                             <span className="text-xs text-muted-foreground">
                               Weeks {unit.startWeek}-{unit.endWeek}
                             </span>
+                            {currentWeek !== null && (
+                              <Badge
+                                variant={unitStatus === "current" ? "default" : "outline"}
+                                className={
+                                  unitStatus === "current" ? "bg-lys-yellow text-black" :
+                                  unitStatus === "completed" ? "text-green-600 border-green-500/30" :
+                                  ""
+                                }
+                                data-testid={`badge-unit-status-${unit.id}`}
+                              >
+                                {unitStatus === "current" ? "Current" :
+                                 unitStatus === "completed" ? "Done" :
+                                 "Upcoming"}
+                              </Badge>
+                            )}
                           </div>
                           <CardTitle className="font-oswald text-lg">{unit.title}</CardTitle>
                           {unit.summary && (
@@ -621,7 +801,8 @@ export default function ScopeEditor() {
                       )}
                     </CardContent>
                   </Card>
-                ))}
+                  );
+                })}
               </div>
             )}
           </CardContent>

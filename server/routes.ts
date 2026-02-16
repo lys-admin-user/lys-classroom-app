@@ -140,6 +140,24 @@ const updateRoleSchema = z.object({
   role: z.enum(["student", "educator", "campus_admin", "district_admin", "site_admin", "system_admin", "homeschool_parent"]),
 });
 
+async function syncScopeStandardsToProfile(scopeId: string, userId: string) {
+  const units = await storage.getSequenceUnits(scopeId);
+  const standardsMap = new Map<string, { code: string; description: string }>();
+  for (const unit of units) {
+    const codes = (unit.standardCodes as { code: string; description: string }[]) || [];
+    for (const std of codes) {
+      if (std.code && !standardsMap.has(std.code)) {
+        standardsMap.set(std.code, { code: std.code, description: std.description || "" });
+      }
+    }
+  }
+  if (standardsMap.size > 0) {
+    await storage.updateEducatorProfile(userId, {
+      preferredStandardCodes: Array.from(standardsMap.values()),
+    });
+  }
+}
+
 export async function registerRoutes(
   httpServer: Server,
   app: Express
@@ -1343,6 +1361,11 @@ export async function registerRoutes(
       
       const validated = insertSequenceUnitSchema.parse({ ...req.body, scopeId });
       const unit = await storage.createSequenceUnit(validated);
+
+      syncScopeStandardsToProfile(scopeId, userId).catch(err =>
+        console.error("Auto-sync standards failed:", err)
+      );
+
       res.json(unit);
     } catch (error) {
       if (error instanceof z.ZodError) {
@@ -1365,6 +1388,13 @@ export async function registerRoutes(
         res.status(404).json({ error: "Unit not found or not authorized" });
         return;
       }
+
+      if (updated.scopeId) {
+        syncScopeStandardsToProfile(updated.scopeId, userId).catch(err =>
+          console.error("Auto-sync standards failed:", err)
+        );
+      }
+
       res.json(updated);
     } catch (error) {
       res.status(500).json({ error: "Failed to update unit" });
@@ -1384,6 +1414,40 @@ export async function registerRoutes(
       res.json({ success: true });
     } catch (error) {
       res.status(500).json({ error: "Failed to delete unit" });
+    }
+  });
+
+  app.post("/api/scopes/:scopeId/sync-standards", isAuthenticated, async (req: any, res) => {
+    try {
+      const { scopeId } = req.params;
+      const userId = req.user?.claims?.sub;
+
+      const scope = await storage.getScopeSequence(scopeId);
+      if (!scope || scope.userId !== userId) {
+        res.status(403).json({ error: "Not authorized" });
+        return;
+      }
+
+      const units = await storage.getSequenceUnits(scopeId);
+      const standardsMap = new Map<string, { code: string; description: string }>();
+      for (const unit of units) {
+        const codes = (unit.standardCodes as { code: string; description: string }[]) || [];
+        for (const std of codes) {
+          if (std.code && !standardsMap.has(std.code)) {
+            standardsMap.set(std.code, { code: std.code, description: std.description || "" });
+          }
+        }
+      }
+
+      const allStandards = Array.from(standardsMap.values());
+      if (allStandards.length > 0) {
+        await storage.updateEducatorProfile(userId, { preferredStandardCodes: allStandards });
+      }
+
+      res.json({ success: true, count: allStandards.length, standards: allStandards });
+    } catch (error) {
+      console.error("Sync standards error:", error);
+      res.status(500).json({ error: "Failed to sync standards" });
     }
   });
 

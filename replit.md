@@ -1,7 +1,7 @@
 # LYS Educational Platform
 
 ## Overview
-LYS (Laddering Your Success) is an AI-powered educational platform designed to empower educators and students using the "Be-Know-Do" methodology. It offers AI lesson planning, self-discovery assessments, career exploration, goal tracking, and educational resources. The platform aims to foster identity-based learning, bridging academic preparation with real-world success, and enhancing the market potential for comprehensive educational tools.
+LYS (Laddering Your Success) is an AI-powered educational platform designed to empower educators and students through the "Be-Know-Do" methodology. It offers AI lesson planning, self-discovery assessments, career exploration, goal tracking, and comprehensive educational resources, aiming to bridge academic preparation with real-world success.
 
 ## User Preferences
 Preferred communication style: Simple, everyday language.
@@ -14,57 +14,56 @@ Preferred communication style: Simple, everyday language.
 -   **Typography**: Custom font stack featuring Permanent Marker (headers), Oswald (subheaders), and Roboto (body text).
 
 ### Technical Implementations
--   **Frontend**: React 18 with TypeScript, Wouter for routing, TanStack React Query for server state management, and Vite.
--   **Backend**: Express.js with TypeScript, RESTful JSON API (`/api` prefix), and Zod for validation.
--   **Data Layer**: PostgreSQL database managed by Drizzle ORM, with shared schemas and types.
--   **Authentication**: Replit Auth (Google, GitHub, email) with `express-session` and PostgreSQL for session storage.
--   **Security**: Input validation (Zod), ownership checks, and server-side regeneration of critical IDs.
--   **Monorepo Structure**: `/client` (frontend), `/server` (backend), and `/shared` (common code).
+-   **Frontend**: React 18 with TypeScript, Wouter for routing, TanStack React Query, and Vite.
+-   **Backend**: Express.js with TypeScript, RESTful JSON API, and Zod for validation.
+-   **Data Layer**: PostgreSQL database managed by Drizzle ORM.
+-   **Authentication**: Replit Auth with `express-session` and PostgreSQL for session storage.
+-   **Security**: Input validation, ownership checks, and server-side regeneration of critical IDs.
+-   **Monorepo Structure**: `/client`, `/server`, and `/shared` directories.
 -   **AI Integration**: OpenAI API for AI-driven features, with mock data fallback.
 -   **Real-Time Collaboration**: WebSocket server for live cursor positions, presence, and chat.
 -   **Multi-Tenancy**: Supports organizations (School, District, University) with role-based access control and an invitation system.
--   **Automated Standards Ingestion**: Three-tier system for importing educational standards: CSP API, planned CASE Protocol integration, and LLM extraction with human review.
+-   **Automated Standards Ingestion**: Three-tier system for importing educational standards including CSP API, planned CASE Protocol, and LLM extraction.
 
 ### Feature Specifications
--   **Be-Know-Do Framework**: Integrates self-discovery assessments (BE), career exploration (KNOW), and goal setting with milestones (DO).
--   **Lesson Plan Rubric System**: Comprehensive rubric with 6 categories (Objectives, Essential Questions, LYS Methodology, Resources, Instructional Input, Lesson Close) and 4 quality levels (Distinguished, Accomplished, Acceptable, Needs Improvement). Located in `shared/lessonRubric.ts`. Rubric reference dialog and quick tips available in Lesson Authoring page. AI lesson generator uses rubric standards. Quality scores calculated server-side during lesson approval.
--   **AI Lesson Plan Caching**: Database-backed cache (`lesson_plan_cache` table) for AI-generated lesson plans. Cache key is SHA-256 hash of normalized request parameters (topic, course, unit, grade level, BKD focus, duration, standard codes). 30-day TTL with hit counting. Admin management in SiteAdmin Performance tab (view stats, clear all, clear expired, delete individual entries). Reduces duplicate OpenAI API calls for identical lesson patterns.
--   **AI Lesson-Assignment Alignment**: AI Assignment Generator (`server/assignmentGenerator.ts`) is aligned with lesson rubric standards. Assignments directly assess lesson objectives, include BE-KNOW-DO questions with clear balance, connect to the 7 life dimensions for reflections, and use higher-order thinking with educational feedback for distractors. Each question includes standard mappings for objective alignment tracking.
--   **Scope & Sequence Builder**: Tool for educators to plan curricula, create from scratch or import with AI unit extraction.
--   **Self-Discovery Module**: 9-question assessment linking to career exploration.
--   **Career Exploration**: Detailed career information with saving capabilities.
--   **Educator Influence & Affiliate System**: Referral codes, social sharing, and point-based rewards for educators.
+-   **Be-Know-Do Framework**: Integrates self-discovery assessments (BE), career exploration (KNOW), and goal setting (DO).
+-   **Lesson Plan Rubric System**: Comprehensive rubric with 6 categories and 4 quality levels, used for AI lesson generation and quality scoring.
+-   **AI Lesson Plan Caching**: Database-backed cache for AI-generated lesson plans to reduce duplicate API calls.
+-   **AI Lesson-Assignment Alignment**: AI Assignment Generator aligns with lesson rubric standards, assessing objectives and incorporating BKD principles.
+-   **Scope & Sequence Builder**: Tool for curriculum planning, including pacing tracking and automatic standards extraction.
+-   **Self-Discovery & Career Exploration**: Modules for self-assessment and detailed career information.
+-   **Educator Influence & Affiliate System**: Rewards system for educators.
 -   **Real-Time Collaboration**: Co-creation of lesson plans with invite codes, role differentiation, chat, and edit history.
 -   **Shared Resource Library**: Community platform for educators to share resources.
--   **Educational Standards System**: Lesson generator incorporates legally-compliant, hierarchical standards. Standards administration (syncing, importing, approving, extracting) is restricted to system-level admins only. Available at `/admin/standards`. Educators can save preferred country, state, subject, and standard codes in their profile (Settings page) which auto-populate in the AI Lesson Planner.
--   **Student Digital Portfolio**: Students can create and manage portfolios with customizable themes, privacy controls, shareable links, social sharing, PDF download, and analytics.
--   **One-Click Template Library**: Educators can save and browse community-shared lesson plan templates.
--   **Student Transfer System**: Campus-level feature for transferring students between educators or organizations with triple confirmation workflow (Campus → District → System Admin approval chain). Available at `/transfer-approvals`.
--   **Gradebook System**: Educators and campus admins can manage student grades with categories, automatic letter grade calculation, CSV export, and SIS integration for sharing grades. Includes career alignment tab showing how grades relate to career readiness. Available at `/gradebook`.
--   **Career Alignment**: Classes can be mapped to career fields (STEM, Healthcare, Business, etc.). Gradebook shows career readiness scores based on academic performance. Parent Portal displays career readiness insights alongside saved careers.
--   **Parent Portal**: Free tier with ad support for parents. Parents can search for students by school and student ID to request connections. Educators approve/reject connection requests. Features student progress tracking, Be-Know-Do journey visualization, and career readiness insights. Available at `/parent-portal`.
--   **System Admin Performance Analytics**: Dashboard for tracking educator, campus, and organization performance based on goal completion, standards coverage, and student Be-Know-Do progress. Includes Educator Type Usage breakdown (Teacher, Homeschooling Parent, Micro School) with 7-day and 30-day activity tracking. Available at `/site-admin` under the Performance tab.
--   **Educator Type Classification**: Educators self-select their type (Teacher, Homeschooling Parent, Micro School) in their profile settings. System admins can view usage analytics by educator type to understand platform adoption patterns.
--   **KNOW Resources Management**: Admin-managed curated educational content (books, ebooks, YouTube channels, podcasts, WhatsApp channels) for the KNOW pillar. Site/system/campus admins can create, edit, and manage resources with categories, target audiences (students, educators, parents), career field alignment, and featured status. Public API for students/educators to browse active resources. Available at `/admin/know-resources`.
--   **Student Matriculation & Achievement Tracking**: System-level tracking of student progress including enrollment, grade progression, transfers, graduation, and withdrawals. Includes system-wide achievement definitions (academic, skill, behavior, extracurricular, career, BKD, custom) with point values and verification workflow. Admins can view matriculation statistics, achievement analytics, and manage system achievements. Available at `/admin/matriculation`.
--   **Onboarding Tour**: After profile setup, users receive a guided spotlight tour of their personalized sections. Tour is role-aware (student vs educator) and goal-prioritized (discover, career, lessons, curriculum). Uses spotlight overlay highlighting sidebar navigation items. Tour completion tracked in localStorage. Component at `client/src/components/OnboardingTour.tsx`, managed by TourManager in `App.tsx`.
--   **Scholarship & Mentorship System**: Comprehensive scholarship planning aligned with Be-Know-Do methodology. Includes scholarship resource types in KNOW Resources (scholarship, financial_guide, essay_template) with deadline, amount, eligibility, season tracking, GPA requirements, first-gen friendly flag, and recurring application support. Features: Scholarship Planner (`/scholarship-planner`) with seasonal timeline, application tracking, and discovery; Essay Builder (`/essay-builder`) with guided BKD narrative sections; Strengths Inventory (`/strengths-inventory`) for documenting personal strengths with proficiency levels and evidence; Campus Activities Tracker (`/campus-activities`) for extracurricular involvement, leadership roles, and achievements; Mentor Connect (`/mentor-connect`) for finding and connecting with career mentors. Database tables: resource_ratings, student_narratives, strengths_inventory, campus_activities, scholarship_applications, mentor_profiles, mentor_connections.
+-   **Educational Standards System**: Incorporates legally-compliant, hierarchical standards into lesson generation, with admin management and user preferences.
+-   **Student Digital Portfolio**: Customizable digital portfolios with privacy controls and shareable links.
+-   **One-Click Template Library**: For sharing and browsing lesson plan templates.
+-   **Student Transfer System**: Campus-level feature for transferring students with a triple confirmation workflow.
+-   **Gradebook System**: Manages student grades, calculates letter grades, exports CSV, and integrates with SIS.
+-   **Career Alignment**: Maps classes to career fields and displays career readiness scores in the gradebook and parent portal.
+-   **Parent Portal**: Free tier portal for parents to track student progress, visualize Be-Know-Do journey, and view career readiness insights.
+-   **System Admin Performance Analytics**: Dashboard for tracking performance, goal completion, standards coverage, and student progress.
+-   **Educator Type Classification**: Allows educators to self-select their type for platform usage analytics.
+-   **KNOW Resources Management**: Admin-managed curated educational content for the KNOW pillar.
+-   **Student Matriculation & Achievement Tracking**: System-level tracking of student progress and achievements.
+-   **Onboarding Tour**: Role-aware guided tour for new users.
+-   **Scholarship & Mentorship System**: Comprehensive scholarship planning, essay builder, strengths inventory, campus activities tracker, and mentor connection features.
 
 ### Global Architecture
--   **Educational Hierarchy**: Structured organization of students and classes (Country > State/Jurisdiction > District > School/Campus > Class > Student) with validation.
--   **Organization Inheritance**: Resources (Scope & Sequence, SIS Connections) cascade through the hierarchy - District settings apply to all campuses; campus settings apply to all educators.
--   **Scope & Sequence Visibility**: Supports personal, campus, district, and system-level scopes with proper inheritance.
--   **SIS Integration Inheritance**: Campus/District SIS connections are automatically available to educators within that organization hierarchy.
--   **Global Authority Tree**: Polymorphic hierarchy supporting various educational governance systems (bottom_heavy, top_down_unitary, federal_hybrid).
--   **LYS Milestone Engine**: Tracks Being/Knowing/Doing progress with gatekeeper logic, regional multipliers, and alternative pathways.
--   **Workforce Trends Integration**: Weekly automated sync with BLS Occupational Outlook Handbook data for career alignment, salary, and job outlook.
+-   **Educational Hierarchy**: Structured organization of students and classes.
+-   **Organization Inheritance**: Resources and settings cascade through the hierarchy.
+-   **Scope & Sequence Visibility**: Supports personal, campus, district, and system-level scopes.
+-   **SIS Integration Inheritance**: Campus/District SIS connections are automatically available to educators.
+-   **Global Authority Tree**: Polymorphic hierarchy supporting various educational governance systems.
+-   **LYS Milestone Engine**: Tracks Being/Knowing/Doing progress with gatekeeper logic.
+-   **Workforce Trends Integration**: Automated sync with BLS Occupational Outlook Handbook data.
 -   **Alignment Matrix**: Connects regional gamification weights to workforce data.
 
 ### Data Architecture (Journey Tracking)
--   **studentJourneyEntries**: General event log for any user type (student, educator, admin) - BKD pillar events.
--   **studentJourneyProgress**: Aggregated progress scores per student (BE/KNOW/DO scores).
--   **studentJourneyMilestones**: Specific milestone achievements tracked per student.
--   **studentJourneyActivities**: Detailed activity log tied to journey progress for student analytics.
+-   **studentJourneyEntries**: General event log for user activity.
+-   **studentJourneyProgress**: Aggregated progress scores per student.
+-   **studentJourneyMilestones**: Specific milestone achievements tracked.
+-   **studentJourneyActivities**: Detailed activity log for student analytics.
 
 ## External Dependencies
 
@@ -82,36 +81,21 @@ Preferred communication style: Simple, everyday language.
 -   **Icons**: `lucide-react`, `react-icons`.
 
 ### Payment Integration
--   **Demo Mode**: Simulation of tier upgrades.
--   **Future**: Stripe integration via Replit's Stripe connector.
+-   **Future**: Stripe integration (via Replit's Stripe connector).
 
 ### Ad Monetization (Free Tier)
--   **Revenue Model**: EdTech eCPM range of $8-$15 (average $12), with 40 page views/month and 2 ads/screen = ~$0.96/user/month.
--   **Ad Slot Configuration**: IAB standard sizes (leaderboard, medium rectangle, skyscraper, in-feed, native) in `client/src/lib/adConfig.ts`.
--   **Ad Components**: `AdSlot`, `AdSlotSidebar`, `AdSlotInFeed`, `AdSlotHeader`, `AdSlotFooter` in `client/src/components/ads/`.
--   **Tier-Aware Rendering**: Ads only display for free tier users; hidden for Pro/paid tiers and Focus Mode subscribers.
--   **Grade-Level Restriction**: Students below 8th grade (K-7) never see ads for COPPA/child safety compliance.
--   **Sponsor Categories**: Education, Career, EdTech, Tutoring, Scholarships, Test Prep with eCPM multipliers.
--   **Integrated Pages**: Parent Portal with header, sidebar, and in-feed ad slots.
+-   **Revenue Model**: EdTech eCPM-based advertising for free-tier users (excluding K-7 students).
+-   **Ad Slot Configuration**: IAB standard sizes.
 
 ### Country Affordability Index (CAI) Global Pricing
--   **Purpose**: Equitable, cross-border pricing based on local purchasing power using GDP per Capita, Monthly Income, Healthcare Spend, and Cost-of-Living Index.
--   **Formula**: `Adjusted Price = Global Reference Price × (CAI Score + LCSI Adjustment)`.
--   **Coverage**: 120+ countries.
+-   **Purpose**: Equitable, cross-border pricing based on local purchasing power using a custom formula.
 
 ### HubSpot CRM Integration
--   **Connection**: Uses Replit's HubSpot connector.
--   **Capabilities**: Create/update contacts, companies, deals, and sync users.
+-   **Connection**: Uses Replit's HubSpot connector for contact, company, and deal management.
 
-### WordPress Integration (Full Site Hosting)
--   **Methods**: Iframe Embeds, Shortcodes, oEmbed, REST API.
--   **Full Site Embed**: Host the complete LYS platform in WordPress using `[lys_platform]` shortcode.
--   **Individual Widgets**: 22+ embeddable features (lesson generator, gradebook, portfolios, parent portal, etc.).
--   **WordPress Plugin**: Downloadable from `/api/integrations/wordpress/plugin` - includes all shortcodes, admin settings, theme sync, and auto-resize.
--   **Embed Routes**: All pages available at `/embed/{feature}` (e.g., `/embed/gradebook`, `/embed/parent-portal`).
--   **Theme Sync**: WordPress dark/light mode communicates with embedded LYS via postMessage.
--   **Features**: Sync lesson plans to WordPress as draft posts, embed LYS widgets.
+### WordPress Integration
+-   **Features**: Iframe Embeds, Shortcodes, oEmbed, REST API for hosting the LYS platform or individual widgets within WordPress. Includes a downloadable WordPress plugin for integration.
 
 ### SIS (Student Information System) Integration
 -   **Supported Providers**: Clever, PowerSchool, Canvas LMS, Infinite Campus, Skyward, OneRoster.
--   **Features**: OAuth authentication, manual API token configuration, student/course import and sync, sync history tracking, configurable settings, role-based access.
+-   **Features**: OAuth authentication, student/course import and sync, configurable settings.
