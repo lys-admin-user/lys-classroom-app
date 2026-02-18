@@ -19,9 +19,12 @@ import {
   TrendingUp, CreditCard, Share2, BookOpen, Target, UserCheck, 
   Eye, Edit2, Search, ChevronRight, Map, GraduationCap, DollarSign,
   Activity, Globe, FileText, Award, Zap, ExternalLink, UserCog, Library, Plus,
-  Server, Database, Cpu, HardDrive, Wifi, Lock, Monitor, Code2, Layers, Check
+  Server, Database, Cpu, HardDrive, Wifi, Lock, Monitor, Code2, Layers, Check,
+  MapPin, Upload, X, Headphones, Video
 } from "lucide-react";
-import type { Organization, User as UserType, Lesson } from "@shared/schema";
+import { Textarea } from "@/components/ui/textarea";
+import { Switch } from "@/components/ui/switch";
+import type { Organization, User as UserType, Lesson, Authority, SystemLessonAuthor, MasterLesson, ContentLibraryItem } from "@shared/schema";
 
 interface Analytics {
   users: {
@@ -108,6 +111,44 @@ export default function SystemAdminPage() {
   const [editingTier, setEditingTier] = useState<{ tierId: string; name: string; basePrice: number; period: string; description: string; isActive: boolean } | null>(null);
   const [addJurisdictionOpen, setAddJurisdictionOpen] = useState(false);
   const [newJurisdiction, setNewJurisdiction] = useState({ country: 'United States', name: '', abbreviation: '', standardsName: '' });
+
+  const [isCreateAuthorityOpen, setIsCreateAuthorityOpen] = useState(false);
+  const [editingAuthority, setEditingAuthority] = useState<Authority | null>(null);
+  const [newAuthority, setNewAuthority] = useState({ 
+    code: "", 
+    name: "", 
+    level: "national" as const, 
+    modelType: "bottom_heavy" as const, 
+    country: "US",
+    parentId: null as string | null
+  });
+
+  const [isAddAuthorOpen, setIsAddAuthorOpen] = useState(false);
+  const [authorSearch, setAuthorSearch] = useState("");
+  const [selectedUserId, setSelectedUserId] = useState("");
+  const [authorSpecializations, setAuthorSpecializations] = useState<string[]>([]);
+  const [authorBio, setAuthorBio] = useState("");
+  
+  const [lessonStatusFilter, setLessonStatusFilter] = useState<string>("all");
+  const [lessonSubjectFilter, setLessonSubjectFilter] = useState<string>("all");
+  
+  const [contentTypeFilter, setContentTypeFilter] = useState<string>("all");
+  const [isAddContentOpen, setIsAddContentOpen] = useState(false);
+  const [isBulkUploadOpen, setIsBulkUploadOpen] = useState(false);
+  const [bulkUploadFile, setBulkUploadFile] = useState<File | null>(null);
+  const [bulkUploadPreview, setBulkUploadPreview] = useState<any[]>([]);
+  const [bulkUploadAllLessons, setBulkUploadAllLessons] = useState<any[]>([]);
+  const [bulkUploadErrors, setBulkUploadErrors] = useState<string[]>([]);
+  const [newContent, setNewContent] = useState({
+    title: "",
+    description: "",
+    contentType: "pdf" as string,
+    source: "",
+    author: "",
+    subjects: [] as string[],
+    gradeLevels: [] as string[],
+    tags: [] as string[]
+  });
 
   const { data: adminCheck, isLoading: checkLoading } = useQuery<{ isSiteAdmin: boolean }>({
     queryKey: ["/api/admin/check"],
@@ -297,6 +338,317 @@ export default function SystemAdminPage() {
     },
   });
 
+  type EnrichedAuthor = SystemLessonAuthor & { user?: { firstName: string | null; lastName: string | null; email: string | null } };
+
+  const { data: authorities = [], isLoading: authoritiesLoading } = useQuery<Authority[]>({
+    queryKey: ["/api/authorities"],
+    enabled: adminCheck?.isSiteAdmin,
+  });
+
+  const { data: lessonAuthors = [], isLoading: authorsLoading } = useQuery<EnrichedAuthor[]>({
+    queryKey: ["/api/admin/lesson-authors"],
+    enabled: adminCheck?.isSiteAdmin,
+  });
+
+  const { data: masterLessons = [], isLoading: masterLessonsLoading } = useQuery<MasterLesson[]>({
+    queryKey: ["/api/admin/master-lessons"],
+    enabled: adminCheck?.isSiteAdmin,
+  });
+
+  const { data: contentLibrary = [], isLoading: contentLoading } = useQuery<ContentLibraryItem[]>({
+    queryKey: ["/api/admin/content-library"],
+    enabled: adminCheck?.isSiteAdmin,
+  });
+
+  const { data: allUsers = [] } = useQuery<Array<{ id: string; email: string | null; firstName: string | null; lastName: string | null }>>({
+    queryKey: ["/api/users"],
+    enabled: adminCheck?.isSiteAdmin && isAddAuthorOpen,
+  });
+
+  const filteredMasterLessons = masterLessons.filter(lesson => {
+    if (lessonStatusFilter !== "all" && lesson.status !== lessonStatusFilter) return false;
+    if (lessonSubjectFilter !== "all" && lesson.subject !== lessonSubjectFilter) return false;
+    return true;
+  });
+
+  const filteredContent = contentLibrary.filter(item => {
+    if (contentTypeFilter !== "all" && item.contentType !== contentTypeFilter) return false;
+    return true;
+  });
+
+  const createAuthorityMutation = useMutation({
+    mutationFn: async (data: typeof newAuthority) => {
+      return await apiRequest("POST", "/api/authorities", data);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/authorities"] });
+      setIsCreateAuthorityOpen(false);
+      setNewAuthority({ code: "", name: "", level: "national", modelType: "bottom_heavy", country: "US", parentId: null });
+      toast({ title: "Authority created" });
+    },
+    onError: () => {
+      toast({ title: "Failed to create authority", variant: "destructive" });
+    },
+  });
+
+  const updateAuthorityMutation = useMutation({
+    mutationFn: async ({ id, updates }: { id: string; updates: Partial<Authority> }) => {
+      return await apiRequest("PATCH", `/api/authorities/${id}`, updates);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/authorities"] });
+      setEditingAuthority(null);
+      toast({ title: "Authority updated" });
+    },
+    onError: () => {
+      toast({ title: "Failed to update authority", variant: "destructive" });
+    },
+  });
+
+  const createAuthorMutation = useMutation({
+    mutationFn: async (data: { userId: string; specializations: string[]; bio: string }) => {
+      return await apiRequest("POST", "/api/admin/lesson-authors", data);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/lesson-authors"] });
+      setIsAddAuthorOpen(false);
+      setSelectedUserId("");
+      setAuthorSpecializations([]);
+      setAuthorBio("");
+      toast({ title: "Lesson author added successfully" });
+    },
+    onError: () => {
+      toast({ title: "Failed to add lesson author", variant: "destructive" });
+    },
+  });
+
+  const removeAuthorMutation = useMutation({
+    mutationFn: async (userId: string) => {
+      return await apiRequest("DELETE", `/api/admin/lesson-authors/${userId}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/lesson-authors"] });
+      toast({ title: "Lesson author removed" });
+    },
+    onError: () => {
+      toast({ title: "Failed to remove author", variant: "destructive" });
+    },
+  });
+
+  const approveLessonMutation = useMutation({
+    mutationFn: async ({ id, notes }: { id: string; notes?: string }) => {
+      return await apiRequest("POST", `/api/admin/master-lessons/${id}/approve`, { notes });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/master-lessons"] });
+      toast({ title: "Lesson approved" });
+    },
+    onError: () => {
+      toast({ title: "Failed to approve lesson", variant: "destructive" });
+    },
+  });
+
+  const rejectLessonMutation = useMutation({
+    mutationFn: async ({ id, notes }: { id: string; notes: string }) => {
+      return await apiRequest("POST", `/api/admin/master-lessons/${id}/reject`, { notes });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/master-lessons"] });
+      toast({ title: "Lesson rejected" });
+    },
+    onError: () => {
+      toast({ title: "Failed to reject lesson", variant: "destructive" });
+    },
+  });
+
+  const createContentMutation = useMutation({
+    mutationFn: async (data: typeof newContent) => {
+      return await apiRequest("POST", "/api/admin/content-library", data);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/content-library"] });
+      setIsAddContentOpen(false);
+      setNewContent({ title: "", description: "", contentType: "pdf", source: "", author: "", subjects: [], gradeLevels: [], tags: [] });
+      toast({ title: "Content added to library" });
+    },
+    onError: () => {
+      toast({ title: "Failed to add content", variant: "destructive" });
+    },
+  });
+
+  const deleteContentMutation = useMutation({
+    mutationFn: async (id: string) => {
+      return await apiRequest("DELETE", `/api/admin/content-library/${id}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/content-library"] });
+      toast({ title: "Content removed" });
+    },
+    onError: () => {
+      toast({ title: "Failed to remove content", variant: "destructive" });
+    },
+  });
+
+  const bulkUploadMutation = useMutation({
+    mutationFn: async ({ fileName, fileType, lessons }: { fileName: string; fileType: string; lessons: any[] }) => {
+      return await apiRequest("POST", "/api/admin/bulk-imports", { fileName, fileType, lessons });
+    },
+    onSuccess: (data: any) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/master-lessons"] });
+      setIsBulkUploadOpen(false);
+      setBulkUploadFile(null);
+      setBulkUploadPreview([]);
+      setBulkUploadAllLessons([]);
+      setBulkUploadErrors([]);
+      const errors = data.errors || [];
+      if (errors.length > 0) {
+        toast({ 
+          title: "Import completed with errors", 
+          description: `${data.successCount || 0} imported, ${data.errorCount || 0} failed. Check console for details.`,
+          variant: "destructive"
+        });
+        console.log("Import errors:", errors);
+      } else {
+        toast({ 
+          title: "Bulk import completed", 
+          description: `${data.successCount || 0} lessons imported successfully` 
+        });
+      }
+    },
+    onError: () => {
+      toast({ title: "Failed to import lessons", variant: "destructive" });
+    },
+  });
+
+  const parseCSVLine = (line: string): string[] => {
+    const result: string[] = [];
+    let current = '';
+    let inQuotes = false;
+    for (let i = 0; i < line.length; i++) {
+      const char = line[i];
+      if (char === '"') {
+        if (inQuotes && line[i + 1] === '"') {
+          current += '"';
+          i++;
+        } else {
+          inQuotes = !inQuotes;
+        }
+      } else if (char === ',' && !inQuotes) {
+        result.push(current.trim());
+        current = '';
+      } else {
+        current += char;
+      }
+    }
+    result.push(current.trim());
+    return result;
+  };
+
+  const parseCSV = (content: string): any[] => {
+    const lines = content.split(/\r?\n/);
+    if (lines.length < 2) return [];
+    const headers = parseCSVLine(lines[0]).map(h => h.replace(/^"|"$/g, ''));
+    const lessons: any[] = [];
+    for (let i = 1; i < lines.length; i++) {
+      if (!lines[i].trim()) continue;
+      const values = parseCSVLine(lines[i]);
+      const lesson: any = {};
+      headers.forEach((header, idx) => {
+        const val = (values[idx] || '').replace(/^"|"$/g, '');
+        if (header === 'objectives' || header === 'materials' || header === 'tags') {
+          lesson[header] = val ? val.split(';').map((v: string) => v.trim()).filter(Boolean) : [];
+        } else if (header === 'activities') {
+          lesson[header] = val ? val.split(';').map((v: string) => ({ title: v.trim(), description: v.trim(), duration: '15 min', type: 'activity' })).filter((a: any) => a.title) : [];
+        } else {
+          lesson[header] = val;
+        }
+      });
+      lessons.push(lesson);
+    }
+    return lessons;
+  };
+
+  const validateLessons = (lessons: any[]): { valid: any[]; errors: string[] } => {
+    const valid: any[] = [];
+    const errors: string[] = [];
+    lessons.forEach((lesson, idx) => {
+      const missing: string[] = [];
+      if (!lesson.title?.trim()) missing.push('title');
+      if (!lesson.topic?.trim()) missing.push('topic');
+      if (!lesson.subject?.trim()) missing.push('subject');
+      if (!lesson.gradeLevel?.trim()) missing.push('gradeLevel');
+      if (missing.length > 0) {
+        errors.push(`Row ${idx + 1}: Missing ${missing.join(', ')}`);
+      } else {
+        valid.push(lesson);
+      }
+    });
+    return { valid, errors };
+  };
+
+  const handleBulkUploadFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setBulkUploadFile(file);
+    setBulkUploadErrors([]);
+    
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      try {
+        const content = event.target?.result as string;
+        let lessons: any[] = [];
+        
+        if (file.name.endsWith('.json')) {
+          const parsed = JSON.parse(content);
+          lessons = Array.isArray(parsed) ? parsed : (parsed.lessons || []);
+        } else if (file.name.endsWith('.csv')) {
+          lessons = parseCSV(content);
+        }
+        
+        const { valid, errors } = validateLessons(lessons);
+        setBulkUploadAllLessons(valid);
+        setBulkUploadPreview(valid.slice(0, 5));
+        setBulkUploadErrors(errors);
+      } catch (error) {
+        toast({ title: "Failed to parse file", description: "Please check file format", variant: "destructive" });
+        setBulkUploadPreview([]);
+        setBulkUploadAllLessons([]);
+        setBulkUploadErrors([]);
+      }
+    };
+    reader.readAsText(file);
+  };
+
+  const handleBulkUploadSubmit = () => {
+    if (!bulkUploadFile || bulkUploadAllLessons.length === 0) return;
+    
+    bulkUploadMutation.mutate({
+      fileName: bulkUploadFile.name,
+      fileType: bulkUploadFile.name.endsWith('.json') ? 'json' : 'csv',
+      lessons: bulkUploadAllLessons
+    });
+  };
+
+  const getLevelLabel = (level: string) => {
+    const labels: Record<string, string> = {
+      supranational: "Supranational (UN/EU)",
+      national: "National",
+      regional_state: "Regional/State",
+      local_district: "Local/District",
+      school: "School"
+    };
+    return labels[level] || level;
+  };
+
+  const getModelLabel = (model: string) => {
+    const labels: Record<string, string> = {
+      bottom_heavy: "US Style (Local Control)",
+      top_down_unitary: "Centralized National",
+      federal_hybrid: "Federal Hybrid"
+    };
+    return labels[model] || model;
+  };
+
   if (authLoading || checkLoading) {
     return (
       <div className="flex items-center justify-center h-[60vh]">
@@ -393,6 +745,22 @@ export default function SystemAdminPage() {
           <TabsTrigger value="techspecs" className="gap-2" data-testid="tab-techspecs">
             <Server className="h-4 w-4" />
             <span className="hidden sm:inline">Technical Specs</span>
+          </TabsTrigger>
+          <TabsTrigger value="authorities" className="gap-2" data-testid="tab-authorities">
+            <Globe className="h-4 w-4" />
+            <span className="hidden sm:inline">Global Authorities</span>
+          </TabsTrigger>
+          <TabsTrigger value="lesson-authors" className="gap-2" data-testid="tab-lesson-authors">
+            <Users className="h-4 w-4" />
+            <span className="hidden sm:inline">Lesson Authors</span>
+          </TabsTrigger>
+          <TabsTrigger value="lesson-repository" className="gap-2" data-testid="tab-lesson-repository">
+            <BookOpen className="h-4 w-4" />
+            <span className="hidden sm:inline">Lesson Repository</span>
+          </TabsTrigger>
+          <TabsTrigger value="content-library" className="gap-2" data-testid="tab-content-library">
+            <Library className="h-4 w-4" />
+            <span className="hidden sm:inline">Content Library</span>
           </TabsTrigger>
         </TabsList>
 
@@ -1450,6 +1818,755 @@ export default function SystemAdminPage() {
 
         <TabsContent value="techspecs" className="space-y-6">
           <TechnicalSpecsSection />
+        </TabsContent>
+
+        <TabsContent value="authorities" className="space-y-4">
+          <div className="flex items-center justify-between gap-4 flex-wrap">
+            <div>
+              <h2 className="font-oswald text-xl">Global Authority Tree</h2>
+              <p className="text-sm text-muted-foreground">Manage educational governance systems worldwide</p>
+            </div>
+            <Dialog open={isCreateAuthorityOpen} onOpenChange={setIsCreateAuthorityOpen}>
+              <DialogTrigger asChild>
+                <Button className="bg-lys-teal hover:bg-lys-teal/90" data-testid="button-create-authority">
+                  <Plus className="h-4 w-4 mr-2" />
+                  Add Authority
+                </Button>
+              </DialogTrigger>
+              <DialogContent>
+                <DialogHeader>
+                  <DialogTitle>Add Educational Authority</DialogTitle>
+                  <DialogDescription>
+                    Create a new educational authority in the global hierarchy.
+                  </DialogDescription>
+                </DialogHeader>
+                <div className="grid gap-4 py-4">
+                  <div className="grid gap-2">
+                    <Label htmlFor="authority-code">Authority Code</Label>
+                    <Input
+                      id="authority-code"
+                      value={newAuthority.code}
+                      onChange={(e) => setNewAuthority({ ...newAuthority, code: e.target.value.toUpperCase().replace(/[^A-Z0-9_-]/g, "") })}
+                      placeholder="US-TEA"
+                      data-testid="input-authority-code"
+                    />
+                  </div>
+                  <div className="grid gap-2">
+                    <Label htmlFor="authority-name">Name</Label>
+                    <Input
+                      id="authority-name"
+                      value={newAuthority.name}
+                      onChange={(e) => setNewAuthority({ ...newAuthority, name: e.target.value })}
+                      placeholder="Texas Education Agency"
+                      data-testid="input-authority-name"
+                    />
+                  </div>
+                  <div className="grid gap-2">
+                    <Label htmlFor="authority-country">Country Code</Label>
+                    <Input
+                      id="authority-country"
+                      value={newAuthority.country}
+                      onChange={(e) => setNewAuthority({ ...newAuthority, country: e.target.value.toUpperCase().slice(0, 2) })}
+                      placeholder="US"
+                      maxLength={2}
+                      data-testid="input-authority-country"
+                    />
+                  </div>
+                  <div className="grid gap-2">
+                    <Label htmlFor="authority-level">Hierarchy Level</Label>
+                    <Select
+                      value={newAuthority.level}
+                      onValueChange={(value: any) => setNewAuthority({ ...newAuthority, level: value })}
+                    >
+                      <SelectTrigger data-testid="select-authority-level">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="supranational">Supranational (UN/EU)</SelectItem>
+                        <SelectItem value="national">National</SelectItem>
+                        <SelectItem value="regional_state">Regional/State</SelectItem>
+                        <SelectItem value="local_district">Local/District</SelectItem>
+                        <SelectItem value="school">School</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="grid gap-2">
+                    <Label htmlFor="authority-model">Governance Model</Label>
+                    <Select
+                      value={newAuthority.modelType}
+                      onValueChange={(value: any) => setNewAuthority({ ...newAuthority, modelType: value })}
+                    >
+                      <SelectTrigger data-testid="select-authority-model">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="bottom_heavy">US Style (Strong Local Control)</SelectItem>
+                        <SelectItem value="top_down_unitary">Centralized National Curriculum</SelectItem>
+                        <SelectItem value="federal_hybrid">Federal Hybrid (EU/Canada)</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  {authorities.length > 0 && (
+                    <div className="grid gap-2">
+                      <Label htmlFor="authority-parent">Parent Authority (Optional)</Label>
+                      <Select
+                        value={newAuthority.parentId || "none"}
+                        onValueChange={(value) => setNewAuthority({ ...newAuthority, parentId: value === "none" ? null : value })}
+                      >
+                        <SelectTrigger data-testid="select-authority-parent">
+                          <SelectValue placeholder="Select parent..." />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="none">No Parent (Top Level)</SelectItem>
+                          {authorities.map((auth) => (
+                            <SelectItem key={auth.id} value={auth.id}>
+                              {auth.name} ({getLevelLabel(auth.level)})
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  )}
+                </div>
+                <DialogFooter>
+                  <Button variant="outline" onClick={() => setIsCreateAuthorityOpen(false)} data-testid="button-cancel-authority">
+                    Cancel
+                  </Button>
+                  <Button
+                    onClick={() => createAuthorityMutation.mutate(newAuthority)}
+                    disabled={!newAuthority.code || !newAuthority.name || createAuthorityMutation.isPending}
+                    data-testid="button-submit-authority"
+                  >
+                    {createAuthorityMutation.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+                    Create
+                  </Button>
+                </DialogFooter>
+              </DialogContent>
+            </Dialog>
+          </div>
+
+          {authoritiesLoading ? (
+            <div className="flex items-center justify-center py-12">
+              <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+            </div>
+          ) : authorities.length === 0 ? (
+            <Card>
+              <CardContent className="py-12 text-center">
+                <Globe className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+                <p className="text-muted-foreground">No educational authorities configured</p>
+                <p className="text-sm text-muted-foreground">Add authorities to define the global educational governance hierarchy</p>
+              </CardContent>
+            </Card>
+          ) : (
+            <div className="grid gap-4">
+              {authorities.map((auth) => (
+                <Card key={auth.id} data-testid={`card-authority-${auth.id}`}>
+                  <CardHeader className="flex flex-row items-start justify-between gap-4">
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-md bg-lys-teal/10 flex items-center justify-center">
+                        <MapPin className="h-5 w-5 text-lys-teal" />
+                      </div>
+                      <div>
+                        <CardTitle className="text-lg">{auth.name}</CardTitle>
+                        <CardDescription className="flex items-center gap-2">
+                          <span className="font-mono">{auth.code}</span>
+                          <ChevronRight className="h-3 w-3" />
+                          <span>{auth.country}</span>
+                        </CardDescription>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <Badge variant="outline">{getLevelLabel(auth.level)}</Badge>
+                      <Badge variant="secondary">{getModelLabel(auth.modelType || "bottom_heavy")}</Badge>
+                      <Button
+                        size="icon"
+                        variant="ghost"
+                        onClick={() => setEditingAuthority(auth)}
+                        data-testid={`button-edit-authority-${auth.id}`}
+                      >
+                        <Edit2 className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  </CardHeader>
+                  {auth.parentId && (
+                    <CardContent>
+                      <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                        <span>Parent:</span>
+                        <Badge variant="outline" className="font-normal">
+                          {authorities.find(a => a.id === auth.parentId)?.name || auth.parentId}
+                        </Badge>
+                      </div>
+                    </CardContent>
+                  )}
+                </Card>
+              ))}
+            </div>
+          )}
+
+          <Dialog open={!!editingAuthority} onOpenChange={(open) => !open && setEditingAuthority(null)}>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>Edit Authority</DialogTitle>
+                <DialogDescription>Update the educational authority settings.</DialogDescription>
+              </DialogHeader>
+              {editingAuthority && (
+                <div className="grid gap-4 py-4">
+                  <div className="grid gap-2">
+                    <Label>Authority Code</Label>
+                    <Input value={editingAuthority.code || ""} disabled className="bg-muted" />
+                  </div>
+                  <div className="grid gap-2">
+                    <Label htmlFor="edit-authority-name">Name</Label>
+                    <Input
+                      id="edit-authority-name"
+                      value={editingAuthority.name}
+                      onChange={(e) => setEditingAuthority({ ...editingAuthority, name: e.target.value })}
+                      data-testid="input-edit-authority-name"
+                    />
+                  </div>
+                  <div className="grid gap-2">
+                    <Label htmlFor="edit-authority-model">Governance Model</Label>
+                    <Select
+                      value={editingAuthority.modelType || "bottom_heavy"}
+                      onValueChange={(value: any) => setEditingAuthority({ ...editingAuthority, modelType: value })}
+                    >
+                      <SelectTrigger data-testid="select-edit-authority-model">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="bottom_heavy">US Style (Strong Local Control)</SelectItem>
+                        <SelectItem value="top_down_unitary">Centralized National Curriculum</SelectItem>
+                        <SelectItem value="federal_hybrid">Federal Hybrid (EU/Canada)</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="flex items-center justify-between gap-4">
+                    <div className="space-y-0.5">
+                      <Label>Active</Label>
+                      <p className="text-sm text-muted-foreground">Enable this authority</p>
+                    </div>
+                    <Switch
+                      checked={editingAuthority.isActive ?? true}
+                      onCheckedChange={(checked) => setEditingAuthority({ ...editingAuthority, isActive: checked })}
+                      data-testid="switch-edit-authority-active"
+                    />
+                  </div>
+                </div>
+              )}
+              <DialogFooter>
+                <Button variant="outline" onClick={() => setEditingAuthority(null)} data-testid="button-cancel-edit-authority">
+                  Cancel
+                </Button>
+                <Button
+                  onClick={() => editingAuthority && updateAuthorityMutation.mutate({
+                    id: editingAuthority.id,
+                    updates: {
+                      name: editingAuthority.name,
+                      modelType: editingAuthority.modelType,
+                      isActive: editingAuthority.isActive,
+                    }
+                  })}
+                  disabled={updateAuthorityMutation.isPending}
+                  data-testid="button-submit-edit-authority"
+                >
+                  {updateAuthorityMutation.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+                  Save Changes
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
+        </TabsContent>
+
+        <TabsContent value="lesson-authors" className="space-y-4">
+          <div className="flex items-center justify-between gap-4 flex-wrap">
+            <div>
+              <h2 className="font-oswald text-xl">System-Level Lesson Authors</h2>
+              <p className="text-sm text-muted-foreground">Educators authorized to create master lessons that influence AI-generated content across the <strong>entire system</strong>. Campus-level authors are managed by campus admins.</p>
+            </div>
+            <Dialog open={isAddAuthorOpen} onOpenChange={setIsAddAuthorOpen}>
+              <DialogTrigger asChild>
+                <Button className="bg-lys-teal hover:bg-lys-teal/90" data-testid="button-add-author">
+                  <Plus className="h-4 w-4 mr-2" />
+                  Add Author
+                </Button>
+              </DialogTrigger>
+              <DialogContent>
+                <DialogHeader>
+                  <DialogTitle>Add System Lesson Author</DialogTitle>
+                  <DialogDescription>
+                    Grant an educator permission to create master lessons that influence AI-generated content.
+                  </DialogDescription>
+                </DialogHeader>
+                <div className="grid gap-4 py-4">
+                  <div className="grid gap-2">
+                    <Label htmlFor="author-user">Select Educator</Label>
+                    <Select value={selectedUserId} onValueChange={setSelectedUserId}>
+                      <SelectTrigger data-testid="select-author-user">
+                        <SelectValue placeholder="Choose an educator..." />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {allUsers.filter(u => !lessonAuthors.some(a => a.userId === u.id)).map(user => (
+                          <SelectItem key={user.id} value={user.id}>
+                            {user.firstName} {user.lastName} ({user.email})
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="grid gap-2">
+                    <Label htmlFor="author-specializations">Specializations (comma-separated)</Label>
+                    <Input
+                      id="author-specializations"
+                      placeholder="e.g., math, elementary, stem"
+                      onChange={(e) => setAuthorSpecializations(e.target.value.split(",").map(s => s.trim()).filter(Boolean))}
+                      data-testid="input-author-specializations"
+                    />
+                  </div>
+                  <div className="grid gap-2">
+                    <Label htmlFor="author-bio">Bio (optional)</Label>
+                    <Textarea
+                      id="author-bio"
+                      placeholder="Brief description of the author's expertise..."
+                      value={authorBio}
+                      onChange={(e) => setAuthorBio(e.target.value)}
+                      data-testid="input-author-bio"
+                    />
+                  </div>
+                </div>
+                <DialogFooter>
+                  <Button
+                    onClick={() => createAuthorMutation.mutate({ userId: selectedUserId, specializations: authorSpecializations, bio: authorBio })}
+                    disabled={!selectedUserId || createAuthorMutation.isPending}
+                    data-testid="button-submit-author"
+                  >
+                    {createAuthorMutation.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+                    Add Author
+                  </Button>
+                </DialogFooter>
+              </DialogContent>
+            </Dialog>
+          </div>
+
+          {authorsLoading ? (
+            <div className="space-y-2">
+              {[1, 2, 3].map(i => (
+                <div key={i} className="h-20 bg-muted animate-pulse rounded" />
+              ))}
+            </div>
+          ) : lessonAuthors.length === 0 ? (
+            <Card>
+              <CardContent className="py-8 text-center">
+                <Users className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
+                <p className="text-muted-foreground">No lesson authors yet. Add your first author to start building the master lesson repository.</p>
+              </CardContent>
+            </Card>
+          ) : (
+            <div className="grid gap-4">
+              {lessonAuthors.map((author) => (
+                <Card key={author.id} data-testid={`author-card-${author.userId}`}>
+                  <CardContent className="py-4">
+                    <div className="flex items-center justify-between gap-4 flex-wrap">
+                      <div className="flex items-center gap-4">
+                        <div className="w-12 h-12 rounded-full bg-lys-teal/20 flex items-center justify-center">
+                          <BookOpen className="h-6 w-6 text-lys-teal" />
+                        </div>
+                        <div>
+                          <p className="font-semibold">{author.user?.firstName} {author.user?.lastName}</p>
+                          <p className="text-sm text-muted-foreground">{author.user?.email}</p>
+                          {author.specializations && author.specializations.length > 0 && (
+                            <div className="flex gap-1 mt-1 flex-wrap">
+                              {author.specializations.map(spec => (
+                                <Badge key={spec} variant="secondary" className="text-xs">{spec}</Badge>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-4">
+                        <div className="text-right">
+                          <p className="text-lg font-bold">{author.lessonsCreated || 0}</p>
+                          <p className="text-xs text-muted-foreground">Lessons Created</p>
+                        </div>
+                        <Badge variant={author.status === "active" ? "default" : "secondary"}>
+                          {author.status}
+                        </Badge>
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          className="text-destructive hover:text-destructive"
+                          onClick={() => removeAuthorMutation.mutate(author.userId)}
+                          data-testid={`button-remove-author-${author.userId}`}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          )}
+        </TabsContent>
+
+        <TabsContent value="lesson-repository" className="space-y-4">
+          <div className="flex items-center justify-between gap-4 flex-wrap">
+            <div>
+              <h2 className="font-oswald text-xl">Master Lesson Repository</h2>
+              <p className="text-sm text-muted-foreground">Authoritative lessons that influence AI-generated content across the platform</p>
+            </div>
+            <div className="flex items-center gap-2 flex-wrap">
+              <Select value={lessonStatusFilter} onValueChange={setLessonStatusFilter}>
+                <SelectTrigger className="w-[150px]" data-testid="select-lesson-status">
+                  <SelectValue placeholder="Status" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Status</SelectItem>
+                  <SelectItem value="draft">Draft</SelectItem>
+                  <SelectItem value="pending_review">Pending Review</SelectItem>
+                  <SelectItem value="approved">Approved</SelectItem>
+                  <SelectItem value="archived">Archived</SelectItem>
+                </SelectContent>
+              </Select>
+              <Select value={lessonSubjectFilter} onValueChange={setLessonSubjectFilter}>
+                <SelectTrigger className="w-[150px]" data-testid="select-lesson-subject">
+                  <SelectValue placeholder="Subject" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Subjects</SelectItem>
+                  <SelectItem value="math">Math</SelectItem>
+                  <SelectItem value="science">Science</SelectItem>
+                  <SelectItem value="english">English</SelectItem>
+                  <SelectItem value="history">History</SelectItem>
+                  <SelectItem value="art">Art</SelectItem>
+                </SelectContent>
+              </Select>
+              <Dialog open={isBulkUploadOpen} onOpenChange={setIsBulkUploadOpen}>
+                <DialogTrigger asChild>
+                  <Button variant="outline" data-testid="button-bulk-upload">
+                    <Upload className="h-4 w-4 mr-2" />
+                    Bulk Import
+                  </Button>
+                </DialogTrigger>
+                <DialogContent className="max-w-2xl">
+                  <DialogHeader>
+                    <DialogTitle>Bulk Import Lessons</DialogTitle>
+                    <DialogDescription>
+                      Upload a CSV or JSON file containing lesson data. Lessons will be imported for review.
+                    </DialogDescription>
+                  </DialogHeader>
+                  <div className="space-y-4">
+                    <div>
+                      <Label htmlFor="bulk-file">Upload File (CSV or JSON)</Label>
+                      <Input
+                        id="bulk-file"
+                        type="file"
+                        accept=".csv,.json"
+                        onChange={handleBulkUploadFileChange}
+                        className="mt-2"
+                        data-testid="input-bulk-file"
+                      />
+                      <p className="text-xs text-muted-foreground mt-1">
+                        CSV columns: title, topic, subject, gradeLevel, gradeBand, bkdFocus, duration, assessment, objectives (semicolon-separated), materials (semicolon-separated), tags (semicolon-separated)
+                      </p>
+                    </div>
+                    {bulkUploadFile && (
+                      <div className="p-3 bg-muted rounded-md">
+                        <p className="text-sm font-medium">File: {bulkUploadFile.name}</p>
+                        <p className="text-xs text-muted-foreground">
+                          {bulkUploadAllLessons.length} valid lessons ready to import
+                          {bulkUploadErrors.length > 0 && `, ${bulkUploadErrors.length} with errors`}
+                        </p>
+                        {bulkUploadErrors.length > 0 && (
+                          <div className="mt-2 p-2 bg-destructive/10 rounded border border-destructive/20">
+                            <p className="text-xs text-destructive font-medium mb-1">Validation Errors (will be skipped):</p>
+                            <div className="space-y-0.5 max-h-24 overflow-y-auto">
+                              {bulkUploadErrors.slice(0, 5).map((err, idx) => (
+                                <p key={idx} className="text-xs text-destructive">{err}</p>
+                              ))}
+                              {bulkUploadErrors.length > 5 && (
+                                <p className="text-xs text-destructive">...and {bulkUploadErrors.length - 5} more</p>
+                              )}
+                            </div>
+                          </div>
+                        )}
+                        {bulkUploadPreview.length > 0 && (
+                          <div className="mt-2">
+                            <p className="text-xs text-muted-foreground mb-2">Preview (first {Math.min(5, bulkUploadPreview.length)} valid records):</p>
+                            <div className="space-y-1 max-h-40 overflow-y-auto">
+                              {bulkUploadPreview.map((lesson, idx) => (
+                                <div key={idx} className="text-xs p-2 bg-background rounded border">
+                                  <strong>{lesson.title}</strong> - {lesson.subject} / Grade {lesson.gradeLevel}
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                  <DialogFooter>
+                    <Button variant="outline" onClick={() => setIsBulkUploadOpen(false)}>Cancel</Button>
+                    <Button 
+                      onClick={handleBulkUploadSubmit}
+                      disabled={!bulkUploadFile || bulkUploadAllLessons.length === 0 || bulkUploadMutation.isPending}
+                      data-testid="button-submit-bulk"
+                    >
+                      {bulkUploadMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Upload className="h-4 w-4 mr-2" />}
+                      Import {bulkUploadAllLessons.length} Lesson{bulkUploadAllLessons.length !== 1 ? 's' : ''}
+                    </Button>
+                  </DialogFooter>
+                </DialogContent>
+              </Dialog>
+            </div>
+          </div>
+
+          {masterLessonsLoading ? (
+            <div className="space-y-2">
+              {[1, 2, 3].map(i => (
+                <div key={i} className="h-24 bg-muted animate-pulse rounded" />
+              ))}
+            </div>
+          ) : filteredMasterLessons.length === 0 ? (
+            <Card>
+              <CardContent className="py-8 text-center">
+                <BookOpen className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
+                <p className="text-muted-foreground">No lessons found. Lesson authors can create master lessons that will appear here.</p>
+              </CardContent>
+            </Card>
+          ) : (
+            <ScrollArea className="h-[600px]">
+              <div className="space-y-4">
+                {filteredMasterLessons.map((lesson) => (
+                  <Card key={lesson.id} data-testid={`lesson-card-${lesson.id}`}>
+                    <CardContent className="py-4">
+                      <div className="flex items-start justify-between gap-4">
+                        <div className="flex-1">
+                          <div className="flex items-center gap-2 mb-1">
+                            <h3 className="font-semibold">{lesson.title}</h3>
+                            <Badge variant={
+                              lesson.status === "approved" ? "default" :
+                              lesson.status === "pending_review" ? "secondary" :
+                              lesson.status === "draft" ? "outline" : "secondary"
+                            }>
+                              {lesson.status === "pending_review" ? "Pending Review" : lesson.status}
+                            </Badge>
+                          </div>
+                          <p className="text-sm text-muted-foreground line-clamp-2">{lesson.description || lesson.topic}</p>
+                          <div className="flex items-center gap-4 mt-2 flex-wrap">
+                            <Badge variant="outline">{lesson.subject}</Badge>
+                            <Badge variant="outline">{lesson.gradeLevel}</Badge>
+                            <Badge variant="outline" className="capitalize">{lesson.bkdFocus}</Badge>
+                            <span className="text-xs text-muted-foreground">{lesson.duration}</span>
+                          </div>
+                          <div className="flex items-center gap-4 mt-2 text-sm text-muted-foreground">
+                            <span>Quality: {lesson.qualityScore || 0}%</span>
+                            <span>Used: {lesson.usageCount || 0} times</span>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          {lesson.status === "pending_review" && (
+                            <>
+                              <Button
+                                size="sm"
+                                variant="default"
+                                className="bg-green-600 hover:bg-green-700"
+                                onClick={() => approveLessonMutation.mutate({ id: lesson.id })}
+                                disabled={approveLessonMutation.isPending}
+                                data-testid={`button-approve-${lesson.id}`}
+                              >
+                                <Check className="h-4 w-4 mr-1" />
+                                Approve
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="destructive"
+                                onClick={() => rejectLessonMutation.mutate({ id: lesson.id, notes: "Needs revision" })}
+                                disabled={rejectLessonMutation.isPending}
+                                data-testid={`button-reject-${lesson.id}`}
+                              >
+                                <X className="h-4 w-4 mr-1" />
+                                Reject
+                              </Button>
+                            </>
+                          )}
+                          <Button size="icon" variant="ghost" data-testid={`button-view-${lesson.id}`}>
+                            <Eye className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            </ScrollArea>
+          )}
+        </TabsContent>
+
+        <TabsContent value="content-library" className="space-y-4">
+          <div className="flex items-center justify-between gap-4 flex-wrap">
+            <div>
+              <h2 className="font-oswald text-xl">Content Library</h2>
+              <p className="text-sm text-muted-foreground">PDFs, eBooks, podcasts, and videos that influence AI lesson generation</p>
+            </div>
+            <div className="flex items-center gap-2">
+              <Select value={contentTypeFilter} onValueChange={setContentTypeFilter}>
+                <SelectTrigger className="w-[150px]" data-testid="select-content-type">
+                  <SelectValue placeholder="Type" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Types</SelectItem>
+                  <SelectItem value="pdf">PDF</SelectItem>
+                  <SelectItem value="ebook">eBook</SelectItem>
+                  <SelectItem value="book">Book</SelectItem>
+                  <SelectItem value="podcast">Podcast</SelectItem>
+                  <SelectItem value="youtube_channel">YouTube Channel</SelectItem>
+                  <SelectItem value="youtube_video">YouTube Video</SelectItem>
+                  <SelectItem value="article">Article</SelectItem>
+                </SelectContent>
+              </Select>
+              <Dialog open={isAddContentOpen} onOpenChange={setIsAddContentOpen}>
+                <DialogTrigger asChild>
+                  <Button className="bg-lys-teal hover:bg-lys-teal/90" data-testid="button-add-content">
+                    <Upload className="h-4 w-4 mr-2" />
+                    Add Content
+                  </Button>
+                </DialogTrigger>
+                <DialogContent className="max-w-lg">
+                  <DialogHeader>
+                    <DialogTitle>Add Content to Library</DialogTitle>
+                    <DialogDescription>
+                      Add educational content that will be used to enhance AI lesson generation.
+                    </DialogDescription>
+                  </DialogHeader>
+                  <div className="grid gap-4 py-4 max-h-[60vh] overflow-y-auto">
+                    <div className="grid gap-2">
+                      <Label htmlFor="content-title">Title</Label>
+                      <Input
+                        id="content-title"
+                        value={newContent.title}
+                        onChange={(e) => setNewContent({ ...newContent, title: e.target.value })}
+                        placeholder="Content title"
+                        data-testid="input-content-title"
+                      />
+                    </div>
+                    <div className="grid gap-2">
+                      <Label htmlFor="content-type">Content Type</Label>
+                      <Select value={newContent.contentType} onValueChange={(v) => setNewContent({ ...newContent, contentType: v })}>
+                        <SelectTrigger data-testid="select-new-content-type">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="pdf">PDF Document</SelectItem>
+                          <SelectItem value="ebook">eBook</SelectItem>
+                          <SelectItem value="book">Book</SelectItem>
+                          <SelectItem value="podcast">Podcast</SelectItem>
+                          <SelectItem value="youtube_channel">YouTube Channel</SelectItem>
+                          <SelectItem value="youtube_video">YouTube Video</SelectItem>
+                          <SelectItem value="article">Article</SelectItem>
+                          <SelectItem value="research_paper">Research Paper</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="grid gap-2">
+                      <Label htmlFor="content-source">Source URL</Label>
+                      <Input
+                        id="content-source"
+                        value={newContent.source}
+                        onChange={(e) => setNewContent({ ...newContent, source: e.target.value })}
+                        placeholder="https://..."
+                        data-testid="input-content-source"
+                      />
+                    </div>
+                    <div className="grid gap-2">
+                      <Label htmlFor="content-author">Author</Label>
+                      <Input
+                        id="content-author"
+                        value={newContent.author}
+                        onChange={(e) => setNewContent({ ...newContent, author: e.target.value })}
+                        placeholder="Original author"
+                        data-testid="input-content-author"
+                      />
+                    </div>
+                    <div className="grid gap-2">
+                      <Label htmlFor="content-description">Description</Label>
+                      <Textarea
+                        id="content-description"
+                        value={newContent.description}
+                        onChange={(e) => setNewContent({ ...newContent, description: e.target.value })}
+                        placeholder="Brief description of the content..."
+                        data-testid="input-content-description"
+                      />
+                    </div>
+                  </div>
+                  <DialogFooter>
+                    <Button
+                      onClick={() => createContentMutation.mutate(newContent)}
+                      disabled={!newContent.title || createContentMutation.isPending}
+                      data-testid="button-submit-content"
+                    >
+                      {createContentMutation.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+                      Add Content
+                    </Button>
+                  </DialogFooter>
+                </DialogContent>
+              </Dialog>
+            </div>
+          </div>
+
+          {contentLoading ? (
+            <div className="space-y-2">
+              {[1, 2, 3].map(i => (
+                <div key={i} className="h-20 bg-muted animate-pulse rounded" />
+              ))}
+            </div>
+          ) : filteredContent.length === 0 ? (
+            <Card>
+              <CardContent className="py-8 text-center">
+                <Library className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
+                <p className="text-muted-foreground">No content in library yet. Add PDFs, eBooks, podcasts, or YouTube content to enhance AI generation.</p>
+              </CardContent>
+            </Card>
+          ) : (
+            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+              {filteredContent.map((item) => (
+                <Card key={item.id} data-testid={`content-card-${item.id}`}>
+                  <CardContent className="py-4">
+                    <div className="flex items-start gap-3">
+                      <div className="w-10 h-10 rounded-lg bg-muted flex items-center justify-center shrink-0">
+                        {item.contentType === "pdf" && <FileText className="h-5 w-5" />}
+                        {item.contentType === "ebook" && <BookOpen className="h-5 w-5" />}
+                        {item.contentType === "book" && <BookOpen className="h-5 w-5" />}
+                        {item.contentType === "podcast" && <Headphones className="h-5 w-5" />}
+                        {(item.contentType === "youtube_channel" || item.contentType === "youtube_video") && <Video className="h-5 w-5" />}
+                        {item.contentType === "article" && <FileText className="h-5 w-5" />}
+                        {item.contentType === "research_paper" && <FileText className="h-5 w-5" />}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <h3 className="font-semibold text-sm truncate">{item.title}</h3>
+                        {item.author && <p className="text-xs text-muted-foreground">by {item.author}</p>}
+                        <div className="flex items-center gap-2 mt-1">
+                          <Badge variant="outline" className="text-xs capitalize">{item.contentType.replace("_", " ")}</Badge>
+                          <Badge variant={item.processingStatus === "completed" ? "default" : item.processingStatus === "failed" ? "destructive" : "secondary"} className="text-xs">
+                            {item.processingStatus === "completed" ? "Ready" : item.processingStatus}
+                          </Badge>
+                        </div>
+                        <p className="text-xs text-muted-foreground mt-1">Used {item.usageCount || 0} times</p>
+                      </div>
+                      <Button
+                        size="icon"
+                        variant="ghost"
+                        className="text-destructive hover:text-destructive shrink-0"
+                        onClick={() => deleteContentMutation.mutate(item.id)}
+                        data-testid={`button-delete-content-${item.id}`}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          )}
         </TabsContent>
       </Tabs>
     </div>
