@@ -202,11 +202,14 @@ export type InsertOrgMembership = z.infer<typeof insertOrgMembershipSchema>;
 export type OrgMembership = typeof organizationMemberships.$inferSelect;
 
 // Organization invitations for pending users
+export type PersonType = "educator" | "student" | "mentor" | "parent" | "employer" | "counselor" | "administrator" | "volunteer" | "other";
+
 export const organizationInvitations = pgTable("organization_invitations", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   organizationId: varchar("organization_id").notNull().references(() => organizations.id),
   email: varchar("email").notNull(),
   role: varchar("role").default("member").$type<OrgMemberRole>(),
+  personType: varchar("person_type").default("educator").$type<PersonType>(),
   token: varchar("token").notNull().unique(),
   invitedBy: varchar("invited_by").notNull(),
   expiresAt: timestamp("expires_at").notNull(),

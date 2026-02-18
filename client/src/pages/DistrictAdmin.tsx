@@ -46,6 +46,7 @@ export default function DistrictAdmin() {
   const [isInviteOpen, setIsInviteOpen] = useState(false);
   const [inviteEmail, setInviteEmail] = useState("");
   const [inviteRole, setInviteRole] = useState("member");
+  const [invitePersonType, setInvitePersonType] = useState("educator");
   const [isBulkImportOpen, setIsBulkImportOpen] = useState(false);
   const [bulkCsvText, setBulkCsvText] = useState("");
   const [bulkImportResults, setBulkImportResults] = useState<{ success: number; failed: number; errors: { row: number; email: string; message: string }[] } | null>(null);
@@ -98,7 +99,7 @@ export default function DistrictAdmin() {
   });
 
   const inviteMemberMutation = useMutation({
-    mutationFn: async (data: { email: string; role: string }) => {
+    mutationFn: async (data: { email: string; role: string; personType: string }) => {
       return await apiRequest("POST", `/api/organizations/${selectedCampusForPeople}/invite`, data);
     },
     onSuccess: () => {
@@ -139,22 +140,22 @@ export default function DistrictAdmin() {
     },
   });
 
-  const parseCsvText = (text: string): { email: string; role: string }[] => {
+  const parseCsvText = (text: string): { email: string; role: string; personType: string }[] => {
     const lines = text.trim().split("\n").filter(l => l.trim());
-    const results: { email: string; role: string }[] = [];
+    const results: { email: string; role: string; personType: string }[] = [];
     for (const line of lines) {
       const firstLine = line.trim().toLowerCase();
       if (firstLine.startsWith("email") || firstLine.startsWith("name")) continue;
       const parts = line.split(/[,\t]+/).map(p => p.trim());
       if (parts.length >= 1 && parts[0]) {
-        results.push({ email: parts[0], role: parts[1] || "member" });
+        results.push({ email: parts[0], personType: parts[1] || "educator", role: parts[2] || "member" });
       }
     }
     return results;
   };
 
   const bulkInviteMutation = useMutation({
-    mutationFn: async (people: { email: string; role: string }[]) => {
+    mutationFn: async (people: { email: string; role: string; personType: string }[]) => {
       const res = await apiRequest("POST", `/api/organizations/${selectedCampusForPeople}/bulk-invite`, { people });
       return res.json();
     },
@@ -475,13 +476,33 @@ export default function DistrictAdmin() {
                         </Select>
                         <p className="text-xs text-muted-foreground">This determines what the person can do within this organization</p>
                       </div>
+                      <div className="grid gap-2">
+                        <Label htmlFor="invite-person-type-district">Person Type</Label>
+                        <Select value={invitePersonType} onValueChange={setInvitePersonType}>
+                          <SelectTrigger data-testid="select-invite-person-type-district">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="educator">Educator</SelectItem>
+                            <SelectItem value="student">Student</SelectItem>
+                            <SelectItem value="mentor">Mentor</SelectItem>
+                            <SelectItem value="parent">Parent / Guardian</SelectItem>
+                            <SelectItem value="employer">Employer</SelectItem>
+                            <SelectItem value="counselor">Counselor</SelectItem>
+                            <SelectItem value="administrator">Administrator</SelectItem>
+                            <SelectItem value="volunteer">Volunteer</SelectItem>
+                            <SelectItem value="other">Other</SelectItem>
+                          </SelectContent>
+                        </Select>
+                        <p className="text-xs text-muted-foreground">This describes the person's role in the educational community. It can be changed after they accept.</p>
+                      </div>
                     </div>
                     <DialogFooter>
                       <Button variant="outline" onClick={() => setIsInviteOpen(false)} data-testid="button-cancel-invite">
                         Cancel
                       </Button>
                       <Button
-                        onClick={() => inviteMemberMutation.mutate({ email: inviteEmail, role: inviteRole })}
+                        onClick={() => inviteMemberMutation.mutate({ email: inviteEmail, role: inviteRole, personType: invitePersonType })}
                         disabled={!inviteEmail || inviteMemberMutation.isPending}
                         data-testid="button-send-invite"
                       >
@@ -509,14 +530,15 @@ export default function DistrictAdmin() {
                     <div className="grid gap-4 py-4">
                       <div className="p-3 rounded-md bg-muted/50 border">
                         <p className="text-sm font-medium mb-2">Required Format (CSV)</p>
-                        <p className="text-xs text-muted-foreground mb-2">One person per line. Columns: email, role (optional - defaults to "member")</p>
+                        <p className="text-xs text-muted-foreground mb-2">One person per line. Columns: email, person type, org role (last two optional)</p>
                         <code className="text-xs block bg-background p-2 rounded border font-mono">
-                          email,role{"\n"}
-                          teacher@school.edu,member{"\n"}
-                          admin@school.edu,admin{"\n"}
-                          coach@school.edu,member
+                          email,person type,role{"\n"}
+                          teacher@school.edu,educator,member{"\n"}
+                          mentor@org.com,mentor,member{"\n"}
+                          admin@school.edu,administrator,admin{"\n"}
+                          parent@email.com,parent,member
                         </code>
-                        <p className="text-xs text-muted-foreground mt-2">Roles: member, admin, or owner. You can also paste tab-separated data from a spreadsheet.</p>
+                        <p className="text-xs text-muted-foreground mt-2">Person types: educator, student, mentor, parent, employer, counselor, administrator, volunteer, other. Org roles: member, admin, owner. You can also paste tab-separated data from a spreadsheet.</p>
                       </div>
                       <div className="grid gap-2">
                         <Label htmlFor="bulk-csv-district">Paste your data here</Label>
@@ -524,7 +546,7 @@ export default function DistrictAdmin() {
                           id="bulk-csv-district"
                           value={bulkCsvText}
                           onChange={(e) => setBulkCsvText(e.target.value)}
-                          placeholder={"teacher1@school.edu,member\nteacher2@school.edu,admin\ncoach@school.edu,member"}
+                          placeholder={"teacher@school.edu,educator,member\nmentor@org.com,mentor,member\nparent@email.com,parent,member"}
                           className="min-h-[120px] font-mono text-sm"
                           data-testid="textarea-bulk-csv-district"
                         />
@@ -747,7 +769,12 @@ export default function DistrictAdmin() {
                             </p>
                           </div>
                         </div>
-                        <Badge variant="secondary" className="text-xs">{inv.role || "member"}</Badge>
+                        <div className="flex items-center gap-2">
+                          {inv.personType && (
+                            <Badge variant="outline" className="text-xs capitalize">{inv.personType}</Badge>
+                          )}
+                          <Badge variant="secondary" className="text-xs">{inv.role || "member"}</Badge>
+                        </div>
                       </div>
                     ))}
                   </div>

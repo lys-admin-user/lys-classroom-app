@@ -6418,7 +6418,7 @@ export async function registerRoutes(
   app.post("/api/organizations/:id/invite", isAuthenticated, async (req: any, res) => {
     try {
       const { id } = req.params;
-      const { email, role } = req.body;
+      const { email, role, personType } = req.body;
       const userId = req.user?.claims?.sub;
       
       const user = await storage.getUser(userId);
@@ -6438,6 +6438,7 @@ export async function registerRoutes(
         organizationId: id,
         email,
         role: role || "member",
+        personType: personType || "educator",
         token,
         invitedBy: userId,
         expiresAt,
@@ -6543,6 +6544,7 @@ export async function registerRoutes(
         const person = people[i];
         const email = person.email?.trim();
         const role = person.role?.trim()?.toLowerCase() || "member";
+        const personType = person.personType?.trim()?.toLowerCase() || "educator";
 
         if (!email || !email.includes("@")) {
           results.errors.push({ row: i + 1, email: email || "(empty)", message: "Invalid email address" });
@@ -6556,6 +6558,9 @@ export async function registerRoutes(
           continue;
         }
 
+        const validPersonTypes = ["educator", "student", "mentor", "parent", "employer", "counselor", "administrator", "volunteer", "other"];
+        const finalPersonType = validPersonTypes.includes(personType) ? personType : "educator";
+
         try {
           const token = randomUUID().replace(/-/g, "").substring(0, 32);
           const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
@@ -6564,6 +6569,7 @@ export async function registerRoutes(
             organizationId: id,
             email,
             role,
+            personType: finalPersonType,
             token,
             invitedBy: userId,
             expiresAt,
