@@ -22,14 +22,31 @@ export const sessions = pgTable(
 // enterprise: full organizational access with analytics
 export type UserTier = "free" | "pro" | "campus" | "enterprise";
 
-// User roles for different personas
+// User roles for different personas (ordered by privilege, highest first)
+// system_admin: complete platform oversight, configuration, and global settings
+// site_admin: platform-level admin with full access to manage all orgs
+// district_admin: district-level admin managing multiple campuses/schools
+// campus_admin: school/campus admin managing educators within one school
+// educator: teacher creating lessons, scope/sequence, managing classrooms
+// homeschool_parent: parent-educator hybrid with simplified tools (1-5 students)
 // student: K-12 or higher ed student using self-discovery and career tools
-// educator: teacher creating lessons and scope/sequence
-// campus_admin: school/district admin managing multiple educators
-// district_admin: district-level admin managing multiple campuses
-// site_admin: platform-level admin with full access
-// system_admin: complete platform oversight and configuration
-export type UserRole = "student" | "educator" | "campus_admin" | "district_admin" | "site_admin" | "system_admin";
+export type UserRole = "student" | "educator" | "homeschool_parent" | "campus_admin" | "district_admin" | "site_admin" | "system_admin";
+
+// Role hierarchy levels for permission checks (higher number = more privilege)
+export const ROLE_HIERARCHY: Record<UserRole, number> = {
+  student: 0,
+  homeschool_parent: 1,
+  educator: 2,
+  campus_admin: 3,
+  district_admin: 4,
+  site_admin: 5,
+  system_admin: 6,
+};
+
+// Helper to check if a role has at least the given privilege level
+export function hasRolePrivilege(userRole: UserRole, requiredRole: UserRole): boolean {
+  return (ROLE_HIERARCHY[userRole] || 0) >= (ROLE_HIERARCHY[requiredRole] || 0);
+}
 
 // User storage table.
 // (IMPORTANT) This table is mandatory for Replit Auth, don't drop it.

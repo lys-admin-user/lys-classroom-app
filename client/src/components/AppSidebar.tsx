@@ -1,5 +1,6 @@
 import { Link, useLocation } from "wouter";
 import { useAuth } from "@/hooks/use-auth";
+import { ROLE_HIERARCHY, type UserRole } from "@shared/models/auth";
 import {
   Sidebar,
   SidebarContent,
@@ -48,18 +49,26 @@ import {
   UserPlus,
 } from "lucide-react";
 
+function hasMinRole(userRole: string, minRole: UserRole): boolean {
+  const userLevel = ROLE_HIERARCHY[userRole as UserRole] ?? 0;
+  const requiredLevel = ROLE_HIERARCHY[minRole] ?? 0;
+  return userLevel >= requiredLevel;
+}
+
 interface NavItem {
   title: string;
   url: string;
   icon: React.ComponentType<{ className?: string }>;
-  roles?: string[];
+  minRole?: UserRole;
+  exactRole?: UserRole;
   requiresAuth?: boolean;
 }
 
 interface NavGroup {
   label: string;
   items: NavItem[];
-  roles?: string[];
+  minRole?: UserRole;
+  exactRole?: UserRole;
   colorClass?: string;
 }
 
@@ -98,12 +107,24 @@ const navigationGroups: NavGroup[] = [
     items: [
       { title: "Action Plans", url: "/action-plans", icon: Target, requiresAuth: true },
       { title: "Campus Activities", url: "/campus-activities", icon: Trophy, requiresAuth: true },
-      { title: "Assignments", url: "/assignments", icon: ClipboardList, requiresAuth: true, roles: ["educator", "campus_admin"] },
+      { title: "Assignments", url: "/assignments", icon: ClipboardList, requiresAuth: true, minRole: "homeschool_parent" },
+    ],
+  },
+  {
+    label: "Homeschool Tools",
+    exactRole: "homeschool_parent",
+    colorClass: "text-lys-teal",
+    items: [
+      { title: "AI Lesson Generator", url: "/lesson-generator", icon: Sparkles, requiresAuth: true },
+      { title: "My Lessons", url: "/my-lessons", icon: BookOpen, requiresAuth: true },
+      { title: "Scope & Sequence", url: "/scope-sequence", icon: Map, requiresAuth: true },
+      { title: "Gradebook", url: "/gradebook", icon: ClipboardList, requiresAuth: true },
+      { title: "Resource Library", url: "/resource-library", icon: Folder, requiresAuth: true },
     ],
   },
   {
     label: "Educator Tools",
-    roles: ["educator", "campus_admin"],
+    minRole: "educator",
     items: [
       { title: "AI Lesson Generator", url: "/lesson-generator", icon: Sparkles, requiresAuth: true },
       { title: "My Lessons", url: "/my-lessons", icon: BookOpen, requiresAuth: true },
@@ -119,7 +140,7 @@ const navigationGroups: NavGroup[] = [
   },
   {
     label: "Growth & Analytics",
-    roles: ["educator", "campus_admin"],
+    minRole: "homeschool_parent",
     items: [
       { title: "Analytics", url: "/analytics", icon: BarChart3, requiresAuth: true },
       { title: "Educator Influence", url: "/educator-influence", icon: Award, requiresAuth: true },
@@ -128,18 +149,33 @@ const navigationGroups: NavGroup[] = [
   },
   {
     label: "Student Management",
-    roles: ["educator", "campus_admin"],
+    minRole: "homeschool_parent",
     items: [
       { title: "Parent Portal", url: "/parent-portal", icon: Users, requiresAuth: true },
     ],
   },
   {
-    label: "Administration",
-    roles: ["campus_admin"],
+    label: "Campus Administration",
+    minRole: "campus_admin",
     items: [
       { title: "Campus Admin", url: "/admin", icon: Shield, requiresAuth: true },
       { title: "Standards Admin", url: "/admin/standards", icon: Database, requiresAuth: true },
+    ],
+  },
+  {
+    label: "District Administration",
+    minRole: "district_admin",
+    items: [
+      { title: "District Overview", url: "/district-admin", icon: Presentation, requiresAuth: true },
+      { title: "Campus Management", url: "/district-admin/campuses", icon: School, requiresAuth: true },
+    ],
+  },
+  {
+    label: "Platform Administration",
+    minRole: "site_admin",
+    items: [
       { title: "System Admin", url: "/system-admin", icon: Settings, requiresAuth: true },
+      { title: "User Management", url: "/system-admin/users", icon: Users, requiresAuth: true },
     ],
   },
 ];
@@ -155,17 +191,24 @@ export function AppSidebar() {
   };
 
   const shouldShowGroup = (group: NavGroup) => {
-    if (group.roles) {
+    if (group.exactRole) {
       if (!isAuthenticated) return false;
-      return group.roles.includes(userRole);
+      return userRole === group.exactRole;
+    }
+    if (group.minRole) {
+      if (!isAuthenticated) return false;
+      return hasMinRole(userRole, group.minRole);
     }
     return true;
   };
 
   const shouldShowItem = (item: NavItem) => {
     if (item.requiresAuth && !isAuthenticated) return false;
-    if (item.roles) {
-      return item.roles.includes(userRole);
+    if (item.exactRole) {
+      return userRole === item.exactRole;
+    }
+    if (item.minRole) {
+      return hasMinRole(userRole, item.minRole);
     }
     return true;
   };

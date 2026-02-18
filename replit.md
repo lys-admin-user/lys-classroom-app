@@ -22,7 +22,7 @@ Preferred communication style: Simple, everyday language.
 -   **Monorepo Structure**: `/client`, `/server`, and `/shared` directories.
 -   **AI Integration**: OpenAI API for AI-driven features, with mock data fallback.
 -   **Real-Time Collaboration**: WebSocket server for live cursor positions, presence, and chat.
--   **Multi-Tenancy**: Supports organizations (School, District, University) with role-based access control and an invitation system.
+-   **Multi-Tenancy**: Supports organizations (School, District, University) with hierarchical role-based access control (system_admin > site_admin > district_admin > campus_admin > educator > homeschool_parent > student), `requireRole()` middleware with DB lookups, and an invitation system.
 -   **Automated Standards Ingestion**: Three-tier system for importing educational standards including CSP API, planned CASE Protocol, and LLM extraction.
 
 ### Feature Specifications

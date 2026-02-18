@@ -137,7 +137,7 @@ const completeOnboardingSchema = z.object({
 });
 
 const updateRoleSchema = z.object({
-  role: z.enum(["student", "educator", "campus_admin", "district_admin", "site_admin", "system_admin", "homeschool_parent"]),
+  role: z.enum(["student", "educator", "homeschool_parent", "campus_admin", "district_admin", "site_admin", "system_admin"]),
 });
 
 async function syncScopeStandardsToProfile(scopeId: string, userId: string) {
@@ -157,6 +157,32 @@ async function syncScopeStandardsToProfile(scopeId: string, userId: string) {
     });
   }
 }
+
+function requireRole(...allowedRoles: string[]) {
+  return async (req: any, res: any, next: any) => {
+    try {
+      const userId = req.user?.claims?.sub;
+      if (!userId) {
+        res.status(401).json({ error: "Not authenticated" });
+        return;
+      }
+      const dbUser = await storage.getUser(userId);
+      const userRole = dbUser?.role || "student";
+      if (!allowedRoles.includes(userRole)) {
+        res.status(403).json({ error: "Insufficient permissions for this action" });
+        return;
+      }
+      next();
+    } catch {
+      res.status(500).json({ error: "Failed to verify permissions" });
+    }
+  };
+}
+
+const requireCampusAdmin = requireRole("campus_admin", "district_admin", "site_admin", "system_admin");
+const requireDistrictAdmin = requireRole("district_admin", "site_admin", "system_admin");
+const requireSiteAdmin = requireRole("site_admin", "system_admin");
+const requireSystemAdmin = requireRole("system_admin");
 
 export async function registerRoutes(
   httpServer: Server,
@@ -1508,7 +1534,7 @@ export async function registerRoutes(
   });
 
   // Get all pending change requests (for campus admin)
-  app.get("/api/admin/change-requests", isAuthenticated, async (req: any, res) => {
+  app.get("/api/admin/change-requests", isAuthenticated, requireCampusAdmin, async (req: any, res) => {
     try {
       const requests = await storage.getAllPendingChangeRequests();
       res.json(requests);
@@ -3164,7 +3190,7 @@ export async function registerRoutes(
   });
 
   // Get all KNOW resources for admin (includes inactive)
-  app.get("/api/admin/know-resources", isAuthenticated, async (req: any, res) => {
+  app.get("/api/admin/know-resources", isAuthenticated, requireCampusAdmin, async (req: any, res) => {
     try {
       const user = req.user;
       const role = user?.role || user?.claims?.role;
@@ -3202,7 +3228,7 @@ export async function registerRoutes(
   });
 
   // Create KNOW resource (admin only)
-  app.post("/api/admin/know-resources", isAuthenticated, async (req: any, res) => {
+  app.post("/api/admin/know-resources", isAuthenticated, requireCampusAdmin, async (req: any, res) => {
     try {
       const user = req.user;
       const userId = user?.claims?.sub || user?.id;
@@ -3232,7 +3258,7 @@ export async function registerRoutes(
   });
 
   // Update KNOW resource (admin only)
-  app.patch("/api/admin/know-resources/:id", isAuthenticated, async (req: any, res) => {
+  app.patch("/api/admin/know-resources/:id", isAuthenticated, requireCampusAdmin, async (req: any, res) => {
     try {
       const user = req.user;
       const userId = user?.claims?.sub || user?.id;
@@ -3265,7 +3291,7 @@ export async function registerRoutes(
   });
 
   // Delete KNOW resource (admin only)
-  app.delete("/api/admin/know-resources/:id", isAuthenticated, async (req: any, res) => {
+  app.delete("/api/admin/know-resources/:id", isAuthenticated, requireCampusAdmin, async (req: any, res) => {
     try {
       const user = req.user;
       const role = user?.role || user?.claims?.role;
@@ -3300,7 +3326,7 @@ export async function registerRoutes(
   });
 
   // Create matriculation event (admin only)
-  app.post("/api/admin/matriculation", isAuthenticated, async (req: any, res) => {
+  app.post("/api/admin/matriculation", isAuthenticated, requireCampusAdmin, async (req: any, res) => {
     try {
       const user = req.user;
       const role = user?.role || user?.claims?.role;
@@ -3331,7 +3357,7 @@ export async function registerRoutes(
   });
 
   // Get matriculation events by organization (admin)
-  app.get("/api/admin/matriculation/org/:orgId", isAuthenticated, async (req: any, res) => {
+  app.get("/api/admin/matriculation/org/:orgId", isAuthenticated, requireCampusAdmin, async (req: any, res) => {
     try {
       const user = req.user;
       const role = user?.role || user?.claims?.role;
@@ -3351,7 +3377,7 @@ export async function registerRoutes(
   });
 
   // Get matriculation statistics (admin)
-  app.get("/api/admin/matriculation/stats", isAuthenticated, async (req: any, res) => {
+  app.get("/api/admin/matriculation/stats", isAuthenticated, requireCampusAdmin, async (req: any, res) => {
     try {
       const user = req.user;
       const role = user?.role || user?.claims?.role;
@@ -3406,7 +3432,7 @@ export async function registerRoutes(
   });
 
   // Admin: Create system achievement
-  app.post("/api/admin/achievements", isAuthenticated, async (req: any, res) => {
+  app.post("/api/admin/achievements", isAuthenticated, requireCampusAdmin, async (req: any, res) => {
     try {
       const user = req.user;
       const role = user?.role || user?.claims?.role;
@@ -3437,7 +3463,7 @@ export async function registerRoutes(
   });
 
   // Admin: Update system achievement
-  app.patch("/api/admin/achievements/:id", isAuthenticated, async (req: any, res) => {
+  app.patch("/api/admin/achievements/:id", isAuthenticated, requireCampusAdmin, async (req: any, res) => {
     try {
       const user = req.user;
       const role = user?.role || user?.claims?.role;
@@ -3469,7 +3495,7 @@ export async function registerRoutes(
   });
 
   // Admin: Delete system achievement
-  app.delete("/api/admin/achievements/:id", isAuthenticated, async (req: any, res) => {
+  app.delete("/api/admin/achievements/:id", isAuthenticated, requireCampusAdmin, async (req: any, res) => {
     try {
       const user = req.user;
       const role = user?.role || user?.claims?.role;
@@ -3534,7 +3560,7 @@ export async function registerRoutes(
   });
 
   // Verify achievement (admin only)
-  app.post("/api/admin/achievements/:id/verify", isAuthenticated, async (req: any, res) => {
+  app.post("/api/admin/achievements/:id/verify", isAuthenticated, requireCampusAdmin, async (req: any, res) => {
     try {
       const user = req.user;
       const role = user?.role || user?.claims?.role;
@@ -3559,7 +3585,7 @@ export async function registerRoutes(
   });
 
   // Revoke achievement (admin only)
-  app.post("/api/admin/achievements/:id/revoke", isAuthenticated, async (req: any, res) => {
+  app.post("/api/admin/achievements/:id/revoke", isAuthenticated, requireCampusAdmin, async (req: any, res) => {
     try {
       const user = req.user;
       const role = user?.role || user?.claims?.role;
@@ -3590,7 +3616,7 @@ export async function registerRoutes(
   });
 
   // Get achievement statistics (admin)
-  app.get("/api/admin/achievements/stats", isAuthenticated, async (req: any, res) => {
+  app.get("/api/admin/achievements/stats", isAuthenticated, requireCampusAdmin, async (req: any, res) => {
     try {
       const user = req.user;
       const role = user?.role || user?.claims?.role;
@@ -3824,7 +3850,7 @@ export async function registerRoutes(
   };
 
   // Get sync status and statistics
-  app.get("/api/admin/standards/status", isAuthenticated, async (req: any, res) => {
+  app.get("/api/admin/standards/status", isAuthenticated, requireSiteAdmin, async (req: any, res) => {
     try {
       if (!await requireSiteAdminForStandards(req, res)) return;
       const status = await getSyncStatus();
@@ -3848,7 +3874,7 @@ export async function registerRoutes(
   });
 
   // Get all jurisdictions (from database) - admin version
-  app.get("/api/admin/standards/jurisdictions", isAuthenticated, async (req: any, res) => {
+  app.get("/api/admin/standards/jurisdictions", isAuthenticated, requireSiteAdmin, async (req: any, res) => {
     try {
       if (!await requireSiteAdminForStandards(req, res)) return;
       const country = req.query.country as string | undefined;
@@ -3861,7 +3887,7 @@ export async function registerRoutes(
   });
 
   // Get standard sets for a jurisdiction
-  app.get("/api/admin/standards/jurisdictions/:id/sets", isAuthenticated, async (req: any, res) => {
+  app.get("/api/admin/standards/jurisdictions/:id/sets", isAuthenticated, requireSiteAdmin, async (req: any, res) => {
     try {
       if (!await requireSiteAdminForStandards(req, res)) return;
       const { id } = req.params;
@@ -3874,7 +3900,7 @@ export async function registerRoutes(
   });
 
   // Get individual standards for a standard set
-  app.get("/api/admin/standards/sets/:id/standards", isAuthenticated, async (req: any, res) => {
+  app.get("/api/admin/standards/sets/:id/standards", isAuthenticated, requireSiteAdmin, async (req: any, res) => {
     try {
       if (!await requireSiteAdminForStandards(req, res)) return;
       const { id } = req.params;
@@ -3887,7 +3913,7 @@ export async function registerRoutes(
   });
 
   // Sync jurisdictions from CSP (Tier 1)
-  app.post("/api/admin/standards/sync/jurisdictions", isAuthenticated, async (req: any, res) => {
+  app.post("/api/admin/standards/sync/jurisdictions", isAuthenticated, requireSiteAdmin, async (req: any, res) => {
     try {
       if (!await requireSiteAdminForStandards(req, res)) return;
       const userId = req.user?.claims?.sub;
@@ -3900,7 +3926,7 @@ export async function registerRoutes(
   });
 
   // Sync a specific standard set from CSP
-  app.post("/api/admin/standards/sync/standard-set", isAuthenticated, async (req: any, res) => {
+  app.post("/api/admin/standards/sync/standard-set", isAuthenticated, requireSiteAdmin, async (req: any, res) => {
     try {
       if (!await requireSiteAdminForStandards(req, res)) return;
       const userId = req.user?.claims?.sub;
@@ -3920,7 +3946,7 @@ export async function registerRoutes(
   });
 
   // Get available jurisdictions from CSP API (for discovery)
-  app.get("/api/admin/standards/csp/jurisdictions", isAuthenticated, async (req: any, res) => {
+  app.get("/api/admin/standards/csp/jurisdictions", isAuthenticated, requireSiteAdmin, async (req: any, res) => {
     try {
       if (!await requireSiteAdminForStandards(req, res)) return;
       const jurisdictions = await fetchCSPJurisdictions();
@@ -3932,7 +3958,7 @@ export async function registerRoutes(
   });
 
   // Get sync logs
-  app.get("/api/admin/standards/sync-logs", isAuthenticated, async (req: any, res) => {
+  app.get("/api/admin/standards/sync-logs", isAuthenticated, requireSiteAdmin, async (req: any, res) => {
     try {
       if (!await requireSiteAdminForStandards(req, res)) return;
       const limit = parseInt(req.query.limit as string) || 20;
@@ -3945,7 +3971,7 @@ export async function registerRoutes(
   });
 
   // Full import of all standards from all jurisdictions
-  app.post("/api/admin/standards/sync/full-import", isAuthenticated, async (req: any, res) => {
+  app.post("/api/admin/standards/sync/full-import", isAuthenticated, requireSiteAdmin, async (req: any, res) => {
     try {
       if (!await requireSiteAdminForStandards(req, res)) return;
       const userId = req.user?.claims?.sub;
@@ -3964,7 +3990,7 @@ export async function registerRoutes(
   });
 
   // Get import progress
-  app.get("/api/admin/standards/import-progress", isAuthenticated, async (req: any, res) => {
+  app.get("/api/admin/standards/import-progress", isAuthenticated, requireSiteAdmin, async (req: any, res) => {
     try {
       if (!await requireSiteAdminForStandards(req, res)) return;
       const progress = getImportProgress();
@@ -4241,7 +4267,7 @@ export async function registerRoutes(
   // ================================
 
   // Get staging standards (pending, approved, rejected)
-  app.get("/api/admin/standards/staging", isAuthenticated, async (req: any, res) => {
+  app.get("/api/admin/standards/staging", isAuthenticated, requireSiteAdmin, async (req: any, res) => {
     try {
       if (!await requireSiteAdminForStandards(req, res)) return;
       const status = req.query.status as string | undefined;
@@ -4254,7 +4280,7 @@ export async function registerRoutes(
   });
 
   // Approve a staging standard
-  app.post("/api/admin/standards/staging/:id/approve", isAuthenticated, async (req: any, res) => {
+  app.post("/api/admin/standards/staging/:id/approve", isAuthenticated, requireSiteAdmin, async (req: any, res) => {
     try {
       if (!await requireSiteAdminForStandards(req, res)) return;
       const userId = req.user?.claims?.sub;
@@ -4272,7 +4298,7 @@ export async function registerRoutes(
   });
 
   // Reject a staging standard
-  app.post("/api/admin/standards/staging/:id/reject", isAuthenticated, async (req: any, res) => {
+  app.post("/api/admin/standards/staging/:id/reject", isAuthenticated, requireSiteAdmin, async (req: any, res) => {
     try {
       if (!await requireSiteAdminForStandards(req, res)) return;
       const userId = req.user?.claims?.sub;
@@ -4291,7 +4317,7 @@ export async function registerRoutes(
   });
 
   // Bulk approve staging standards
-  app.post("/api/admin/standards/staging/bulk-approve", isAuthenticated, async (req: any, res) => {
+  app.post("/api/admin/standards/staging/bulk-approve", isAuthenticated, requireSiteAdmin, async (req: any, res) => {
     try {
       if (!await requireSiteAdminForStandards(req, res)) return;
       const userId = req.user?.claims?.sub;
@@ -4317,7 +4343,7 @@ export async function registerRoutes(
   // ================================
 
   // Extract standards from text using LLM
-  app.post("/api/admin/standards/extract", isAuthenticated, async (req: any, res) => {
+  app.post("/api/admin/standards/extract", isAuthenticated, requireSiteAdmin, async (req: any, res) => {
     try {
       if (!await requireSiteAdminForStandards(req, res)) return;
       const { rawText, jurisdictionName, subject, gradeLevel } = req.body;
@@ -4334,7 +4360,7 @@ export async function registerRoutes(
   });
 
   // Process a PDF import
-  app.post("/api/admin/standards/pdf/:id/process", isAuthenticated, async (req: any, res) => {
+  app.post("/api/admin/standards/pdf/:id/process", isAuthenticated, requireSiteAdmin, async (req: any, res) => {
     try {
       if (!await requireSiteAdminForStandards(req, res)) return;
       const { id } = req.params;
@@ -4351,7 +4377,7 @@ export async function registerRoutes(
   // ================================
 
   // Check a source URL for changes
-  app.post("/api/admin/standards/check-source", isAuthenticated, async (req: any, res) => {
+  app.post("/api/admin/standards/check-source", isAuthenticated, requireSiteAdmin, async (req: any, res) => {
     try {
       if (!await requireSiteAdminForStandards(req, res)) return;
       const { sourceUrl } = req.body;
@@ -4368,7 +4394,7 @@ export async function registerRoutes(
   });
 
   // Get all sources with detected changes
-  app.get("/api/admin/standards/changed-sources", isAuthenticated, async (req: any, res) => {
+  app.get("/api/admin/standards/changed-sources", isAuthenticated, requireSiteAdmin, async (req: any, res) => {
     try {
       if (!await requireSiteAdminForStandards(req, res)) return;
       const sources = await storage.getChangedSources();
@@ -4380,7 +4406,7 @@ export async function registerRoutes(
   });
 
   // Deprecate a standard (soft delete)
-  app.post("/api/admin/standards/:id/deprecate", isAuthenticated, async (req: any, res) => {
+  app.post("/api/admin/standards/:id/deprecate", isAuthenticated, requireSiteAdmin, async (req: any, res) => {
     try {
       if (!await requireSiteAdminForStandards(req, res)) return;
       const { id } = req.params;
@@ -5451,6 +5477,16 @@ export async function registerRoutes(
       res.json(orgsWithDetails);
     } catch (error) {
       res.status(500).json({ error: "Failed to fetch organizations" });
+    }
+  });
+
+  app.get("/api/organizations/:orgId/children", isAuthenticated, async (req: any, res) => {
+    try {
+      const { orgId } = req.params;
+      const children = await storage.getChildOrganizations(orgId);
+      res.json(children);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch child organizations" });
     }
   });
 

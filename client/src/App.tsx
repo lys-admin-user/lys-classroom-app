@@ -54,6 +54,7 @@ import EssayBuilder from "@/pages/EssayBuilder";
 import CampusActivities from "@/pages/CampusActivities";
 import StrengthsInventory from "@/pages/StrengthsInventory";
 import MentorConnect from "@/pages/MentorConnect";
+import DistrictAdmin from "@/pages/DistrictAdmin";
 import NotFound from "@/pages/not-found";
 import { EmbedRouter } from "@/pages/EmbedRouter";
 
@@ -151,6 +152,8 @@ function Router() {
       <Route path="/campus-activities" component={CampusActivities} />
       <Route path="/strengths-inventory" component={StrengthsInventory} />
       <Route path="/mentor-connect" component={MentorConnect} />
+      <Route path="/district-admin" component={DistrictAdmin} />
+      <Route path="/district-admin/campuses" component={DistrictAdmin} />
       <Route component={NotFound} />
     </Switch>
   );
