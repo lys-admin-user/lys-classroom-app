@@ -157,7 +157,7 @@ export default function DistrictAdmin() {
           My District
         </h1>
         <p className="text-muted-foreground mt-1">
-          Manage the campuses, educators, and curriculum within your district
+          Manage campuses, connected organizations, educators, and curriculum across your district
           {districtOrg?.organization?.name && (
             <span className="font-medium"> — {districtOrg.organization.name}</span>
           )}
@@ -232,7 +232,7 @@ export default function DistrictAdmin() {
                   Campuses
                 </CardTitle>
                 <CardDescription>
-                  Schools and campuses in your district
+                  Schools and campuses in your district, each with their own internal teams and external partners
                 </CardDescription>
               </CardHeader>
               <CardContent>
@@ -278,7 +278,7 @@ export default function DistrictAdmin() {
                   Quick Actions
                 </CardTitle>
                 <CardDescription>
-                  District-wide management tools
+                  Coordinate alignment, standards, and analytics across all campuses
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-3">
@@ -339,7 +339,7 @@ export default function DistrictAdmin() {
           <div className="flex items-center justify-between gap-4 flex-wrap">
             <div>
               <h2 className="font-oswald text-xl">People Management</h2>
-              <p className="text-sm text-muted-foreground">View and manage educators, students, and staff across your district's campuses</p>
+              <p className="text-sm text-muted-foreground">View and manage educators, students, mentors, and staff across all campuses and connected partner organizations in your district</p>
             </div>
           </div>
 

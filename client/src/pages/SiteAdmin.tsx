@@ -410,7 +410,7 @@ export default function SiteAdminPage() {
             My Campus
           </h1>
           <p className="font-roboto text-muted-foreground">
-            Manage organizations, people, feature settings, and email templates for your campus
+            Manage your campus teams, external partner organizations, people, and campus settings
           </p>
         </div>
       </div>
@@ -418,7 +418,7 @@ export default function SiteAdminPage() {
       <div className="grid gap-4 md:grid-cols-3 mb-8">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between gap-4 pb-2">
-            <CardTitle className="text-sm font-medium">Total Organizations</CardTitle>
+            <CardTitle className="text-sm font-medium">Campus Organizations</CardTitle>
             <Building2 className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
@@ -481,8 +481,8 @@ export default function SiteAdminPage() {
         <TabsContent value="organizations" className="space-y-4">
           <div className="flex items-center justify-between gap-4 flex-wrap">
             <div>
-              <h2 className="font-oswald text-xl">Organizations</h2>
-              <p className="text-sm text-muted-foreground">Schools, districts, and universities connected to your campus</p>
+              <h2 className="font-oswald text-xl">Campus Organizations</h2>
+              <p className="text-sm text-muted-foreground">Internal teams (grade levels, departments, support staff) and external partners (non-profits, workforce boards, higher ed) connected to your campus</p>
             </div>
             <Dialog open={isCreateOrgOpen} onOpenChange={setIsCreateOrgOpen}>
               <DialogTrigger asChild>
@@ -495,7 +495,7 @@ export default function SiteAdminPage() {
                 <DialogHeader>
                   <DialogTitle>Create New Organization</DialogTitle>
                   <DialogDescription>
-                    Add a new school, district, or university to the platform.
+                    Add an internal campus team or connect an external partner organization.
                   </DialogDescription>
                 </DialogHeader>
                 <div className="grid gap-4 py-4">
@@ -505,7 +505,7 @@ export default function SiteAdminPage() {
                       id="org-name"
                       value={newOrg.name}
                       onChange={(e) => setNewOrg({ ...newOrg, name: e.target.value })}
-                      placeholder="Lincoln High School"
+                      placeholder="e.g., 9th Grade Team, Science Dept, Boys & Girls Club"
                       data-testid="input-org-name"
                     />
                   </div>
@@ -515,7 +515,7 @@ export default function SiteAdminPage() {
                       id="org-slug"
                       value={newOrg.slug}
                       onChange={(e) => setNewOrg({ ...newOrg, slug: e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, "-") })}
-                      placeholder="lincoln-high"
+                      placeholder="9th-grade-team"
                       data-testid="input-org-slug"
                     />
                   </div>
@@ -529,13 +529,20 @@ export default function SiteAdminPage() {
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="school">School</SelectItem>
-                        <SelectItem value="district">District</SelectItem>
-                        <SelectItem value="university">University</SelectItem>
-                        <SelectItem value="organization">Organization</SelectItem>
+                        <SelectItem value="school">Internal - School / Campus Team</SelectItem>
+                        <SelectItem value="district">Internal - District</SelectItem>
+                        <SelectItem value="university">Internal - University / Higher Ed</SelectItem>
+                        <SelectItem value="organization">External - Partner Organization</SelectItem>
                       </SelectContent>
                     </Select>
+                    <p className="text-xs text-muted-foreground">Internal teams are part of your campus. External partners connect to provide mentoring, scholarships, workforce opportunities, or enrichment resources.</p>
                   </div>
+                  {newOrg.type === "organization" && (
+                    <div className="p-3 rounded-md bg-amber-500/10 border border-amber-500/20">
+                      <p className="text-sm font-medium text-amber-700 dark:text-amber-400">External Partner Notice</p>
+                      <p className="text-xs text-muted-foreground mt-1">External partners do not have access to student academic data. Members of this organization will need to be assigned to a class within the campus to interact with students.</p>
+                    </div>
+                  )}
                   <div className="grid gap-2">
                     <Label htmlFor="org-tier">Tier</Label>
                     <Select
@@ -581,8 +588,8 @@ export default function SiteAdminPage() {
             <Card>
               <CardContent className="py-12 text-center">
                 <Building2 className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-                <p className="text-muted-foreground">No organizations yet</p>
-                <p className="text-sm text-muted-foreground">Create your first organization to get started</p>
+                <p className="text-muted-foreground font-medium">No organizations yet</p>
+                <p className="text-sm text-muted-foreground mt-1">Create internal campus teams (grade levels, departments) or connect external partners (non-profits, workforce boards) to get started</p>
               </CardContent>
             </Card>
           ) : (
