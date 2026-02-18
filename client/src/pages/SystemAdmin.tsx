@@ -2619,7 +2619,7 @@ function TechnicalSpecsSection() {
         { label: "ORM", value: "Drizzle ORM with drizzle-zod for schema-to-validation" },
         { label: "Schema Location", value: "shared/schema.ts (monorepo shared types)" },
         { label: "Migrations", value: "Drizzle Kit with push strategy" },
-        { label: "Tables", value: "50+ tables covering users, lessons, organizations, standards, careers, portfolios, gradebook, and more" },
+        { label: "Tables", value: "100+ tables covering users, lessons, organizations, standards, careers, portfolios, gradebook, journeys, scholarships, and more" },
         { label: "Session Storage", value: "PostgreSQL sessions table with TTL index" },
         { label: "Caching", value: "Database-backed lesson plan cache with 30-day TTL and SHA-256 keys" },
       ],
@@ -2657,7 +2657,7 @@ function TechnicalSpecsSection() {
         { label: "Ownership Checks", value: "User-scoped data access with server-side ID regeneration" },
         { label: "COPPA Compliance", value: "Grade-level ad restriction (K-7 never see ads)" },
         { label: "Session Security", value: "HTTP-only cookies, secure in production, 30-day max age" },
-        { label: "RBAC", value: "Role-based access: student, educator, campus_admin, district_admin, site_admin, system_admin" },
+        { label: "RBAC", value: "7-role hierarchy: student < homeschool_parent < educator < campus_admin < district_admin < site_admin < system_admin" },
         { label: "Secrets Management", value: "Replit secrets store for API keys and credentials" },
       ],
     },
@@ -2670,6 +2670,7 @@ function TechnicalSpecsSection() {
         { label: "Governance Models", value: "Bottom-heavy (US), Top-down unitary (centralized), Federal hybrid" },
         { label: "Tier System", value: "Free (ad-supported), Pro, Campus, Enterprise with feature gating" },
         { label: "Be-Know-Do Framework", value: "Three-pillar methodology: Being (identity), Knowing (career), Doing (action)" },
+        { label: "Admin Scoping", value: "My Campus (org/admin/flags), My District (multi-campus), System-Wide Admin (platform config/content)" },
         { label: "Affiliate System", value: "Referral codes, social sharing, point-based educator rewards" },
         { label: "Ad Monetization", value: "IAB standard sizes, sponsor categories, eCPM $8-15 range, tier-aware rendering" },
         { label: "Global Pricing", value: "Country Affordability Index (CAI) across 120+ countries" },
@@ -2784,19 +2785,19 @@ function TechnicalSpecsSection() {
         <CardContent>
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
             <div className="p-3 bg-muted/30 rounded-lg text-center">
-              <p className="text-2xl font-bold font-oswald text-lys-red">50+</p>
+              <p className="text-2xl font-bold font-oswald text-lys-red">100+</p>
               <p className="text-xs text-muted-foreground">Database Tables</p>
             </div>
             <div className="p-3 bg-muted/30 rounded-lg text-center">
-              <p className="text-2xl font-bold font-oswald text-lys-yellow">30+</p>
+              <p className="text-2xl font-bold font-oswald text-lys-yellow">47</p>
               <p className="text-xs text-muted-foreground">Pages / Routes</p>
             </div>
             <div className="p-3 bg-muted/30 rounded-lg text-center">
-              <p className="text-2xl font-bold font-oswald text-lys-teal">100+</p>
+              <p className="text-2xl font-bold font-oswald text-lys-teal">430+</p>
               <p className="text-xs text-muted-foreground">API Endpoints</p>
             </div>
             <div className="p-3 bg-muted/30 rounded-lg text-center">
-              <p className="text-2xl font-bold font-oswald">6</p>
+              <p className="text-2xl font-bold font-oswald">7</p>
               <p className="text-xs text-muted-foreground">User Roles</p>
             </div>
           </div>
