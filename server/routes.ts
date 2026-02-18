@@ -6510,6 +6510,116 @@ export async function registerRoutes(
     }
   });
 
+  // Bulk invite members to organization (CSV data)
+  app.post("/api/organizations/:id/bulk-invite", isAuthenticated, async (req: any, res) => {
+    try {
+      const { id } = req.params;
+      const { people } = req.body;
+      const userId = req.user?.claims?.sub;
+
+      const user = await storage.getUser(userId);
+      const isSiteAdminUser = await storage.isSiteAdmin(userId);
+      const isCampusOrHigher = user && ["campus_admin", "district_admin", "site_admin", "system_admin"].includes(user.role || "");
+      const membership = await storage.getOrgMembership(id, userId);
+
+      if (!isSiteAdminUser && !isCampusOrHigher && (!membership || membership.role === "member")) {
+        res.status(403).json({ error: "Admin access required" });
+        return;
+      }
+
+      if (!Array.isArray(people) || people.length === 0) {
+        res.status(400).json({ error: "No people data provided" });
+        return;
+      }
+
+      if (people.length > 500) {
+        res.status(400).json({ error: "Maximum 500 people per batch" });
+        return;
+      }
+
+      const results = { success: 0, failed: 0, errors: [] as { row: number; email: string; message: string }[] };
+
+      for (let i = 0; i < people.length; i++) {
+        const person = people[i];
+        const email = person.email?.trim();
+        const role = person.role?.trim()?.toLowerCase() || "member";
+
+        if (!email || !email.includes("@")) {
+          results.errors.push({ row: i + 1, email: email || "(empty)", message: "Invalid email address" });
+          results.failed++;
+          continue;
+        }
+
+        if (!["member", "admin", "owner"].includes(role)) {
+          results.errors.push({ row: i + 1, email, message: `Invalid role "${role}". Use member, admin, or owner.` });
+          results.failed++;
+          continue;
+        }
+
+        try {
+          const token = randomUUID().replace(/-/g, "").substring(0, 32);
+          const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+
+          await storage.createOrgInvitation({
+            organizationId: id,
+            email,
+            role,
+            token,
+            invitedBy: userId,
+            expiresAt,
+          });
+          results.success++;
+        } catch (err) {
+          results.errors.push({ row: i + 1, email, message: "Failed to create invitation" });
+          results.failed++;
+        }
+      }
+
+      res.json(results);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to process bulk invitations" });
+    }
+  });
+
+  // Bulk remove members from organization
+  app.post("/api/organizations/:orgId/bulk-remove", isAuthenticated, async (req: any, res) => {
+    try {
+      const { orgId } = req.params;
+      const { memberIds } = req.body;
+      const userId = req.user?.claims?.sub;
+
+      const isSiteAdminUser = await storage.isSiteAdmin(userId);
+      const user = await storage.getUser(userId);
+      const isCampusOrHigher = user && ["campus_admin", "district_admin", "site_admin", "system_admin"].includes(user.role || "");
+      const membership = await storage.getOrgMembership(orgId, userId);
+
+      if (!isSiteAdminUser && !isCampusOrHigher && (!membership || membership.role === "member")) {
+        res.status(403).json({ error: "Admin access required" });
+        return;
+      }
+
+      if (!Array.isArray(memberIds) || memberIds.length === 0) {
+        res.status(400).json({ error: "No members selected" });
+        return;
+      }
+
+      let removed = 0;
+      let failed = 0;
+      for (const memberId of memberIds) {
+        try {
+          await storage.deleteOrgMembership(memberId);
+          removed++;
+        } catch {
+          failed++;
+        }
+      }
+
+      res.json({ removed, failed });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to bulk remove members" });
+    }
+  });
+
   // Platform statistics for site admin dashboard
   app.get("/api/admin/stats", isAuthenticated, isSiteAdmin, async (req: any, res) => {
     try {

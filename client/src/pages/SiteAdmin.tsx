@@ -15,7 +15,7 @@ import { Slider } from "@/components/ui/slider";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useState } from "react";
-import { Shield, Building2, Users, Plus, Trash2, Settings, BarChart3, AlertTriangle, Loader2, Flag, Mail, Edit2, ToggleLeft, Percent, TrendingUp, Target, Award, GraduationCap, Star, Brain, Compass, Briefcase, Library, FileText, Clock, Search, UserPlus, Mail as MailIcon } from "lucide-react";
+import { Shield, Building2, Users, Plus, Trash2, Settings, BarChart3, AlertTriangle, Loader2, Flag, Mail, Edit2, ToggleLeft, Percent, TrendingUp, Target, Award, GraduationCap, Star, Brain, Compass, Briefcase, Library, FileText, Clock, Search, UserPlus, Mail as MailIcon, Upload, Download, CheckSquare, Square, AlertCircle } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Progress } from "@/components/ui/progress";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -40,6 +40,11 @@ export default function SiteAdminPage() {
   const [isInviteOpen, setIsInviteOpen] = useState(false);
   const [inviteEmail, setInviteEmail] = useState("");
   const [inviteRole, setInviteRole] = useState("member");
+  const [isBulkImportOpen, setIsBulkImportOpen] = useState(false);
+  const [bulkCsvText, setBulkCsvText] = useState("");
+  const [bulkImportResults, setBulkImportResults] = useState<{ success: number; failed: number; errors: { row: number; email: string; message: string }[] } | null>(null);
+  const [selectedMembers, setSelectedMembers] = useState<Set<string>>(new Set());
+  const [isBulkDeleteConfirmOpen, setIsBulkDeleteConfirmOpen] = useState(false);
   
   const { data: adminCheck, isLoading: checkLoading } = useQuery<{ isSiteAdmin: boolean }>({
     queryKey: ["/api/admin/check"],
@@ -136,6 +141,72 @@ export default function SiteAdminPage() {
       toast({ title: "Failed to update role", variant: "destructive" });
     },
   });
+
+  const parseCsvText = (text: string): { email: string; role: string }[] => {
+    const lines = text.trim().split("\n").filter(l => l.trim());
+    const results: { email: string; role: string }[] = [];
+    for (const line of lines) {
+      const firstLine = line.trim().toLowerCase();
+      if (firstLine.startsWith("email") || firstLine.startsWith("name")) continue;
+      const parts = line.split(/[,\t]+/).map(p => p.trim());
+      if (parts.length >= 1 && parts[0]) {
+        results.push({ email: parts[0], role: parts[1] || "member" });
+      }
+    }
+    return results;
+  };
+
+  const bulkInviteMutation = useMutation({
+    mutationFn: async (people: { email: string; role: string }[]) => {
+      const res = await apiRequest("POST", `/api/organizations/${selectedOrgForPeople}/bulk-invite`, { people });
+      return res.json();
+    },
+    onSuccess: (data) => {
+      setBulkImportResults(data);
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/organizations", selectedOrgForPeople, "invitations"] });
+      if (data.success > 0) {
+        toast({ title: `${data.success} invitation(s) sent successfully${data.failed > 0 ? `, ${data.failed} failed` : ""}` });
+      } else {
+        toast({ title: "No invitations sent - check errors below", variant: "destructive" });
+      }
+    },
+    onError: () => {
+      toast({ title: "Failed to process bulk invitations", variant: "destructive" });
+    },
+  });
+
+  const bulkRemoveMutation = useMutation({
+    mutationFn: async (memberIds: string[]) => {
+      const res = await apiRequest("POST", `/api/organizations/${selectedOrgForPeople}/bulk-remove`, { memberIds });
+      return res.json();
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/organizations", selectedOrgForPeople, "members"] });
+      setSelectedMembers(new Set());
+      setIsBulkDeleteConfirmOpen(false);
+      toast({ title: `${data.removed} member(s) removed${data.failed > 0 ? `, ${data.failed} failed` : ""}` });
+    },
+    onError: () => {
+      toast({ title: "Failed to remove members", variant: "destructive" });
+    },
+  });
+
+  const toggleMemberSelection = (memberId: string) => {
+    setSelectedMembers(prev => {
+      const next = new Set(prev);
+      if (next.has(memberId)) next.delete(memberId);
+      else next.add(memberId);
+      return next;
+    });
+  };
+
+  const toggleAllMembers = (members: any[]) => {
+    if (selectedMembers.size === members.length) {
+      setSelectedMembers(new Set());
+    } else {
+      setSelectedMembers(new Set(members.map((m: any) => m.id)));
+    }
+  };
 
   // Performance Analytics Types
   type EducatorPerformanceMetric = {
@@ -690,7 +761,7 @@ export default function SiteAdminPage() {
           <div className="flex items-center gap-4 flex-wrap">
             <div className="w-full max-w-sm">
               <Label htmlFor="people-org-select" className="text-sm text-muted-foreground mb-1 block">Select an organization to view its members</Label>
-              <Select value={selectedOrgForPeople} onValueChange={setSelectedOrgForPeople}>
+              <Select value={selectedOrgForPeople} onValueChange={(v) => { setSelectedOrgForPeople(v); setSelectedMembers(new Set()); }}>
                 <SelectTrigger data-testid="select-people-org">
                   <SelectValue placeholder="Choose an organization..." />
                 </SelectTrigger>
@@ -702,62 +773,182 @@ export default function SiteAdminPage() {
               </Select>
             </div>
             {selectedOrgForPeople && (
-              <Dialog open={isInviteOpen} onOpenChange={setIsInviteOpen}>
-                <DialogTrigger asChild>
-                  <Button data-testid="button-invite-people">
-                    <UserPlus className="h-4 w-4 mr-2" />
-                    Invite People
-                  </Button>
-                </DialogTrigger>
-                <DialogContent>
-                  <DialogHeader>
-                    <DialogTitle>Invite People</DialogTitle>
-                    <DialogDescription>
-                      Send an email invitation to join the selected organization. They will receive a link to accept and join.
-                    </DialogDescription>
-                  </DialogHeader>
-                  <div className="grid gap-4 py-4">
-                    <div className="grid gap-2">
-                      <Label htmlFor="invite-email">Email Address</Label>
-                      <Input
-                        id="invite-email"
-                        type="email"
-                        value={inviteEmail}
-                        onChange={(e) => setInviteEmail(e.target.value)}
-                        placeholder="educator@school.edu"
-                        data-testid="input-invite-email"
-                      />
-                    </div>
-                    <div className="grid gap-2">
-                      <Label htmlFor="invite-role">Organization Role</Label>
-                      <Select value={inviteRole} onValueChange={setInviteRole}>
-                        <SelectTrigger data-testid="select-invite-role">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="member">Member - Can view and participate</SelectItem>
-                          <SelectItem value="admin">Admin - Can manage members and settings</SelectItem>
-                          <SelectItem value="owner">Owner - Full control over the organization</SelectItem>
-                        </SelectContent>
-                      </Select>
-                      <p className="text-xs text-muted-foreground">This determines what the person can do within this organization</p>
-                    </div>
-                  </div>
-                  <DialogFooter>
-                    <Button variant="outline" onClick={() => setIsInviteOpen(false)} data-testid="button-cancel-invite">
-                      Cancel
+              <div className="flex items-center gap-2 flex-wrap">
+                <Dialog open={isInviteOpen} onOpenChange={setIsInviteOpen}>
+                  <DialogTrigger asChild>
+                    <Button data-testid="button-invite-people">
+                      <UserPlus className="h-4 w-4 mr-2" />
+                      Invite People
                     </Button>
-                    <Button
-                      onClick={() => inviteMemberMutation.mutate({ email: inviteEmail, role: inviteRole })}
-                      disabled={!inviteEmail || inviteMemberMutation.isPending}
-                      data-testid="button-send-invite"
-                    >
-                      {inviteMemberMutation.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
-                      Send Invitation
+                  </DialogTrigger>
+                  <DialogContent>
+                    <DialogHeader>
+                      <DialogTitle>Invite People</DialogTitle>
+                      <DialogDescription>
+                        Send an email invitation to join the selected organization. They will receive a link to accept and join.
+                      </DialogDescription>
+                    </DialogHeader>
+                    <div className="grid gap-4 py-4">
+                      <div className="grid gap-2">
+                        <Label htmlFor="invite-email">Email Address</Label>
+                        <Input
+                          id="invite-email"
+                          type="email"
+                          value={inviteEmail}
+                          onChange={(e) => setInviteEmail(e.target.value)}
+                          placeholder="educator@school.edu"
+                          data-testid="input-invite-email"
+                        />
+                      </div>
+                      <div className="grid gap-2">
+                        <Label htmlFor="invite-role">Organization Role</Label>
+                        <Select value={inviteRole} onValueChange={setInviteRole}>
+                          <SelectTrigger data-testid="select-invite-role">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="member">Member - Can view and participate</SelectItem>
+                            <SelectItem value="admin">Admin - Can manage members and settings</SelectItem>
+                            <SelectItem value="owner">Owner - Full control over the organization</SelectItem>
+                          </SelectContent>
+                        </Select>
+                        <p className="text-xs text-muted-foreground">This determines what the person can do within this organization</p>
+                      </div>
+                    </div>
+                    <DialogFooter>
+                      <Button variant="outline" onClick={() => setIsInviteOpen(false)} data-testid="button-cancel-invite">
+                        Cancel
+                      </Button>
+                      <Button
+                        onClick={() => inviteMemberMutation.mutate({ email: inviteEmail, role: inviteRole })}
+                        disabled={!inviteEmail || inviteMemberMutation.isPending}
+                        data-testid="button-send-invite"
+                      >
+                        {inviteMemberMutation.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+                        Send Invitation
+                      </Button>
+                    </DialogFooter>
+                  </DialogContent>
+                </Dialog>
+
+                <Dialog open={isBulkImportOpen} onOpenChange={(open) => { setIsBulkImportOpen(open); if (!open) { setBulkCsvText(""); setBulkImportResults(null); } }}>
+                  <DialogTrigger asChild>
+                    <Button variant="outline" data-testid="button-bulk-import">
+                      <Upload className="h-4 w-4 mr-2" />
+                      Bulk Add
                     </Button>
-                  </DialogFooter>
-                </DialogContent>
-              </Dialog>
+                  </DialogTrigger>
+                  <DialogContent className="max-w-lg">
+                    <DialogHeader>
+                      <DialogTitle>Bulk Add People</DialogTitle>
+                      <DialogDescription>
+                        Add multiple people at once by pasting their information below. Each person will receive an email invitation.
+                      </DialogDescription>
+                    </DialogHeader>
+                    <div className="grid gap-4 py-4">
+                      <div className="p-3 rounded-md bg-muted/50 border">
+                        <p className="text-sm font-medium mb-2">Required Format (CSV)</p>
+                        <p className="text-xs text-muted-foreground mb-2">One person per line. Columns: email, role (optional - defaults to "member")</p>
+                        <code className="text-xs block bg-background p-2 rounded border font-mono">
+                          email,role{"\n"}
+                          teacher@school.edu,member{"\n"}
+                          admin@school.edu,admin{"\n"}
+                          coach@school.edu,member
+                        </code>
+                        <p className="text-xs text-muted-foreground mt-2">Roles: member, admin, or owner. You can also paste tab-separated data from a spreadsheet.</p>
+                      </div>
+                      <div className="grid gap-2">
+                        <Label htmlFor="bulk-csv">Paste your data here</Label>
+                        <Textarea
+                          id="bulk-csv"
+                          value={bulkCsvText}
+                          onChange={(e) => setBulkCsvText(e.target.value)}
+                          placeholder={"teacher1@school.edu,member\nteacher2@school.edu,admin\ncoach@school.edu,member"}
+                          className="min-h-[120px] font-mono text-sm"
+                          data-testid="textarea-bulk-csv"
+                        />
+                        <p className="text-xs text-muted-foreground">
+                          {bulkCsvText ? `${parseCsvText(bulkCsvText).length} people detected` : "Paste CSV or tab-separated data"}
+                        </p>
+                      </div>
+                      {bulkImportResults && (
+                        <div className="p-3 rounded-md border space-y-2">
+                          <p className="text-sm font-medium">Results</p>
+                          <div className="flex gap-4 text-sm">
+                            <span className="text-green-600">{bulkImportResults.success} sent</span>
+                            {bulkImportResults.failed > 0 && <span className="text-destructive">{bulkImportResults.failed} failed</span>}
+                          </div>
+                          {bulkImportResults.errors.length > 0 && (
+                            <div className="space-y-1 max-h-32 overflow-y-auto">
+                              {bulkImportResults.errors.map((err, i) => (
+                                <div key={i} className="flex items-start gap-2 text-xs text-destructive">
+                                  <AlertCircle className="h-3 w-3 mt-0.5 shrink-0" />
+                                  <span>Row {err.row} ({err.email}): {err.message}</span>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                    <DialogFooter>
+                      <Button variant="outline" onClick={() => { setIsBulkImportOpen(false); setBulkCsvText(""); setBulkImportResults(null); }} data-testid="button-cancel-bulk">
+                        {bulkImportResults ? "Close" : "Cancel"}
+                      </Button>
+                      {!bulkImportResults && (
+                        <Button
+                          onClick={() => {
+                            const people = parseCsvText(bulkCsvText);
+                            if (people.length === 0) {
+                              toast({ title: "No valid entries found. Check your format.", variant: "destructive" });
+                              return;
+                            }
+                            bulkInviteMutation.mutate(people);
+                          }}
+                          disabled={!bulkCsvText.trim() || bulkInviteMutation.isPending}
+                          data-testid="button-send-bulk-invites"
+                        >
+                          {bulkInviteMutation.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+                          Send {parseCsvText(bulkCsvText).length} Invitations
+                        </Button>
+                      )}
+                    </DialogFooter>
+                  </DialogContent>
+                </Dialog>
+
+                {selectedMembers.size > 0 && (
+                  <Dialog open={isBulkDeleteConfirmOpen} onOpenChange={setIsBulkDeleteConfirmOpen}>
+                    <DialogTrigger asChild>
+                      <Button variant="destructive" data-testid="button-bulk-delete">
+                        <Trash2 className="h-4 w-4 mr-2" />
+                        Remove {selectedMembers.size} Selected
+                      </Button>
+                    </DialogTrigger>
+                    <DialogContent>
+                      <DialogHeader>
+                        <DialogTitle>Remove Selected Members</DialogTitle>
+                        <DialogDescription>
+                          Are you sure you want to remove {selectedMembers.size} member(s) from this organization? This action cannot be undone.
+                        </DialogDescription>
+                      </DialogHeader>
+                      <DialogFooter>
+                        <Button variant="outline" onClick={() => setIsBulkDeleteConfirmOpen(false)} data-testid="button-cancel-bulk-delete">
+                          Cancel
+                        </Button>
+                        <Button
+                          variant="destructive"
+                          onClick={() => bulkRemoveMutation.mutate(Array.from(selectedMembers))}
+                          disabled={bulkRemoveMutation.isPending}
+                          data-testid="button-confirm-bulk-delete"
+                        >
+                          {bulkRemoveMutation.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+                          Remove {selectedMembers.size} Members
+                        </Button>
+                      </DialogFooter>
+                    </DialogContent>
+                  </Dialog>
+                )}
+              </div>
             )}
           </div>
 
@@ -772,7 +963,12 @@ export default function SiteAdminPage() {
           ) : (
             <div className="space-y-6">
               <div>
-                <h3 className="font-oswald text-lg mb-3">Current Members</h3>
+                <div className="flex items-center justify-between gap-4 mb-3 flex-wrap">
+                  <h3 className="font-oswald text-lg">Current Members</h3>
+                  {orgMembers.length > 0 && (
+                    <p className="text-xs text-muted-foreground">{orgMembers.length} member(s) total</p>
+                  )}
+                </div>
                 {membersLoading ? (
                   <div className="flex items-center justify-center py-8">
                     <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
@@ -782,18 +978,45 @@ export default function SiteAdminPage() {
                     <CardContent className="py-8 text-center">
                       <Users className="h-10 w-10 text-muted-foreground mx-auto mb-3" />
                       <p className="text-muted-foreground text-sm">No members in this organization yet</p>
-                      <p className="text-xs text-muted-foreground mt-1">Use the "Invite People" button to add educators, students, or staff</p>
+                      <p className="text-xs text-muted-foreground mt-1">Use "Invite People" or "Bulk Add" to add educators, students, or staff</p>
                     </CardContent>
                   </Card>
                 ) : (
                   <div className="space-y-2">
+                    <div className="flex items-center gap-3 px-3 py-2 rounded-md bg-muted/30">
+                      <button
+                        onClick={() => toggleAllMembers(orgMembers)}
+                        className="text-muted-foreground hover:text-foreground"
+                        data-testid="button-select-all-members"
+                      >
+                        {selectedMembers.size === orgMembers.length ? (
+                          <CheckSquare className="h-4 w-4" />
+                        ) : (
+                          <Square className="h-4 w-4" />
+                        )}
+                      </button>
+                      <span className="text-xs text-muted-foreground">
+                        {selectedMembers.size > 0 ? `${selectedMembers.size} selected` : "Select all"}
+                      </span>
+                    </div>
                     {orgMembers.map((member: any) => (
                       <div
                         key={member.id}
-                        className="flex items-center justify-between gap-4 p-3 rounded-md border"
+                        className={`flex items-center justify-between gap-4 p-3 rounded-md border ${selectedMembers.has(member.id) ? "border-primary/30 bg-primary/5" : ""}`}
                         data-testid={`member-row-${member.id}`}
                       >
                         <div className="flex items-center gap-3">
+                          <button
+                            onClick={() => toggleMemberSelection(member.id)}
+                            className="text-muted-foreground hover:text-foreground"
+                            data-testid={`checkbox-member-${member.id}`}
+                          >
+                            {selectedMembers.has(member.id) ? (
+                              <CheckSquare className="h-4 w-4 text-primary" />
+                            ) : (
+                              <Square className="h-4 w-4" />
+                            )}
+                          </button>
                           <Avatar>
                             <AvatarImage src={member.user?.profileImageUrl || undefined} />
                             <AvatarFallback>
