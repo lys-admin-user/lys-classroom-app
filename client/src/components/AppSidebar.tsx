@@ -155,27 +155,27 @@ const navigationGroups: NavGroup[] = [
     ],
   },
   {
-    label: "Campus Administration",
+    label: "My Campus",
     minRole: "campus_admin",
     items: [
-      { title: "Campus Admin", url: "/admin", icon: Shield, requiresAuth: true },
-      { title: "Standards Admin", url: "/admin/standards", icon: Database, requiresAuth: true },
+      { title: "Campus Overview", url: "/admin", icon: Shield, requiresAuth: true },
+      { title: "Campus Standards", url: "/admin/standards", icon: Database, requiresAuth: true },
     ],
   },
   {
-    label: "District Administration",
+    label: "My District",
     minRole: "district_admin",
     items: [
       { title: "District Overview", url: "/district-admin", icon: Presentation, requiresAuth: true },
-      { title: "Campus Management", url: "/district-admin/campuses", icon: School, requiresAuth: true },
+      { title: "District Campuses", url: "/district-admin/campuses", icon: School, requiresAuth: true },
     ],
   },
   {
-    label: "Platform Administration",
+    label: "System-Wide Admin",
     minRole: "site_admin",
     items: [
-      { title: "System Admin", url: "/system-admin", icon: Settings, requiresAuth: true },
-      { title: "User Management", url: "/system-admin/users", icon: Users, requiresAuth: true },
+      { title: "Platform Config", url: "/system-admin", icon: Settings, requiresAuth: true },
+      { title: "All Users", url: "/system-admin/users", icon: Users, requiresAuth: true },
     ],
   },
 ];

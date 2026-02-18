@@ -245,8 +245,8 @@ export default function StandardsAdmin() {
     <div className="container py-8 max-w-6xl">
       <div className="flex items-center justify-between gap-4 mb-6 flex-wrap">
         <div>
-          <h1 className="text-3xl font-marker text-foreground">Standards Management</h1>
-          <p className="text-muted-foreground">Sync and manage educational standards from external sources</p>
+          <h1 className="text-3xl font-marker text-foreground">Campus Standards</h1>
+          <p className="text-muted-foreground">Manage educational standards for your campus from external sources</p>
         </div>
         <div className="flex gap-2 flex-wrap">
           <Button

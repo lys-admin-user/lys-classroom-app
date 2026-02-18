@@ -348,10 +348,10 @@ export default function SystemAdminPage() {
         </div>
         <div>
           <h1 className="font-marker text-3xl sm:text-4xl text-foreground">
-            System Administration
+            System-Wide Admin
           </h1>
           <p className="font-roboto text-muted-foreground">
-            Complete platform oversight and control
+            Platform-wide oversight, all users, billing, and global configuration
           </p>
         </div>
       </div>

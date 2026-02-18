@@ -690,10 +690,10 @@ export default function SiteAdminPage() {
         </div>
         <div>
           <h1 className="font-marker text-3xl sm:text-4xl text-foreground">
-            Site Administration
+            My Campus
           </h1>
           <p className="font-roboto text-muted-foreground">
-            Platform-wide management and configuration
+            Manage your campus organizations, admins, and settings
           </p>
         </div>
       </div>

@@ -53,7 +53,7 @@ export default function DistrictAdmin() {
     return (
       <div className="p-8 text-center">
         <Shield className="h-12 w-12 mx-auto mb-4 text-muted-foreground opacity-50" />
-        <h2 className="text-xl font-oswald mb-2">District Administration</h2>
+        <h2 className="text-xl font-oswald mb-2">My District</h2>
         <p className="text-muted-foreground">
           You need district administrator privileges to access this page.
         </p>
@@ -65,10 +65,10 @@ export default function DistrictAdmin() {
     <div className="p-6 max-w-7xl mx-auto space-y-6">
       <div>
         <h1 className="text-3xl font-marker text-lys-red" data-testid="text-district-title">
-          District Administration
+          My District
         </h1>
         <p className="text-muted-foreground mt-1">
-          Manage campuses, educators, and district-wide curriculum
+          Manage the campuses, educators, and curriculum within your district
           {districtOrg?.organization?.name && (
             <span className="font-medium"> — {districtOrg.organization.name}</span>
           )}
