@@ -15,7 +15,8 @@ import { Slider } from "@/components/ui/slider";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useState } from "react";
-import { Shield, Building2, Users, Plus, Trash2, Settings, BarChart3, AlertTriangle, Loader2, Flag, Mail, Edit2, ToggleLeft, Percent, TrendingUp, Target, Award, GraduationCap, Star, Brain, Compass, Briefcase, Library, FileText, Clock, Search } from "lucide-react";
+import { Shield, Building2, Users, Plus, Trash2, Settings, BarChart3, AlertTriangle, Loader2, Flag, Mail, Edit2, ToggleLeft, Percent, TrendingUp, Target, Award, GraduationCap, Star, Brain, Compass, Briefcase, Library, FileText, Clock, Search, UserPlus, Mail as MailIcon } from "lucide-react";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Progress } from "@/components/ui/progress";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import type { Organization, SiteAdmin, FeatureFlag, EmailTemplate } from "@shared/schema";
@@ -34,6 +35,11 @@ export default function SiteAdminPage() {
   const [isCreateTemplateOpen, setIsCreateTemplateOpen] = useState(false);
   const [editingTemplate, setEditingTemplate] = useState<EmailTemplate | null>(null);
   const [newTemplate, setNewTemplate] = useState({ name: "", subject: "", category: "notification", htmlContent: "", textContent: "", variables: [] as string[], isActive: true });
+  
+  const [selectedOrgForPeople, setSelectedOrgForPeople] = useState<string>("");
+  const [isInviteOpen, setIsInviteOpen] = useState(false);
+  const [inviteEmail, setInviteEmail] = useState("");
+  const [inviteRole, setInviteRole] = useState("member");
   
   const { data: adminCheck, isLoading: checkLoading } = useQuery<{ isSiteAdmin: boolean }>({
     queryKey: ["/api/admin/check"],
@@ -67,6 +73,68 @@ export default function SiteAdminPage() {
   const { data: emailTemplates = [], isLoading: templatesLoading } = useQuery<EmailTemplate[]>({
     queryKey: ["/api/admin/email-templates"],
     enabled: adminCheck?.isSiteAdmin,
+  });
+
+  const { data: orgMembers = [], isLoading: membersLoading } = useQuery<any[]>({
+    queryKey: ["/api/admin/organizations", selectedOrgForPeople, "members"],
+    queryFn: async () => {
+      const res = await fetch(`/api/admin/organizations/${selectedOrgForPeople}/members`);
+      if (!res.ok) throw new Error("Failed");
+      return res.json();
+    },
+    enabled: !!selectedOrgForPeople,
+  });
+
+  const { data: orgInvitations = [] } = useQuery<any[]>({
+    queryKey: ["/api/admin/organizations", selectedOrgForPeople, "invitations"],
+    queryFn: async () => {
+      const res = await fetch(`/api/admin/organizations/${selectedOrgForPeople}/invitations`);
+      if (!res.ok) throw new Error("Failed");
+      return res.json();
+    },
+    enabled: !!selectedOrgForPeople,
+  });
+
+  const inviteMemberMutation = useMutation({
+    mutationFn: async (data: { email: string; role: string }) => {
+      return await apiRequest("POST", `/api/organizations/${selectedOrgForPeople}/invite`, data);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/organizations", selectedOrgForPeople, "invitations"] });
+      setIsInviteOpen(false);
+      setInviteEmail("");
+      setInviteRole("member");
+      toast({ title: "Invitation sent successfully" });
+    },
+    onError: () => {
+      toast({ title: "Failed to send invitation", variant: "destructive" });
+    },
+  });
+
+  const removeMemberMutation = useMutation({
+    mutationFn: async (memberId: string) => {
+      return await apiRequest("DELETE", `/api/organizations/${selectedOrgForPeople}/members/${memberId}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/organizations", selectedOrgForPeople, "members"] });
+      toast({ title: "Member removed" });
+    },
+    onError: () => {
+      toast({ title: "Failed to remove member", variant: "destructive" });
+    },
+  });
+
+  const updateMemberRoleMutation = useMutation({
+    mutationFn: async ({ memberId, role }: { memberId: string; role: string }) => {
+      return await apiRequest("PATCH", `/api/organizations/${selectedOrgForPeople}/members/${memberId}`, { role });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/organizations", selectedOrgForPeople, "members"] });
+      toast({ title: "Member role updated" });
+    },
+    onError: () => {
+      toast({ title: "Failed to update role", variant: "destructive" });
+    },
   });
 
   // Performance Analytics Types
@@ -392,6 +460,10 @@ export default function SiteAdminPage() {
             <Shield className="h-4 w-4 mr-2" />
             Site Admins
           </TabsTrigger>
+          <TabsTrigger value="people" data-testid="tab-people">
+            <Users className="h-4 w-4 mr-2" />
+            People
+          </TabsTrigger>
           <TabsTrigger value="feature-flags" data-testid="tab-feature-flags">
             <Flag className="h-4 w-4 mr-2" />
             Feature Flags
@@ -589,6 +661,195 @@ export default function SiteAdminPage() {
                   </CardHeader>
                 </Card>
               ))}
+            </div>
+          )}
+        </TabsContent>
+
+        <TabsContent value="people" className="space-y-4">
+          <div className="flex items-center justify-between gap-4 flex-wrap">
+            <h2 className="font-oswald text-xl">People Management</h2>
+          </div>
+
+          <div className="flex items-center gap-4 flex-wrap">
+            <div className="w-full max-w-sm">
+              <Label htmlFor="people-org-select" className="text-sm text-muted-foreground mb-1 block">Select Organization</Label>
+              <Select value={selectedOrgForPeople} onValueChange={setSelectedOrgForPeople}>
+                <SelectTrigger data-testid="select-people-org">
+                  <SelectValue placeholder="Choose an organization..." />
+                </SelectTrigger>
+                <SelectContent>
+                  {organizations.map((org) => (
+                    <SelectItem key={org.id} value={org.id}>{org.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            {selectedOrgForPeople && (
+              <Dialog open={isInviteOpen} onOpenChange={setIsInviteOpen}>
+                <DialogTrigger asChild>
+                  <Button data-testid="button-invite-people">
+                    <UserPlus className="h-4 w-4 mr-2" />
+                    Invite People
+                  </Button>
+                </DialogTrigger>
+                <DialogContent>
+                  <DialogHeader>
+                    <DialogTitle>Invite People</DialogTitle>
+                    <DialogDescription>
+                      Send an invitation to join this organization.
+                    </DialogDescription>
+                  </DialogHeader>
+                  <div className="grid gap-4 py-4">
+                    <div className="grid gap-2">
+                      <Label htmlFor="invite-email">Email Address</Label>
+                      <Input
+                        id="invite-email"
+                        type="email"
+                        value={inviteEmail}
+                        onChange={(e) => setInviteEmail(e.target.value)}
+                        placeholder="educator@school.edu"
+                        data-testid="input-invite-email"
+                      />
+                    </div>
+                    <div className="grid gap-2">
+                      <Label htmlFor="invite-role">Role</Label>
+                      <Select value={inviteRole} onValueChange={setInviteRole}>
+                        <SelectTrigger data-testid="select-invite-role">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="member">Member</SelectItem>
+                          <SelectItem value="admin">Admin</SelectItem>
+                          <SelectItem value="owner">Owner</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+                  <DialogFooter>
+                    <Button variant="outline" onClick={() => setIsInviteOpen(false)} data-testid="button-cancel-invite">
+                      Cancel
+                    </Button>
+                    <Button
+                      onClick={() => inviteMemberMutation.mutate({ email: inviteEmail, role: inviteRole })}
+                      disabled={!inviteEmail || inviteMemberMutation.isPending}
+                      data-testid="button-send-invite"
+                    >
+                      {inviteMemberMutation.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+                      Send Invitation
+                    </Button>
+                  </DialogFooter>
+                </DialogContent>
+              </Dialog>
+            )}
+          </div>
+
+          {!selectedOrgForPeople ? (
+            <Card>
+              <CardContent className="py-12 text-center">
+                <Users className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+                <p className="text-muted-foreground">Select an organization to manage its people</p>
+                <p className="text-sm text-muted-foreground mt-1">Use the dropdown above to choose an organization</p>
+              </CardContent>
+            </Card>
+          ) : (
+            <div className="space-y-6">
+              <div>
+                <h3 className="font-oswald text-lg mb-3">Current Members</h3>
+                {membersLoading ? (
+                  <div className="flex items-center justify-center py-8">
+                    <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+                  </div>
+                ) : orgMembers.length === 0 ? (
+                  <Card>
+                    <CardContent className="py-8 text-center">
+                      <Users className="h-10 w-10 text-muted-foreground mx-auto mb-3" />
+                      <p className="text-muted-foreground text-sm">No members yet</p>
+                    </CardContent>
+                  </Card>
+                ) : (
+                  <div className="space-y-2">
+                    {orgMembers.map((member: any) => (
+                      <div
+                        key={member.id}
+                        className="flex items-center justify-between gap-4 p-3 rounded-md border"
+                        data-testid={`member-row-${member.id}`}
+                      >
+                        <div className="flex items-center gap-3">
+                          <Avatar>
+                            <AvatarImage src={member.user?.profileImageUrl || undefined} />
+                            <AvatarFallback>
+                              {(member.user?.firstName?.[0] || "") + (member.user?.lastName?.[0] || "") || "?"}
+                            </AvatarFallback>
+                          </Avatar>
+                          <div>
+                            <p className="text-sm font-medium">
+                              {member.user?.firstName || member.user?.lastName
+                                ? `${member.user?.firstName || ""} ${member.user?.lastName || ""}`.trim()
+                                : member.userId}
+                            </p>
+                            <p className="text-xs text-muted-foreground">{member.user?.email || "No email"}</p>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <Select
+                            value={member.role || "member"}
+                            onValueChange={(newRole) => updateMemberRoleMutation.mutate({ memberId: member.id, role: newRole })}
+                          >
+                            <SelectTrigger className="w-28" data-testid={`select-member-role-${member.id}`}>
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="member">Member</SelectItem>
+                              <SelectItem value="admin">Admin</SelectItem>
+                              <SelectItem value="owner">Owner</SelectItem>
+                            </SelectContent>
+                          </Select>
+                          <Badge variant="outline" className="text-xs">
+                            {member.user?.role || "user"}
+                          </Badge>
+                          <Button
+                            size="icon"
+                            variant="ghost"
+                            onClick={() => removeMemberMutation.mutate(member.id)}
+                            disabled={removeMemberMutation.isPending}
+                            data-testid={`button-remove-member-${member.id}`}
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {orgInvitations.length > 0 && (
+                <div>
+                  <h3 className="font-oswald text-lg mb-3">Pending Invitations</h3>
+                  <div className="space-y-2">
+                    {orgInvitations.map((inv: any) => (
+                      <div
+                        key={inv.id}
+                        className="flex items-center justify-between gap-4 p-3 rounded-md border"
+                        data-testid={`invitation-row-${inv.id}`}
+                      >
+                        <div className="flex items-center gap-3">
+                          <div className="w-9 h-9 rounded-full bg-muted flex items-center justify-center">
+                            <MailIcon className="h-4 w-4 text-muted-foreground" />
+                          </div>
+                          <div>
+                            <p className="text-sm font-medium">{inv.email}</p>
+                            <p className="text-xs text-muted-foreground">
+                              Expires {new Date(inv.expiresAt).toLocaleDateString()}
+                            </p>
+                          </div>
+                        </div>
+                        <Badge variant="secondary" className="text-xs">{inv.role || "member"}</Badge>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
           )}
         </TabsContent>

@@ -5445,19 +5445,61 @@ export async function registerRoutes(
     try {
       const { id } = req.params;
       const userId = req.user?.claims?.sub;
+      const user = await storage.getUser(userId);
       
       const isSiteAdminUser = await storage.isSiteAdmin(userId);
+      const isCampusOrHigher = user && ["campus_admin", "district_admin", "site_admin", "system_admin"].includes(user.role || "");
       const membership = await storage.getOrgMembership(id, userId);
       
-      if (!isSiteAdminUser && (!membership || membership.role === "member")) {
+      if (!isSiteAdminUser && !isCampusOrHigher && (!membership || membership.role === "member")) {
         res.status(403).json({ error: "Admin access required" });
         return;
       }
       
       const members = await storage.getOrganizationMembers(id);
-      res.json(members);
+      const enrichedMembers = await Promise.all(
+        members.map(async (m) => {
+          const memberUser = await storage.getUser(m.userId);
+          return {
+            ...m,
+            user: memberUser ? {
+              id: memberUser.id,
+              email: memberUser.email,
+              firstName: memberUser.firstName,
+              lastName: memberUser.lastName,
+              role: memberUser.role,
+              profileImageUrl: memberUser.profileImageUrl,
+            } : null,
+          };
+        })
+      );
+      res.json(enrichedMembers);
     } catch (error) {
       res.status(500).json({ error: "Failed to fetch members" });
+    }
+  });
+
+  // Get organization invitations (site admin or org admin)
+  app.get("/api/admin/organizations/:id/invitations", isAuthenticated, async (req: any, res) => {
+    try {
+      const { id } = req.params;
+      const userId = req.user?.claims?.sub;
+      const user = await storage.getUser(userId);
+      
+      const isSiteAdminUser = await storage.isSiteAdmin(userId);
+      const isCampusOrHigher = user && ["campus_admin", "district_admin", "site_admin", "system_admin"].includes(user.role || "");
+      const membership = await storage.getOrgMembership(id, userId);
+      
+      if (!isSiteAdminUser && !isCampusOrHigher && (!membership || membership.role === "member")) {
+        res.status(403).json({ error: "Admin access required" });
+        return;
+      }
+      
+      const invitations = await storage.getOrgInvitations(id);
+      const pending = invitations.filter(inv => !inv.acceptedAt && new Date(inv.expiresAt) > new Date());
+      res.json(pending);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch invitations" });
     }
   });
 
@@ -6379,10 +6421,12 @@ export async function registerRoutes(
       const { email, role } = req.body;
       const userId = req.user?.claims?.sub;
       
+      const user = await storage.getUser(userId);
       const isSiteAdminUser = await storage.isSiteAdmin(userId);
+      const isCampusOrHigher = user && ["campus_admin", "district_admin", "site_admin", "system_admin"].includes(user.role || "");
       const membership = await storage.getOrgMembership(id, userId);
       
-      if (!isSiteAdminUser && (!membership || membership.role === "member")) {
+      if (!isSiteAdminUser && !isCampusOrHigher && (!membership || membership.role === "member")) {
         res.status(403).json({ error: "Admin access required" });
         return;
       }
