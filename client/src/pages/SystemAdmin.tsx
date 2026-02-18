@@ -1,6 +1,6 @@
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/use-auth";
-import { useLocation } from "wouter";
+import { useLocation, useRoute } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -13,7 +13,7 @@ import { Separator } from "@/components/ui/separator";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient, apiRequest } from "@/lib/queryClient";
-import { useState } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { 
   Shield, Building2, Users, Trash2, BarChart3, AlertTriangle, Loader2, 
   TrendingUp, CreditCard, Share2, BookOpen, Target, UserCheck, 
@@ -97,7 +97,21 @@ export default function SystemAdminPage() {
   const { user, isLoading: authLoading } = useAuth();
   const [, setLocation] = useLocation();
   const { toast } = useToast();
-  const [activeTab, setActiveTab] = useState("overview");
+  const [, routeParams] = useRoute("/system-admin/:tab");
+  const initialTab = routeParams?.tab || "overview";
+  const [activeTab, setActiveTab] = useState(initialTab);
+
+  useEffect(() => {
+    const urlTab = routeParams?.tab || "overview";
+    if (urlTab !== activeTab) {
+      setActiveTab(urlTab);
+    }
+  }, [routeParams?.tab]);
+
+  const handleTabChange = useCallback((value: string) => {
+    setActiveTab(value);
+    setLocation(value === "overview" ? "/system-admin" : `/system-admin/${value}`);
+  }, [setLocation]);
   const [userSearch, setUserSearch] = useState("");
   const [userRoleFilter, setUserRoleFilter] = useState<string>("all");
   const [userTierFilter, setUserTierFilter] = useState<string>("all");
@@ -708,7 +722,7 @@ export default function SystemAdminPage() {
         </div>
       </div>
 
-      <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
+      <Tabs value={activeTab} onValueChange={handleTabChange} className="space-y-6">
         <TabsList className="flex flex-wrap gap-1 h-auto p-1">
           <TabsTrigger value="overview" className="gap-2" data-testid="tab-overview">
             <Map className="h-4 w-4" />
@@ -900,7 +914,7 @@ export default function SystemAdminPage() {
                             onClick={() => {
                               if (section.path.includes("?tab=")) {
                                 const tab = section.path.split("?tab=")[1];
-                                setActiveTab(tab);
+                                handleTabChange(tab);
                               } else {
                                 setLocation(section.path);
                               }

@@ -131,6 +131,7 @@ function Router() {
       <Route path="/collaboration/:id" component={Collaboration} />
       <Route path="/resource-library" component={ResourceLibrary} />
       <Route path="/admin" component={SiteAdmin} />
+      <Route path="/system-admin/:tab" component={SystemAdmin} />
       <Route path="/system-admin" component={SystemAdmin} />
       <Route path="/parent-portal" component={ParentPortal} />
       <Route path="/milestones" component={Milestones} />
