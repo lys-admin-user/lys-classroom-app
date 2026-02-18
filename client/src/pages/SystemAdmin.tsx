@@ -670,12 +670,12 @@ export default function SystemAdminPage() {
             <AlertTriangle className="h-12 w-12 text-destructive mx-auto mb-4" />
             <CardTitle className="font-marker text-xl">Access Denied</CardTitle>
             <CardDescription>
-              System Administrator privileges required. Contact a platform administrator if you believe this is an error.
+              You need system administrator privileges to access this page. This area is reserved for platform-wide management. Contact a system administrator if you need access.
             </CardDescription>
           </CardHeader>
           <CardContent className="text-center">
             <Button variant="outline" onClick={() => setLocation("/")} data-testid="button-go-home">
-              Go to Home
+              Back to Dashboard
             </Button>
           </CardContent>
         </Card>
@@ -700,10 +700,10 @@ export default function SystemAdminPage() {
         </div>
         <div>
           <h1 className="font-marker text-3xl sm:text-4xl text-foreground">
-            System-Wide Admin
+            System Administration
           </h1>
           <p className="font-roboto text-muted-foreground">
-            Platform-wide oversight, all users, billing, and global configuration
+            Manage all users, organizations, billing, content, educational standards, and platform-wide settings
           </p>
         </div>
       </div>
@@ -964,6 +964,10 @@ export default function SystemAdminPage() {
         </TabsContent>
 
         <TabsContent value="users" className="space-y-4">
+          <div>
+            <h2 className="font-oswald text-xl">All Users</h2>
+            <p className="text-sm text-muted-foreground mb-4">Search, view, and manage every user account on the platform. You can edit roles, tiers, and account details.</p>
+          </div>
           <div className="flex flex-col sm:flex-row gap-4">
             <div className="relative flex-1">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
@@ -1248,9 +1252,12 @@ export default function SystemAdminPage() {
 
         <TabsContent value="organizations" className="space-y-4">
           <div className="flex items-center justify-between gap-4 flex-wrap">
-            <h2 className="font-oswald text-xl">Organizations</h2>
+            <div>
+              <h2 className="font-oswald text-xl">All Organizations</h2>
+              <p className="text-sm text-muted-foreground">View every school, district, and university registered on the platform</p>
+            </div>
             <Button onClick={() => setLocation("/admin")} data-testid="button-manage-orgs">
-              Manage in Site Admin
+              Go to Campus Admin
               <ExternalLink className="h-4 w-4 ml-2" />
             </Button>
           </div>
@@ -1259,7 +1266,8 @@ export default function SystemAdminPage() {
             <Card>
               <CardContent className="py-12 text-center">
                 <Building2 className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-                <p className="text-muted-foreground">No organizations yet</p>
+                <p className="text-muted-foreground font-medium">No organizations registered yet</p>
+                <p className="text-sm text-muted-foreground mt-1">Schools, districts, and universities will appear here once they register on the platform</p>
               </CardContent>
             </Card>
           ) : (
@@ -1300,6 +1308,10 @@ export default function SystemAdminPage() {
         </TabsContent>
 
         <TabsContent value="content" className="space-y-4">
+          <div>
+            <h2 className="font-oswald text-xl">Lesson Content</h2>
+            <p className="text-sm text-muted-foreground mb-4">Browse and manage all lessons created by educators across the platform</p>
+          </div>
           <div className="flex flex-col sm:flex-row gap-4">
             <div className="relative flex-1">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
@@ -1360,7 +1372,10 @@ export default function SystemAdminPage() {
 
         <TabsContent value="affiliates" className="space-y-4">
           <div className="flex items-center justify-between gap-4 flex-wrap">
-            <h2 className="font-oswald text-xl">Affiliate Program</h2>
+            <div>
+              <h2 className="font-oswald text-xl">Affiliate Program</h2>
+              <p className="text-sm text-muted-foreground">Track educator referrals, reward points, and affiliate performance</p>
+            </div>
           </div>
 
           {affiliatesLoading ? (
@@ -1371,7 +1386,8 @@ export default function SystemAdminPage() {
             <Card>
               <CardContent className="py-12 text-center">
                 <Share2 className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-                <p className="text-muted-foreground">No affiliates yet</p>
+                <p className="text-muted-foreground font-medium">No affiliates yet</p>
+                <p className="text-sm text-muted-foreground mt-1">Educators who join the affiliate program and refer others will appear here</p>
               </CardContent>
             </Card>
           ) : (
@@ -1418,7 +1434,10 @@ export default function SystemAdminPage() {
 
         <TabsContent value="billing" className="space-y-4">
           <div className="flex items-center justify-between gap-4 flex-wrap">
-            <h2 className="font-oswald text-xl">Billing & Subscriptions</h2>
+            <div>
+              <h2 className="font-oswald text-xl">Billing & Subscriptions</h2>
+              <p className="text-sm text-muted-foreground">Monitor subscription plans, pricing tiers, and payment activity across the platform</p>
+            </div>
           </div>
 
           <div className="grid gap-4 md:grid-cols-3">
@@ -1640,7 +1659,10 @@ export default function SystemAdminPage() {
 
         <TabsContent value="standards" className="space-y-4">
           <div className="flex items-center justify-between gap-4 flex-wrap">
-            <h2 className="font-oswald text-xl">Educational Standards & Jurisdictions</h2>
+            <div>
+              <h2 className="font-oswald text-xl">Educational Standards & Jurisdictions</h2>
+              <p className="text-sm text-muted-foreground">Manage state and regional educational standards that are used in lesson generation and alignment</p>
+            </div>
             <Dialog open={addJurisdictionOpen} onOpenChange={setAddJurisdictionOpen}>
               <DialogTrigger asChild>
                 <Button data-testid="button-add-jurisdiction">

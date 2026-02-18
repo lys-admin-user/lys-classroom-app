@@ -386,12 +386,12 @@ export default function SiteAdminPage() {
             <AlertTriangle className="h-12 w-12 text-destructive mx-auto mb-4" />
             <CardTitle className="font-marker text-xl">Access Denied</CardTitle>
             <CardDescription>
-              You do not have site administrator privileges. Contact a platform administrator if you believe this is an error.
+              You need campus administrator or higher privileges to access this page. If you believe this is an error, please contact your campus or district administrator.
             </CardDescription>
           </CardHeader>
           <CardContent className="text-center">
             <Button variant="outline" onClick={() => setLocation("/")} data-testid="button-go-home">
-              Go to Home
+              Back to Dashboard
             </Button>
           </CardContent>
         </Card>
@@ -410,7 +410,7 @@ export default function SiteAdminPage() {
             My Campus
           </h1>
           <p className="font-roboto text-muted-foreground">
-            Manage your campus organizations, admins, and settings
+            Manage organizations, people, feature settings, and email templates for your campus
           </p>
         </div>
       </div>
@@ -430,22 +430,22 @@ export default function SiteAdminPage() {
         </Card>
         <Card>
           <CardHeader className="flex flex-row items-center justify-between gap-4 pb-2">
-            <CardTitle className="text-sm font-medium">Site Admins</CardTitle>
+            <CardTitle className="text-sm font-medium">Campus Admins</CardTitle>
             <Shield className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">{stats?.totalSiteAdmins || 0}</div>
-            <p className="text-xs text-muted-foreground">Platform administrators</p>
+            <p className="text-xs text-muted-foreground">Administrators with campus access</p>
           </CardContent>
         </Card>
         <Card>
           <CardHeader className="flex flex-row items-center justify-between gap-4 pb-2">
-            <CardTitle className="text-sm font-medium">Platform Status</CardTitle>
+            <CardTitle className="text-sm font-medium">Campus Status</CardTitle>
             <BarChart3 className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-green-600">Healthy</div>
-            <p className="text-xs text-muted-foreground">All systems operational</p>
+            <div className="text-2xl font-bold text-green-600">Active</div>
+            <p className="text-xs text-muted-foreground">All services running normally</p>
           </CardContent>
         </Card>
       </div>
@@ -458,7 +458,7 @@ export default function SiteAdminPage() {
           </TabsTrigger>
           <TabsTrigger value="admins" data-testid="tab-admins">
             <Shield className="h-4 w-4 mr-2" />
-            Site Admins
+            Administrators
           </TabsTrigger>
           <TabsTrigger value="people" data-testid="tab-people">
             <Users className="h-4 w-4 mr-2" />
@@ -480,7 +480,10 @@ export default function SiteAdminPage() {
 
         <TabsContent value="organizations" className="space-y-4">
           <div className="flex items-center justify-between gap-4 flex-wrap">
-            <h2 className="font-oswald text-xl">Manage Organizations</h2>
+            <div>
+              <h2 className="font-oswald text-xl">Organizations</h2>
+              <p className="text-sm text-muted-foreground">Schools, districts, and universities connected to your campus</p>
+            </div>
             <Dialog open={isCreateOrgOpen} onOpenChange={setIsCreateOrgOpen}>
               <DialogTrigger asChild>
                 <Button className="bg-lys-teal hover:bg-lys-teal/90" data-testid="button-create-org">
@@ -631,14 +634,18 @@ export default function SiteAdminPage() {
 
         <TabsContent value="admins" className="space-y-4">
           <div className="flex items-center justify-between gap-4 flex-wrap">
-            <h2 className="font-oswald text-xl">Site Administrators</h2>
+            <div>
+              <h2 className="font-oswald text-xl">Administrators</h2>
+              <p className="text-sm text-muted-foreground">Users with elevated access to manage your campus settings and organizations</p>
+            </div>
           </div>
 
           {siteAdmins.length === 0 ? (
             <Card>
               <CardContent className="py-12 text-center">
                 <Shield className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-                <p className="text-muted-foreground">No site administrators configured</p>
+                <p className="text-muted-foreground">No administrators configured yet</p>
+                <p className="text-sm text-muted-foreground mt-1">Administrators can manage organizations, people, and campus settings</p>
               </CardContent>
             </Card>
           ) : (
@@ -667,12 +674,15 @@ export default function SiteAdminPage() {
 
         <TabsContent value="people" className="space-y-4">
           <div className="flex items-center justify-between gap-4 flex-wrap">
-            <h2 className="font-oswald text-xl">People Management</h2>
+            <div>
+              <h2 className="font-oswald text-xl">People Management</h2>
+              <p className="text-sm text-muted-foreground">View and manage the educators, students, and staff within each organization</p>
+            </div>
           </div>
 
           <div className="flex items-center gap-4 flex-wrap">
             <div className="w-full max-w-sm">
-              <Label htmlFor="people-org-select" className="text-sm text-muted-foreground mb-1 block">Select Organization</Label>
+              <Label htmlFor="people-org-select" className="text-sm text-muted-foreground mb-1 block">Select an organization to view its members</Label>
               <Select value={selectedOrgForPeople} onValueChange={setSelectedOrgForPeople}>
                 <SelectTrigger data-testid="select-people-org">
                   <SelectValue placeholder="Choose an organization..." />
@@ -696,7 +706,7 @@ export default function SiteAdminPage() {
                   <DialogHeader>
                     <DialogTitle>Invite People</DialogTitle>
                     <DialogDescription>
-                      Send an invitation to join this organization.
+                      Send an email invitation to join the selected organization. They will receive a link to accept and join.
                     </DialogDescription>
                   </DialogHeader>
                   <div className="grid gap-4 py-4">
@@ -712,17 +722,18 @@ export default function SiteAdminPage() {
                       />
                     </div>
                     <div className="grid gap-2">
-                      <Label htmlFor="invite-role">Role</Label>
+                      <Label htmlFor="invite-role">Organization Role</Label>
                       <Select value={inviteRole} onValueChange={setInviteRole}>
                         <SelectTrigger data-testid="select-invite-role">
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="member">Member</SelectItem>
-                          <SelectItem value="admin">Admin</SelectItem>
-                          <SelectItem value="owner">Owner</SelectItem>
+                          <SelectItem value="member">Member - Can view and participate</SelectItem>
+                          <SelectItem value="admin">Admin - Can manage members and settings</SelectItem>
+                          <SelectItem value="owner">Owner - Full control over the organization</SelectItem>
                         </SelectContent>
                       </Select>
+                      <p className="text-xs text-muted-foreground">This determines what the person can do within this organization</p>
                     </div>
                   </div>
                   <DialogFooter>
@@ -747,8 +758,8 @@ export default function SiteAdminPage() {
             <Card>
               <CardContent className="py-12 text-center">
                 <Users className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-                <p className="text-muted-foreground">Select an organization to manage its people</p>
-                <p className="text-sm text-muted-foreground mt-1">Use the dropdown above to choose an organization</p>
+                <p className="text-muted-foreground font-medium">No organization selected</p>
+                <p className="text-sm text-muted-foreground mt-1">Choose an organization from the dropdown above to view its members, invite new people, or manage roles</p>
               </CardContent>
             </Card>
           ) : (
@@ -763,7 +774,8 @@ export default function SiteAdminPage() {
                   <Card>
                     <CardContent className="py-8 text-center">
                       <Users className="h-10 w-10 text-muted-foreground mx-auto mb-3" />
-                      <p className="text-muted-foreground text-sm">No members yet</p>
+                      <p className="text-muted-foreground text-sm">No members in this organization yet</p>
+                      <p className="text-xs text-muted-foreground mt-1">Use the "Invite People" button to add educators, students, or staff</p>
                     </CardContent>
                   </Card>
                 ) : (
@@ -856,7 +868,10 @@ export default function SiteAdminPage() {
 
         <TabsContent value="feature-flags" className="space-y-4">
           <div className="flex items-center justify-between gap-4 flex-wrap">
-            <h2 className="font-oswald text-xl">Feature Flags</h2>
+            <div>
+              <h2 className="font-oswald text-xl">Feature Flags</h2>
+              <p className="text-sm text-muted-foreground">Control which features are enabled and gradually roll them out to users</p>
+            </div>
             <Dialog open={isCreateFlagOpen} onOpenChange={setIsCreateFlagOpen}>
               <DialogTrigger asChild>
                 <Button className="bg-lys-teal hover:bg-lys-teal/90" data-testid="button-create-flag">
@@ -1067,7 +1082,10 @@ export default function SiteAdminPage() {
 
         <TabsContent value="email-templates" className="space-y-4">
           <div className="flex items-center justify-between gap-4 flex-wrap">
-            <h2 className="font-oswald text-xl">Email Templates</h2>
+            <div>
+              <h2 className="font-oswald text-xl">Email Templates</h2>
+              <p className="text-sm text-muted-foreground">Create and manage the email templates used for system notifications and invitations</p>
+            </div>
             <Dialog open={isCreateTemplateOpen} onOpenChange={setIsCreateTemplateOpen}>
               <DialogTrigger asChild>
                 <Button className="bg-lys-teal hover:bg-lys-teal/90" data-testid="button-create-template">

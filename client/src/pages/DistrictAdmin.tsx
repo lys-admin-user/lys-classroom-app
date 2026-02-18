@@ -136,7 +136,10 @@ export default function DistrictAdmin() {
         <Shield className="h-12 w-12 mx-auto mb-4 text-muted-foreground opacity-50" />
         <h2 className="text-xl font-oswald mb-2">My District</h2>
         <p className="text-muted-foreground">
-          You need district administrator privileges to access this page.
+          You need district administrator or higher privileges to access this page.
+        </p>
+        <p className="text-sm text-muted-foreground mt-1">
+          If you believe this is an error, contact your district or system administrator.
         </p>
       </div>
     );
@@ -179,7 +182,7 @@ export default function DistrictAdmin() {
               <Users className="h-5 w-5 text-lys-yellow" />
             </div>
             <div>
-              <p className="text-2xl font-bold">—</p>
+              <p className="text-2xl font-bold">0</p>
               <p className="text-xs text-muted-foreground">Educators</p>
             </div>
           </CardContent>
@@ -190,7 +193,7 @@ export default function DistrictAdmin() {
               <GraduationCap className="h-5 w-5 text-lys-red" />
             </div>
             <div>
-              <p className="text-2xl font-bold">—</p>
+              <p className="text-2xl font-bold">0</p>
               <p className="text-xs text-muted-foreground">Students</p>
             </div>
           </CardContent>
@@ -201,7 +204,7 @@ export default function DistrictAdmin() {
               <BookOpen className="h-5 w-5 text-primary" />
             </div>
             <div>
-              <p className="text-2xl font-bold">—</p>
+              <p className="text-2xl font-bold">0</p>
               <p className="text-xs text-muted-foreground">Lessons Created</p>
             </div>
           </CardContent>
@@ -334,15 +337,18 @@ export default function DistrictAdmin() {
 
         <TabsContent value="people" className="space-y-4">
           <div className="flex items-center justify-between gap-4 flex-wrap">
-            <h2 className="font-oswald text-xl">People Management</h2>
+            <div>
+              <h2 className="font-oswald text-xl">People Management</h2>
+              <p className="text-sm text-muted-foreground">View and manage educators, students, and staff across your district's campuses</p>
+            </div>
           </div>
 
           <div className="flex items-center gap-4 flex-wrap">
             <div className="w-full max-w-sm">
-              <Label htmlFor="people-campus-select" className="text-sm text-muted-foreground mb-1 block">Select Campus</Label>
+              <Label htmlFor="people-campus-select" className="text-sm text-muted-foreground mb-1 block">Select a campus or district to view its members</Label>
               <Select value={selectedCampusForPeople} onValueChange={setSelectedCampusForPeople}>
                 <SelectTrigger data-testid="select-people-campus">
-                  <SelectValue placeholder="Choose a campus..." />
+                  <SelectValue placeholder="Choose a campus or district..." />
                 </SelectTrigger>
                 <SelectContent>
                   {allSelectableOrgs.map((org) => (
@@ -363,7 +369,7 @@ export default function DistrictAdmin() {
                   <DialogHeader>
                     <DialogTitle>Invite People</DialogTitle>
                     <DialogDescription>
-                      Send an invitation to join this campus or district.
+                      Send an email invitation to join the selected campus or district. They will receive a link to accept and join.
                     </DialogDescription>
                   </DialogHeader>
                   <div className="grid gap-4 py-4">
@@ -379,17 +385,18 @@ export default function DistrictAdmin() {
                       />
                     </div>
                     <div className="grid gap-2">
-                      <Label htmlFor="invite-role">Role</Label>
+                      <Label htmlFor="invite-role">Organization Role</Label>
                       <Select value={inviteRole} onValueChange={setInviteRole}>
                         <SelectTrigger data-testid="select-invite-role">
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="member">Member</SelectItem>
-                          <SelectItem value="admin">Admin</SelectItem>
-                          <SelectItem value="owner">Owner</SelectItem>
+                          <SelectItem value="member">Member - Can view and participate</SelectItem>
+                          <SelectItem value="admin">Admin - Can manage members and settings</SelectItem>
+                          <SelectItem value="owner">Owner - Full control over the organization</SelectItem>
                         </SelectContent>
                       </Select>
+                      <p className="text-xs text-muted-foreground">This determines what the person can do within this organization</p>
                     </div>
                   </div>
                   <DialogFooter>
@@ -414,8 +421,8 @@ export default function DistrictAdmin() {
             <Card>
               <CardContent className="py-12 text-center">
                 <Users className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-                <p className="text-muted-foreground">Select a campus to manage its people</p>
-                <p className="text-sm text-muted-foreground mt-1">Use the dropdown above to choose a campus or the district itself</p>
+                <p className="text-muted-foreground font-medium">No campus or district selected</p>
+                <p className="text-sm text-muted-foreground mt-1">Choose a campus or the district itself from the dropdown above to view members, invite new people, or manage roles</p>
               </CardContent>
             </Card>
           ) : (
@@ -430,7 +437,8 @@ export default function DistrictAdmin() {
                   <Card>
                     <CardContent className="py-8 text-center">
                       <Users className="h-10 w-10 text-muted-foreground mx-auto mb-3" />
-                      <p className="text-muted-foreground text-sm">No members yet</p>
+                      <p className="text-muted-foreground text-sm">No members in this organization yet</p>
+                      <p className="text-xs text-muted-foreground mt-1">Use the "Invite People" button to add educators, students, or staff</p>
                     </CardContent>
                   </Card>
                 ) : (
