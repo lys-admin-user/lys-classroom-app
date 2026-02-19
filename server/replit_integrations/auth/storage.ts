@@ -1,6 +1,6 @@
 import { users, type User, type UpsertUser } from "@shared/models/auth";
 import { db } from "../../db";
-import { eq } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 
 // Interface for auth storage operations
 // (IMPORTANT) These user operations are mandatory for Replit Auth.
@@ -18,11 +18,13 @@ class AuthStorage implements IAuthStorage {
   async upsertUser(userData: UpsertUser): Promise<User> {
     const [user] = await db
       .insert(users)
-      .values(userData)
+      .values({ ...userData, lastLoginAt: new Date(), loginCount: 1 })
       .onConflictDoUpdate({
         target: users.id,
         set: {
           ...userData,
+          lastLoginAt: new Date(),
+          loginCount: sql`COALESCE(${users.loginCount}, 0) + 1`,
           updatedAt: new Date(),
         },
       })

@@ -53,6 +53,75 @@ interface Analytics {
   };
 }
 
+interface UserAnalyticsEntry {
+  id: string;
+  email: string | null;
+  firstName: string | null;
+  lastName: string | null;
+  role: string | null;
+  tier: string | null;
+  profileImageUrl: string | null;
+  joinDate: string | null;
+  lastLoginAt: string | null;
+  loginCount: number;
+  lastActivityDate: string;
+  daysSinceJoin: number;
+  daysSinceLastLogin: number | null;
+  daysSinceLastActivity: number;
+  status: "active" | "at_risk" | "churned" | "new" | "inactive";
+  isPaid: boolean;
+  subscriptionStatus: string | null;
+  stripeCustomerId: string | null;
+  onboardingCompleted: boolean | null;
+  educatorType: string | null;
+  country: string | null;
+  state: string | null;
+  organizationCount: number;
+  usage: {
+    totalActions: number;
+    activeDays: number;
+    engagementRate: number;
+    lessonsCreated: number;
+    lessonsLast30Days: number;
+    aiLessonsGenerated: number;
+    aiLessonsLast30Days: number;
+    goalsCreated: number;
+    goalsLast30Days: number;
+    goalsCompleted: number;
+    assignmentsCreated: number;
+    assignmentsLast30Days: number;
+    scopeSequencesCreated: number;
+    selfDiscoveryCompleted: number;
+    careersExplored: number;
+    journeyEntries: number;
+  };
+  journey: { beScore: number | null; knowScore: number | null; doScore: number | null; overallScore: number | null } | null;
+  affiliate: { referralCode: string; totalPoints: number | null; totalReferrals: number | null; isActive: boolean | null } | null;
+}
+
+interface PlatformMetrics {
+  totalUsers: number;
+  activeUsers: number;
+  atRiskUsers: number;
+  churnedUsers: number;
+  newUsers: number;
+  inactiveUsers: number;
+  paidUsers: number;
+  churnRate: number;
+  monthlyChurnRate: number;
+  estimatedBurnRate: number;
+  estimatedMRR: number;
+  runwayMonths: number;
+  conversionRate: number;
+  onboardingRate: number;
+  dauMauRatio: number;
+  avgLoginCount: number;
+  cohorts: { month: string; totalJoined: number; stillActive: number; retentionRate: number }[];
+  featureAdoption: Record<string, { users: number; rate: number }>;
+  tierBreakdown: Record<string, number>;
+  roleBreakdown: Record<string, number>;
+}
+
 interface SitemapSection {
   name: string;
   path: string;
@@ -146,6 +215,12 @@ export default function SystemAdminPage() {
   const [lessonStatusFilter, setLessonStatusFilter] = useState<string>("all");
   const [lessonSubjectFilter, setLessonSubjectFilter] = useState<string>("all");
   
+  const [analyticsSearch, setAnalyticsSearch] = useState("");
+  const [analyticsStatusFilter, setAnalyticsStatusFilter] = useState<string>("all");
+  const [analyticsTierFilter, setAnalyticsTierFilter] = useState<string>("all");
+  const [analyticsRoleFilter, setAnalyticsRoleFilter] = useState<string>("all");
+  const [analyticsSortBy, setAnalyticsSortBy] = useState<string>("lastActivity");
+  const [expandedUserId, setExpandedUserId] = useState<string | null>(null);
   const [contentTypeFilter, setContentTypeFilter] = useState<string>("all");
   const [isAddContentOpen, setIsAddContentOpen] = useState(false);
   const [isBulkUploadOpen, setIsBulkUploadOpen] = useState(false);
@@ -198,6 +273,15 @@ export default function SystemAdminPage() {
   const { data: billingData } = useQuery<BillingData>({
     queryKey: ["/api/admin/billing"],
     enabled: adminCheck?.isSiteAdmin && activeTab === "billing",
+  });
+
+  const { data: userAnalyticsData, isLoading: userAnalyticsLoading } = useQuery<{
+    users: UserAnalyticsEntry[];
+    platformMetrics: PlatformMetrics;
+  }>({
+    queryKey: ["/api/admin/user-analytics"],
+    enabled: adminCheck?.isSiteAdmin && activeTab === "user-analytics",
+    refetchInterval: 60000,
   });
 
   const { data: organizations = [] } = useQuery<Organization[]>({
@@ -775,6 +859,10 @@ export default function SystemAdminPage() {
           <TabsTrigger value="content-library" className="gap-2" data-testid="tab-content-library">
             <Library className="h-4 w-4" />
             <span className="hidden sm:inline">Content Library</span>
+          </TabsTrigger>
+          <TabsTrigger value="user-analytics" className="gap-2" data-testid="tab-user-analytics">
+            <Activity className="h-4 w-4" />
+            <span className="hidden sm:inline">User Analytics</span>
           </TabsTrigger>
         </TabsList>
 
@@ -2603,6 +2691,389 @@ export default function SystemAdminPage() {
               ))}
             </div>
           )}
+        </TabsContent>
+
+        <TabsContent value="user-analytics" className="space-y-6">
+          {userAnalyticsLoading ? (
+            <div className="flex items-center justify-center py-12">
+              <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+            </div>
+          ) : userAnalyticsData ? (
+            <>
+              <div>
+                <h2 className="font-oswald text-xl">User Analytics Dashboard</h2>
+                <p className="text-sm text-muted-foreground">Granular metrics for every user including churn rate, engagement, usage patterns, and revenue data.</p>
+              </div>
+
+              <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+                <Card className="overflow-visible">
+                  <CardContent className="pt-6">
+                    <div className="flex items-center justify-between gap-2">
+                      <div>
+                        <p className="text-sm text-muted-foreground">Monthly Churn Rate</p>
+                        <p className="text-2xl font-bold text-foreground" data-testid="text-monthly-churn">{userAnalyticsData.platformMetrics.monthlyChurnRate}%</p>
+                      </div>
+                      <TrendingUp className="h-5 w-5 text-muted-foreground" />
+                    </div>
+                    <p className="text-xs text-muted-foreground mt-1">Overall: {userAnalyticsData.platformMetrics.churnRate}%</p>
+                  </CardContent>
+                </Card>
+                <Card className="overflow-visible">
+                  <CardContent className="pt-6">
+                    <div className="flex items-center justify-between gap-2">
+                      <div>
+                        <p className="text-sm text-muted-foreground">Est. Burn Rate</p>
+                        <p className="text-2xl font-bold text-foreground" data-testid="text-burn-rate">${userAnalyticsData.platformMetrics.estimatedBurnRate}/mo</p>
+                      </div>
+                      <DollarSign className="h-5 w-5 text-muted-foreground" />
+                    </div>
+                    <p className="text-xs text-muted-foreground mt-1">MRR: ${userAnalyticsData.platformMetrics.estimatedMRR.toFixed(2)}</p>
+                  </CardContent>
+                </Card>
+                <Card className="overflow-visible">
+                  <CardContent className="pt-6">
+                    <div className="flex items-center justify-between gap-2">
+                      <div>
+                        <p className="text-sm text-muted-foreground">Conversion Rate</p>
+                        <p className="text-2xl font-bold text-foreground" data-testid="text-conversion-rate">{userAnalyticsData.platformMetrics.conversionRate}%</p>
+                      </div>
+                      <Target className="h-5 w-5 text-muted-foreground" />
+                    </div>
+                    <p className="text-xs text-muted-foreground mt-1">{userAnalyticsData.platformMetrics.paidUsers} paid users</p>
+                  </CardContent>
+                </Card>
+                <Card className="overflow-visible">
+                  <CardContent className="pt-6">
+                    <div className="flex items-center justify-between gap-2">
+                      <div>
+                        <p className="text-sm text-muted-foreground">DAU/MAU Ratio</p>
+                        <p className="text-2xl font-bold text-foreground" data-testid="text-dau-mau">{userAnalyticsData.platformMetrics.dauMauRatio}%</p>
+                      </div>
+                      <Activity className="h-5 w-5 text-muted-foreground" />
+                    </div>
+                    <p className="text-xs text-muted-foreground mt-1">Avg logins: {userAnalyticsData.platformMetrics.avgLoginCount}</p>
+                  </CardContent>
+                </Card>
+              </div>
+
+              <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-5">
+                <Card className="overflow-visible">
+                  <CardContent className="pt-4 pb-4">
+                    <div className="flex items-center gap-2">
+                      <div className="w-3 h-3 rounded-full bg-green-500" />
+                      <div>
+                        <p className="text-xs text-muted-foreground">Active</p>
+                        <p className="text-lg font-bold text-foreground">{userAnalyticsData.platformMetrics.activeUsers}</p>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+                <Card className="overflow-visible">
+                  <CardContent className="pt-4 pb-4">
+                    <div className="flex items-center gap-2">
+                      <div className="w-3 h-3 rounded-full bg-blue-500" />
+                      <div>
+                        <p className="text-xs text-muted-foreground">New</p>
+                        <p className="text-lg font-bold text-foreground">{userAnalyticsData.platformMetrics.newUsers}</p>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+                <Card className="overflow-visible">
+                  <CardContent className="pt-4 pb-4">
+                    <div className="flex items-center gap-2">
+                      <div className="w-3 h-3 rounded-full bg-amber-500" />
+                      <div>
+                        <p className="text-xs text-muted-foreground">At Risk</p>
+                        <p className="text-lg font-bold text-foreground">{userAnalyticsData.platformMetrics.atRiskUsers}</p>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+                <Card className="overflow-visible">
+                  <CardContent className="pt-4 pb-4">
+                    <div className="flex items-center gap-2">
+                      <div className="w-3 h-3 rounded-full bg-gray-400" />
+                      <div>
+                        <p className="text-xs text-muted-foreground">Inactive</p>
+                        <p className="text-lg font-bold text-foreground">{userAnalyticsData.platformMetrics.inactiveUsers}</p>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+                <Card className="overflow-visible">
+                  <CardContent className="pt-4 pb-4">
+                    <div className="flex items-center gap-2">
+                      <div className="w-3 h-3 rounded-full bg-red-500" />
+                      <div>
+                        <p className="text-xs text-muted-foreground">Churned</p>
+                        <p className="text-lg font-bold text-foreground">{userAnalyticsData.platformMetrics.churnedUsers}</p>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              </div>
+
+              <div className="grid gap-4 lg:grid-cols-2">
+                <Card className="overflow-visible">
+                  <CardHeader>
+                    <CardTitle className="text-base font-oswald">Cohort Retention</CardTitle>
+                    <CardDescription>Monthly sign-up cohorts and their retention rates</CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="space-y-2">
+                      {userAnalyticsData.platformMetrics.cohorts.map(c => (
+                        <div key={c.month} className="flex items-center gap-3">
+                          <span className="text-sm text-muted-foreground w-20 shrink-0">{c.month}</span>
+                          <div className="flex-1 bg-muted rounded-full h-5 overflow-hidden">
+                            <div 
+                              className="bg-lys-teal h-full rounded-full transition-all" 
+                              style={{ width: `${c.retentionRate}%` }}
+                            />
+                          </div>
+                          <span className="text-sm font-medium w-20 text-right shrink-0">{c.stillActive}/{c.totalJoined} ({c.retentionRate}%)</span>
+                        </div>
+                      ))}
+                    </div>
+                  </CardContent>
+                </Card>
+
+                <Card className="overflow-visible">
+                  <CardHeader>
+                    <CardTitle className="text-base font-oswald">Feature Adoption</CardTitle>
+                    <CardDescription>Percentage of users who have used each feature</CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="space-y-3">
+                      {Object.entries(userAnalyticsData.platformMetrics.featureAdoption).map(([feature, data]) => (
+                        <div key={feature}>
+                          <div className="flex items-center justify-between mb-1">
+                            <span className="text-sm text-foreground capitalize">{feature.replace(/([A-Z])/g, ' $1').trim()}</span>
+                            <span className="text-sm text-muted-foreground">{data.users} users ({data.rate}%)</span>
+                          </div>
+                          <div className="bg-muted rounded-full h-2 overflow-hidden">
+                            <div className="bg-lys-yellow h-full rounded-full transition-all" style={{ width: `${data.rate}%` }} />
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </CardContent>
+                </Card>
+              </div>
+
+              <Card className="overflow-visible">
+                <CardHeader>
+                  <div className="flex items-center justify-between gap-4 flex-wrap">
+                    <div>
+                      <CardTitle className="text-base font-oswald">Individual User Metrics</CardTitle>
+                      <CardDescription>Click any user to see granular details</CardDescription>
+                    </div>
+                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                      <span>Onboarding: {userAnalyticsData.platformMetrics.onboardingRate}%</span>
+                    </div>
+                  </div>
+                </CardHeader>
+                <CardContent>
+                  <div className="flex flex-col sm:flex-row gap-3 mb-4">
+                    <div className="relative flex-1">
+                      <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                      <Input
+                        placeholder="Search by name or email..."
+                        value={analyticsSearch}
+                        onChange={(e) => setAnalyticsSearch(e.target.value)}
+                        className="pl-9"
+                        data-testid="input-analytics-search"
+                      />
+                    </div>
+                    <Select value={analyticsStatusFilter} onValueChange={setAnalyticsStatusFilter}>
+                      <SelectTrigger className="w-[130px]" data-testid="select-analytics-status">
+                        <SelectValue placeholder="Status" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">All Status</SelectItem>
+                        <SelectItem value="active">Active</SelectItem>
+                        <SelectItem value="new">New</SelectItem>
+                        <SelectItem value="at_risk">At Risk</SelectItem>
+                        <SelectItem value="inactive">Inactive</SelectItem>
+                        <SelectItem value="churned">Churned</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <Select value={analyticsTierFilter} onValueChange={setAnalyticsTierFilter}>
+                      <SelectTrigger className="w-[120px]" data-testid="select-analytics-tier">
+                        <SelectValue placeholder="Tier" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">All Tiers</SelectItem>
+                        <SelectItem value="free">Free</SelectItem>
+                        <SelectItem value="pro">Pro</SelectItem>
+                        <SelectItem value="campus">Campus</SelectItem>
+                        <SelectItem value="enterprise">Enterprise</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <Select value={analyticsRoleFilter} onValueChange={setAnalyticsRoleFilter}>
+                      <SelectTrigger className="w-[140px]" data-testid="select-analytics-role">
+                        <SelectValue placeholder="Role" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">All Roles</SelectItem>
+                        <SelectItem value="student">Student</SelectItem>
+                        <SelectItem value="educator">Educator</SelectItem>
+                        <SelectItem value="campus_admin">Campus Admin</SelectItem>
+                        <SelectItem value="district_admin">District Admin</SelectItem>
+                        <SelectItem value="site_admin">Site Admin</SelectItem>
+                        <SelectItem value="system_admin">System Admin</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <Select value={analyticsSortBy} onValueChange={setAnalyticsSortBy}>
+                      <SelectTrigger className="w-[150px]" data-testid="select-analytics-sort">
+                        <SelectValue placeholder="Sort by" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="lastActivity">Last Activity</SelectItem>
+                        <SelectItem value="joinDate">Join Date</SelectItem>
+                        <SelectItem value="engagement">Engagement</SelectItem>
+                        <SelectItem value="totalActions">Total Actions</SelectItem>
+                        <SelectItem value="loginCount">Login Count</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  {(() => {
+                    let filtered = userAnalyticsData.users;
+                    if (analyticsSearch) {
+                      const s = analyticsSearch.toLowerCase();
+                      filtered = filtered.filter(u => 
+                        u.email?.toLowerCase().includes(s) ||
+                        u.firstName?.toLowerCase().includes(s) ||
+                        u.lastName?.toLowerCase().includes(s)
+                      );
+                    }
+                    if (analyticsStatusFilter !== "all") filtered = filtered.filter(u => u.status === analyticsStatusFilter);
+                    if (analyticsTierFilter !== "all") filtered = filtered.filter(u => u.tier === analyticsTierFilter);
+                    if (analyticsRoleFilter !== "all") filtered = filtered.filter(u => u.role === analyticsRoleFilter);
+                    
+                    filtered = [...filtered].sort((a, b) => {
+                      switch (analyticsSortBy) {
+                        case "joinDate": return new Date(b.joinDate || 0).getTime() - new Date(a.joinDate || 0).getTime();
+                        case "engagement": return b.usage.engagementRate - a.usage.engagementRate;
+                        case "totalActions": return b.usage.totalActions - a.usage.totalActions;
+                        case "loginCount": return b.loginCount - a.loginCount;
+                        default: return a.daysSinceLastActivity - b.daysSinceLastActivity;
+                      }
+                    });
+
+                    const statusColors: Record<string, string> = {
+                      active: "bg-green-500/10 text-green-700 dark:text-green-400 border-green-500/30",
+                      new: "bg-blue-500/10 text-blue-700 dark:text-blue-400 border-blue-500/30",
+                      at_risk: "bg-amber-500/10 text-amber-700 dark:text-amber-400 border-amber-500/30",
+                      inactive: "bg-gray-500/10 text-gray-700 dark:text-gray-400 border-gray-500/30",
+                      churned: "bg-red-500/10 text-red-700 dark:text-red-400 border-red-500/30",
+                    };
+
+                    return (
+                      <div className="space-y-1">
+                        <p className="text-sm text-muted-foreground mb-3">{filtered.length} users</p>
+                        {filtered.slice(0, 100).map(u => (
+                          <div key={u.id} data-testid={`analytics-user-${u.id}`}>
+                            <button
+                              type="button"
+                              className="w-full text-left p-3 rounded-md border hover-elevate transition-colors"
+                              onClick={() => setExpandedUserId(expandedUserId === u.id ? null : u.id)}
+                              data-testid={`button-expand-user-${u.id}`}
+                            >
+                              <div className="flex items-center gap-3 flex-wrap">
+                                <div className="w-8 h-8 rounded-full bg-muted flex items-center justify-center shrink-0">
+                                  {u.profileImageUrl ? (
+                                    <img src={u.profileImageUrl} alt="" className="w-full h-full rounded-full object-cover" />
+                                  ) : (
+                                    <span className="text-sm font-medium text-muted-foreground">{(u.firstName?.[0] || "?").toUpperCase()}</span>
+                                  )}
+                                </div>
+                                <div className="min-w-0 flex-1">
+                                  <p className="text-sm font-medium truncate">{u.firstName} {u.lastName}</p>
+                                  <p className="text-xs text-muted-foreground truncate">{u.email}</p>
+                                </div>
+                                <Badge variant="outline" className={`text-xs border ${statusColors[u.status] || ""}`}>
+                                  {u.status === "at_risk" ? "At Risk" : u.status.charAt(0).toUpperCase() + u.status.slice(1)}
+                                </Badge>
+                                <Badge variant="outline" className="capitalize text-xs">{u.role}</Badge>
+                                <Badge className={getTierColor(u.tier)} >{u.tier}</Badge>
+                                <div className="hidden md:flex items-center gap-4 text-xs text-muted-foreground">
+                                  <span title="Days since join">{u.daysSinceJoin}d old</span>
+                                  <span title="Last active">{u.daysSinceLastActivity === 0 ? "Today" : `${u.daysSinceLastActivity}d ago`}</span>
+                                  <span title="Total actions">{u.usage.totalActions} actions</span>
+                                  <span title="Engagement rate">{u.usage.engagementRate}% engaged</span>
+                                </div>
+                                <ChevronRight className={`h-4 w-4 text-muted-foreground transition-transform shrink-0 ${expandedUserId === u.id ? "rotate-90" : ""}`} />
+                              </div>
+                            </button>
+
+                            {expandedUserId === u.id && (
+                              <div className="ml-4 mr-2 mt-1 mb-3 p-4 border rounded-md bg-muted/30 space-y-4">
+                                <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+                                  <div>
+                                    <p className="text-xs text-muted-foreground font-medium mb-1">Account Info</p>
+                                    <div className="space-y-1 text-sm">
+                                      <p><span className="text-muted-foreground">Joined:</span> {u.joinDate ? new Date(u.joinDate).toLocaleDateString() : "N/A"}</p>
+                                      <p><span className="text-muted-foreground">Last Login:</span> {u.lastLoginAt ? new Date(u.lastLoginAt).toLocaleDateString() : "Never"}</p>
+                                      <p><span className="text-muted-foreground">Login Count:</span> {u.loginCount}</p>
+                                      <p><span className="text-muted-foreground">Days on Platform:</span> {u.daysSinceJoin}</p>
+                                      <p><span className="text-muted-foreground">Onboarding:</span> {u.onboardingCompleted ? "Completed" : "Incomplete"}</p>
+                                      {u.educatorType && <p><span className="text-muted-foreground">Educator Type:</span> {u.educatorType}</p>}
+                                      {u.country && <p><span className="text-muted-foreground">Location:</span> {u.state ? `${u.state}, ` : ""}{u.country}</p>}
+                                    </div>
+                                  </div>
+                                  <div>
+                                    <p className="text-xs text-muted-foreground font-medium mb-1">Engagement</p>
+                                    <div className="space-y-1 text-sm">
+                                      <p><span className="text-muted-foreground">Engagement Rate:</span> {u.usage.engagementRate}%</p>
+                                      <p><span className="text-muted-foreground">Active Days:</span> {u.usage.activeDays}</p>
+                                      <p><span className="text-muted-foreground">Total Actions:</span> {u.usage.totalActions}</p>
+                                      <p><span className="text-muted-foreground">Last Activity:</span> {u.daysSinceLastActivity === 0 ? "Today" : `${u.daysSinceLastActivity} days ago`}</p>
+                                      <p><span className="text-muted-foreground">Days Since Login:</span> {u.daysSinceLastLogin !== null ? u.daysSinceLastLogin : "N/A"}</p>
+                                    </div>
+                                  </div>
+                                  <div>
+                                    <p className="text-xs text-muted-foreground font-medium mb-1">Content & Usage</p>
+                                    <div className="space-y-1 text-sm">
+                                      <p><span className="text-muted-foreground">Lessons Created:</span> {u.usage.lessonsCreated} <span className="text-xs text-muted-foreground">({u.usage.lessonsLast30Days} last 30d)</span></p>
+                                      <p><span className="text-muted-foreground">AI Generations:</span> {u.usage.aiLessonsGenerated} <span className="text-xs text-muted-foreground">({u.usage.aiLessonsLast30Days} last 30d)</span></p>
+                                      <p><span className="text-muted-foreground">Assignments:</span> {u.usage.assignmentsCreated} <span className="text-xs text-muted-foreground">({u.usage.assignmentsLast30Days} last 30d)</span></p>
+                                      <p><span className="text-muted-foreground">Goals:</span> {u.usage.goalsCreated} ({u.usage.goalsCompleted} completed)</p>
+                                      <p><span className="text-muted-foreground">Scope & Sequences:</span> {u.usage.scopeSequencesCreated}</p>
+                                    </div>
+                                  </div>
+                                  <div>
+                                    <p className="text-xs text-muted-foreground font-medium mb-1">Be-Know-Do & Revenue</p>
+                                    <div className="space-y-1 text-sm">
+                                      <p><span className="text-muted-foreground">Self-Discovery:</span> {u.usage.selfDiscoveryCompleted} completed</p>
+                                      <p><span className="text-muted-foreground">Careers Explored:</span> {u.usage.careersExplored}</p>
+                                      <p><span className="text-muted-foreground">Journey Entries:</span> {u.usage.journeyEntries}</p>
+                                      {u.journey && (
+                                        <p><span className="text-muted-foreground">BKD Scores:</span> B:{u.journey.beScore || 0} K:{u.journey.knowScore || 0} D:{u.journey.doScore || 0}</p>
+                                      )}
+                                      <p><span className="text-muted-foreground">Subscription:</span> {u.subscriptionStatus || "none"}</p>
+                                      {u.isPaid && <p><span className="text-muted-foreground">Stripe ID:</span> {u.stripeCustomerId ? "Connected" : "None"}</p>}
+                                      {u.affiliate && (
+                                        <p><span className="text-muted-foreground">Affiliate:</span> {u.affiliate.totalReferrals || 0} referrals, {u.affiliate.totalPoints || 0} pts</p>
+                                      )}
+                                    </div>
+                                  </div>
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        ))}
+                        {filtered.length > 100 && (
+                          <p className="text-sm text-muted-foreground text-center py-2">Showing first 100 of {filtered.length} users. Use filters to narrow results.</p>
+                        )}
+                      </div>
+                    );
+                  })()}
+                </CardContent>
+              </Card>
+            </>
+          ) : null}
         </TabsContent>
       </Tabs>
     </div>

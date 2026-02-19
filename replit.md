@@ -43,6 +43,7 @@ Preferred communication style: Simple, everyday language.
 -   **Career Alignment**: Maps classes to career fields and displays career readiness scores in the gradebook and parent portal.
 -   **Parent Portal**: Free tier portal for parents to track student progress, visualize Be-Know-Do journey, and view career readiness insights.
 -   **System Admin Performance Analytics**: Dashboard for tracking performance, goal completion, standards coverage, and student progress.
+-   **Granular User Analytics**: Per-user metrics dashboard with churn rate, burn rate, engagement rate, DAU/MAU ratio, cohort retention, feature adoption rates, MRR tracking, and expandable individual user detail views showing join date, login count, content creation stats, BKD journey progress, and subscription data.
 -   **Educator Type Classification**: Allows educators to self-select their type for platform usage analytics.
 -   **KNOW Resources Management**: Admin-managed curated educational content for the KNOW pillar.
 -   **Student Matriculation & Achievement Tracking**: System-level tracking of student progress and achievements.

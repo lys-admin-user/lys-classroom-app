@@ -29,6 +29,13 @@ import {
   standardsJurisdictions,
   authorities as authoritiesTable,
   pricingTiers,
+  lessonGenerations,
+  selfDiscoveryResults,
+  studentJourneyEntries,
+  studentJourneyProgress,
+  savedCareers,
+  scopeSequences,
+  assignments,
 } from "@shared/schema";
 import { z } from "zod";
 import { setupAuth, registerAuthRoutes, isAuthenticated } from "./replit_integrations/auth";
@@ -6709,6 +6716,274 @@ export async function registerRoutes(
     } catch (error) {
       console.error("Analytics error:", error);
       res.status(500).json({ error: "Failed to fetch analytics" });
+    }
+  });
+
+  // Granular User Analytics - per-user metrics with churn, burn rate, usage data
+  app.get("/api/admin/user-analytics", isAuthenticated, isSiteAdmin, async (req: any, res) => {
+    try {
+      const allUsers = await db.select().from(users);
+      const allLessons = await db.select().from(lessons);
+      const allGoals = await db.select().from(goals);
+      const allLessonGens = await db.select().from(lessonGenerations);
+      const allJourneyEntries = await db.select().from(studentJourneyEntries);
+      const allJourneyProgress = await db.select().from(studentJourneyProgress);
+      const allSelfDiscovery = await db.select().from(selfDiscoveryResults);
+      const allSavedCareers = await db.select().from(savedCareers);
+      const allScopeSequences = await db.select().from(scopeSequences);
+      const allAssignments = await db.select().from(assignments);
+      const allAffiliates = await db.select().from(educatorAffiliates);
+      const allProfiles = await db.select().from(educatorProfiles);
+      const allPrefs = await db.select().from(userPreferences);
+      const allOrgs = await storage.getOrganizations();
+
+      const now = new Date();
+      const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+      const sixtyDaysAgo = new Date(now.getTime() - 60 * 24 * 60 * 60 * 1000);
+      const ninetyDaysAgo = new Date(now.getTime() - 90 * 24 * 60 * 60 * 1000);
+
+      const userAnalytics = allUsers.map(u => {
+        const userLessons = allLessons.filter(l => l.userId === u.id);
+        const userGoals = allGoals.filter(g => g.userId === u.id);
+        const userLessonGens = allLessonGens.filter(lg => lg.userId === u.id);
+        const userJourneyEntries = allJourneyEntries.filter(je => je.userId === u.id);
+        const userJourneyProg = allJourneyProgress.find(jp => jp.studentId === u.id);
+        const userSelfDisc = allSelfDiscovery.filter(sd => sd.userId === u.id);
+        const userCareers = allSavedCareers.filter(sc => sc.userId === u.id);
+        const userScopes = allScopeSequences.filter(ss => ss.userId === u.id);
+        const userAssignments = allAssignments.filter(a => a.userId === u.id);
+        const userAffiliate = allAffiliates.find(a => a.userId === u.id);
+        const userProfile = allProfiles.find(p => p.userId === u.id);
+        const userPref = allPrefs.find(p => p.userId === u.id);
+        const userOrgCount = 0;
+
+        const joinDate = u.createdAt ? new Date(u.createdAt) : now;
+        const daysSinceJoin = Math.floor((now.getTime() - joinDate.getTime()) / (1000 * 60 * 60 * 24));
+        const lastLogin = u.lastLoginAt ? new Date(u.lastLoginAt) : null;
+        const daysSinceLastLogin = lastLogin ? Math.floor((now.getTime() - lastLogin.getTime()) / (1000 * 60 * 60 * 24)) : null;
+
+        const allUserDates = [
+          ...userLessons.map(l => l.createdAt),
+          ...userGoals.map(g => g.createdAt),
+          ...userLessonGens.map(lg => lg.createdAt),
+          ...userJourneyEntries.map(je => je.createdAt),
+          ...userAssignments.map(a => a.createdAt),
+        ].filter(Boolean).map(d => new Date(d!));
+
+        const lastActivityDate = allUserDates.length > 0 
+          ? new Date(Math.max(...allUserDates.map(d => d.getTime()))) 
+          : lastLogin || joinDate;
+        const daysSinceLastActivity = Math.floor((now.getTime() - lastActivityDate.getTime()) / (1000 * 60 * 60 * 24));
+
+        const recentLessons = userLessons.filter(l => l.createdAt && new Date(l.createdAt) > thirtyDaysAgo).length;
+        const recentGoals = userGoals.filter(g => g.createdAt && new Date(g.createdAt) > thirtyDaysAgo).length;
+        const recentLessonGens = userLessonGens.filter(lg => lg.createdAt && new Date(lg.createdAt) > thirtyDaysAgo).length;
+        const recentAssignments = userAssignments.filter(a => a.createdAt && new Date(a.createdAt) > thirtyDaysAgo).length;
+
+        const totalActions = userLessons.length + userGoals.length + userLessonGens.length + 
+          userJourneyEntries.length + userAssignments.length + userScopes.length +
+          userSelfDisc.length + userCareers.length;
+
+        const activeDaysCount = new Set(allUserDates.map(d => d.toISOString().split('T')[0])).size;
+        const engagementRate = daysSinceJoin > 0 ? Math.min(100, Math.round((activeDaysCount / daysSinceJoin) * 100)) : 0;
+
+        let status: "active" | "at_risk" | "churned" | "new" | "inactive";
+        if (daysSinceJoin <= 7) status = "new";
+        else if (daysSinceLastActivity <= 7) status = "active";
+        else if (daysSinceLastActivity <= 30) status = "at_risk";
+        else if (daysSinceLastActivity <= 90) status = "inactive";
+        else status = "churned";
+
+        const isPaid = u.tier !== "free";
+        const tierHistory = u.updatedAt && u.tier !== "free" ? u.updatedAt : null;
+
+        return {
+          id: u.id,
+          email: u.email,
+          firstName: u.firstName,
+          lastName: u.lastName,
+          role: u.role,
+          tier: u.tier,
+          profileImageUrl: u.profileImageUrl,
+          joinDate: u.createdAt,
+          lastLoginAt: u.lastLoginAt,
+          loginCount: u.loginCount || 0,
+          lastActivityDate,
+          daysSinceJoin,
+          daysSinceLastLogin,
+          daysSinceLastActivity,
+          status,
+          isPaid,
+          subscriptionStatus: u.subscriptionStatus,
+          stripeCustomerId: u.stripeCustomerId,
+          onboardingCompleted: u.onboardingCompleted,
+          educatorType: userProfile?.educatorType || null,
+          country: userPref?.country || null,
+          state: userPref?.state || null,
+          organizationCount: userOrgCount,
+          usage: {
+            totalActions,
+            activeDays: activeDaysCount,
+            engagementRate,
+            lessonsCreated: userLessons.length,
+            lessonsLast30Days: recentLessons,
+            aiLessonsGenerated: userLessonGens.length,
+            aiLessonsLast30Days: recentLessonGens,
+            goalsCreated: userGoals.length,
+            goalsLast30Days: recentGoals,
+            goalsCompleted: userGoals.filter(g => g.status === "completed").length,
+            assignmentsCreated: userAssignments.length,
+            assignmentsLast30Days: recentAssignments,
+            scopeSequencesCreated: userScopes.length,
+            selfDiscoveryCompleted: userSelfDisc.length,
+            careersExplored: userCareers.length,
+            journeyEntries: userJourneyEntries.length,
+          },
+          journey: userJourneyProg ? {
+            beScore: userJourneyProg.beScore,
+            knowScore: userJourneyProg.knowScore,
+            doScore: userJourneyProg.doScore,
+            overallScore: userJourneyProg.overallScore,
+          } : null,
+          affiliate: userAffiliate ? {
+            referralCode: userAffiliate.referralCode,
+            totalPoints: userAffiliate.totalPoints,
+            totalReferrals: userAffiliate.totalReferrals,
+            isActive: userAffiliate.isActive,
+          } : null,
+        };
+      });
+
+      // Platform-level metrics
+      const totalUsers = allUsers.length;
+      const paidUsers = allUsers.filter(u => u.tier !== "free").length;
+      const activeUsers = userAnalytics.filter(u => u.status === "active").length;
+      const atRiskUsers = userAnalytics.filter(u => u.status === "at_risk").length;
+      const churnedUsers = userAnalytics.filter(u => u.status === "churned").length;
+      const newUsers = userAnalytics.filter(u => u.status === "new").length;
+      const inactiveUsers = userAnalytics.filter(u => u.status === "inactive").length;
+
+      // Churn rate: users who haven't been active in 90+ days / total users who joined 90+ days ago
+      const usersOlderThan90 = allUsers.filter(u => u.createdAt && new Date(u.createdAt) < ninetyDaysAgo);
+      const churnRate = usersOlderThan90.length > 0 
+        ? Math.round((churnedUsers / usersOlderThan90.length) * 100 * 10) / 10 
+        : 0;
+
+      // Monthly churn: users who went inactive in the last 30 days
+      const monthlyChurnedUsers = userAnalytics.filter(u => {
+        return u.daysSinceLastActivity >= 30 && u.daysSinceLastActivity < 60 && u.daysSinceJoin > 30;
+      }).length;
+      const activeLastMonth = userAnalytics.filter(u => u.daysSinceJoin > 30).length;
+      const monthlyChurnRate = activeLastMonth > 0 
+        ? Math.round((monthlyChurnedUsers / activeLastMonth) * 100 * 10) / 10 
+        : 0;
+
+      // Burn rate calculation (estimated monthly cost based on active users)
+      const estimatedInfraPerUser = 0.50; // estimated monthly infrastructure cost per active user
+      const estimatedBurnRate = Math.round(activeUsers * estimatedInfraPerUser * 100) / 100;
+
+      // Revenue metrics  
+      const proUsers = allUsers.filter(u => u.tier === "pro").length;
+      const campusUsers = allUsers.filter(u => u.tier === "campus").length;
+      const enterpriseUsers = allUsers.filter(u => u.tier === "enterprise").length;
+      const estimatedMRR = (proUsers * 14.99) + (campusUsers * 39.99) + (enterpriseUsers * 199);
+      const runwayMonths = estimatedBurnRate > 0 ? Math.round(estimatedMRR / estimatedBurnRate * 10) / 10 : Infinity;
+
+      // Retention by cohort (monthly)
+      const cohorts: { month: string; totalJoined: number; stillActive: number; retentionRate: number }[] = [];
+      for (let i = 0; i < 6; i++) {
+        const monthStart = new Date(now.getFullYear(), now.getMonth() - i, 1);
+        const monthEnd = new Date(now.getFullYear(), now.getMonth() - i + 1, 0);
+        const cohortUsers = allUsers.filter(u => {
+          if (!u.createdAt) return false;
+          const d = new Date(u.createdAt);
+          return d >= monthStart && d <= monthEnd;
+        });
+        const stillActive = cohortUsers.filter(cu => {
+          const ua = userAnalytics.find(a => a.id === cu.id);
+          return ua && (ua.status === "active" || ua.status === "at_risk" || ua.status === "new");
+        }).length;
+        cohorts.push({
+          month: monthStart.toISOString().slice(0, 7),
+          totalJoined: cohortUsers.length,
+          stillActive,
+          retentionRate: cohortUsers.length > 0 ? Math.round((stillActive / cohortUsers.length) * 100) : 0,
+        });
+      }
+
+      // DAU/MAU approximation
+      const usersActiveToday = userAnalytics.filter(u => u.daysSinceLastActivity === 0).length;
+      const usersActiveLast30 = userAnalytics.filter(u => u.daysSinceLastActivity <= 30).length;
+      const dauMauRatio = usersActiveLast30 > 0 
+        ? Math.round((usersActiveToday / usersActiveLast30) * 100) 
+        : 0;
+
+      // Average session frequency
+      const avgLoginCount = totalUsers > 0 
+        ? Math.round(allUsers.reduce((sum, u) => sum + (u.loginCount || 0), 0) / totalUsers * 10) / 10 
+        : 0;
+
+      // Conversion rate (free to paid)
+      const convertedUsers = allUsers.filter(u => u.tier !== "free").length;
+      const conversionRate = totalUsers > 0 ? Math.round((convertedUsers / totalUsers) * 100 * 10) / 10 : 0;
+
+      // Onboarding completion rate
+      const onboardingCompleted = allUsers.filter(u => u.onboardingCompleted).length;
+      const onboardingRate = totalUsers > 0 ? Math.round((onboardingCompleted / totalUsers) * 100) : 0;
+
+      // Feature adoption rates
+      const usersWithLessons = new Set(allLessons.map(l => l.userId)).size;
+      const usersWithGoals = new Set(allGoals.map(g => g.userId)).size;
+      const usersWithAssignments = new Set(allAssignments.map(a => a.userId)).size;
+      const usersWithSelfDiscovery = new Set(allSelfDiscovery.map(sd => sd.userId)).size;
+      const usersWithCareers = new Set(allSavedCareers.map(sc => sc.userId)).size;
+
+      res.json({
+        users: userAnalytics,
+        platformMetrics: {
+          totalUsers,
+          activeUsers,
+          atRiskUsers,
+          churnedUsers,
+          newUsers,
+          inactiveUsers,
+          paidUsers,
+          churnRate,
+          monthlyChurnRate,
+          estimatedBurnRate,
+          estimatedMRR,
+          runwayMonths,
+          conversionRate,
+          onboardingRate,
+          dauMauRatio,
+          avgLoginCount,
+          cohorts,
+          featureAdoption: {
+            lessonCreation: { users: usersWithLessons, rate: totalUsers > 0 ? Math.round((usersWithLessons / totalUsers) * 100) : 0 },
+            goalSetting: { users: usersWithGoals, rate: totalUsers > 0 ? Math.round((usersWithGoals / totalUsers) * 100) : 0 },
+            assignments: { users: usersWithAssignments, rate: totalUsers > 0 ? Math.round((usersWithAssignments / totalUsers) * 100) : 0 },
+            selfDiscovery: { users: usersWithSelfDiscovery, rate: totalUsers > 0 ? Math.round((usersWithSelfDiscovery / totalUsers) * 100) : 0 },
+            careerExploration: { users: usersWithCareers, rate: totalUsers > 0 ? Math.round((usersWithCareers / totalUsers) * 100) : 0 },
+          },
+          tierBreakdown: {
+            free: allUsers.filter(u => u.tier === "free").length,
+            pro: proUsers,
+            campus: campusUsers,
+            enterprise: enterpriseUsers,
+          },
+          roleBreakdown: {
+            student: allUsers.filter(u => u.role === "student").length,
+            educator: allUsers.filter(u => u.role === "educator").length,
+            campus_admin: allUsers.filter(u => u.role === "campus_admin").length,
+            district_admin: allUsers.filter(u => u.role === "district_admin").length,
+            site_admin: allUsers.filter(u => u.role === "site_admin").length,
+            system_admin: allUsers.filter(u => u.role === "system_admin").length,
+          },
+        },
+      });
+    } catch (error) {
+      console.error("User analytics error:", error);
+      res.status(500).json({ error: "Failed to fetch user analytics" });
     }
   });
 
