@@ -17,7 +17,7 @@ import { useState, useEffect, useCallback } from "react";
 import { 
   Shield, Building2, Users, Trash2, BarChart3, AlertTriangle, Loader2, 
   TrendingUp, CreditCard, Share2, BookOpen, Target, UserCheck, 
-  Eye, Edit2, Search, ChevronRight, Map, GraduationCap, DollarSign,
+  Eye, Edit2, Search, ChevronLeft, ChevronRight, Map, GraduationCap, DollarSign,
   Activity, Globe, FileText, Award, Zap, ExternalLink, UserCog, Library, Plus,
   Server, Database, Cpu, HardDrive, Wifi, Lock, Monitor, Code2, Layers, Check,
   MapPin, Upload, X, Headphones, Video
@@ -221,6 +221,7 @@ export default function SystemAdminPage() {
   const [analyticsRoleFilter, setAnalyticsRoleFilter] = useState<string>("all");
   const [analyticsSortBy, setAnalyticsSortBy] = useState<string>("lastActivity");
   const [expandedUserId, setExpandedUserId] = useState<string | null>(null);
+  const [analyticsPage, setAnalyticsPage] = useState(1);
   const [contentTypeFilter, setContentTypeFilter] = useState<string>("all");
   const [isAddContentOpen, setIsAddContentOpen] = useState(false);
   const [isBulkUploadOpen, setIsBulkUploadOpen] = useState(false);
@@ -2880,12 +2881,12 @@ export default function SystemAdminPage() {
                       <Input
                         placeholder="Search by name or email..."
                         value={analyticsSearch}
-                        onChange={(e) => setAnalyticsSearch(e.target.value)}
+                        onChange={(e) => { setAnalyticsSearch(e.target.value); setAnalyticsPage(1); }}
                         className="pl-9"
                         data-testid="input-analytics-search"
                       />
                     </div>
-                    <Select value={analyticsStatusFilter} onValueChange={setAnalyticsStatusFilter}>
+                    <Select value={analyticsStatusFilter} onValueChange={(v) => { setAnalyticsStatusFilter(v); setAnalyticsPage(1); }}>
                       <SelectTrigger className="w-[130px]" data-testid="select-analytics-status">
                         <SelectValue placeholder="Status" />
                       </SelectTrigger>
@@ -2898,7 +2899,7 @@ export default function SystemAdminPage() {
                         <SelectItem value="churned">Churned</SelectItem>
                       </SelectContent>
                     </Select>
-                    <Select value={analyticsTierFilter} onValueChange={setAnalyticsTierFilter}>
+                    <Select value={analyticsTierFilter} onValueChange={(v) => { setAnalyticsTierFilter(v); setAnalyticsPage(1); }}>
                       <SelectTrigger className="w-[120px]" data-testid="select-analytics-tier">
                         <SelectValue placeholder="Tier" />
                       </SelectTrigger>
@@ -2910,7 +2911,7 @@ export default function SystemAdminPage() {
                         <SelectItem value="enterprise">Enterprise</SelectItem>
                       </SelectContent>
                     </Select>
-                    <Select value={analyticsRoleFilter} onValueChange={setAnalyticsRoleFilter}>
+                    <Select value={analyticsRoleFilter} onValueChange={(v) => { setAnalyticsRoleFilter(v); setAnalyticsPage(1); }}>
                       <SelectTrigger className="w-[140px]" data-testid="select-analytics-role">
                         <SelectValue placeholder="Role" />
                       </SelectTrigger>
@@ -2970,10 +2971,16 @@ export default function SystemAdminPage() {
                       churned: "bg-red-500/10 text-red-700 dark:text-red-400 border-red-500/30",
                     };
 
+                    const perPage = 10;
+                    const totalPages = Math.max(1, Math.ceil(filtered.length / perPage));
+                    const safePage = Math.min(analyticsPage, totalPages);
+                    const startIdx = (safePage - 1) * perPage;
+                    const paged = filtered.slice(startIdx, startIdx + perPage);
+
                     return (
                       <div className="space-y-1">
                         <p className="text-sm text-muted-foreground mb-3">{filtered.length} users</p>
-                        {filtered.slice(0, 100).map(u => (
+                        {paged.map(u => (
                           <div key={u.id} data-testid={`analytics-user-${u.id}`}>
                             <button
                               type="button"
@@ -3064,8 +3071,56 @@ export default function SystemAdminPage() {
                             )}
                           </div>
                         ))}
-                        {filtered.length > 100 && (
-                          <p className="text-sm text-muted-foreground text-center py-2">Showing first 100 of {filtered.length} users. Use filters to narrow results.</p>
+                        {totalPages > 1 && (
+                          <div className="flex items-center justify-between gap-4 pt-3 flex-wrap">
+                            <p className="text-sm text-muted-foreground">
+                              Showing {startIdx + 1}–{Math.min(startIdx + perPage, filtered.length)} of {filtered.length} users
+                            </p>
+                            <div className="flex items-center gap-1">
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                disabled={safePage <= 1}
+                                onClick={() => setAnalyticsPage(safePage - 1)}
+                                data-testid="button-analytics-prev"
+                              >
+                                <ChevronLeft className="h-4 w-4" />
+                                <span className="sr-only">Previous</span>
+                              </Button>
+                              {Array.from({ length: totalPages }, (_, i) => i + 1)
+                                .filter(p => p === 1 || p === totalPages || Math.abs(p - safePage) <= 1)
+                                .reduce<(number | "ellipsis")[]>((acc, p, i, arr) => {
+                                  if (i > 0 && p - (arr[i - 1] as number) > 1) acc.push("ellipsis");
+                                  acc.push(p);
+                                  return acc;
+                                }, [])
+                                .map((p, i) =>
+                                  p === "ellipsis" ? (
+                                    <span key={`e${i}`} className="px-1 text-muted-foreground text-sm">...</span>
+                                  ) : (
+                                    <Button
+                                      key={p}
+                                      variant={p === safePage ? "default" : "outline"}
+                                      size="sm"
+                                      onClick={() => setAnalyticsPage(p)}
+                                      data-testid={`button-analytics-page-${p}`}
+                                    >
+                                      {p}
+                                    </Button>
+                                  )
+                                )}
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                disabled={safePage >= totalPages}
+                                onClick={() => setAnalyticsPage(safePage + 1)}
+                                data-testid="button-analytics-next"
+                              >
+                                <ChevronRight className="h-4 w-4" />
+                                <span className="sr-only">Next</span>
+                              </Button>
+                            </div>
+                          </div>
                         )}
                       </div>
                     );
