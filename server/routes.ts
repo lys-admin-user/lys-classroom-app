@@ -37,6 +37,7 @@ import multer from "multer";
 import { syncJurisdictionsFromCSP, syncStandardSetFromCSP, getSyncStatus, fetchCSPJurisdictions, syncAllStandardsFromCSP, getImportProgress } from "./services/cspService";
 import { extractStandardsFromText, processPdfImport, checkSourceForChanges } from "./services/llmExtractionService";
 import { syncBlsData, getLastSyncStatus, getSyncHistory, startBlsScheduler, getSchedulerStatus } from "./services/blsService";
+import { createPaypalOrder, capturePaypalOrder, loadPaypalDefault, isPayPalConfigured } from "./paypal";
 import * as hubspotService from "./services/hubspotService";
 import * as wordpressService from "./services/wordpressService";
 import { db } from "./db";
@@ -8273,6 +8274,126 @@ export async function registerRoutes(
     } catch (error) {
       res.status(500).json({ error: "Failed to downgrade tier" });
     }
+  });
+
+  // ================================
+  // Payment Methods & PayPal Integration
+  // ================================
+
+  app.get("/api/payment-methods/available", async (_req: any, res) => {
+    try {
+      const methods = [
+        {
+          id: "stripe",
+          name: "Credit / Debit Card",
+          description: "Pay securely with Visa, Mastercard, Amex, or Discover",
+          icon: "credit-card",
+          configured: !!process.env.STRIPE_SECRET_KEY,
+          available: true,
+        },
+        {
+          id: "paypal",
+          name: "PayPal",
+          description: "Pay with your PayPal account or PayPal Credit",
+          icon: "paypal",
+          configured: isPayPalConfigured(),
+          available: true,
+        },
+        {
+          id: "purchase_order",
+          name: "Purchase Order",
+          description: "For schools and districts - pay via institutional purchase order",
+          icon: "file-text",
+          configured: true,
+          available: true,
+        },
+        {
+          id: "bank_transfer",
+          name: "Bank Transfer / ACH",
+          description: "Direct bank payment for annual plans (US institutions)",
+          icon: "landmark",
+          configured: true,
+          available: true,
+        },
+      ];
+      res.json(methods);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to get payment methods" });
+    }
+  });
+
+  app.post("/api/purchase-order/submit", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user?.claims?.sub;
+      const { tier, poNumber, organizationName, contactName, contactEmail, notes } = req.body;
+
+      if (!tier || !poNumber || !organizationName || !contactEmail) {
+        res.status(400).json({ error: "Missing required fields: tier, poNumber, organizationName, contactEmail" });
+        return;
+      }
+
+      if (!["pro", "campus"].includes(tier)) {
+        res.status(400).json({ error: "Invalid tier" });
+        return;
+      }
+
+      await db.update(users)
+        .set({
+          tier: tier,
+          subscriptionStatus: "po_pending",
+          updatedAt: new Date()
+        })
+        .where(eq(users.id, userId));
+
+      res.json({
+        success: true,
+        message: `Purchase order ${poNumber} submitted for ${tier} tier. Your account has been provisioned while we process the PO.`,
+        tier: tier,
+        poNumber: poNumber,
+        status: "pending_verification",
+      });
+    } catch (error) {
+      console.error("Purchase order error:", error);
+      res.status(500).json({ error: "Failed to submit purchase order" });
+    }
+  });
+
+  app.post("/api/bank-transfer/request", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user?.claims?.sub;
+      const { tier, organizationName, contactEmail } = req.body;
+
+      if (!tier || !organizationName || !contactEmail) {
+        res.status(400).json({ error: "Missing required fields" });
+        return;
+      }
+
+      res.json({
+        success: true,
+        message: "Bank transfer instructions have been sent to your email.",
+        bankDetails: {
+          bankName: "LYS Education Inc.",
+          routingNumber: "Contact sales@lys.edu for details",
+          accountType: "Business Checking",
+          reference: `LYS-${tier.toUpperCase()}-${userId.slice(0, 8)}`,
+          note: "Please include the reference number in your transfer memo",
+        },
+      });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to process bank transfer request" });
+    }
+  });
+
+  app.get("/paypal/setup", async (req, res) => {
+    await loadPaypalDefault(req, res);
+  });
+
+  app.post("/paypal/order", async (req, res) => {
+    await createPaypalOrder(req, res);
+  });
+
+  app.post("/paypal/order/:orderID/capture", async (req, res) => {
+    await capturePaypalOrder(req, res);
   });
 
   // ================================

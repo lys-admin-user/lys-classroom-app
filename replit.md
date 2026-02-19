@@ -81,7 +81,11 @@ Preferred communication style: Simple, everyday language.
 -   **Icons**: `lucide-react`, `react-icons`.
 
 ### Payment Integration
--   **Future**: Stripe integration (via Replit's Stripe connector).
+-   **Stripe**: Credit/debit card processing (via Replit's Stripe connector, demo mode until configured).
+-   **PayPal**: PayPal checkout via `@paypal/paypal-server-sdk` with lazy-loaded SDK initialization (demo mode until credentials provided).
+-   **Purchase Order**: Institutional billing for schools and districts with PO number tracking.
+-   **Bank Transfer / ACH**: Direct bank payment for annual plans with reference number generation.
+-   **Payment Methods API**: `/api/payment-methods/available` returns available methods with configuration status.
 
 ### Ad Monetization (Free Tier)
 -   **Revenue Model**: EdTech eCPM-based advertising for free-tier users (excluding K-7 students).

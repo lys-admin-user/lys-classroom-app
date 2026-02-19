@@ -5,7 +5,12 @@ import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter }
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Check, X, Sparkles, Building2, GraduationCap, AlertCircle, Eye, Globe, Info, TrendingDown } from "lucide-react";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import { Check, X, Building2, GraduationCap, AlertCircle, Eye, Globe, Info, TrendingDown, CreditCard, FileText, Landmark, Loader2 } from "lucide-react";
+import { SiPaypal } from "react-icons/si";
 import { useAuth } from "@/hooks/use-auth";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
@@ -48,6 +53,15 @@ interface CAIPricing {
     lcsiAdjustment: number;
     description: string;
   };
+}
+
+interface PaymentMethod {
+  id: string;
+  name: string;
+  description: string;
+  icon: string;
+  configured: boolean;
+  available: boolean;
 }
 
 const baseTiers = [
@@ -132,10 +146,23 @@ const incomeLevelLabels: Record<string, string> = {
   low: "Low Income",
 };
 
+const paymentMethodIcons: Record<string, any> = {
+  "credit-card": CreditCard,
+  "paypal": SiPaypal,
+  "file-text": FileText,
+  "landmark": Landmark,
+};
+
 export default function Pricing() {
   const { isAuthenticated, user } = useAuth();
   const { toast } = useToast();
   const [selectedCountry, setSelectedCountry] = useState<string>("US");
+  const [checkoutOpen, setCheckoutOpen] = useState(false);
+  const [checkoutTier, setCheckoutTier] = useState<string>("");
+  const [selectedPaymentMethod, setSelectedPaymentMethod] = useState<string>("");
+  const [poFormData, setPoFormData] = useState({ poNumber: "", organizationName: "", contactName: "", contactEmail: user?.email || "", notes: "" });
+  const [bankFormData, setBankFormData] = useState({ organizationName: "", contactEmail: user?.email || "" });
+  const [bankTransferDetails, setBankTransferDetails] = useState<any>(null);
 
   const { data: countries } = useQuery<CAICountry[]>({
     queryKey: ["/api/cai/countries"],
@@ -149,6 +176,10 @@ export default function Pricing() {
   const { data: subscriptionStatus } = useQuery<SubscriptionStatus>({
     queryKey: ["/api/subscription/status"],
     enabled: isAuthenticated,
+  });
+
+  const { data: paymentMethods } = useQuery<PaymentMethod[]>({
+    queryKey: ["/api/payment-methods/available"],
   });
 
   const countryGroups = useMemo(() => {
@@ -169,6 +200,7 @@ export default function Pricing() {
     onSuccess: (data: any) => {
       queryClient.invalidateQueries({ queryKey: ["/api/subscription/status"] });
       queryClient.invalidateQueries({ queryKey: ["/api/auth/user"] });
+      setCheckoutOpen(false);
       toast({
         title: "Upgrade Successful",
         description: data.message || `You've been upgraded to ${data.tier}!`,
@@ -178,6 +210,45 @@ export default function Pricing() {
       toast({
         title: "Upgrade Failed",
         description: "There was a problem processing your upgrade.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const poMutation = useMutation({
+    mutationFn: (data: any) => apiRequest("POST", "/api/purchase-order/submit", data),
+    onSuccess: (data: any) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/subscription/status"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/auth/user"] });
+      setCheckoutOpen(false);
+      toast({
+        title: "Purchase Order Submitted",
+        description: data.message,
+      });
+    },
+    onError: () => {
+      toast({
+        title: "Submission Failed",
+        description: "Could not submit the purchase order. Please try again.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const bankTransferMutation = useMutation({
+    mutationFn: (data: any) => apiRequest("POST", "/api/bank-transfer/request", data),
+    onSuccess: (data: any) => {
+      setBankTransferDetails(data.bankDetails);
+      queryClient.invalidateQueries({ queryKey: ["/api/subscription/status"] });
+      toast({
+        title: "Bank Transfer Details",
+        description: data.message,
+      });
+    },
+    onError: () => {
+      toast({
+        title: "Request Failed",
+        description: "Could not get bank transfer details.",
         variant: "destructive",
       });
     },
@@ -214,9 +285,30 @@ export default function Pricing() {
   const handleTierClick = (tierId: string) => {
     const action = getButtonAction(tierId);
     if (action === "upgrade" && (tierId === "pro" || tierId === "campus")) {
-      upgradeMutation.mutate(tierId);
+      setCheckoutTier(tierId);
+      setSelectedPaymentMethod("");
+      setBankTransferDetails(null);
+      setCheckoutOpen(true);
     } else if (action === "downgrade") {
       downgradeMutation.mutate();
+    }
+  };
+
+  const handlePaymentSubmit = () => {
+    if (selectedPaymentMethod === "stripe") {
+      upgradeMutation.mutate(checkoutTier);
+    } else if (selectedPaymentMethod === "paypal") {
+      upgradeMutation.mutate(checkoutTier);
+    } else if (selectedPaymentMethod === "purchase_order") {
+      poMutation.mutate({
+        tier: checkoutTier,
+        ...poFormData,
+      });
+    } else if (selectedPaymentMethod === "bank_transfer") {
+      bankTransferMutation.mutate({
+        tier: checkoutTier,
+        ...bankFormData,
+      });
     }
   };
 
@@ -235,6 +327,11 @@ export default function Pricing() {
     if (price === 0) return "$0";
     return `$${price.toFixed(2)}`;
   };
+
+  const selectedTierData = baseTiers.find(t => t.id === checkoutTier);
+  const checkoutPrice = getAdjustedPrice(checkoutTier);
+  const displayCheckoutPrice = checkoutPrice ? formatPrice(checkoutPrice.price) : selectedTierData ? `$${selectedTierData.basePrice}` : "$0";
+  const isPending = upgradeMutation.isPending || downgradeMutation.isPending || poMutation.isPending || bankTransferMutation.isPending;
 
   return (
     <div className="min-h-screen bg-background">
@@ -332,8 +429,8 @@ export default function Pricing() {
               <AlertCircle className="h-5 w-5 text-muted-foreground shrink-0 mt-0.5" />
               <div>
                 <p className="text-sm text-muted-foreground">
-                  <span className="font-medium text-foreground">Demo Mode:</span> Tier upgrades are simulated for testing. 
-                  Connect Stripe for real payment processing.
+                  <span className="font-medium text-foreground">Demo Mode:</span> Payment processing is in sandbox mode.
+                  Tier upgrades are available for testing across all payment methods.
                 </p>
               </div>
             </div>
@@ -344,7 +441,6 @@ export default function Pricing() {
           {baseTiers.map((tier) => {
             const action = getButtonAction(tier.id);
             const isCurrentPlan = tier.id === currentTier;
-            const isPending = upgradeMutation.isPending || downgradeMutation.isPending;
             const adjustedPricing = getAdjustedPrice(tier.id);
             const displayPrice = adjustedPricing ? formatPrice(adjustedPricing.price) : `$${tier.basePrice}`;
             const hasSavings = adjustedPricing && adjustedPricing.savingsPercent > 0;
@@ -444,7 +540,44 @@ export default function Pricing() {
           })}
         </div>
 
-        <div className="max-w-3xl mx-auto mb-12">
+        <div className="max-w-3xl mx-auto mb-12 space-y-6">
+          {paymentMethods && paymentMethods.length > 0 && (
+            <Card>
+              <CardContent className="pt-6">
+                <h3 className="font-oswald text-lg text-foreground mb-4 flex items-center gap-2">
+                  <CreditCard className="h-5 w-5 text-lys-teal" />
+                  Accepted Payment Methods
+                </h3>
+                <div className="grid sm:grid-cols-2 gap-3">
+                  {paymentMethods.map((method) => {
+                    const IconComp = paymentMethodIcons[method.icon] || CreditCard;
+                    const needsSetup = (method.id === "stripe" || method.id === "paypal") && !method.configured;
+                    return (
+                      <div
+                        key={method.id}
+                        className="flex items-start gap-3 p-3 rounded-md bg-muted/50 border"
+                        data-testid={`payment-method-${method.id}`}
+                      >
+                        <div className="p-2 rounded-md bg-background border">
+                          <IconComp className="h-5 w-5 text-foreground" />
+                        </div>
+                        <div className="min-w-0">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <p className="text-sm font-medium text-foreground">{method.name}</p>
+                            {needsSetup && (
+                              <Badge variant="outline" className="text-xs">Coming Soon</Badge>
+                            )}
+                          </div>
+                          <p className="text-xs text-muted-foreground">{method.description}</p>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
           <Card className="bg-muted/50">
             <CardContent className="pt-6">
               <h3 className="font-oswald text-lg text-foreground mb-3 flex items-center gap-2">
@@ -469,7 +602,7 @@ export default function Pricing() {
                 <div className="p-3 rounded-md bg-background border">
                   <div className="font-medium text-foreground mb-1">Pricing Formula</div>
                   <div className="text-muted-foreground font-mono text-xs">
-                    Adjusted Price = Global Price × (CAI + LCSI)
+                    Adjusted Price = Global Price x (CAI + LCSI)
                   </div>
                   <div className="text-muted-foreground mt-2">
                     LCSI accounts for regional cost variations within countries.
@@ -492,6 +625,244 @@ export default function Pricing() {
           </Button>
         </div>
       </div>
+
+      <Dialog open={checkoutOpen} onOpenChange={setCheckoutOpen}>
+        <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="font-oswald text-xl">
+              Upgrade to {selectedTierData?.name}
+            </DialogTitle>
+            <DialogDescription>
+              {displayCheckoutPrice}{selectedTierData?.period} - Choose your preferred payment method
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4 py-2">
+            <div>
+              <Label className="text-sm font-medium mb-3 block">Payment Method</Label>
+              <div className="grid gap-2">
+                {paymentMethods?.map((method) => {
+                  const IconComp = paymentMethodIcons[method.icon] || CreditCard;
+                  const needsSetup = (method.id === "stripe" || method.id === "paypal") && !method.configured;
+                  return (
+                    <button
+                      key={method.id}
+                      type="button"
+                      onClick={() => {
+                        setSelectedPaymentMethod(method.id);
+                        setBankTransferDetails(null);
+                      }}
+                      className={`flex items-center gap-3 p-3 rounded-md border text-left transition-colors ${
+                        selectedPaymentMethod === method.id
+                          ? "border-lys-teal bg-lys-teal/5 ring-1 ring-lys-teal"
+                          : "hover-elevate"
+                      }`}
+                      data-testid={`button-select-payment-${method.id}`}
+                    >
+                      <div className={`p-2 rounded-md border ${selectedPaymentMethod === method.id ? "bg-lys-teal/10 border-lys-teal/30" : "bg-muted"}`}>
+                        <IconComp className="h-4 w-4 text-foreground" />
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <p className="text-sm font-medium text-foreground">{method.name}</p>
+                          {needsSetup && (
+                            <Badge variant="secondary" className="text-xs">Demo Mode</Badge>
+                          )}
+                        </div>
+                        <p className="text-xs text-muted-foreground">{method.description}</p>
+                      </div>
+                      {selectedPaymentMethod === method.id && (
+                        <Check className="h-4 w-4 text-lys-teal shrink-0" />
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            {selectedPaymentMethod === "stripe" && (
+              <div className="p-4 rounded-md bg-muted/50 border space-y-2">
+                <p className="text-sm text-foreground font-medium">Credit / Debit Card</p>
+                {paymentMethods?.find(m => m.id === "stripe")?.configured ? (
+                  <p className="text-xs text-muted-foreground">
+                    You'll be redirected to our secure payment page to enter your card details.
+                    We accept Visa, Mastercard, American Express, and Discover.
+                  </p>
+                ) : (
+                  <p className="text-xs text-muted-foreground">
+                    Card payments are in demo mode. Clicking below will simulate a successful upgrade
+                    so you can explore all features. Live card processing via Stripe will be available soon.
+                  </p>
+                )}
+              </div>
+            )}
+
+            {selectedPaymentMethod === "paypal" && (
+              <div className="p-4 rounded-md bg-muted/50 border space-y-2">
+                <p className="text-sm text-foreground font-medium">PayPal Checkout</p>
+                {paymentMethods?.find(m => m.id === "paypal")?.configured ? (
+                  <p className="text-xs text-muted-foreground">
+                    You'll be redirected to PayPal to complete your payment securely.
+                    You can pay with your PayPal balance, linked bank account, or PayPal Credit.
+                  </p>
+                ) : (
+                  <p className="text-xs text-muted-foreground">
+                    PayPal is in demo mode. Clicking below will simulate a successful upgrade
+                    so you can explore all features. Live PayPal checkout will be available soon.
+                  </p>
+                )}
+              </div>
+            )}
+
+            {selectedPaymentMethod === "purchase_order" && (
+              <div className="space-y-3">
+                <p className="text-xs text-muted-foreground">
+                  Submit a purchase order for institutional billing. Your account will be provisioned immediately while we process the PO.
+                </p>
+                <div className="grid gap-3">
+                  <div className="grid gap-1.5">
+                    <Label htmlFor="po-number" className="text-sm">PO Number *</Label>
+                    <Input
+                      id="po-number"
+                      value={poFormData.poNumber}
+                      onChange={(e) => setPoFormData(prev => ({ ...prev, poNumber: e.target.value }))}
+                      placeholder="PO-2026-001"
+                      data-testid="input-po-number"
+                    />
+                  </div>
+                  <div className="grid gap-1.5">
+                    <Label htmlFor="po-org" className="text-sm">Organization Name *</Label>
+                    <Input
+                      id="po-org"
+                      value={poFormData.organizationName}
+                      onChange={(e) => setPoFormData(prev => ({ ...prev, organizationName: e.target.value }))}
+                      placeholder="Springfield School District"
+                      data-testid="input-po-org"
+                    />
+                  </div>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="grid gap-1.5">
+                      <Label htmlFor="po-contact" className="text-sm">Contact Name</Label>
+                      <Input
+                        id="po-contact"
+                        value={poFormData.contactName}
+                        onChange={(e) => setPoFormData(prev => ({ ...prev, contactName: e.target.value }))}
+                        placeholder="Jane Doe"
+                        data-testid="input-po-contact"
+                      />
+                    </div>
+                    <div className="grid gap-1.5">
+                      <Label htmlFor="po-email" className="text-sm">Billing Email *</Label>
+                      <Input
+                        id="po-email"
+                        type="email"
+                        value={poFormData.contactEmail}
+                        onChange={(e) => setPoFormData(prev => ({ ...prev, contactEmail: e.target.value }))}
+                        placeholder="billing@school.edu"
+                        data-testid="input-po-email"
+                      />
+                    </div>
+                  </div>
+                  <div className="grid gap-1.5">
+                    <Label htmlFor="po-notes" className="text-sm">Notes (optional)</Label>
+                    <Textarea
+                      id="po-notes"
+                      value={poFormData.notes}
+                      onChange={(e) => setPoFormData(prev => ({ ...prev, notes: e.target.value }))}
+                      placeholder="Any additional details for the purchase order..."
+                      className="min-h-[60px]"
+                      data-testid="textarea-po-notes"
+                    />
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {selectedPaymentMethod === "bank_transfer" && !bankTransferDetails && (
+              <div className="space-y-3">
+                <p className="text-xs text-muted-foreground">
+                  Available for annual plans. Enter your organization details to receive bank transfer instructions.
+                </p>
+                <div className="grid gap-3">
+                  <div className="grid gap-1.5">
+                    <Label htmlFor="bank-org" className="text-sm">Organization Name *</Label>
+                    <Input
+                      id="bank-org"
+                      value={bankFormData.organizationName}
+                      onChange={(e) => setBankFormData(prev => ({ ...prev, organizationName: e.target.value }))}
+                      placeholder="Springfield School District"
+                      data-testid="input-bank-org"
+                    />
+                  </div>
+                  <div className="grid gap-1.5">
+                    <Label htmlFor="bank-email" className="text-sm">Contact Email *</Label>
+                    <Input
+                      id="bank-email"
+                      type="email"
+                      value={bankFormData.contactEmail}
+                      onChange={(e) => setBankFormData(prev => ({ ...prev, contactEmail: e.target.value }))}
+                      placeholder="billing@school.edu"
+                      data-testid="input-bank-email"
+                    />
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {selectedPaymentMethod === "bank_transfer" && bankTransferDetails && (
+              <div className="p-4 rounded-md bg-green-500/5 border border-green-500/20 space-y-3">
+                <p className="text-sm font-medium text-foreground">Bank Transfer Instructions</p>
+                <div className="grid gap-2 text-sm">
+                  <div className="flex justify-between gap-2">
+                    <span className="text-muted-foreground">Payee:</span>
+                    <span className="text-foreground font-medium">{bankTransferDetails.bankName}</span>
+                  </div>
+                  <div className="flex justify-between gap-2">
+                    <span className="text-muted-foreground">Account Type:</span>
+                    <span className="text-foreground">{bankTransferDetails.accountType}</span>
+                  </div>
+                  <div className="flex justify-between gap-2">
+                    <span className="text-muted-foreground">Routing Info:</span>
+                    <span className="text-foreground text-xs">{bankTransferDetails.routingNumber}</span>
+                  </div>
+                  <div className="flex justify-between gap-2">
+                    <span className="text-muted-foreground">Reference:</span>
+                    <span className="text-foreground font-mono text-xs">{bankTransferDetails.reference}</span>
+                  </div>
+                </div>
+                <p className="text-xs text-muted-foreground">{bankTransferDetails.note}</p>
+              </div>
+            )}
+          </div>
+
+          <DialogFooter className="flex flex-col sm:flex-row gap-2">
+            <Button variant="outline" onClick={() => setCheckoutOpen(false)} data-testid="button-cancel-checkout">
+              Cancel
+            </Button>
+            {selectedPaymentMethod === "bank_transfer" && bankTransferDetails ? (
+              <Button onClick={() => setCheckoutOpen(false)} data-testid="button-done-checkout">
+                Done
+              </Button>
+            ) : (
+              <Button
+                onClick={handlePaymentSubmit}
+                disabled={!selectedPaymentMethod || isPending || 
+                  (selectedPaymentMethod === "purchase_order" && (!poFormData.poNumber || !poFormData.organizationName || !poFormData.contactEmail)) ||
+                  (selectedPaymentMethod === "bank_transfer" && (!bankFormData.organizationName || !bankFormData.contactEmail))
+                }
+                data-testid="button-confirm-checkout"
+              >
+                {isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+                {selectedPaymentMethod === "purchase_order" ? "Submit Purchase Order" :
+                 selectedPaymentMethod === "bank_transfer" ? "Get Transfer Instructions" :
+                 selectedPaymentMethod === "paypal" ? "Continue to PayPal" :
+                 selectedPaymentMethod === "stripe" ? "Continue to Card Payment" :
+                 "Select Payment Method"}
+              </Button>
+            )}
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
