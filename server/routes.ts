@@ -9930,7 +9930,7 @@ export async function registerRoutes(
           const { isCoppaRestricted } = await import("./services/dataGovernance");
           if (isCoppaRestricted(user.birthdate)) {
             const parentalConsent = await db.select().from(parentalConsentsTable)
-              .where(and(eq(parentalConsentsTable.userId, userId), eq(parentalConsentsTable.status, "approved")));
+              .where(and(eq(parentalConsentsTable.studentUserId, userId), eq(parentalConsentsTable.consentStatus, "approved")));
             if (parentalConsent.length === 0) {
               res.status(403).json({ error: "Users under 13 cannot make portfolios public without parental consent (COPPA)." });
               return;
@@ -12209,7 +12209,7 @@ export async function registerRoutes(
       const { isCoppaRestricted } = await import("./services/dataGovernance");
       if (isCoppaRestricted(user.birthdate)) {
         const parentalConsent = await db.select().from(parentalConsentsTable)
-          .where(and(eq(parentalConsentsTable.userId, userId), eq(parentalConsentsTable.status, "approved")));
+          .where(and(eq(parentalConsentsTable.studentUserId, userId), eq(parentalConsentsTable.consentStatus, "approved")));
         if (parentalConsent.length === 0) {
           res.status(403).json({ error: "Messaging is restricted for users under 13 without parental consent." });
           return;
