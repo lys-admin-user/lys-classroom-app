@@ -11934,6 +11934,185 @@ export async function registerRoutes(
     }
   });
 
+  // ============ Org-Scoped Safety Routes (Campus/District Admins) ============
+
+  const getAdminOrgIds = async (userId: string): Promise<string[]> => {
+    const memberships = await db.select().from(orgMembershipsTable)
+      .where(eq(orgMembershipsTable.userId, userId));
+    return memberships.map(m => m.organizationId);
+  };
+
+  app.get("/api/org-safety/review-queue", isAuthenticated, requireCampusAdmin, async (req: any, res) => {
+    try {
+      const userId = req.user?.claims?.sub;
+      const orgIds = await getAdminOrgIds(userId);
+      const { status, limit: lim } = req.query;
+      const conditions = [];
+      if (orgIds.length > 0) {
+        conditions.push(inArray(contentReviewQueueTable.organizationId, orgIds));
+      }
+      if (status) conditions.push(eq(contentReviewQueueTable.status, status as string));
+      const items = await db.select().from(contentReviewQueueTable)
+        .where(conditions.length > 0 ? and(...conditions) : undefined)
+        .orderBy(desc(contentReviewQueueTable.createdAt))
+        .limit(parseInt(lim as string) || 50);
+
+      const total = await db.select({ count: drizzleSql<number>`count(*)` })
+        .from(contentReviewQueueTable)
+        .where(conditions.length > 0 ? and(...conditions) : undefined);
+
+      res.json({ items, total: total[0]?.count || 0 });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch review queue" });
+    }
+  });
+
+  app.get("/api/org-safety/review-queue/stats", isAuthenticated, requireCampusAdmin, async (req: any, res) => {
+    try {
+      const userId = req.user?.claims?.sub;
+      const orgIds = await getAdminOrgIds(userId);
+      const orgFilter = orgIds.length > 0 ? inArray(contentReviewQueueTable.organizationId, orgIds) : undefined;
+
+      const pending = await db.select({ count: drizzleSql<number>`count(*)` })
+        .from(contentReviewQueueTable).where(and(eq(contentReviewQueueTable.status, "pending_review"), orgFilter));
+      const approved = await db.select({ count: drizzleSql<number>`count(*)` })
+        .from(contentReviewQueueTable).where(and(eq(contentReviewQueueTable.status, "approved"), orgFilter));
+      const rejected = await db.select({ count: drizzleSql<number>`count(*)` })
+        .from(contentReviewQueueTable).where(and(eq(contentReviewQueueTable.status, "rejected"), orgFilter));
+      const high = await db.select({ count: drizzleSql<number>`count(*)` })
+        .from(contentReviewQueueTable)
+        .where(and(eq(contentReviewQueueTable.severity, "high"), eq(contentReviewQueueTable.status, "pending_review"), orgFilter));
+
+      res.json({
+        pending: pending[0]?.count || 0,
+        approved: approved[0]?.count || 0,
+        rejected: rejected[0]?.count || 0,
+        highSeverityPending: high[0]?.count || 0,
+      });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch review stats" });
+    }
+  });
+
+  app.patch("/api/org-safety/review-queue/:id", isAuthenticated, requireCampusAdmin, async (req: any, res) => {
+    try {
+      const { id } = req.params;
+      const userId = req.user?.claims?.sub;
+      const { action, notes } = req.body;
+
+      if (!["approved", "rejected", "archived"].includes(action)) {
+        res.status(400).json({ error: "Invalid action" });
+        return;
+      }
+
+      const orgIds = await getAdminOrgIds(userId);
+      const [item] = await db.select().from(contentReviewQueueTable).where(eq(contentReviewQueueTable.id, id));
+      if (!item) { res.status(404).json({ error: "Review item not found" }); return; }
+      if (item.organizationId && orgIds.length > 0 && !orgIds.includes(item.organizationId)) {
+        res.status(403).json({ error: "Not authorized for this organization's content" });
+        return;
+      }
+
+      const [updated] = await db.update(contentReviewQueueTable)
+        .set({ status: action, reviewedBy: userId, reviewedAt: new Date(), reviewAction: action, reviewNotes: notes || null })
+        .where(eq(contentReviewQueueTable.id, id))
+        .returning();
+
+      await logAuditEvent({
+        userId, action: `content_review_${action}`, category: "content_moderation",
+        severity: action === "rejected" ? "warning" : "info",
+        resourceType: "content_review", resourceId: id,
+        details: { reviewAction: action, notes }, ipAddress: getClientIP(req),
+      });
+
+      res.json(updated);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to update review item" });
+    }
+  });
+
+  app.post("/api/org-safety/review-queue/bulk", isAuthenticated, requireCampusAdmin, async (req: any, res) => {
+    try {
+      const userId = req.user?.claims?.sub;
+      const { ids, action, notes } = req.body;
+      if (!Array.isArray(ids) || ids.length === 0) { res.status(400).json({ error: "No items selected" }); return; }
+      if (!["approved", "rejected", "archived"].includes(action)) { res.status(400).json({ error: "Invalid action" }); return; }
+
+      const orgIds = await getAdminOrgIds(userId);
+      let updated = 0;
+      for (const id of ids) {
+        const [item] = await db.select().from(contentReviewQueueTable).where(eq(contentReviewQueueTable.id, id));
+        if (item && (!item.organizationId || orgIds.includes(item.organizationId || ""))) {
+          const [result] = await db.update(contentReviewQueueTable)
+            .set({ status: action, reviewedBy: userId, reviewedAt: new Date(), reviewAction: action, reviewNotes: notes || null })
+            .where(eq(contentReviewQueueTable.id, id))
+            .returning();
+          if (result) updated++;
+        }
+      }
+
+      await logAuditEvent({
+        userId, action: `bulk_content_review_${action}`, category: "content_moderation",
+        severity: "info", details: { count: updated, action, ids }, ipAddress: getClientIP(req),
+      });
+
+      res.json({ updated, total: ids.length });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to bulk update review items" });
+    }
+  });
+
+  app.get("/api/org-safety/audit-logs", isAuthenticated, requireCampusAdmin, async (req: any, res) => {
+    try {
+      const userId = req.user?.claims?.sub;
+      const orgIds = await getAdminOrgIds(userId);
+      const { category, limit: lim } = req.query;
+
+      const conditions = [];
+      if (orgIds.length > 0) {
+        conditions.push(inArray(auditLogsTable.organizationId, orgIds));
+      }
+      if (category && category !== "all") {
+        conditions.push(eq(auditLogsTable.category, category as string));
+      }
+
+      const logs = await db.select().from(auditLogsTable)
+        .where(conditions.length > 0 ? and(...conditions) : undefined)
+        .orderBy(desc(auditLogsTable.createdAt))
+        .limit(parseInt(lim as string) || 50);
+
+      res.json(logs);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch audit logs" });
+    }
+  });
+
+  app.get("/api/org-safety/governance-status", isAuthenticated, requireCampusAdmin, async (req: any, res) => {
+    try {
+      const userId = req.user?.claims?.sub;
+      const orgIds = await getAdminOrgIds(userId);
+      const orgFilter = orgIds.length > 0 ? inArray(successMarksTable.organizationId, orgIds) : undefined;
+
+      const [totalMarks] = await db.select({ count: count() }).from(successMarksTable).where(orgFilter);
+      const [finalizedMarks] = await db.select({ count: count() }).from(successMarksTable)
+        .where(and(eq(successMarksTable.isMutable, false), orgFilter));
+
+      const vaultOrgFilter = orgIds.length > 0 ? inArray(safetyVaultTable.senderTenantId, orgIds) : undefined;
+      const [totalVault] = await db.select({ count: count() }).from(safetyVaultTable).where(vaultOrgFilter);
+      const [blockedMessages] = await db.select({ count: count() }).from(safetyVaultTable)
+        .where(and(eq(safetyVaultTable.isPiiBlocked, true), vaultOrgFilter));
+
+      res.json({
+        successLedger: { totalMarks: totalMarks.count, finalizedMarks: finalizedMarks.count, editWindowHours: 24 },
+        safetyVault: { totalArchived: totalVault.count, piiBlocked: blockedMessages.count },
+        coppaStatus: "enforced",
+        piiProtection: "active",
+      });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch governance status" });
+    }
+  });
+
   // ============ Parental Consent Routes ============
 
   app.get("/api/parental-consent/status", isAuthenticated, async (req: any, res) => {

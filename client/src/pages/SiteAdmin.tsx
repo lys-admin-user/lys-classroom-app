@@ -548,6 +548,10 @@ export default function SiteAdminPage() {
             <TrendingUp className="h-4 w-4 mr-2" />
             Performance
           </TabsTrigger>
+          <TabsTrigger value="safety" data-testid="tab-safety">
+            <AlertTriangle className="h-4 w-4 mr-2" />
+            Safety & Security
+          </TabsTrigger>
         </TabsList>
 
         <TabsContent value="organizations" className="space-y-4">
@@ -1984,8 +1988,390 @@ export default function SiteAdminPage() {
           )}
         </TabsContent>
 
+        <TabsContent value="safety" className="space-y-6">
+          <OrgSafetySuiteTab />
+        </TabsContent>
+
       </Tabs>
     </div>
+  );
+}
+
+function OrgSafetySuiteTab() {
+  const { toast } = useToast();
+  const [reviewFilter, setReviewFilter] = useState<string>("pending_review");
+  const [selectedItems, setSelectedItems] = useState<string[]>([]);
+  const [auditCategory, setAuditCategory] = useState<string>("all");
+
+  const { data: reviewStats } = useQuery<{
+    pending: number;
+    approved: number;
+    rejected: number;
+    highSeverityPending: number;
+  }>({
+    queryKey: ["/api/org-safety/review-queue/stats"],
+  });
+
+  const { data: reviewQueue, isLoading: queueLoading } = useQuery<{
+    items: any[];
+    total: number;
+  }>({
+    queryKey: ["/api/org-safety/review-queue", reviewFilter],
+    queryFn: async () => {
+      const res = await fetch(`/api/org-safety/review-queue?status=${reviewFilter}&limit=50`, { credentials: "include" });
+      if (!res.ok) throw new Error("Failed to fetch");
+      return res.json();
+    },
+  });
+
+  const { data: auditLogs, isLoading: auditLoading } = useQuery<any[]>({
+    queryKey: ["/api/org-safety/audit-logs", auditCategory],
+    queryFn: async () => {
+      const params = auditCategory !== "all" ? `?category=${auditCategory}&limit=50` : "?limit=50";
+      const res = await fetch(`/api/org-safety/audit-logs${params}`, { credentials: "include" });
+      if (!res.ok) throw new Error("Failed to fetch");
+      return res.json();
+    },
+  });
+
+  const { data: governance } = useQuery<{
+    successLedger: { totalMarks: number; finalizedMarks: number; editWindowHours: number };
+    safetyVault: { totalArchived: number; piiBlocked: number };
+    coppaStatus: string;
+    piiProtection: string;
+  }>({
+    queryKey: ["/api/org-safety/governance-status"],
+  });
+
+  const reviewMutation = useMutation({
+    mutationFn: async ({ id, action, notes }: { id: string; action: string; notes?: string }) => {
+      const res = await apiRequest("PATCH", `/api/org-safety/review-queue/${id}`, { action, notes });
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/org-safety/review-queue"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/org-safety/review-queue/stats"] });
+      toast({ title: "Review updated" });
+    },
+  });
+
+  const bulkReviewMutation = useMutation({
+    mutationFn: async ({ ids, action }: { ids: string[]; action: string }) => {
+      const res = await apiRequest("POST", "/api/org-safety/review-queue/bulk", { ids, action });
+      return res.json();
+    },
+    onSuccess: (data: any) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/org-safety/review-queue"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/org-safety/review-queue/stats"] });
+      setSelectedItems([]);
+      toast({ title: `${data.updated} items updated` });
+    },
+  });
+
+  const severityColors: Record<string, string> = {
+    high: "bg-red-500/10 text-red-700 dark:text-red-400 border-red-500/30",
+    medium: "bg-amber-500/10 text-amber-700 dark:text-amber-400 border-amber-500/30",
+    low: "bg-blue-500/10 text-blue-700 dark:text-blue-400 border-blue-500/30",
+  };
+
+  return (
+    <>
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+        <Card>
+          <CardContent className="p-4">
+            <div className="flex items-center gap-2">
+              <AlertTriangle className="h-5 w-5 text-amber-600" />
+              <div>
+                <p className="text-2xl font-bold font-oswald" data-testid="text-org-pending-count">{reviewStats?.pending || 0}</p>
+                <p className="text-sm text-muted-foreground font-roboto">Pending Review</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="p-4">
+            <div className="flex items-center gap-2">
+              <AlertTriangle className="h-5 w-5 text-red-600" />
+              <div>
+                <p className="text-2xl font-bold font-oswald" data-testid="text-org-high-severity">{reviewStats?.highSeverityPending || 0}</p>
+                <p className="text-sm text-muted-foreground font-roboto">High Severity</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="p-4">
+            <div className="flex items-center gap-2">
+              <Shield className="h-5 w-5 text-green-600" />
+              <div>
+                <p className="text-2xl font-bold font-oswald" data-testid="text-org-approved">{reviewStats?.approved || 0}</p>
+                <p className="text-sm text-muted-foreground font-roboto">Approved</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="p-4">
+            <div className="flex items-center gap-2">
+              <Shield className="h-5 w-5 text-lys-teal" />
+              <div>
+                <p className="text-2xl font-bold font-oswald" data-testid="text-org-governance-marks">{governance?.successLedger.totalMarks || 0}</p>
+                <p className="text-sm text-muted-foreground font-roboto">Success Marks</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      <Card>
+        <CardHeader>
+          <div className="flex items-center justify-between">
+            <div>
+              <CardTitle className="font-oswald">Content Review Queue</CardTitle>
+              <CardDescription className="font-roboto">
+                Flagged content within your organization requiring review
+              </CardDescription>
+            </div>
+            <div className="flex items-center gap-2">
+              {selectedItems.length > 0 && (
+                <>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => bulkReviewMutation.mutate({ ids: selectedItems, action: "approved" })}
+                    disabled={bulkReviewMutation.isPending}
+                    data-testid="button-org-bulk-approve"
+                  >
+                    <Shield className="h-4 w-4 mr-1" /> Approve ({selectedItems.length})
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="text-red-600"
+                    onClick={() => bulkReviewMutation.mutate({ ids: selectedItems, action: "rejected" })}
+                    disabled={bulkReviewMutation.isPending}
+                    data-testid="button-org-bulk-reject"
+                  >
+                    <AlertTriangle className="h-4 w-4 mr-1" /> Reject ({selectedItems.length})
+                  </Button>
+                </>
+              )}
+              <Select value={reviewFilter} onValueChange={setReviewFilter}>
+                <SelectTrigger className="w-[180px]" data-testid="select-org-review-filter">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="pending_review">Pending Review</SelectItem>
+                  <SelectItem value="approved">Approved</SelectItem>
+                  <SelectItem value="rejected">Rejected</SelectItem>
+                  <SelectItem value="auto_blocked">Auto-Blocked</SelectItem>
+                  <SelectItem value="archived">Archived</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+        </CardHeader>
+        <CardContent>
+          {queueLoading ? (
+            <div className="flex items-center justify-center py-8">
+              <Loader2 className="h-6 w-6 animate-spin" />
+            </div>
+          ) : !reviewQueue?.items?.length ? (
+            <div className="text-center py-8 text-muted-foreground font-roboto">
+              <Shield className="h-12 w-12 mx-auto mb-3 opacity-30" />
+              <p>No items in the {reviewFilter.replace("_", " ")} queue</p>
+              <p className="text-sm mt-1">Content flagged by the keyword filter will appear here</p>
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {reviewQueue.items.map((item: any) => (
+                <div
+                  key={item.id}
+                  className="border rounded-lg p-4 space-y-2"
+                  data-testid={`org-review-item-${item.id}`}
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="flex items-start gap-3 flex-1">
+                      <input
+                        type="checkbox"
+                        className="mt-1"
+                        checked={selectedItems.includes(item.id)}
+                        onChange={(e) => {
+                          setSelectedItems(prev =>
+                            e.target.checked
+                              ? [...prev, item.id]
+                              : prev.filter((id: string) => id !== item.id)
+                          );
+                        }}
+                        data-testid={`checkbox-org-review-${item.id}`}
+                      />
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 mb-1">
+                          <Badge className={`text-xs ${severityColors[item.severity] || ""}`}>
+                            {item.severity}
+                          </Badge>
+                          <Badge variant="outline" className="text-xs">
+                            {item.contentType}
+                          </Badge>
+                          <span className="text-xs text-muted-foreground font-roboto">
+                            {new Date(item.createdAt).toLocaleDateString()}
+                          </span>
+                        </div>
+                        <p className="text-sm font-roboto line-clamp-3">{item.content}</p>
+                        {item.flaggedKeywords?.length > 0 && (
+                          <div className="flex gap-1 mt-2 flex-wrap">
+                            {item.flaggedKeywords.map((kw: string, i: number) => (
+                              <Badge key={i} variant="destructive" className="text-xs">
+                                {kw}
+                              </Badge>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                    {item.status === "pending_review" && (
+                      <div className="flex gap-1 shrink-0">
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => reviewMutation.mutate({ id: item.id, action: "approved" })}
+                          disabled={reviewMutation.isPending}
+                          data-testid={`button-org-approve-${item.id}`}
+                        >
+                          <Shield className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="text-red-600"
+                          onClick={() => reviewMutation.mutate({ id: item.id, action: "rejected" })}
+                          disabled={reviewMutation.isPending}
+                          data-testid={`button-org-reject-${item.id}`}
+                        >
+                          <AlertTriangle className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          onClick={() => reviewMutation.mutate({ id: item.id, action: "archived" })}
+                          disabled={reviewMutation.isPending}
+                          data-testid={`button-org-archive-${item.id}`}
+                        >
+                          Archive
+                        </Button>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <div className="flex items-center justify-between">
+            <div>
+              <CardTitle className="font-oswald">Organization Audit Log</CardTitle>
+              <CardDescription className="font-roboto">
+                Security events and actions within your organization
+              </CardDescription>
+            </div>
+            <Select value={auditCategory} onValueChange={setAuditCategory}>
+              <SelectTrigger className="w-[180px]" data-testid="select-org-audit-category">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Categories</SelectItem>
+                <SelectItem value="auth">Authentication</SelectItem>
+                <SelectItem value="admin_action">Admin Actions</SelectItem>
+                <SelectItem value="content_moderation">Content Moderation</SelectItem>
+                <SelectItem value="security">Security</SelectItem>
+                <SelectItem value="ai_usage">AI Usage</SelectItem>
+                <SelectItem value="data_modify">Data Changes</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+        </CardHeader>
+        <CardContent>
+          {auditLoading ? (
+            <div className="flex items-center justify-center py-8">
+              <Loader2 className="h-6 w-6 animate-spin" />
+            </div>
+          ) : !auditLogs?.length ? (
+            <div className="text-center py-8 text-muted-foreground font-roboto">
+              <FileText className="h-12 w-12 mx-auto mb-3 opacity-30" />
+              <p>No audit log entries for your organization yet</p>
+              <p className="text-sm mt-1">Security events will be recorded here as users interact with the platform</p>
+            </div>
+          ) : (
+            <div className="space-y-2 max-h-[500px] overflow-y-auto">
+              {auditLogs.map((log: any) => (
+                <div
+                  key={log.id}
+                  className="flex items-start gap-3 p-3 border rounded-md text-sm"
+                  data-testid={`org-audit-log-${log.id}`}
+                >
+                  <div className={`w-2 h-2 rounded-full mt-1.5 shrink-0 ${
+                    log.severity === "critical" ? "bg-red-500" :
+                    log.severity === "warning" ? "bg-amber-500" : "bg-green-500"
+                  }`} />
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="font-medium font-roboto">{log.action.replace(/_/g, " ")}</span>
+                      <Badge variant="outline" className="text-xs">{log.category}</Badge>
+                      {log.severity !== "info" && (
+                        <Badge className={`text-xs ${log.severity === "critical" ? "bg-red-100 text-red-700" : "bg-amber-100 text-amber-700"}`}>
+                          {log.severity}
+                        </Badge>
+                      )}
+                    </div>
+                    <div className="text-xs text-muted-foreground mt-1 font-roboto">
+                      {log.userId && <span>User: {log.userId} · </span>}
+                      <span>{new Date(log.createdAt).toLocaleString()}</span>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="font-oswald">Governance Status</CardTitle>
+          <CardDescription className="font-roboto">Data governance metrics for your organization</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+            <div className="border rounded-lg p-4 text-center">
+              <p className="text-2xl font-bold font-oswald" data-testid="text-org-ledger-total">{governance?.successLedger.totalMarks || 0}</p>
+              <p className="text-sm text-muted-foreground font-roboto">Success Marks</p>
+              <p className="text-xs text-muted-foreground">{governance?.successLedger.finalizedMarks || 0} finalized</p>
+            </div>
+            <div className="border rounded-lg p-4 text-center">
+              <p className="text-2xl font-bold font-oswald" data-testid="text-org-vault-total">{governance?.safetyVault.totalArchived || 0}</p>
+              <p className="text-sm text-muted-foreground font-roboto">Archived Messages</p>
+              <p className="text-xs text-muted-foreground">{governance?.safetyVault.piiBlocked || 0} PII blocked</p>
+            </div>
+            <div className="border rounded-lg p-4 text-center">
+              <Badge variant={governance?.coppaStatus === "enforced" ? "default" : "destructive"} className="mb-2">
+                {governance?.coppaStatus || "unknown"}
+              </Badge>
+              <p className="text-sm text-muted-foreground font-roboto">COPPA Status</p>
+            </div>
+            <div className="border rounded-lg p-4 text-center">
+              <Badge variant={governance?.piiProtection === "active" ? "default" : "destructive"} className="mb-2">
+                {governance?.piiProtection || "unknown"}
+              </Badge>
+              <p className="text-sm text-muted-foreground font-roboto">PII Protection</p>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+    </>
   );
 }
 
