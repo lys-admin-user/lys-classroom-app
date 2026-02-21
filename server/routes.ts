@@ -39,6 +39,12 @@ import {
   contentReviewQueue as contentReviewQueueTable,
   parentalConsents as parentalConsentsTable,
   auditLogs as auditLogsTable,
+  successMarks as successMarksTable,
+  safetyVault as safetyVaultTable,
+  fraudStrikes as fraudStrikesTable,
+  userDataRegions as userDataRegionsTable,
+  organizationMemberships as orgMembershipsTable,
+  hasRolePrivilege,
 } from "@shared/schema";
 import { z } from "zod";
 import { setupAuth, registerAuthRoutes, isAuthenticated } from "./replit_integrations/auth";
@@ -53,7 +59,7 @@ import * as wordpressService from "./services/wordpressService";
 import { db } from "./db";
 import { logAuditEvent, getAuditLogs, getClientIP } from "./services/auditLog";
 import { filterChatMessage } from "./services/contentFilter";
-import { eq, desc, and, sql as drizzleSql } from "drizzle-orm";
+import { eq, desc, and, sql as drizzleSql, count, inArray } from "drizzle-orm";
 
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 10 * 1024 * 1024 } });
 
@@ -296,6 +302,16 @@ export async function registerRoutes(
         });
       }
       
+      const { checkFraudStrikes } = await import("./services/dataGovernance");
+      const fraudCheck = await checkFraudStrikes(userId);
+      if (fraudCheck.blocked) {
+        res.status(403).json({
+          error: "AI features are temporarily disabled due to location verification required. Please contact support.",
+          reason: "fraud_strikes_exceeded",
+        });
+        return;
+      }
+
       await logAuditEvent({
         userId,
         action: "lesson_generate",
@@ -9907,6 +9923,21 @@ export async function registerRoutes(
     try {
       const userId = req.user?.claims?.sub;
       const { id } = req.params;
+
+      if (req.body.privacy && req.body.privacy !== "private") {
+        const user = await storage.getUser(userId);
+        if (user) {
+          const { isCoppaRestricted } = await import("./services/dataGovernance");
+          if (isCoppaRestricted(user.birthdate)) {
+            const parentalConsent = await db.select().from(parentalConsentsTable)
+              .where(and(eq(parentalConsentsTable.userId, userId), eq(parentalConsentsTable.status, "approved")));
+            if (parentalConsent.length === 0) {
+              res.status(403).json({ error: "Users under 13 cannot make portfolios public without parental consent (COPPA)." });
+              return;
+            }
+          }
+        }
+      }
       
       const updated = await storage.updateStudentPortfolio(id, req.body, userId);
       if (!updated) {
@@ -12059,6 +12090,236 @@ export async function registerRoutes(
       });
     } catch (error) {
       res.status(500).json({ error: "Failed to check content" });
+    }
+  });
+
+  // ============ Zero-Trust Data Governance Routes ============
+
+  // Rule 1: Success Ledger
+  app.post("/api/success-marks", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user?.claims?.sub;
+      const user = await storage.getUser(userId);
+      if (!user || !hasRolePrivilege(user.role as any, "educator")) {
+        res.status(403).json({ error: "Only educators can submit success marks" });
+        return;
+      }
+      const { studentId, classId, assignmentId, organizationId, standardCode, mark } = req.body;
+      if (!studentId || !mark || !["success", "not_yet"].includes(mark)) {
+        res.status(400).json({ error: "studentId and mark (success/not_yet) are required" });
+        return;
+      }
+      const { submitSuccessMark } = await import("./services/dataGovernance");
+      const record = await submitSuccessMark({
+        studentId, classId, assignmentId, educatorId: userId, organizationId, standardCode, mark,
+      });
+      res.json(record);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to submit success mark" });
+    }
+  });
+
+  app.patch("/api/success-marks/:id", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user?.claims?.sub;
+      const { mark, auditReason } = req.body;
+      if (!mark || !["success", "not_yet"].includes(mark)) {
+        res.status(400).json({ error: "Valid mark (success/not_yet) is required" });
+        return;
+      }
+      const { editSuccessMark } = await import("./services/dataGovernance");
+      const updated = await editSuccessMark(req.params.id, userId, mark, auditReason);
+      res.json(updated);
+    } catch (error: any) {
+      if (error.message?.includes("finalized") || error.message?.includes("Only the submitting")) {
+        res.status(403).json({ error: error.message });
+      } else {
+        res.status(500).json({ error: "Failed to edit success mark" });
+      }
+    }
+  });
+
+  app.post("/api/success-marks/:id/archive", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user?.claims?.sub;
+      const user = await storage.getUser(userId);
+      if (!user || !hasRolePrivilege(user.role as any, "educator")) {
+        res.status(403).json({ error: "Only educators can archive success marks" });
+        return;
+      }
+
+      const mark = await db.select().from(successMarksTable).where(eq(successMarksTable.id, req.params.id)).limit(1);
+      if (mark.length === 0) { res.status(404).json({ error: "Success mark not found" }); return; }
+
+      if (!hasRolePrivilege(user.role as any, "system_admin")) {
+        const userMemberships = await db.select().from(orgMembershipsTable).where(eq(orgMembershipsTable.userId, userId));
+        const userOrgIds = userMemberships.map(m => String(m.organizationId));
+        if (mark[0].organizationId && !userOrgIds.includes(String(mark[0].organizationId))) {
+          res.status(403).json({ error: "Cannot archive success marks outside your organization" });
+          return;
+        }
+      }
+
+      const { archiveSuccessMark } = await import("./services/dataGovernance");
+      const updated = await archiveSuccessMark(req.params.id, userId);
+      res.json({ ...updated, note: "Mark archived (hidden from UI). Underlying data preserved per retention policy." });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to archive success mark" });
+    }
+  });
+
+  app.get("/api/success-marks", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user?.claims?.sub;
+      const user = await storage.getUser(userId);
+      if (!user) { res.status(401).json({ error: "User not found" }); return; }
+
+      const userMemberships = await db.select().from(orgMembershipsTable)
+        .where(eq(orgMembershipsTable.userId, userId));
+      const userOrgIds = userMemberships.map(m => m.organizationId);
+
+      const { studentId, classId } = req.query;
+      const conditions = [];
+      if (studentId) conditions.push(eq(successMarksTable.studentId, studentId as string));
+      if (classId) conditions.push(eq(successMarksTable.classId, classId as string));
+      conditions.push(eq(successMarksTable.isArchived, false));
+
+      if (!hasRolePrivilege(user.role as any, "system_admin") && userOrgIds.length > 0) {
+        conditions.push(inArray(successMarksTable.organizationId, userOrgIds.map(String)));
+      } else if (!hasRolePrivilege(user.role as any, "system_admin") && userOrgIds.length === 0) {
+        conditions.push(eq(successMarksTable.educatorId, userId));
+      }
+
+      const marks = await db.select().from(successMarksTable)
+        .where(and(...conditions))
+        .orderBy(desc(successMarksTable.createdAt));
+      res.json(marks);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch success marks" });
+    }
+  });
+
+  // Rule 2: Communication Safety Intercept
+  app.post("/api/messages/send", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user?.claims?.sub;
+      const user = await storage.getUser(userId);
+      if (!user) { res.status(401).json({ error: "User not found" }); return; }
+
+      const { isCoppaRestricted } = await import("./services/dataGovernance");
+      if (isCoppaRestricted(user.birthdate)) {
+        const parentalConsent = await db.select().from(parentalConsentsTable)
+          .where(and(eq(parentalConsentsTable.userId, userId), eq(parentalConsentsTable.status, "approved")));
+        if (parentalConsent.length === 0) {
+          res.status(403).json({ error: "Messaging is restricted for users under 13 without parental consent." });
+          return;
+        }
+      }
+
+      const { content, recipientId } = req.body;
+      if (!content) { res.status(400).json({ error: "Message content is required" }); return; }
+
+      const senderMemberships = await db.select().from(orgMembershipsTable)
+        .where(eq(orgMembershipsTable.userId, userId));
+      const senderTenantId = senderMemberships.length > 0 ? senderMemberships[0].organizationId : null;
+
+      let recipientTenantId = null;
+      if (recipientId) {
+        const recipMemberships = await db.select().from(orgMembershipsTable)
+          .where(eq(orgMembershipsTable.userId, recipientId));
+        recipientTenantId = recipMemberships.length > 0 ? recipMemberships[0].organizationId : null;
+      }
+
+      const { interceptStudentMessage } = await import("./services/dataGovernance");
+      const result = await interceptStudentMessage(
+        userId, user.role || "student", senderTenantId, recipientId, recipientTenantId,
+        content, getClientIP(req), req.headers["user-agent"]
+      );
+
+      if (!result.allowed) {
+        res.status(403).json({ error: result.message, reason: result.reason });
+        return;
+      }
+
+      res.json({ sent: true });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to send message" });
+    }
+  });
+
+  // Rule 7: Fraud Strike Check (middleware helper exposed as endpoint for admin)
+  app.get("/api/admin/fraud-strikes/:userId", isAuthenticated, requireSiteAdmin, async (req: any, res) => {
+    try {
+      const { checkFraudStrikes } = await import("./services/dataGovernance");
+      const result = await checkFraudStrikes(req.params.userId);
+      const strikes = await db.select().from(fraudStrikesTable)
+        .where(eq(fraudStrikesTable.userId, req.params.userId))
+        .orderBy(desc(fraudStrikesTable.createdAt));
+      res.json({ ...result, strikes });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to check fraud strikes" });
+    }
+  });
+
+  app.post("/api/admin/fraud-strikes/:userId/resolve", isAuthenticated, requireSiteAdmin, async (req: any, res) => {
+    try {
+      const adminId = req.user?.claims?.sub;
+      const { resolveFraudStrikes } = await import("./services/dataGovernance");
+      await resolveFraudStrikes(req.params.userId, adminId);
+      res.json({ resolved: true });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to resolve fraud strikes" });
+    }
+  });
+
+  // Rule 4: Data Residency Check
+  app.get("/api/data-region", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user?.claims?.sub;
+      const region = await db.select().from(userDataRegionsTable).where(eq(userDataRegionsTable.userId, userId));
+      res.json(region[0] || { dataRegion: "global", note: "Region not yet determined" });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to check data region" });
+    }
+  });
+
+  // Governance Status endpoint (for admin dashboard)
+  app.get("/api/admin/governance-status", isAuthenticated, requireSiteAdmin, async (req: any, res) => {
+    try {
+      const [totalMarks] = await db.select({ count: count() }).from(successMarksTable);
+      const [finalizedMarks] = await db.select({ count: count() }).from(successMarksTable).where(eq(successMarksTable.isMutable, false));
+      const [totalVault] = await db.select({ count: count() }).from(safetyVaultTable);
+      const [blockedMessages] = await db.select({ count: count() }).from(safetyVaultTable).where(eq(safetyVaultTable.isPiiBlocked, true));
+      const [totalStrikes] = await db.select({ count: count() }).from(fraudStrikesTable);
+      const [unresolvedStrikes] = await db.select({ count: count() }).from(fraudStrikesTable).where(eq(fraudStrikesTable.isResolved, false));
+
+      res.json({
+        successLedger: {
+          totalMarks: totalMarks.count,
+          finalizedMarks: finalizedMarks.count,
+          editWindowHours: 24,
+        },
+        safetyVault: {
+          totalArchived: totalVault.count,
+          piiBlocked: blockedMessages.count,
+        },
+        fraudProtection: {
+          totalStrikes: totalStrikes.count,
+          unresolvedStrikes: unresolvedStrikes.count,
+          strikeThreshold: 3,
+        },
+        rules: [
+          { id: 1, name: "Success Ledger Immutability", status: "active", description: "24-hour edit window, then requires audit reason" },
+          { id: 2, name: "Communication Safety Intercept", status: "active", description: "PII blocking, cross-tenant lockdown, archive mandate" },
+          { id: 3, name: "Multi-Tenant RLS", status: "active", description: "App-level tenant scoping on queries" },
+          { id: 4, name: "Data Residency", status: "stub", description: "Region tagging active, geographic routing planned" },
+          { id: 5, name: "COPPA Compliance", status: "active", description: "Under-13 restricted state, messaging blocked without consent" },
+          { id: 6, name: "Marketplace Security", status: "active", description: "Content filter on uploads, standards read-only" },
+          { id: 7, name: "VPN/Fraud Protection", status: "active", description: "3-strike GeoIP mismatch tracking" },
+        ],
+      });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch governance status" });
     }
   });
 

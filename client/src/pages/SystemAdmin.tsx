@@ -869,6 +869,10 @@ export default function SystemAdminPage() {
             <Shield className="h-4 w-4" />
             <span className="hidden sm:inline">Safety Suite</span>
           </TabsTrigger>
+          <TabsTrigger value="governance" className="gap-2" data-testid="tab-governance">
+            <Lock className="h-4 w-4" />
+            <span className="hidden sm:inline">Data Governance</span>
+          </TabsTrigger>
         </TabsList>
 
         <TabsContent value="overview" className="space-y-6">
@@ -3138,6 +3142,9 @@ export default function SystemAdminPage() {
         <TabsContent value="safety" className="space-y-6">
           <SafetySuiteTab />
         </TabsContent>
+        <TabsContent value="governance" className="space-y-6">
+          <DataGovernanceTab />
+        </TabsContent>
       </Tabs>
     </div>
   );
@@ -4162,6 +4169,182 @@ function SafetySuiteTab() {
               <li>• Log aggregation service (Datadog, Elastic, CloudWatch)</li>
               <li>• Penetration testing before production launch</li>
             </ul>
+          </div>
+        </CardContent>
+      </Card>
+    </>
+  );
+}
+
+function DataGovernanceTab() {
+  const { data: governance, isLoading } = useQuery<{
+    successLedger: { totalMarks: number; finalizedMarks: number; editWindowHours: number };
+    safetyVault: { totalArchived: number; piiBlocked: number };
+    fraudProtection: { totalStrikes: number; unresolvedStrikes: number; strikeThreshold: number };
+    rules: { id: number; name: string; status: string; description: string }[];
+  }>({
+    queryKey: ["/api/admin/governance-status"],
+  });
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center py-12">
+        <Loader2 className="h-6 w-6 animate-spin" />
+      </div>
+    );
+  }
+
+  const statusColor = (status: string) =>
+    status === "active" ? "bg-green-100 text-green-700 border-green-300" :
+    status === "stub" ? "bg-amber-100 text-amber-700 border-amber-300" :
+    "bg-gray-100 text-gray-700 border-gray-300";
+
+  return (
+    <>
+      <Card>
+        <CardHeader>
+          <CardTitle className="font-oswald flex items-center gap-2">
+            <Lock className="h-5 w-5" />
+            Zero-Trust Data Governance
+          </CardTitle>
+          <CardDescription className="font-roboto">
+            Hard-coded platform laws enforced at API and database levels
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+            <Card>
+              <CardContent className="p-4">
+                <div className="flex items-center gap-2">
+                  <Award className="h-5 w-5 text-blue-600" />
+                  <div>
+                    <p className="text-2xl font-bold font-oswald">{governance?.successLedger.totalMarks || 0}</p>
+                    <p className="text-sm text-muted-foreground font-roboto">Success Marks</p>
+                    <p className="text-xs text-muted-foreground">{governance?.successLedger.finalizedMarks || 0} finalized</p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardContent className="p-4">
+                <div className="flex items-center gap-2">
+                  <Shield className="h-5 w-5 text-teal-600" />
+                  <div>
+                    <p className="text-2xl font-bold font-oswald">{governance?.safetyVault.totalArchived || 0}</p>
+                    <p className="text-sm text-muted-foreground font-roboto">Vault Messages</p>
+                    <p className="text-xs text-muted-foreground">{governance?.safetyVault.piiBlocked || 0} PII blocked</p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardContent className="p-4">
+                <div className="flex items-center gap-2">
+                  <AlertTriangle className="h-5 w-5 text-red-600" />
+                  <div>
+                    <p className="text-2xl font-bold font-oswald">{governance?.fraudProtection.unresolvedStrikes || 0}</p>
+                    <p className="text-sm text-muted-foreground font-roboto">Fraud Strikes</p>
+                    <p className="text-xs text-muted-foreground">{governance?.fraudProtection.totalStrikes || 0} total ({governance?.fraudProtection.strikeThreshold || 3}-strike rule)</p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+
+          <h3 className="font-oswald text-lg font-semibold mb-3">Governance Rules</h3>
+          <div className="space-y-3">
+            {governance?.rules.map((rule) => (
+              <div key={rule.id} className="flex items-start gap-3 p-4 border rounded-lg" data-testid={`governance-rule-${rule.id}`}>
+                <div className={`w-3 h-3 rounded-full mt-1 shrink-0 ${rule.status === "active" ? "bg-green-500" : "bg-amber-500"}`} />
+                <div className="flex-1">
+                  <div className="flex items-center gap-2">
+                    <p className="font-medium font-roboto">Rule {rule.id}: {rule.name}</p>
+                    <Badge className={`text-xs ${statusColor(rule.status)}`}>{rule.status}</Badge>
+                  </div>
+                  <p className="text-sm text-muted-foreground font-roboto mt-1">{rule.description}</p>
+                </div>
+              </div>
+            ))}
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="font-oswald">Success Ledger Details</CardTitle>
+          <CardDescription className="font-roboto">Immutable student success tracking with 24-hour edit window</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-4">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="p-3 border rounded-lg">
+                <p className="text-sm font-medium font-roboto">Edit Window</p>
+                <p className="text-2xl font-bold font-oswald">{governance?.successLedger.editWindowHours || 24}h</p>
+                <p className="text-xs text-muted-foreground font-roboto">After submission, educators can correct clerical errors within 1,440 minutes</p>
+              </div>
+              <div className="p-3 border rounded-lg">
+                <p className="text-sm font-medium font-roboto">Post-Window Edits</p>
+                <p className="text-sm font-roboto text-muted-foreground mt-1">Require signed "Audit Reason" permanently attached to the student's longitudinal record</p>
+              </div>
+              <div className="p-3 border rounded-lg">
+                <p className="text-sm font-medium font-roboto">Deletion Policy</p>
+                <p className="text-sm font-roboto text-muted-foreground mt-1">No deletion allowed. Archive hides from UI only. Data retained for 10-year predictive engine.</p>
+              </div>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="font-oswald">Communication Safety</CardTitle>
+          <CardDescription className="font-roboto">Real-time PII scrubbing and cross-tenant lockdown</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="p-3 border rounded-lg">
+              <p className="font-medium font-roboto text-sm mb-2">PII Interception Patterns</p>
+              <ul className="text-sm text-muted-foreground font-roboto space-y-1">
+                <li>• Phone numbers (domestic & international)</li>
+                <li>• Home addresses (street patterns)</li>
+                <li>• Email addresses</li>
+                <li>• Social Security Numbers</li>
+                <li>• Social media handles (@username)</li>
+                <li>• Instagram, Snapchat, TikTok URLs</li>
+              </ul>
+            </div>
+            <div className="p-3 border rounded-lg">
+              <p className="font-medium font-roboto text-sm mb-2">Tenant Isolation</p>
+              <ul className="text-sm text-muted-foreground font-roboto space-y-1">
+                <li>• Students cannot message outside their school/district</li>
+                <li>• Cross-tenant requires Super Admin "Global Project" flag</li>
+                <li>• All metadata (IP, timestamp, device) logged</li>
+                <li>• Chat deletions are soft-deletes only (Safety Vault)</li>
+                <li>• Full archive retained for legal compliance</li>
+              </ul>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="font-oswald">VPN & Fraud Protection</CardTitle>
+          <CardDescription className="font-roboto">3-strike rule for GeoIP/Payment region mismatches</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="p-4 bg-amber-50 dark:bg-amber-900/20 rounded-lg border border-amber-200 dark:border-amber-800">
+            <div className="flex items-start gap-3">
+              <AlertTriangle className="h-5 w-5 text-amber-600 shrink-0 mt-0.5" />
+              <div>
+                <p className="font-medium font-roboto text-sm">3-Strike Rule</p>
+                <p className="text-sm text-muted-foreground font-roboto mt-1">
+                  If GeoIP location and Payment Region mismatch for 3 consecutive sessions, 
+                  the AI features ("Master Builder") are disabled until the user verifies their location. 
+                  This prevents pricing arbitrage while maintaining access to basic portfolio tools.
+                </p>
+              </div>
+            </div>
           </div>
         </CardContent>
       </Card>

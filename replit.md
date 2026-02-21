@@ -19,6 +19,7 @@ Preferred communication style: Simple, everyday language.
 -   **Data Layer**: PostgreSQL database managed by Drizzle ORM.
 -   **Authentication**: Replit Auth with `express-session` and PostgreSQL for session storage.
 -   **Security**: Input validation, ownership checks, server-side regeneration of critical IDs, Helmet security headers, rate limiting (express-rate-limit), PII stripping before AI calls, content keyword filtering, audit logging, and parental consent (COPPA) system.
+-   **Zero-Trust Data Governance**: 7-rule governance system including immutable success ledger (24-hour edit window), communication safety intercept (PII blocking, cross-tenant lockdown), app-level tenant scoping, data residency stubs (region tagging), COPPA restricted state enforcement, marketplace security, and VPN/fraud 3-strike protection. Admin dashboard tab for governance monitoring.
 -   **Monorepo Structure**: `/client`, `/server`, and `/shared` directories.
 -   **AI Integration**: OpenAI API for AI-driven features, with mock data fallback.
 -   **Real-Time Collaboration**: WebSocket server for live cursor positions, presence, and chat.

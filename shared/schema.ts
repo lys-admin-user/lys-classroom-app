@@ -2945,3 +2945,89 @@ export const insertAuditLogSchema = createInsertSchema(auditLogs).omit({ id: tru
 export type InsertAuditLog = z.infer<typeof insertAuditLogSchema>;
 export type AuditLog = typeof auditLogs.$inferSelect;
 
+// =============================================================================
+// ZERO-TRUST DATA GOVERNANCE
+// =============================================================================
+
+// Rule 1: Success Ledger - Immutable student success records
+export const successMarks = pgTable("success_marks", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  studentId: varchar("student_id").notNull(),
+  classId: varchar("class_id"),
+  assignmentId: varchar("assignment_id"),
+  educatorId: varchar("educator_id").notNull(),
+  organizationId: varchar("organization_id"),
+  standardCode: varchar("standard_code"),
+  mark: varchar("mark").notNull().$type<"success" | "not_yet">(),
+  isMutable: boolean("is_mutable").default(true),
+  finalizedAt: timestamp("finalized_at"),
+  auditReason: text("audit_reason"),
+  auditEditedBy: varchar("audit_edited_by"),
+  auditEditedAt: timestamp("audit_edited_at"),
+  isArchived: boolean("is_archived").default(false),
+  metadata: jsonb("metadata").$type<Record<string, any>>(),
+  submittedAt: timestamp("submitted_at").defaultNow(),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertSuccessMarkSchema = createInsertSchema(successMarks).omit({ id: true, createdAt: true, finalizedAt: true, auditEditedAt: true });
+export type InsertSuccessMark = z.infer<typeof insertSuccessMarkSchema>;
+export type SuccessMark = typeof successMarks.$inferSelect;
+
+// Rule 2: Communication Safety Vault - soft-delete archive for all messages
+export const safetyVault = pgTable("safety_vault", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  messageId: varchar("message_id"),
+  threadId: varchar("thread_id"),
+  senderId: varchar("sender_id").notNull(),
+  senderRole: varchar("sender_role"),
+  senderTenantId: varchar("sender_tenant_id"),
+  recipientId: varchar("recipient_id"),
+  recipientTenantId: varchar("recipient_tenant_id"),
+  content: text("content").notNull(),
+  contentType: varchar("content_type").default("message"),
+  isDeletedFromUI: boolean("is_deleted_from_ui").default(false),
+  isPiiBlocked: boolean("is_pii_blocked").default(false),
+  blockedPatterns: jsonb("blocked_patterns").$type<string[]>(),
+  ipAddress: varchar("ip_address"),
+  userAgent: text("user_agent"),
+  deviceId: varchar("device_id"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertSafetyVaultSchema = createInsertSchema(safetyVault).omit({ id: true, createdAt: true });
+export type InsertSafetyVault = z.infer<typeof insertSafetyVaultSchema>;
+export type SafetyVault = typeof safetyVault.$inferSelect;
+
+// Rule 7: VPN/Fraud 3-Strike Tracking
+export const fraudStrikes = pgTable("fraud_strikes", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull(),
+  geoIpCountry: varchar("geo_ip_country"),
+  geoIpRegion: varchar("geo_ip_region"),
+  paymentRegion: varchar("payment_region"),
+  sessionIp: varchar("session_ip"),
+  mismatchType: varchar("mismatch_type").default("geo_payment"),
+  strikeNumber: integer("strike_number").default(1),
+  isResolved: boolean("is_resolved").default(false),
+  resolvedAt: timestamp("resolved_at"),
+  resolvedBy: varchar("resolved_by"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertFraudStrikeSchema = createInsertSchema(fraudStrikes).omit({ id: true, createdAt: true });
+export type InsertFraudStrike = z.infer<typeof insertFraudStrikeSchema>;
+export type FraudStrike = typeof fraudStrikes.$inferSelect;
+
+// User data region tracking (Rule 4: Data Residency)
+export const userDataRegions = pgTable("user_data_regions", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull().unique(),
+  dataRegion: varchar("data_region").notNull().$type<"us" | "eu" | "ng" | "global">(),
+  detectedCountry: varchar("detected_country"),
+  detectedIp: varchar("detected_ip"),
+  isLocked: boolean("is_locked").default(true),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
