@@ -9,7 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue, SelectGr
 import { Checkbox } from "@/components/ui/checkbox";
 import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
-import { GraduationCap, BookOpen, Building2, ChevronRight, ChevronLeft, Sparkles, Target, Compass, BookMarked, School, Home } from "lucide-react";
+import { GraduationCap, BookOpen, Building2, ChevronRight, ChevronLeft, Sparkles, Target, Compass, BookMarked, School, Home, Presentation } from "lucide-react";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import type { StandardsJurisdiction } from "@shared/schema";
@@ -118,9 +118,15 @@ const COUNTRIES = [
   { code: "TN", name: "Tunisia", region: "Africa" },
 ];
 
-const PRIMARY_GOALS = [
+const PRIMARY_GOALS_BASE = [
   { id: "discover", label: "Discover my strengths and interests", icon: Compass },
   { id: "career", label: "Explore career pathways", icon: Target },
+  { id: "lessons", label: "Create engaging lesson plans", icon: BookOpen },
+  { id: "curriculum", label: "Build scope & sequence", icon: BookMarked },
+];
+
+const PRIMARY_GOALS_ADMIN = [
+  { id: "oversight", label: "Oversee campus/district performance", icon: Presentation },
   { id: "lessons", label: "Create engaging lesson plans", icon: BookOpen },
   { id: "curriculum", label: "Build scope & sequence", icon: BookMarked },
 ];
@@ -129,20 +135,21 @@ const PRIMARY_GOALS = [
 const getAutoInterests = (role: string, primaryGoal: string): string[] => {
   const interests: string[] = [];
   
-  // Role-based interests
   if (role === "student") {
     interests.push("self-discovery", "career-exploration", "action-plans", "resources");
   } else if (role === "educator" || role === "homeschool_parent") {
     interests.push("ai-lessons", "scope-sequence", "analytics", "resources");
   } else if (role === "campus_admin") {
-    interests.push("scope-sequence", "analytics", "ai-lessons");
+    interests.push("scope-sequence", "analytics", "ai-lessons", "safety-monitoring");
+  } else if (role === "district_admin") {
+    interests.push("district-management", "analytics", "safety-monitoring", "scope-sequence");
   }
   
-  // Goal-based additions
   if (primaryGoal === "discover") interests.push("self-discovery", "career-exploration");
   if (primaryGoal === "career") interests.push("career-exploration", "action-plans");
   if (primaryGoal === "lessons") interests.push("ai-lessons", "resources");
   if (primaryGoal === "curriculum") interests.push("scope-sequence", "analytics");
+  if (primaryGoal === "oversight") interests.push("analytics", "safety-monitoring", "district-management");
   
   return Array.from(new Set(interests));
 };
@@ -268,6 +275,10 @@ export default function Onboarding() {
     if (primaryGoal === "career") return "/careers";
     if (primaryGoal === "lessons") return "/lesson-generator";
     if (primaryGoal === "curriculum") return "/scope-sequence";
+    if (primaryGoal === "oversight") {
+      if (role === "district_admin") return "/district-admin";
+      return "/admin";
+    }
     return "/";
   };
 
@@ -297,12 +308,14 @@ export default function Onboarding() {
     });
   };
 
-  const isEducator = role === "educator" || role === "campus_admin" || role === "homeschool_parent";
+  const isEducator = role === "educator" || role === "campus_admin" || role === "district_admin" || role === "homeschool_parent";
+  const isAdmin = role === "campus_admin" || role === "district_admin";
+  const primaryGoals = isAdmin ? PRIMARY_GOALS_ADMIN : PRIMARY_GOALS_BASE;
 
   const steps: { key: StepKey; label: string }[] = isEducator
     ? [
         { key: "role", label: "Your Role" },
-        { key: "classes", label: "Your Classes" },
+        { key: "classes", label: isAdmin ? "Grade Levels" : "Your Classes" },
         { key: "goals", label: "Your Goals" },
         { key: "location", label: "Get Started" },
       ]
@@ -363,10 +376,10 @@ export default function Onboarding() {
           {step === "role" && (
             <div className="space-y-6">
               <Label className="text-lg font-oswald">What best describes you?</Label>
-              <RadioGroup value={role} onValueChange={setRole} className="grid gap-4">
+              <RadioGroup value={role} onValueChange={(v) => { setRole(v); setPrimaryGoal(""); }} className="grid gap-4">
                 <div 
                   className={`flex items-center gap-4 p-4 rounded-md border cursor-pointer hover-elevate ${role === "student" ? "border-lys-red bg-muted" : ""}`}
-                  onClick={() => setRole("student")}
+                  onClick={() => { setRole("student"); setPrimaryGoal(""); }}
                   data-testid="option-student"
                 >
                   <RadioGroupItem value="student" id="student" />
@@ -378,7 +391,7 @@ export default function Onboarding() {
                 </div>
                 <div 
                   className={`flex items-center gap-4 p-4 rounded-md border cursor-pointer hover-elevate ${role === "educator" ? "border-lys-red bg-muted" : ""}`}
-                  onClick={() => setRole("educator")}
+                  onClick={() => { setRole("educator"); setPrimaryGoal(""); }}
                   data-testid="option-educator"
                 >
                   <RadioGroupItem value="educator" id="educator" />
@@ -390,7 +403,7 @@ export default function Onboarding() {
                 </div>
                 <div 
                   className={`flex items-center gap-4 p-4 rounded-md border cursor-pointer hover-elevate ${role === "homeschool_parent" ? "border-lys-red bg-muted" : ""}`}
-                  onClick={() => setRole("homeschool_parent")}
+                  onClick={() => { setRole("homeschool_parent"); setPrimaryGoal(""); }}
                   data-testid="option-homeschool-parent"
                 >
                   <RadioGroupItem value="homeschool_parent" id="homeschool_parent" />
@@ -402,14 +415,26 @@ export default function Onboarding() {
                 </div>
                 <div 
                   className={`flex items-center gap-4 p-4 rounded-md border cursor-pointer hover-elevate ${role === "campus_admin" ? "border-lys-red bg-muted" : ""}`}
-                  onClick={() => setRole("campus_admin")}
+                  onClick={() => { setRole("campus_admin"); setPrimaryGoal(""); }}
                   data-testid="option-campus-admin"
                 >
                   <RadioGroupItem value="campus_admin" id="campus_admin" />
                   <Building2 className="h-6 w-6 text-lys-red" />
                   <div>
                     <Label htmlFor="campus_admin" className="cursor-pointer font-medium">Campus Administrator</Label>
-                    <p className="text-sm text-muted-foreground">School or district leadership</p>
+                    <p className="text-sm text-muted-foreground">School principal or campus leadership</p>
+                  </div>
+                </div>
+                <div 
+                  className={`flex items-center gap-4 p-4 rounded-md border cursor-pointer hover-elevate ${role === "district_admin" ? "border-lys-red bg-muted" : ""}`}
+                  onClick={() => { setRole("district_admin"); setPrimaryGoal(""); }}
+                  data-testid="option-district-admin"
+                >
+                  <RadioGroupItem value="district_admin" id="district_admin" />
+                  <Presentation className="h-6 w-6 text-lys-red" />
+                  <div>
+                    <Label htmlFor="district_admin" className="cursor-pointer font-medium">District Administrator</Label>
+                    <p className="text-sm text-muted-foreground">District-level leadership overseeing multiple campuses</p>
                   </div>
                 </div>
               </RadioGroup>
@@ -419,9 +444,14 @@ export default function Onboarding() {
           {step === "classes" && (
             <div className="space-y-6">
               <div>
-                <Label className="text-lg font-oswald">What grade levels do you teach?</Label>
+                <Label className="text-lg font-oswald">
+                  {isAdmin ? "What grade levels does your organization serve?" : "What grade levels do you teach?"}
+                </Label>
                 <p className="text-sm text-muted-foreground mt-1 mb-4">
-                  Select all the grade levels for your classes. This helps us show you relevant educational standards.
+                  {isAdmin
+                    ? "Select all the grade levels in your campus or district. This helps us tailor standards and analytics."
+                    : "Select all the grade levels for your classes. This helps us show you relevant educational standards."
+                  }
                 </p>
                 
                 <div className="space-y-4">
@@ -499,7 +529,7 @@ export default function Onboarding() {
                   We'll personalize your experience based on your selection
                 </p>
                 <RadioGroup value={primaryGoal} onValueChange={setPrimaryGoal} className="grid gap-3">
-                  {PRIMARY_GOALS.map((goal) => (
+                  {primaryGoals.map((goal) => (
                     <div 
                       key={goal.id}
                       className={`flex items-center gap-4 p-4 rounded-md border cursor-pointer hover-elevate ${primaryGoal === goal.id ? "border-lys-red bg-muted" : ""}`}

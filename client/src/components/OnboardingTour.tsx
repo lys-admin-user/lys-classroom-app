@@ -20,6 +20,22 @@ import {
   Trophy,
   PenTool,
   UserPlus,
+  Library,
+  Milestone,
+  Shield,
+  School,
+  Presentation,
+  Settings,
+  FileText,
+  Share2,
+  Link2,
+  TrendingUp,
+  ClipboardList,
+  HelpCircle,
+  Award,
+  Folder,
+  Database,
+  Home,
 } from "lucide-react";
 
 interface TourStep {
@@ -29,7 +45,7 @@ interface TourStep {
   icon: React.ComponentType<{ className?: string }>;
   targetSelector?: string;
   navPath?: string;
-  pillar?: "be" | "know" | "do" | "tools" | "general";
+  pillar?: "be" | "know" | "do" | "tools" | "general" | "admin";
 }
 
 const STUDENT_STEPS: TourStep[] = [
@@ -59,12 +75,30 @@ const STUDENT_STEPS: TourStep[] = [
     pillar: "be",
   },
   {
+    id: "be-essay",
+    title: "BE - Essay Builder",
+    description: "Craft compelling scholarship and college essays that showcase your unique story and achievements.",
+    icon: PenTool,
+    targetSelector: '[data-testid="nav-essay-builder"]',
+    navPath: "/essay-builder",
+    pillar: "be",
+  },
+  {
     id: "be-portfolio",
     title: "BE - Your Portfolio",
-    description: "Build a digital portfolio to showcase your achievements, skills, and growth over time.",
+    description: "Build a digital portfolio to showcase your achievements, skills, and growth over time. Share it with colleges and employers.",
     icon: PenTool,
     targetSelector: '[data-testid="nav-my-portfolio"]',
     navPath: "/portfolio",
+    pillar: "be",
+  },
+  {
+    id: "be-milestones",
+    title: "BE - Milestones",
+    description: "Track your Be-Know-Do milestones and celebrate each achievement along your learning journey.",
+    icon: Milestone,
+    targetSelector: '[data-testid="nav-milestones"]',
+    navPath: "/milestones",
     pillar: "be",
   },
   {
@@ -74,6 +108,15 @@ const STUDENT_STEPS: TourStep[] = [
     icon: Briefcase,
     targetSelector: '[data-testid="nav-career-explorer"]',
     navPath: "/careers",
+    pillar: "know",
+  },
+  {
+    id: "know-resources",
+    title: "KNOW - Resources",
+    description: "Access curated educational resources, articles, and learning materials to expand your knowledge.",
+    icon: Library,
+    targetSelector: '[data-testid="nav-resources"]',
+    navPath: "/resources",
     pillar: "know",
   },
   {
@@ -121,13 +164,22 @@ const STUDENT_STEPS: TourStep[] = [
     navPath: "/my-journey",
     pillar: "general",
   },
+  {
+    id: "help-desk",
+    title: "Need Help?",
+    description: "Visit the Help Desk anytime for troubleshooting guides, FAQs, and step-by-step solutions to common questions.",
+    icon: HelpCircle,
+    targetSelector: '[data-testid="nav-help-desk"]',
+    navPath: "/help",
+    pillar: "general",
+  },
 ];
 
 const EDUCATOR_STEPS: TourStep[] = [
   {
     id: "welcome",
     title: "Welcome to LYS!",
-    description: "Your educator toolkit is ready. Let's explore the features personalized for you.",
+    description: "Your educator toolkit is ready. Let's explore the features designed to help you create engaging, standards-aligned instruction.",
     icon: Sparkles,
     pillar: "general",
   },
@@ -150,6 +202,15 @@ const EDUCATOR_STEPS: TourStep[] = [
     pillar: "tools",
   },
   {
+    id: "assessments",
+    title: "Assessments",
+    description: "Create and manage assessments aligned to your lessons and standards for measuring student understanding.",
+    icon: FileText,
+    targetSelector: '[data-testid="nav-assessments"]',
+    navPath: "/assessments",
+    pillar: "tools",
+  },
+  {
     id: "scope-sequence",
     title: "Scope & Sequence Builder",
     description: "Plan your curriculum from start to finish. Create from scratch or import existing plans with AI-powered unit extraction.",
@@ -159,12 +220,48 @@ const EDUCATOR_STEPS: TourStep[] = [
     pillar: "tools",
   },
   {
+    id: "classroom",
+    title: "Classroom Management",
+    description: "Organize your classes, manage student rosters, and keep track of your teaching assignments.",
+    icon: School,
+    targetSelector: '[data-testid="nav-classroom"]',
+    navPath: "/classroom",
+    pillar: "tools",
+  },
+  {
     id: "gradebook",
     title: "Gradebook",
     description: "Manage student grades with automatic calculations, CSV export, and career alignment insights.",
-    icon: BookOpen,
+    icon: ClipboardList,
     targetSelector: '[data-testid="nav-gradebook"]',
     navPath: "/gradebook",
+    pillar: "tools",
+  },
+  {
+    id: "collaboration",
+    title: "Collaboration",
+    description: "Co-create lesson plans with other educators in real time. Share invite codes, chat, and track edit history.",
+    icon: Share2,
+    targetSelector: '[data-testid="nav-collaboration"]',
+    navPath: "/collaboration",
+    pillar: "tools",
+  },
+  {
+    id: "resource-library",
+    title: "Resource Library",
+    description: "Browse and share teaching resources with the educator community. Find templates, activities, and materials.",
+    icon: Folder,
+    targetSelector: '[data-testid="nav-resource-library"]',
+    navPath: "/resource-library",
+    pillar: "tools",
+  },
+  {
+    id: "sis-integration",
+    title: "SIS Integration",
+    description: "Connect your Student Information System (Clever, PowerSchool, Canvas, etc.) to sync student rosters and course data.",
+    icon: Link2,
+    targetSelector: '[data-testid="nav-sis-integration"]',
+    navPath: "/sis-integration",
     pillar: "tools",
   },
   {
@@ -174,6 +271,24 @@ const EDUCATOR_STEPS: TourStep[] = [
     icon: BarChart3,
     targetSelector: '[data-testid="nav-analytics"]',
     navPath: "/analytics",
+    pillar: "tools",
+  },
+  {
+    id: "professional-dev",
+    title: "Professional Development",
+    description: "Access professional development resources and track your growth as an educator.",
+    icon: TrendingUp,
+    targetSelector: '[data-testid="nav-professional-dev"]',
+    navPath: "/professional-development",
+    pillar: "tools",
+  },
+  {
+    id: "educator-influence",
+    title: "Educator Influence",
+    description: "Earn rewards by sharing resources and growing the LYS community through the affiliate program.",
+    icon: Award,
+    targetSelector: '[data-testid="nav-educator-influence"]',
+    navPath: "/educator-influence",
     pillar: "tools",
   },
   {
@@ -212,6 +327,361 @@ const EDUCATOR_STEPS: TourStep[] = [
     navPath: "/action-plans",
     pillar: "do",
   },
+  {
+    id: "help-desk",
+    title: "Need Help?",
+    description: "Visit the Help Desk anytime for troubleshooting guides, FAQs, and step-by-step solutions to common questions.",
+    icon: HelpCircle,
+    targetSelector: '[data-testid="nav-help-desk"]',
+    navPath: "/help",
+    pillar: "general",
+  },
+];
+
+const HOMESCHOOL_PARENT_STEPS: TourStep[] = [
+  {
+    id: "welcome",
+    title: "Welcome to LYS!",
+    description: "Your homeschool toolkit is ready. Let's explore the features designed to help you teach and guide your children effectively.",
+    icon: Home,
+    pillar: "general",
+  },
+  {
+    id: "lesson-generator",
+    title: "AI Lesson Generator",
+    description: "Create engaging, standards-aligned lesson plans instantly with AI. Customize for your child's learning style and pace.",
+    icon: Sparkles,
+    targetSelector: '[data-testid="nav-ai-lesson-generator"]',
+    navPath: "/lesson-generator",
+    pillar: "tools",
+  },
+  {
+    id: "my-lessons",
+    title: "Your Lesson Library",
+    description: "All your saved lesson plans organized in one place. Edit, duplicate, and build your curriculum over time.",
+    icon: BookOpen,
+    targetSelector: '[data-testid="nav-my-lessons"]',
+    navPath: "/my-lessons",
+    pillar: "tools",
+  },
+  {
+    id: "scope-sequence",
+    title: "Scope & Sequence Builder",
+    description: "Plan your homeschool curriculum with pacing guides and unit organization for the entire year.",
+    icon: Map,
+    targetSelector: '[data-testid="nav-scope-sequence"]',
+    navPath: "/scope-sequence",
+    pillar: "tools",
+  },
+  {
+    id: "gradebook",
+    title: "Gradebook",
+    description: "Track your child's grades with automatic calculations. Export records for compliance or portfolio reviews.",
+    icon: ClipboardList,
+    targetSelector: '[data-testid="nav-gradebook"]',
+    navPath: "/gradebook",
+    pillar: "tools",
+  },
+  {
+    id: "resource-library",
+    title: "Resource Library",
+    description: "Browse community-shared teaching resources, templates, and activities to enrich your homeschool experience.",
+    icon: Folder,
+    targetSelector: '[data-testid="nav-resource-library"]',
+    navPath: "/resource-library",
+    pillar: "tools",
+  },
+  {
+    id: "assignments",
+    title: "Assignments",
+    description: "Create and manage assignments aligned with your lesson plans and track completion.",
+    icon: ClipboardList,
+    targetSelector: '[data-testid="nav-assignments"]',
+    navPath: "/assignments",
+    pillar: "tools",
+  },
+  {
+    id: "analytics",
+    title: "Analytics",
+    description: "View learning analytics and progress reports to understand how your child is growing.",
+    icon: BarChart3,
+    targetSelector: '[data-testid="nav-analytics"]',
+    navPath: "/analytics",
+    pillar: "tools",
+  },
+  {
+    id: "parent-portal",
+    title: "Parent Portal",
+    description: "Your central hub for tracking student progress, career readiness insights, and Be-Know-Do journey updates.",
+    icon: Users,
+    targetSelector: '[data-testid="nav-parent-portal"]',
+    navPath: "/parent-portal",
+    pillar: "tools",
+  },
+  {
+    id: "be-discovery",
+    title: "BE - Self Discovery",
+    description: "Help your child discover their unique strengths, values, and identity through guided assessments.",
+    icon: Heart,
+    targetSelector: '[data-testid="nav-self-discovery"]',
+    navPath: "/self-discovery",
+    pillar: "be",
+  },
+  {
+    id: "know-careers",
+    title: "KNOW - Career Explorer",
+    description: "Explore career pathways together to connect learning with real-world opportunities.",
+    icon: Briefcase,
+    targetSelector: '[data-testid="nav-career-explorer"]',
+    navPath: "/careers",
+    pillar: "know",
+  },
+  {
+    id: "do-action",
+    title: "DO - Action Plans",
+    description: "Set goals and create action plans to build discipline and track your child's achievements.",
+    icon: Target,
+    targetSelector: '[data-testid="nav-action-plans"]',
+    navPath: "/action-plans",
+    pillar: "do",
+  },
+  {
+    id: "help-desk",
+    title: "Need Help?",
+    description: "Visit the Help Desk anytime for troubleshooting guides, FAQs, and step-by-step solutions.",
+    icon: HelpCircle,
+    targetSelector: '[data-testid="nav-help-desk"]',
+    navPath: "/help",
+    pillar: "general",
+  },
+];
+
+const CAMPUS_ADMIN_STEPS: TourStep[] = [
+  {
+    id: "welcome",
+    title: "Welcome to LYS!",
+    description: "Your campus administration tools are ready. Let's explore how you can manage your school, monitor safety, and support educators.",
+    icon: Shield,
+    pillar: "general",
+  },
+  {
+    id: "campus-admin",
+    title: "Campus Admin Dashboard",
+    description: "Your central hub for managing campus operations, reviewing safety metrics, and overseeing educator activity.",
+    icon: Shield,
+    targetSelector: '[data-testid="nav-campus-admin"]',
+    navPath: "/admin",
+    pillar: "admin",
+  },
+  {
+    id: "standards",
+    title: "Educational Standards",
+    description: "Manage and configure educational standards for your campus. Ensure lesson plans align with required standards.",
+    icon: Database,
+    targetSelector: '[data-testid="nav-standards"]',
+    navPath: "/admin/standards",
+    pillar: "admin",
+  },
+  {
+    id: "lesson-generator",
+    title: "AI Lesson Generator",
+    description: "Create standards-aligned lesson plans with AI, or review and approve lessons created by your educators.",
+    icon: Sparkles,
+    targetSelector: '[data-testid="nav-ai-lesson-generator"]',
+    navPath: "/lesson-generator",
+    pillar: "tools",
+  },
+  {
+    id: "scope-sequence",
+    title: "Scope & Sequence",
+    description: "Review and manage curriculum plans across your campus. Ensure consistent pacing and standards coverage.",
+    icon: Map,
+    targetSelector: '[data-testid="nav-scope-sequence"]',
+    navPath: "/scope-sequence",
+    pillar: "tools",
+  },
+  {
+    id: "gradebook",
+    title: "Gradebook",
+    description: "Access gradebook data across your campus. Review student performance and career alignment metrics.",
+    icon: ClipboardList,
+    targetSelector: '[data-testid="nav-gradebook"]',
+    navPath: "/gradebook",
+    pillar: "tools",
+  },
+  {
+    id: "analytics",
+    title: "Analytics & Reports",
+    description: "View campus-wide analytics including student progress, standards coverage, and educator performance.",
+    icon: BarChart3,
+    targetSelector: '[data-testid="nav-analytics"]',
+    navPath: "/analytics",
+    pillar: "tools",
+  },
+  {
+    id: "sis-integration",
+    title: "SIS Integration",
+    description: "Connect your Student Information System to automatically sync student rosters and course data.",
+    icon: Link2,
+    targetSelector: '[data-testid="nav-sis-integration"]',
+    navPath: "/sis-integration",
+    pillar: "tools",
+  },
+  {
+    id: "parent-portal",
+    title: "Parent Portal",
+    description: "Manage parent communications and review how families are engaging with student progress data.",
+    icon: Users,
+    targetSelector: '[data-testid="nav-parent-portal"]',
+    navPath: "/parent-portal",
+    pillar: "tools",
+  },
+  {
+    id: "help-desk",
+    title: "Need Help?",
+    description: "Visit the Help Desk anytime for troubleshooting guides, FAQs, and step-by-step solutions.",
+    icon: HelpCircle,
+    targetSelector: '[data-testid="nav-help-desk"]',
+    navPath: "/help",
+    pillar: "general",
+  },
+];
+
+const DISTRICT_ADMIN_STEPS: TourStep[] = [
+  {
+    id: "welcome",
+    title: "Welcome to LYS!",
+    description: "Your district administration tools are ready. Let's explore how you can oversee campuses, monitor safety, and manage district-wide operations.",
+    icon: Presentation,
+    pillar: "general",
+  },
+  {
+    id: "district-admin",
+    title: "District Admin Dashboard",
+    description: "Your command center for district-wide operations, safety monitoring, governance metrics, and campus oversight.",
+    icon: Presentation,
+    targetSelector: '[data-testid="nav-district-admin"]',
+    navPath: "/district-admin",
+    pillar: "admin",
+  },
+  {
+    id: "campuses",
+    title: "Campus Management",
+    description: "View and manage all campuses in your district. Monitor performance, transfer students, and configure campus settings.",
+    icon: School,
+    targetSelector: '[data-testid="nav-campuses"]',
+    navPath: "/district-admin/campuses",
+    pillar: "admin",
+  },
+  {
+    id: "campus-admin",
+    title: "Campus Admin Tools",
+    description: "Access campus-level administration including standards management and educator oversight.",
+    icon: Shield,
+    targetSelector: '[data-testid="nav-campus-admin"]',
+    navPath: "/admin",
+    pillar: "admin",
+  },
+  {
+    id: "analytics",
+    title: "District Analytics",
+    description: "Review district-wide performance analytics, student progress, standards coverage, and educator metrics.",
+    icon: BarChart3,
+    targetSelector: '[data-testid="nav-analytics"]',
+    navPath: "/analytics",
+    pillar: "tools",
+  },
+  {
+    id: "scope-sequence",
+    title: "Scope & Sequence",
+    description: "Oversee curriculum planning across the district. Ensure alignment and consistency across campuses.",
+    icon: Map,
+    targetSelector: '[data-testid="nav-scope-sequence"]',
+    navPath: "/scope-sequence",
+    pillar: "tools",
+  },
+  {
+    id: "sis-integration",
+    title: "SIS Integration",
+    description: "Configure district-level SIS connections that automatically cascade to all campuses.",
+    icon: Link2,
+    targetSelector: '[data-testid="nav-sis-integration"]',
+    navPath: "/sis-integration",
+    pillar: "tools",
+  },
+  {
+    id: "help-desk",
+    title: "Need Help?",
+    description: "Visit the Help Desk anytime for troubleshooting guides, FAQs, and step-by-step solutions.",
+    icon: HelpCircle,
+    targetSelector: '[data-testid="nav-help-desk"]',
+    navPath: "/help",
+    pillar: "general",
+  },
+];
+
+const SYSTEM_ADMIN_STEPS: TourStep[] = [
+  {
+    id: "welcome",
+    title: "Welcome to LYS Administration!",
+    description: "You have system-level access. Let's explore your platform management tools, safety systems, and governance controls.",
+    icon: Settings,
+    pillar: "general",
+  },
+  {
+    id: "system-dashboard",
+    title: "System Dashboard",
+    description: "Your platform-wide command center with performance analytics, user metrics, safety monitoring, governance status, and audit logs.",
+    icon: Settings,
+    targetSelector: '[data-testid="nav-system-dashboard"]',
+    navPath: "/system-admin",
+    pillar: "admin",
+  },
+  {
+    id: "manage-users",
+    title: "User Management",
+    description: "Manage all platform users, assign roles, handle invitations, and review user analytics including engagement and retention metrics.",
+    icon: Users,
+    targetSelector: '[data-testid="nav-manage-users"]',
+    navPath: "/system-admin/users",
+    pillar: "admin",
+  },
+  {
+    id: "district-admin",
+    title: "District Management",
+    description: "Oversee district-level operations and campus hierarchies across the entire platform.",
+    icon: Presentation,
+    targetSelector: '[data-testid="nav-district-admin"]',
+    navPath: "/district-admin",
+    pillar: "admin",
+  },
+  {
+    id: "campus-admin",
+    title: "Campus Administration",
+    description: "Access campus-level tools including standards management and educator oversight.",
+    icon: Shield,
+    targetSelector: '[data-testid="nav-campus-admin"]',
+    navPath: "/admin",
+    pillar: "admin",
+  },
+  {
+    id: "analytics",
+    title: "Platform Analytics",
+    description: "Review platform-wide analytics including DAU/MAU ratios, churn rates, feature adoption, and cohort retention data.",
+    icon: BarChart3,
+    targetSelector: '[data-testid="nav-analytics"]',
+    navPath: "/analytics",
+    pillar: "tools",
+  },
+  {
+    id: "help-desk",
+    title: "Help Desk",
+    description: "The Help Desk provides searchable troubleshooting guides and FAQs available to all users from the sidebar.",
+    icon: HelpCircle,
+    targetSelector: '[data-testid="nav-help-desk"]',
+    navPath: "/help",
+    pillar: "general",
+  },
 ];
 
 function getPillarColor(pillar?: string) {
@@ -220,6 +690,7 @@ function getPillarColor(pillar?: string) {
     case "know": return "text-lys-yellow";
     case "do": return "text-lys-teal";
     case "tools": return "text-primary";
+    case "admin": return "text-orange-600 dark:text-orange-400";
     default: return "text-foreground";
   }
 }
@@ -230,20 +701,42 @@ function getPillarBadge(pillar?: string) {
     case "know": return { label: "KNOW", className: "bg-lys-yellow/10 text-lys-yellow border-lys-yellow/20" };
     case "do": return { label: "DO", className: "bg-lys-teal/10 text-lys-teal border-lys-teal/20" };
     case "tools": return { label: "TOOLS", className: "bg-primary/10 text-primary border-primary/20" };
+    case "admin": return { label: "ADMIN", className: "bg-orange-500/10 text-orange-600 dark:text-orange-400 border-orange-500/20" };
     default: return null;
   }
 }
 
 function getStepsForRole(role: string, primaryGoal?: string): TourStep[] {
-  const isEducator = role === "educator" || role === "campus_admin" || role === "homeschool_parent";
-  let steps = isEducator ? [...EDUCATOR_STEPS] : [...STUDENT_STEPS];
+  let steps: TourStep[];
+
+  switch (role) {
+    case "system_admin":
+    case "site_admin":
+      steps = [...SYSTEM_ADMIN_STEPS];
+      break;
+    case "district_admin":
+      steps = [...DISTRICT_ADMIN_STEPS];
+      break;
+    case "campus_admin":
+      steps = [...CAMPUS_ADMIN_STEPS];
+      break;
+    case "homeschool_parent":
+      steps = [...HOMESCHOOL_PARENT_STEPS];
+      break;
+    case "educator":
+      steps = [...EDUCATOR_STEPS];
+      break;
+    default:
+      steps = [...STUDENT_STEPS];
+      break;
+  }
 
   if (primaryGoal) {
     const goalPriority: Record<string, string[]> = {
-      discover: ["be-discovery", "be-strengths", "be-portfolio"],
-      career: ["know-careers", "know-scholarships", "know-mentors"],
-      lessons: ["lesson-generator", "my-lessons", "scope-sequence"],
-      curriculum: ["scope-sequence", "lesson-generator", "analytics"],
+      discover: ["be-discovery", "be-strengths", "be-portfolio", "be-essay", "be-milestones"],
+      career: ["know-careers", "know-scholarships", "know-mentors", "know-resources"],
+      lessons: ["lesson-generator", "my-lessons", "scope-sequence", "assessments"],
+      curriculum: ["scope-sequence", "lesson-generator", "analytics", "gradebook"],
     };
 
     const prioritized = goalPriority[primaryGoal] || [];
