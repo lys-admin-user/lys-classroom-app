@@ -2887,3 +2887,61 @@ export const insertPricingTierSchema = createInsertSchema(pricingTiers).omit({ i
 export type InsertPricingTier = z.infer<typeof insertPricingTierSchema>;
 export type PricingTier = typeof pricingTiers.$inferSelect;
 
+export const contentReviewQueue = pgTable("content_review_queue", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  contentType: varchar("content_type").notNull(),
+  contentId: varchar("content_id"),
+  sourceUserId: varchar("source_user_id").notNull(),
+  sourceUserRole: varchar("source_user_role"),
+  organizationId: varchar("organization_id"),
+  content: text("content").notNull(),
+  context: text("context"),
+  flaggedKeywords: jsonb("flagged_keywords").$type<string[]>().default([]),
+  severity: varchar("severity").notNull().default("medium"),
+  status: varchar("status").notNull().default("pending_review"),
+  reviewedBy: varchar("reviewed_by"),
+  reviewedAt: timestamp("reviewed_at"),
+  reviewAction: varchar("review_action"),
+  reviewNotes: text("review_notes"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertContentReviewSchema = createInsertSchema(contentReviewQueue).omit({ id: true, createdAt: true, reviewedAt: true });
+export type InsertContentReview = z.infer<typeof insertContentReviewSchema>;
+export type ContentReview = typeof contentReviewQueue.$inferSelect;
+
+export const parentalConsents = pgTable("parental_consents", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  studentUserId: varchar("student_user_id").notNull(),
+  parentEmail: varchar("parent_email").notNull(),
+  parentName: varchar("parent_name"),
+  consentStatus: varchar("consent_status").notNull().default("pending"),
+  verificationToken: varchar("verification_token"),
+  consentedAt: timestamp("consented_at"),
+  expiresAt: timestamp("expires_at"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertParentalConsentSchema = createInsertSchema(parentalConsents).omit({ id: true, createdAt: true });
+export type InsertParentalConsent = z.infer<typeof insertParentalConsentSchema>;
+export type ParentalConsent = typeof parentalConsents.$inferSelect;
+
+export const auditLogs = pgTable("audit_logs", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id"),
+  action: varchar("action").notNull(),
+  category: varchar("category").notNull(),
+  severity: varchar("severity").notNull().default("info"),
+  resourceType: varchar("resource_type"),
+  resourceId: varchar("resource_id"),
+  details: jsonb("details").$type<Record<string, any>>(),
+  ipAddress: varchar("ip_address"),
+  userAgent: text("user_agent"),
+  organizationId: varchar("organization_id"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertAuditLogSchema = createInsertSchema(auditLogs).omit({ id: true, createdAt: true });
+export type InsertAuditLog = z.infer<typeof insertAuditLogSchema>;
+export type AuditLog = typeof auditLogs.$inferSelect;
+

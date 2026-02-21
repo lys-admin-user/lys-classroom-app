@@ -35,6 +35,7 @@ export function getSession() {
     cookie: {
       httpOnly: true,
       secure: true,
+      sameSite: "lax",
       maxAge: sessionTtl,
     },
   });
@@ -74,7 +75,18 @@ export async function setupAuth(app: Express) {
   ) => {
     const user = {};
     updateUserSession(user, tokens);
-    await upsertUser(tokens.claims());
+    const claims = tokens.claims();
+    await upsertUser(claims);
+    try {
+      const { logAuditEvent } = await import("../../../server/services/auditLog");
+      await logAuditEvent({
+        userId: claims?.sub as string,
+        action: "login_success",
+        category: "auth",
+        severity: "info",
+        details: { method: "replit_oidc" },
+      });
+    } catch {}
     verified(null, user);
   };
 

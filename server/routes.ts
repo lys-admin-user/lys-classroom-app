@@ -36,6 +36,9 @@ import {
   savedCareers,
   scopeSequences,
   assignments,
+  contentReviewQueue as contentReviewQueueTable,
+  parentalConsents as parentalConsentsTable,
+  auditLogs as auditLogsTable,
 } from "@shared/schema";
 import { z } from "zod";
 import { setupAuth, registerAuthRoutes, isAuthenticated } from "./replit_integrations/auth";
@@ -48,7 +51,9 @@ import { createPaypalOrder, capturePaypalOrder, loadPaypalDefault, isPayPalConfi
 import * as hubspotService from "./services/hubspotService";
 import * as wordpressService from "./services/wordpressService";
 import { db } from "./db";
-import { eq, desc, sql as drizzleSql } from "drizzle-orm";
+import { logAuditEvent, getAuditLogs, getClientIP } from "./services/auditLog";
+import { filterChatMessage } from "./services/contentFilter";
+import { eq, desc, and, sql as drizzleSql } from "drizzle-orm";
 
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 10 * 1024 * 1024 } });
 
@@ -272,6 +277,33 @@ export async function registerRoutes(
     try {
       const userId = req.user?.claims?.sub;
       const validated = generateLessonRequestSchema.parse(req.body);
+      
+      const user = await storage.getUser(userId);
+      const topicCheck = filterChatMessage(validated.topic, user?.role || "student");
+      if (topicCheck.autoBlock) {
+        res.status(400).json({ error: "Content not allowed", flagged: true });
+        return;
+      }
+      if (topicCheck.requiresReview) {
+        await db.insert(contentReviewQueueTable).values({
+          contentType: "lesson_topic",
+          sourceUserId: userId,
+          sourceUserRole: user?.role || "unknown",
+          content: validated.topic,
+          flaggedKeywords: topicCheck.matchedKeywords,
+          severity: topicCheck.severity,
+          status: "pending_review",
+        });
+      }
+      
+      await logAuditEvent({
+        userId,
+        action: "lesson_generate",
+        category: "ai_usage",
+        severity: "info",
+        details: { topic: validated.topic, gradeLevel: validated.gradeLevel },
+        ipAddress: getClientIP(req),
+      });
       
       const tier = await storage.getUserTier(userId);
       if (tier === "free") {
@@ -11716,6 +11748,317 @@ export async function registerRoutes(
       res.json(connection);
     } catch (e) {
       res.status(500).json({ error: "Failed to update connection" });
+    }
+  });
+
+  // ============ Safety Suite & Content Moderation Routes ============
+
+  app.get("/api/admin/review-queue", isAuthenticated, requireSiteAdmin, async (req: any, res) => {
+    try {
+      const { status, severity, limit, offset } = req.query;
+      const items = await db.select().from(contentReviewQueueTable)
+        .where(status ? eq(contentReviewQueueTable.status, status as string) : undefined)
+        .orderBy(desc(contentReviewQueueTable.createdAt))
+        .limit(parseInt(limit as string) || 50)
+        .offset(parseInt(offset as string) || 0);
+      
+      const total = await db.select({ count: drizzleSql<number>`count(*)` })
+        .from(contentReviewQueueTable)
+        .where(status ? eq(contentReviewQueueTable.status, status as string) : undefined);
+      
+      res.json({ items, total: total[0]?.count || 0 });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch review queue" });
+    }
+  });
+
+  app.get("/api/admin/review-queue/stats", isAuthenticated, requireSiteAdmin, async (req: any, res) => {
+    try {
+      const pending = await db.select({ count: drizzleSql<number>`count(*)` })
+        .from(contentReviewQueueTable).where(eq(contentReviewQueueTable.status, "pending_review"));
+      const approved = await db.select({ count: drizzleSql<number>`count(*)` })
+        .from(contentReviewQueueTable).where(eq(contentReviewQueueTable.status, "approved"));
+      const rejected = await db.select({ count: drizzleSql<number>`count(*)` })
+        .from(contentReviewQueueTable).where(eq(contentReviewQueueTable.status, "rejected"));
+      const high = await db.select({ count: drizzleSql<number>`count(*)` })
+        .from(contentReviewQueueTable)
+        .where(and(eq(contentReviewQueueTable.severity, "high"), eq(contentReviewQueueTable.status, "pending_review")));
+      
+      res.json({
+        pending: pending[0]?.count || 0,
+        approved: approved[0]?.count || 0,
+        rejected: rejected[0]?.count || 0,
+        highSeverityPending: high[0]?.count || 0,
+      });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch review stats" });
+    }
+  });
+
+  app.patch("/api/admin/review-queue/:id", isAuthenticated, requireSiteAdmin, async (req: any, res) => {
+    try {
+      const { id } = req.params;
+      const userId = req.user?.claims?.sub;
+      const { action, notes } = req.body;
+      
+      if (!["approved", "rejected", "archived"].includes(action)) {
+        res.status(400).json({ error: "Invalid action" });
+        return;
+      }
+      
+      const [updated] = await db.update(contentReviewQueueTable)
+        .set({
+          status: action,
+          reviewedBy: userId,
+          reviewedAt: new Date(),
+          reviewAction: action,
+          reviewNotes: notes || null,
+        })
+        .where(eq(contentReviewQueueTable.id, id))
+        .returning();
+      
+      if (!updated) {
+        res.status(404).json({ error: "Review item not found" });
+        return;
+      }
+      
+      await logAuditEvent({
+        userId,
+        action: `content_review_${action}`,
+        category: "content_moderation",
+        severity: action === "rejected" ? "warning" : "info",
+        resourceType: "content_review",
+        resourceId: id,
+        details: { reviewAction: action, notes },
+        ipAddress: getClientIP(req),
+      });
+      
+      res.json(updated);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to update review item" });
+    }
+  });
+
+  app.post("/api/admin/review-queue/bulk", isAuthenticated, requireSiteAdmin, async (req: any, res) => {
+    try {
+      const userId = req.user?.claims?.sub;
+      const { ids, action, notes } = req.body;
+      
+      if (!Array.isArray(ids) || ids.length === 0) {
+        res.status(400).json({ error: "No items selected" });
+        return;
+      }
+      if (!["approved", "rejected", "archived"].includes(action)) {
+        res.status(400).json({ error: "Invalid action" });
+        return;
+      }
+      
+      let updated = 0;
+      for (const id of ids) {
+        const [result] = await db.update(contentReviewQueueTable)
+          .set({
+            status: action,
+            reviewedBy: userId,
+            reviewedAt: new Date(),
+            reviewAction: action,
+            reviewNotes: notes || null,
+          })
+          .where(eq(contentReviewQueueTable.id, id))
+          .returning();
+        if (result) updated++;
+      }
+      
+      await logAuditEvent({
+        userId,
+        action: `bulk_content_review_${action}`,
+        category: "content_moderation",
+        severity: "info",
+        details: { count: updated, action, ids },
+        ipAddress: getClientIP(req),
+      });
+      
+      res.json({ updated, total: ids.length });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to bulk update review items" });
+    }
+  });
+
+  // ============ Audit Log Routes ============
+
+  app.get("/api/admin/audit-logs", isAuthenticated, requireSiteAdmin, async (req: any, res) => {
+    try {
+      const { category, severity, userId, startDate, endDate, limit, offset } = req.query;
+      const logs = await getAuditLogs({
+        category: category as string,
+        severity: severity as string,
+        userId: userId as string,
+        startDate: startDate ? new Date(startDate as string) : undefined,
+        endDate: endDate ? new Date(endDate as string) : undefined,
+        limit: parseInt(limit as string) || 100,
+        offset: parseInt(offset as string) || 0,
+      });
+      res.json(logs);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch audit logs" });
+    }
+  });
+
+  // ============ Parental Consent Routes ============
+
+  app.get("/api/parental-consent/status", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user?.claims?.sub;
+      const [consent] = await db.select().from(parentalConsentsTable)
+        .where(eq(parentalConsentsTable.studentUserId, userId))
+        .orderBy(desc(parentalConsentsTable.createdAt))
+        .limit(1);
+      
+      res.json({
+        hasConsent: consent?.consentStatus === "approved",
+        status: consent?.consentStatus || "none",
+        parentEmail: consent?.parentEmail || null,
+      });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to check consent status" });
+    }
+  });
+
+  app.post("/api/parental-consent/request", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user?.claims?.sub;
+      const { parentEmail, parentName } = req.body;
+      
+      if (!parentEmail || !parentEmail.includes("@")) {
+        res.status(400).json({ error: "Valid parent email is required" });
+        return;
+      }
+      
+      const token = randomUUID();
+      const expiresAt = new Date();
+      expiresAt.setDate(expiresAt.getDate() + 7);
+      
+      const [consent] = await db.insert(parentalConsentsTable).values({
+        studentUserId: userId,
+        parentEmail,
+        parentName: parentName || null,
+        consentStatus: "pending",
+        verificationToken: token,
+        expiresAt,
+      }).returning();
+      
+      await logAuditEvent({
+        userId,
+        action: "parental_consent_requested",
+        category: "auth",
+        severity: "info",
+        details: { parentEmail, consentId: consent.id },
+        ipAddress: getClientIP(req),
+      });
+      
+      res.json({ 
+        success: true, 
+        message: "Consent request created. Parent will need to verify.",
+        consentId: consent.id,
+      });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to request parental consent" });
+    }
+  });
+
+  app.post("/api/parental-consent/verify/:token", async (req: any, res) => {
+    try {
+      const { token } = req.params;
+      
+      const [consent] = await db.select().from(parentalConsentsTable)
+        .where(eq(parentalConsentsTable.verificationToken, token));
+      
+      if (!consent) {
+        res.status(404).json({ error: "Invalid or expired consent token" });
+        return;
+      }
+      
+      if (consent.expiresAt && new Date() > consent.expiresAt) {
+        res.status(410).json({ error: "Consent request has expired" });
+        return;
+      }
+      
+      const [updated] = await db.update(parentalConsentsTable)
+        .set({
+          consentStatus: "approved",
+          consentedAt: new Date(),
+          verificationToken: null,
+        })
+        .where(eq(parentalConsentsTable.id, consent.id))
+        .returning();
+      
+      await logAuditEvent({
+        userId: consent.studentUserId,
+        action: "parental_consent_verified",
+        category: "auth",
+        severity: "info",
+        details: { consentId: consent.id, parentEmail: consent.parentEmail },
+      });
+      
+      res.json({ success: true, message: "Parental consent verified successfully." });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to verify consent" });
+    }
+  });
+
+  app.get("/api/admin/parental-consents", isAuthenticated, requireSiteAdmin, async (req: any, res) => {
+    try {
+      const consents = await db.select().from(parentalConsentsTable)
+        .orderBy(desc(parentalConsentsTable.createdAt))
+        .limit(100);
+      res.json(consents);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch consents" });
+    }
+  });
+
+  // ============ Content Filter Check (used internally) ============
+
+  app.post("/api/content/check", isAuthenticated, async (req: any, res) => {
+    try {
+      const { content, contentType } = req.body;
+      const userId = req.user?.claims?.sub;
+      
+      if (!content) {
+        res.status(400).json({ error: "Content is required" });
+        return;
+      }
+      
+      const user = await storage.getUser(userId);
+      const result = filterChatMessage(content, user?.role || "student");
+      
+      if (result.requiresReview) {
+        await db.insert(contentReviewQueueTable).values({
+          contentType: contentType || "message",
+          sourceUserId: userId,
+          sourceUserRole: user?.role || "unknown",
+          content: content.substring(0, 5000),
+          flaggedKeywords: result.matchedKeywords,
+          severity: result.severity,
+          status: result.autoBlock ? "auto_blocked" : "pending_review",
+        });
+        
+        await logAuditEvent({
+          userId,
+          action: "content_flagged",
+          category: "content_moderation",
+          severity: result.severity === "high" ? "warning" : "info",
+          details: { contentType, keywords: result.matchedKeywords, severity: result.severity },
+          ipAddress: getClientIP(req),
+        });
+      }
+      
+      res.json({
+        allowed: !result.autoBlock,
+        flagged: result.flagged,
+        severity: result.severity,
+      });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to check content" });
     }
   });
 

@@ -7,6 +7,7 @@ import { calculateLessonQualityScore, getQualityLevel } from "./lessonQualitySco
 import { storage } from "./storage";
 import { db } from "./db";
 import { eq, sql } from "drizzle-orm";
+import { sanitizePromptText } from "./services/piiSanitizer";
 
 function generateCacheKey(request: GenerateLessonRequest): string {
   const normalizedParts = [
@@ -185,10 +186,14 @@ IMPORTANT: Respond ONLY with a valid JSON object, no additional text.`;
   const subject = request.course || request.topic;
   const masterExamples = await getMasterLessonExamples(subject, request.gradeLevel);
 
+  const safeTopic = sanitizePromptText(request.topic);
+  const safeCourse = request.course ? sanitizePromptText(request.course) : "";
+  const safeUnit = request.unit ? sanitizePromptText(request.unit) : "";
+
   const userPrompt = `Create a complete lesson plan with these specifications:
-- Topic: ${request.topic}
-${request.course ? `- Course: ${request.course}` : ""}
-${request.unit ? `- Unit: ${request.unit}` : ""}
+- Topic: ${safeTopic}
+${safeCourse ? `- Course: ${safeCourse}` : ""}
+${safeUnit ? `- Unit: ${safeUnit}` : ""}
 - Grade Level: ${request.gradeLevel}
 - Primary Focus: ${request.bkdFocus.toUpperCase()} (${bkdDescriptions[request.bkdFocus]})
 - Duration: ${request.duration}

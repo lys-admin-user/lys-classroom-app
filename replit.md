@@ -18,7 +18,7 @@ Preferred communication style: Simple, everyday language.
 -   **Backend**: Express.js with TypeScript, RESTful JSON API, and Zod for validation.
 -   **Data Layer**: PostgreSQL database managed by Drizzle ORM.
 -   **Authentication**: Replit Auth with `express-session` and PostgreSQL for session storage.
--   **Security**: Input validation, ownership checks, and server-side regeneration of critical IDs.
+-   **Security**: Input validation, ownership checks, server-side regeneration of critical IDs, Helmet security headers, rate limiting (express-rate-limit), PII stripping before AI calls, content keyword filtering, audit logging, and parental consent (COPPA) system.
 -   **Monorepo Structure**: `/client`, `/server`, and `/shared` directories.
 -   **AI Integration**: OpenAI API for AI-driven features, with mock data fallback.
 -   **Real-Time Collaboration**: WebSocket server for live cursor positions, presence, and chat.

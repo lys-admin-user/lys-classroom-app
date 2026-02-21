@@ -865,6 +865,10 @@ export default function SystemAdminPage() {
             <Activity className="h-4 w-4" />
             <span className="hidden sm:inline">User Analytics</span>
           </TabsTrigger>
+          <TabsTrigger value="safety" className="gap-2" data-testid="tab-safety">
+            <Shield className="h-4 w-4" />
+            <span className="hidden sm:inline">Safety Suite</span>
+          </TabsTrigger>
         </TabsList>
 
         <TabsContent value="overview" className="space-y-6">
@@ -3130,6 +3134,10 @@ export default function SystemAdminPage() {
             </>
           ) : null}
         </TabsContent>
+
+        <TabsContent value="safety" className="space-y-6">
+          <SafetySuiteTab />
+        </TabsContent>
       </Tabs>
     </div>
   );
@@ -3749,6 +3757,411 @@ function BlsSyncSection() {
               BLS data is updated annually. The sync fetches the latest available data from the public BLS API 
               and updates career salary and outlook information in the platform.
             </p>
+          </div>
+        </CardContent>
+      </Card>
+    </>
+  );
+}
+
+function SafetySuiteTab() {
+  const { toast } = useToast();
+  const [reviewFilter, setReviewFilter] = useState<string>("pending_review");
+  const [selectedItems, setSelectedItems] = useState<string[]>([]);
+  const [auditCategory, setAuditCategory] = useState<string>("all");
+
+  const { data: reviewStats } = useQuery<{
+    pending: number;
+    approved: number;
+    rejected: number;
+    highSeverityPending: number;
+  }>({
+    queryKey: ["/api/admin/review-queue/stats"],
+  });
+
+  const { data: reviewQueue, isLoading: queueLoading } = useQuery<{
+    items: any[];
+    total: number;
+  }>({
+    queryKey: ["/api/admin/review-queue", reviewFilter],
+    queryFn: async () => {
+      const res = await fetch(`/api/admin/review-queue?status=${reviewFilter}&limit=50`, { credentials: "include" });
+      if (!res.ok) throw new Error("Failed to fetch");
+      return res.json();
+    },
+  });
+
+  const { data: auditLogs, isLoading: auditLoading } = useQuery<any[]>({
+    queryKey: ["/api/admin/audit-logs", auditCategory],
+    queryFn: async () => {
+      const params = auditCategory !== "all" ? `?category=${auditCategory}&limit=50` : "?limit=50";
+      const res = await fetch(`/api/admin/audit-logs${params}`, { credentials: "include" });
+      if (!res.ok) throw new Error("Failed to fetch");
+      return res.json();
+    },
+  });
+
+  const reviewMutation = useMutation({
+    mutationFn: async ({ id, action, notes }: { id: string; action: string; notes?: string }) => {
+      const res = await apiRequest("PATCH", `/api/admin/review-queue/${id}`, { action, notes });
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/review-queue"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/review-queue/stats"] });
+      toast({ title: "Review updated" });
+    },
+  });
+
+  const bulkReviewMutation = useMutation({
+    mutationFn: async ({ ids, action }: { ids: string[]; action: string }) => {
+      const res = await apiRequest("POST", "/api/admin/review-queue/bulk", { ids, action });
+      return res.json();
+    },
+    onSuccess: (data: any) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/review-queue"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/review-queue/stats"] });
+      setSelectedItems([]);
+      toast({ title: `${data.updated} items updated` });
+    },
+  });
+
+  const severityColors: Record<string, string> = {
+    high: "bg-red-500/10 text-red-700 dark:text-red-400 border-red-500/30",
+    medium: "bg-amber-500/10 text-amber-700 dark:text-amber-400 border-amber-500/30",
+    low: "bg-blue-500/10 text-blue-700 dark:text-blue-400 border-blue-500/30",
+  };
+
+  return (
+    <>
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+        <Card>
+          <CardContent className="p-4">
+            <div className="flex items-center gap-2">
+              <AlertTriangle className="h-5 w-5 text-amber-600" />
+              <div>
+                <p className="text-2xl font-bold font-oswald">{reviewStats?.pending || 0}</p>
+                <p className="text-sm text-muted-foreground font-roboto">Pending Review</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="p-4">
+            <div className="flex items-center gap-2">
+              <AlertTriangle className="h-5 w-5 text-red-600" />
+              <div>
+                <p className="text-2xl font-bold font-oswald">{reviewStats?.highSeverityPending || 0}</p>
+                <p className="text-sm text-muted-foreground font-roboto">High Severity</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="p-4">
+            <div className="flex items-center gap-2">
+              <Check className="h-5 w-5 text-green-600" />
+              <div>
+                <p className="text-2xl font-bold font-oswald">{reviewStats?.approved || 0}</p>
+                <p className="text-sm text-muted-foreground font-roboto">Approved</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="p-4">
+            <div className="flex items-center gap-2">
+              <X className="h-5 w-5 text-red-600" />
+              <div>
+                <p className="text-2xl font-bold font-oswald">{reviewStats?.rejected || 0}</p>
+                <p className="text-sm text-muted-foreground font-roboto">Rejected</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      <Card>
+        <CardHeader>
+          <div className="flex items-center justify-between">
+            <div>
+              <CardTitle className="font-oswald">Content Review Queue</CardTitle>
+              <CardDescription className="font-roboto">
+                Flagged content requiring administrator review
+              </CardDescription>
+            </div>
+            <div className="flex items-center gap-2">
+              {selectedItems.length > 0 && (
+                <>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => bulkReviewMutation.mutate({ ids: selectedItems, action: "approved" })}
+                    disabled={bulkReviewMutation.isPending}
+                    data-testid="button-bulk-approve"
+                  >
+                    <Check className="h-4 w-4 mr-1" /> Approve ({selectedItems.length})
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="text-red-600"
+                    onClick={() => bulkReviewMutation.mutate({ ids: selectedItems, action: "rejected" })}
+                    disabled={bulkReviewMutation.isPending}
+                    data-testid="button-bulk-reject"
+                  >
+                    <X className="h-4 w-4 mr-1" /> Reject ({selectedItems.length})
+                  </Button>
+                </>
+              )}
+              <Select value={reviewFilter} onValueChange={setReviewFilter}>
+                <SelectTrigger className="w-[180px]" data-testid="select-review-filter">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="pending_review">Pending Review</SelectItem>
+                  <SelectItem value="approved">Approved</SelectItem>
+                  <SelectItem value="rejected">Rejected</SelectItem>
+                  <SelectItem value="auto_blocked">Auto-Blocked</SelectItem>
+                  <SelectItem value="archived">Archived</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+        </CardHeader>
+        <CardContent>
+          {queueLoading ? (
+            <div className="flex items-center justify-center py-8">
+              <Loader2 className="h-6 w-6 animate-spin" />
+            </div>
+          ) : !reviewQueue?.items?.length ? (
+            <div className="text-center py-8 text-muted-foreground font-roboto">
+              <Shield className="h-12 w-12 mx-auto mb-3 opacity-30" />
+              <p>No items in the {reviewFilter.replace("_", " ")} queue</p>
+              <p className="text-sm mt-1">Content flagged by the keyword filter will appear here</p>
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {reviewQueue.items.map((item: any) => (
+                <div
+                  key={item.id}
+                  className="border rounded-lg p-4 space-y-2"
+                  data-testid={`review-item-${item.id}`}
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="flex items-start gap-3 flex-1">
+                      <input
+                        type="checkbox"
+                        className="mt-1"
+                        checked={selectedItems.includes(item.id)}
+                        onChange={(e) => {
+                          setSelectedItems(prev =>
+                            e.target.checked
+                              ? [...prev, item.id]
+                              : prev.filter(id => id !== item.id)
+                          );
+                        }}
+                        data-testid={`checkbox-review-${item.id}`}
+                      />
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 mb-1">
+                          <Badge className={`text-xs ${severityColors[item.severity] || ""}`}>
+                            {item.severity}
+                          </Badge>
+                          <Badge variant="outline" className="text-xs">
+                            {item.contentType}
+                          </Badge>
+                          <span className="text-xs text-muted-foreground font-roboto">
+                            {new Date(item.createdAt).toLocaleDateString()}
+                          </span>
+                        </div>
+                        <p className="text-sm font-roboto line-clamp-3">{item.content}</p>
+                        {item.flaggedKeywords?.length > 0 && (
+                          <div className="flex gap-1 mt-2 flex-wrap">
+                            {item.flaggedKeywords.map((kw: string, i: number) => (
+                              <Badge key={i} variant="destructive" className="text-xs">
+                                {kw}
+                              </Badge>
+                            ))}
+                          </div>
+                        )}
+                        {item.context && (
+                          <p className="text-xs text-muted-foreground mt-1 font-roboto">Context: {item.context}</p>
+                        )}
+                      </div>
+                    </div>
+                    {item.status === "pending_review" && (
+                      <div className="flex gap-1 shrink-0">
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => reviewMutation.mutate({ id: item.id, action: "approved" })}
+                          disabled={reviewMutation.isPending}
+                          data-testid={`button-approve-${item.id}`}
+                        >
+                          <Check className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="text-red-600"
+                          onClick={() => reviewMutation.mutate({ id: item.id, action: "rejected" })}
+                          disabled={reviewMutation.isPending}
+                          data-testid={`button-reject-${item.id}`}
+                        >
+                          <X className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          onClick={() => reviewMutation.mutate({ id: item.id, action: "archived" })}
+                          disabled={reviewMutation.isPending}
+                          data-testid={`button-archive-${item.id}`}
+                        >
+                          Archive
+                        </Button>
+                      </div>
+                    )}
+                    {item.reviewedBy && (
+                      <span className="text-xs text-muted-foreground font-roboto">
+                        Reviewed {new Date(item.reviewedAt).toLocaleDateString()}
+                      </span>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <div className="flex items-center justify-between">
+            <div>
+              <CardTitle className="font-oswald">Audit Log</CardTitle>
+              <CardDescription className="font-roboto">
+                Security events and administrative actions
+              </CardDescription>
+            </div>
+            <Select value={auditCategory} onValueChange={setAuditCategory}>
+              <SelectTrigger className="w-[180px]" data-testid="select-audit-category">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Categories</SelectItem>
+                <SelectItem value="auth">Authentication</SelectItem>
+                <SelectItem value="admin_action">Admin Actions</SelectItem>
+                <SelectItem value="content_moderation">Content Moderation</SelectItem>
+                <SelectItem value="security">Security</SelectItem>
+                <SelectItem value="ai_usage">AI Usage</SelectItem>
+                <SelectItem value="data_modify">Data Changes</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+        </CardHeader>
+        <CardContent>
+          {auditLoading ? (
+            <div className="flex items-center justify-center py-8">
+              <Loader2 className="h-6 w-6 animate-spin" />
+            </div>
+          ) : !auditLogs?.length ? (
+            <div className="text-center py-8 text-muted-foreground font-roboto">
+              <FileText className="h-12 w-12 mx-auto mb-3 opacity-30" />
+              <p>No audit log entries yet</p>
+              <p className="text-sm mt-1">Security events will be recorded here as users interact with the platform</p>
+            </div>
+          ) : (
+            <div className="space-y-2 max-h-[500px] overflow-y-auto">
+              {auditLogs.map((log: any) => (
+                <div
+                  key={log.id}
+                  className="flex items-start gap-3 p-3 border rounded-md text-sm"
+                  data-testid={`audit-log-${log.id}`}
+                >
+                  <div className={`w-2 h-2 rounded-full mt-1.5 shrink-0 ${
+                    log.severity === "critical" ? "bg-red-500" :
+                    log.severity === "warning" ? "bg-amber-500" : "bg-green-500"
+                  }`} />
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="font-medium font-roboto">{log.action.replace(/_/g, " ")}</span>
+                      <Badge variant="outline" className="text-xs">{log.category}</Badge>
+                      {log.severity !== "info" && (
+                        <Badge className={`text-xs ${log.severity === "critical" ? "bg-red-100 text-red-700" : "bg-amber-100 text-amber-700"}`}>
+                          {log.severity}
+                        </Badge>
+                      )}
+                    </div>
+                    <div className="text-xs text-muted-foreground mt-1 font-roboto">
+                      {log.userId && <span>User: {log.userId} · </span>}
+                      {log.ipAddress && <span>IP: {log.ipAddress} · </span>}
+                      <span>{new Date(log.createdAt).toLocaleString()}</span>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="font-oswald">Safety Features Status</CardTitle>
+          <CardDescription className="font-roboto">Current security and safety measures</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {[
+              { label: "Content Keyword Filter", status: "Active", description: "Scans messages for harmful content" },
+              { label: "PII Stripping for AI", status: "Active", description: "Removes personal data before AI processing" },
+              { label: "Rate Limiting", status: "Active", description: "200 req/15min API, 5 req/min AI generation" },
+              { label: "Security Headers (Helmet)", status: "Active", description: "XSS, clickjacking, MIME-type protection" },
+              { label: "COPPA Ad Filtering", status: "Active", description: "No ads for students K-7 grade" },
+              { label: "Parental Consent System", status: "Active", description: "Under-13 accounts require parent verification" },
+              { label: "Audit Logging", status: "Active", description: "All security events are recorded" },
+              { label: "Role-Based Access Control", status: "Active", description: "7-role hierarchical permission system" },
+              { label: "Session Security", status: "Active", description: "HTTP-only cookies with secure flag" },
+              { label: "Input Validation", status: "Active", description: "Zod schema validation on all API inputs" },
+            ].map((feature, i) => (
+              <div key={i} className="flex items-start gap-3 p-3 border rounded-lg">
+                <div className="w-2 h-2 rounded-full bg-green-500 mt-1.5 shrink-0" />
+                <div>
+                  <p className="font-medium font-roboto text-sm">{feature.label}</p>
+                  <p className="text-xs text-muted-foreground font-roboto">{feature.description}</p>
+                </div>
+                <Badge variant="outline" className="ml-auto text-xs text-green-700 border-green-300 shrink-0">
+                  {feature.status}
+                </Badge>
+              </div>
+            ))}
+          </div>
+
+          <Separator className="my-4" />
+
+          <div className="p-4 bg-amber-50 dark:bg-amber-900/20 rounded-lg border border-amber-200 dark:border-amber-800">
+            <h4 className="font-semibold font-oswald mb-2 flex items-center gap-2">
+              <AlertTriangle className="h-4 w-4 text-amber-600" />
+              Self-Hosting Security Checklist
+            </h4>
+            <p className="text-sm text-muted-foreground font-roboto mb-2">
+              When moving to your own infrastructure, ensure these additional measures are in place:
+            </p>
+            <ul className="text-sm space-y-1 text-muted-foreground font-roboto">
+              <li>• SSL/TLS certificates (Let's Encrypt or commercial CA)</li>
+              <li>• Database encryption at rest and in transit</li>
+              <li>• Environment variable / secrets management (HashiCorp Vault, AWS Secrets Manager)</li>
+              <li>• WAF (Web Application Firewall) for DDoS and injection protection</li>
+              <li>• Separate auth provider (Clerk, Auth0) with MFA support</li>
+              <li>• Row-Level Security (RLS) on PostgreSQL for tenant isolation</li>
+              <li>• GDPR/NDPR data residency compliance for international regions</li>
+              <li>• Automated security scanning (OWASP ZAP, Snyk)</li>
+              <li>• Backup and disaster recovery with tested restore procedures</li>
+              <li>• VPN guardrail to prevent GeoIP pricing spoofing</li>
+              <li>• Log aggregation service (Datadog, Elastic, CloudWatch)</li>
+              <li>• Penetration testing before production launch</li>
+            </ul>
           </div>
         </CardContent>
       </Card>

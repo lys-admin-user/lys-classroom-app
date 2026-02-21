@@ -1,9 +1,8 @@
 import { users, type User, type UpsertUser } from "@shared/models/auth";
 import { db } from "../../db";
 import { eq, sql } from "drizzle-orm";
+import { logAuditEvent } from "../../services/auditLog";
 
-// Interface for auth storage operations
-// (IMPORTANT) These user operations are mandatory for Replit Auth.
 export interface IAuthStorage {
   getUser(id: string): Promise<User | undefined>;
   upsertUser(user: UpsertUser): Promise<User>;
@@ -29,6 +28,15 @@ class AuthStorage implements IAuthStorage {
         },
       })
       .returning();
+
+    logAuditEvent({
+      userId: user.id,
+      action: "user_login",
+      category: "auth",
+      severity: "info",
+      details: { email: userData.email, method: "replit_auth" },
+    }).catch(() => {});
+
     return user;
   }
 }
