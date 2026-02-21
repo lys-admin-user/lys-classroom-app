@@ -11934,6 +11934,206 @@ export async function registerRoutes(
     }
   });
 
+  // ============ Org-Admin Self-Service Routes (Campus/District Admins) ============
+
+  const verifyOrgAdminAccess = async (userId: string, orgId: string): Promise<boolean> => {
+    const user = await storage.getUser(userId);
+    if (!user) return false;
+    const isSiteAdminUser = await storage.isSiteAdmin(userId);
+    if (isSiteAdminUser) return true;
+    const membership = await storage.getOrgMembership(orgId, userId);
+    if (membership && (membership.role === "admin" || membership.role === "owner")) return true;
+    if (user.role === "district_admin") {
+      const userOrgs = await storage.getUserOrganizations(userId);
+      for (const uOrg of userOrgs) {
+        const children = await storage.getChildOrganizations(uOrg.organizationId);
+        if (children.some(c => c.id === orgId)) return true;
+      }
+    }
+    return false;
+  };
+
+  const getAdminManagedOrgIds = async (userId: string): Promise<string[]> => {
+    const user = await storage.getUser(userId);
+    if (!user) return [];
+    const memberships = await storage.getUserOrganizations(userId);
+    const orgIds = memberships.map(m => m.organizationId);
+    if (user.role === "district_admin") {
+      for (const m of memberships) {
+        const children = await storage.getChildOrganizations(m.organizationId);
+        children.forEach(c => { if (!orgIds.includes(c.id)) orgIds.push(c.id); });
+      }
+    }
+    return orgIds;
+  };
+
+  app.get("/api/org-admin/my-orgs", isAuthenticated, requireCampusAdmin, async (req: any, res) => {
+    try {
+      const userId = req.user?.claims?.sub;
+      const orgIds = await getAdminManagedOrgIds(userId);
+      const orgs = await Promise.all(orgIds.map(id => storage.getOrganization(id)));
+      res.json(orgs.filter(Boolean));
+    } catch (error) {
+      console.error("Get admin orgs error:", error);
+      res.status(500).json({ error: "Failed to fetch organizations" });
+    }
+  });
+
+  app.get("/api/org-admin/orgs/:orgId/members", isAuthenticated, requireCampusAdmin, async (req: any, res) => {
+    try {
+      const userId = req.user?.claims?.sub;
+      const { orgId } = req.params;
+      if (!await verifyOrgAdminAccess(userId, orgId)) {
+        res.status(403).json({ error: "Access denied to this organization" });
+        return;
+      }
+      const members = await storage.getOrganizationMembersWithDetails(orgId);
+      res.json(members);
+    } catch (error) {
+      console.error("Get org members error:", error);
+      res.status(500).json({ error: "Failed to fetch members" });
+    }
+  });
+
+  app.patch("/api/org-admin/orgs/:orgId/members/:memberId/role", isAuthenticated, requireCampusAdmin, async (req: any, res) => {
+    try {
+      const userId = req.user?.claims?.sub;
+      const { orgId, memberId } = req.params;
+      const { orgRole, platformRole } = req.body;
+      if (!await verifyOrgAdminAccess(userId, orgId)) {
+        res.status(403).json({ error: "Access denied to this organization" });
+        return;
+      }
+      if (orgRole && !["member", "admin", "owner"].includes(orgRole)) {
+        res.status(400).json({ error: "Invalid organization role" });
+        return;
+      }
+      const allowedPlatformRoles = ["student", "educator", "homeschool_parent", "campus_admin"];
+      if (platformRole && !allowedPlatformRoles.includes(platformRole)) {
+        res.status(403).json({ error: "Cannot assign site_admin, district_admin, or system_admin roles. Contact system admin." });
+        return;
+      }
+      if (orgRole) {
+        await storage.updateOrgMembership(memberId, { role: orgRole });
+      }
+      if (platformRole) {
+        const membership = await db.select().from(orgMembershipsTable).where(eq(orgMembershipsTable.id, memberId));
+        if (membership[0]) {
+          await db.update(users).set({ role: platformRole, updatedAt: new Date() }).where(eq(users.id, membership[0].userId));
+        }
+      }
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Update member role error:", error);
+      res.status(500).json({ error: "Failed to update member role" });
+    }
+  });
+
+  app.patch("/api/org-admin/orgs/:orgId/members/:memberId/status", isAuthenticated, requireCampusAdmin, async (req: any, res) => {
+    try {
+      const userId = req.user?.claims?.sub;
+      const { orgId, memberId } = req.params;
+      const { status } = req.body;
+      if (!await verifyOrgAdminAccess(userId, orgId)) {
+        res.status(403).json({ error: "Access denied to this organization" });
+        return;
+      }
+      if (!["active", "suspended"].includes(status)) {
+        res.status(400).json({ error: "Status must be 'active' or 'suspended'" });
+        return;
+      }
+      const updated = await storage.updateOrgMembership(memberId, { status });
+      res.json(updated);
+    } catch (error) {
+      console.error("Update member status error:", error);
+      res.status(500).json({ error: "Failed to update member status" });
+    }
+  });
+
+  app.delete("/api/org-admin/orgs/:orgId/members/:memberId", isAuthenticated, requireCampusAdmin, async (req: any, res) => {
+    try {
+      const userId = req.user?.claims?.sub;
+      const { orgId, memberId } = req.params;
+      if (!await verifyOrgAdminAccess(userId, orgId)) {
+        res.status(403).json({ error: "Access denied to this organization" });
+        return;
+      }
+      const membership = await db.select().from(orgMembershipsTable).where(eq(orgMembershipsTable.id, memberId));
+      if (membership[0]?.userId === userId) {
+        res.status(400).json({ error: "Cannot remove yourself from the organization" });
+        return;
+      }
+      await storage.deleteOrgMembership(memberId);
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Remove member error:", error);
+      res.status(500).json({ error: "Failed to remove member" });
+    }
+  });
+
+  app.get("/api/org-admin/orgs/:orgId/settings", isAuthenticated, requireCampusAdmin, async (req: any, res) => {
+    try {
+      const userId = req.user?.claims?.sub;
+      const { orgId } = req.params;
+      if (!await verifyOrgAdminAccess(userId, orgId)) {
+        res.status(403).json({ error: "Access denied to this organization" });
+        return;
+      }
+      const org = await storage.getOrganization(orgId);
+      if (!org) {
+        res.status(404).json({ error: "Organization not found" });
+        return;
+      }
+      res.json(org);
+    } catch (error) {
+      console.error("Get org settings error:", error);
+      res.status(500).json({ error: "Failed to fetch organization settings" });
+    }
+  });
+
+  app.patch("/api/org-admin/orgs/:orgId/settings", isAuthenticated, requireCampusAdmin, async (req: any, res) => {
+    try {
+      const userId = req.user?.claims?.sub;
+      const { orgId } = req.params;
+      if (!await verifyOrgAdminAccess(userId, orgId)) {
+        res.status(403).json({ error: "Access denied to this organization" });
+        return;
+      }
+      const { name, address, city, state, country, zipCode, phone, website, settings } = req.body;
+      const updates: any = {};
+      if (name !== undefined) updates.name = name;
+      if (address !== undefined) updates.address = address;
+      if (city !== undefined) updates.city = city;
+      if (state !== undefined) updates.state = state;
+      if (country !== undefined) updates.country = country;
+      if (zipCode !== undefined) updates.zipCode = zipCode;
+      if (phone !== undefined) updates.phone = phone;
+      if (website !== undefined) updates.website = website;
+      if (settings !== undefined) updates.settings = settings;
+      const updated = await storage.updateOrganization(orgId, updates);
+      res.json(updated);
+    } catch (error) {
+      console.error("Update org settings error:", error);
+      res.status(500).json({ error: "Failed to update organization settings" });
+    }
+  });
+
+  app.get("/api/org-admin/orgs/:orgId/activity", isAuthenticated, requireCampusAdmin, async (req: any, res) => {
+    try {
+      const userId = req.user?.claims?.sub;
+      const { orgId } = req.params;
+      if (!await verifyOrgAdminAccess(userId, orgId)) {
+        res.status(403).json({ error: "Access denied to this organization" });
+        return;
+      }
+      const stats = await storage.getEducatorActivityStats(orgId);
+      res.json(stats);
+    } catch (error) {
+      console.error("Get educator activity error:", error);
+      res.status(500).json({ error: "Failed to fetch educator activity" });
+    }
+  });
+
   // ============ Org-Scoped Safety Routes (Campus/District Admins) ============
 
   const getAdminOrgIds = async (userId: string): Promise<string[]> => {

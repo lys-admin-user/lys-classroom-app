@@ -51,6 +51,7 @@ Preferred communication style: Simple, everyday language.
 -   **Onboarding Tour**: Role-aware guided tour for new users.
 -   **Scholarship & Mentorship System**: Comprehensive scholarship planning, essay builder, strengths inventory, campus activities tracker, and mentor connection features.
 -   **Help Desk**: Searchable knowledge base with 20+ categorized help articles covering common errors (login, AI features, safety, lesson planning, grades, integrations, etc.), quick-link shortcuts, expandable troubleshooting guides, and full article detail views. Accessible to all users via sidebar.
+-   **Org Admin Self-Service**: Campus and district admins can manage their organizations without needing system admin help. Features include: member management (view, invite, change org/platform roles, suspend/reactivate, remove), org settings (name, address, contact info, registration policies), and educator activity monitoring (login counts, lesson/scope creation stats). District admins manage their district org plus all child campus orgs. Role ceiling enforces that org admins can only assign platform roles up to campus_admin. API routes at `/api/org-admin/*` with `verifyOrgAdminAccess()` authorization.
 
 ### Global Architecture
 -   **Educational Hierarchy**: Structured organization of students and classes.

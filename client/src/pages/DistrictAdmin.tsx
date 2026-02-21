@@ -10,10 +10,11 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Switch } from "@/components/ui/switch";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient, apiRequest } from "@/lib/queryClient";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
   School,
   Users,
@@ -36,6 +37,11 @@ import {
   AlertCircle,
   AlertTriangle,
   FileText,
+  Settings,
+  Activity,
+  Ban,
+  PlayCircle,
+  Save,
 } from "lucide-react";
 
 export default function DistrictAdmin() {
@@ -55,8 +61,19 @@ export default function DistrictAdmin() {
   const [selectedMembers, setSelectedMembers] = useState<Set<string>>(new Set());
   const [isBulkDeleteConfirmOpen, setIsBulkDeleteConfirmOpen] = useState(false);
 
+  const [selectedOrgForSettings, setSelectedOrgForSettings] = useState<string>("");
+  const [settingsForm, setSettingsForm] = useState({
+    name: "", address: "", city: "", state: "", country: "", zipCode: "", phone: "", website: "",
+    settings: { allowSelfRegistration: false, requireEmailDomain: false, defaultUserRole: "student" as string },
+  });
+  const [selectedOrgForActivity, setSelectedOrgForActivity] = useState<string>("");
+
   const { data: orgs } = useQuery<any[]>({
     queryKey: ["/api/organizations/mine"],
+  });
+
+  const { data: myAdminOrgs = [] } = useQuery<any[]>({
+    queryKey: ["/api/org-admin/my-orgs"],
   });
 
   const districtOrg = orgs?.find(
@@ -80,16 +97,6 @@ export default function DistrictAdmin() {
     (o: any) => o.type === "school" || o.type === "campus"
   ) || [];
 
-  const { data: orgMembers = [], isLoading: membersLoading } = useQuery<any[]>({
-    queryKey: ["/api/admin/organizations", selectedCampusForPeople, "members"],
-    queryFn: async () => {
-      const res = await fetch(`/api/admin/organizations/${selectedCampusForPeople}/members`);
-      if (!res.ok) throw new Error("Failed");
-      return res.json();
-    },
-    enabled: !!selectedCampusForPeople,
-  });
-
   const { data: orgInvitations = [] } = useQuery<any[]>({
     queryKey: ["/api/admin/organizations", selectedCampusForPeople, "invitations"],
     queryFn: async () => {
@@ -106,6 +113,7 @@ export default function DistrictAdmin() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/admin/organizations", selectedCampusForPeople, "invitations"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/org-admin/orgs", selectedCampusForPeople, "members"] });
       setIsInviteOpen(false);
       setInviteEmail("");
       setInviteRole("member");
@@ -118,10 +126,10 @@ export default function DistrictAdmin() {
 
   const removeMemberMutation = useMutation({
     mutationFn: async (memberId: string) => {
-      return await apiRequest("DELETE", `/api/organizations/${selectedCampusForPeople}/members/${memberId}`);
+      return await apiRequest("DELETE", `/api/org-admin/orgs/${selectedCampusForPeople}/members/${memberId}`);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/admin/organizations", selectedCampusForPeople, "members"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/org-admin/orgs", selectedCampusForPeople, "members"] });
       toast({ title: "Member removed" });
     },
     onError: () => {
@@ -131,16 +139,119 @@ export default function DistrictAdmin() {
 
   const updateMemberRoleMutation = useMutation({
     mutationFn: async ({ memberId, role }: { memberId: string; role: string }) => {
-      return await apiRequest("PATCH", `/api/organizations/${selectedCampusForPeople}/members/${memberId}`, { role });
+      return await apiRequest("PATCH", `/api/org-admin/orgs/${selectedCampusForPeople}/members/${memberId}/role`, { orgRole: role });
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/admin/organizations", selectedCampusForPeople, "members"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/org-admin/orgs", selectedCampusForPeople, "members"] });
       toast({ title: "Member role updated" });
     },
     onError: () => {
       toast({ title: "Failed to update role", variant: "destructive" });
     },
   });
+
+  const { data: orgAdminMembers = [], isLoading: orgAdminMembersLoading } = useQuery<any[]>({
+    queryKey: ["/api/org-admin/orgs", selectedCampusForPeople, "members"],
+    queryFn: async () => {
+      const res = await fetch(`/api/org-admin/orgs/${selectedCampusForPeople}/members`, { credentials: "include" });
+      if (!res.ok) throw new Error("Failed");
+      return res.json();
+    },
+    enabled: !!selectedCampusForPeople,
+  });
+
+  const updatePlatformRoleMutation = useMutation({
+    mutationFn: async ({ memberId, platformRole }: { memberId: string; platformRole: string }) => {
+      return await apiRequest("PATCH", `/api/org-admin/orgs/${selectedCampusForPeople}/members/${memberId}/role`, { platformRole });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/org-admin/orgs", selectedCampusForPeople, "members"] });
+      toast({ title: "Platform role updated" });
+    },
+    onError: () => {
+      toast({ title: "Failed to update platform role", variant: "destructive" });
+    },
+  });
+
+  const updateMemberStatusMutation = useMutation({
+    mutationFn: async ({ memberId, status }: { memberId: string; status: string }) => {
+      return await apiRequest("PATCH", `/api/org-admin/orgs/${selectedCampusForPeople}/members/${memberId}/status`, { status });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/org-admin/orgs", selectedCampusForPeople, "members"] });
+      toast({ title: "Member status updated" });
+    },
+    onError: () => {
+      toast({ title: "Failed to update member status", variant: "destructive" });
+    },
+  });
+
+  const { data: orgSettings, isLoading: settingsLoading } = useQuery<any>({
+    queryKey: ["/api/org-admin/orgs", selectedOrgForSettings, "settings"],
+    queryFn: async () => {
+      const res = await fetch(`/api/org-admin/orgs/${selectedOrgForSettings}/settings`, { credentials: "include" });
+      if (!res.ok) throw new Error("Failed");
+      return res.json();
+    },
+    enabled: !!selectedOrgForSettings,
+  });
+
+  useEffect(() => {
+    if (orgSettings) {
+      setSettingsForm({
+        name: orgSettings.name || "",
+        address: orgSettings.address || "",
+        city: orgSettings.city || "",
+        state: orgSettings.state || "",
+        country: orgSettings.country || "",
+        zipCode: orgSettings.zipCode || "",
+        phone: orgSettings.phone || "",
+        website: orgSettings.website || "",
+        settings: {
+          allowSelfRegistration: orgSettings.settings?.allowSelfRegistration || false,
+          requireEmailDomain: orgSettings.settings?.requireEmailDomain || false,
+          defaultUserRole: orgSettings.settings?.defaultUserRole || "student",
+        },
+      });
+    }
+  }, [orgSettings]);
+
+  const updateSettingsMutation = useMutation({
+    mutationFn: async (data: typeof settingsForm) => {
+      return await apiRequest("PATCH", `/api/org-admin/orgs/${selectedOrgForSettings}/settings`, data);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/org-admin/orgs", selectedOrgForSettings, "settings"] });
+      toast({ title: "Organization settings saved" });
+    },
+    onError: () => {
+      toast({ title: "Failed to save settings", variant: "destructive" });
+    },
+  });
+
+  const { data: activityData = [], isLoading: activityLoading } = useQuery<any[]>({
+    queryKey: ["/api/org-admin/orgs", selectedOrgForActivity, "activity"],
+    queryFn: async () => {
+      const res = await fetch(`/api/org-admin/orgs/${selectedOrgForActivity}/activity`, { credentials: "include" });
+      if (!res.ok) throw new Error("Failed");
+      return res.json();
+    },
+    enabled: !!selectedOrgForActivity,
+  });
+
+  const sortedActivityData = [...activityData].sort((a, b) => {
+    if (!a.lastLoginAt && !b.lastLoginAt) return 0;
+    if (!a.lastLoginAt) return 1;
+    if (!b.lastLoginAt) return -1;
+    return new Date(b.lastLoginAt).getTime() - new Date(a.lastLoginAt).getTime();
+  });
+
+  const isInactive = (lastLoginAt: string | null) => {
+    if (!lastLoginAt) return true;
+    const thirtyDaysAgo = new Date();
+    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+    return new Date(lastLoginAt) < thirtyDaysAgo;
+  };
 
   const parseCsvText = (text: string): { email: string; role: string; personType: string }[] => {
     const lines = text.trim().split("\n").filter(l => l.trim());
@@ -181,7 +292,7 @@ export default function DistrictAdmin() {
       return res.json();
     },
     onSuccess: (data) => {
-      queryClient.invalidateQueries({ queryKey: ["/api/admin/organizations", selectedCampusForPeople, "members"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/org-admin/orgs", selectedCampusForPeople, "members"] });
       setSelectedMembers(new Set());
       setIsBulkDeleteConfirmOpen(false);
       toast({ title: `${data.removed} member(s) removed${data.failed > 0 ? `, ${data.failed} failed` : ""}` });
@@ -299,6 +410,14 @@ export default function DistrictAdmin() {
           <TabsTrigger value="people" data-testid="tab-people">
             <Users className="h-4 w-4 mr-2" />
             People
+          </TabsTrigger>
+          <TabsTrigger value="settings" data-testid="tab-settings">
+            <Settings className="h-4 w-4 mr-2" />
+            Settings
+          </TabsTrigger>
+          <TabsTrigger value="activity" data-testid="tab-activity">
+            <Activity className="h-4 w-4 mr-2" />
+            Activity
           </TabsTrigger>
           <TabsTrigger value="safety" data-testid="tab-safety">
             <AlertTriangle className="h-4 w-4 mr-2" />
@@ -654,15 +773,15 @@ export default function DistrictAdmin() {
               <div>
                 <div className="flex items-center justify-between gap-4 mb-3 flex-wrap">
                   <h3 className="font-oswald text-lg">Current Members</h3>
-                  {orgMembers.length > 0 && (
-                    <p className="text-xs text-muted-foreground">{orgMembers.length} member(s) total</p>
+                  {orgAdminMembers.length > 0 && (
+                    <p className="text-xs text-muted-foreground">{orgAdminMembers.length} member(s) total</p>
                   )}
                 </div>
-                {membersLoading ? (
+                {orgAdminMembersLoading ? (
                   <div className="flex items-center justify-center py-8">
                     <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
                   </div>
-                ) : orgMembers.length === 0 ? (
+                ) : orgAdminMembers.length === 0 ? (
                   <Card>
                     <CardContent className="py-8 text-center">
                       <Users className="h-10 w-10 text-muted-foreground mx-auto mb-3" />
@@ -674,11 +793,11 @@ export default function DistrictAdmin() {
                   <div className="space-y-2">
                     <div className="flex items-center gap-3 px-3 py-2 rounded-md bg-muted/30">
                       <button
-                        onClick={() => toggleAllMembers(orgMembers)}
+                        onClick={() => toggleAllMembers(orgAdminMembers.map((m: any) => ({ id: m.membership?.id })))}
                         className="text-muted-foreground hover:text-foreground"
                         data-testid="button-select-all-members-district"
                       >
-                        {selectedMembers.size === orgMembers.length ? (
+                        {selectedMembers.size === orgAdminMembers.length ? (
                           <CheckSquare className="h-4 w-4" />
                         ) : (
                           <Square className="h-4 w-4" />
@@ -688,68 +807,110 @@ export default function DistrictAdmin() {
                         {selectedMembers.size > 0 ? `${selectedMembers.size} selected` : "Select all"}
                       </span>
                     </div>
-                    {orgMembers.map((member: any) => (
-                      <div
-                        key={member.id}
-                        className={`flex items-center justify-between gap-4 p-3 rounded-md border ${selectedMembers.has(member.id) ? "border-primary/30 bg-primary/5" : ""}`}
-                        data-testid={`member-row-${member.id}`}
-                      >
-                        <div className="flex items-center gap-3">
-                          <button
-                            onClick={() => toggleMemberSelection(member.id)}
-                            className="text-muted-foreground hover:text-foreground"
-                            data-testid={`checkbox-member-${member.id}`}
-                          >
-                            {selectedMembers.has(member.id) ? (
-                              <CheckSquare className="h-4 w-4 text-primary" />
-                            ) : (
-                              <Square className="h-4 w-4" />
-                            )}
-                          </button>
-                          <Avatar>
-                            <AvatarImage src={member.user?.profileImageUrl || undefined} />
-                            <AvatarFallback>
-                              {(member.user?.firstName?.[0] || "") + (member.user?.lastName?.[0] || "") || "?"}
-                            </AvatarFallback>
-                          </Avatar>
-                          <div>
-                            <p className="text-sm font-medium">
-                              {member.user?.firstName || member.user?.lastName
-                                ? `${member.user?.firstName || ""} ${member.user?.lastName || ""}`.trim()
-                                : member.userId}
-                            </p>
-                            <p className="text-xs text-muted-foreground">{member.user?.email || "No email"}</p>
+                    {orgAdminMembers.map((item: any) => {
+                      const member = item.membership;
+                      const memberUser = item.user;
+                      const memberStatus = member?.status || "active";
+                      const memberPlatformRole = memberUser?.role || "student";
+                      return (
+                        <div
+                          key={member?.id}
+                          className={`flex items-center justify-between gap-4 p-3 rounded-md border ${selectedMembers.has(member?.id) ? "border-primary/30 bg-primary/5" : ""} ${memberStatus === "suspended" ? "opacity-60" : ""}`}
+                          data-testid={`member-row-${member?.id}`}
+                        >
+                          <div className="flex items-center gap-3">
+                            <button
+                              onClick={() => toggleMemberSelection(member?.id)}
+                              className="text-muted-foreground hover:text-foreground"
+                              data-testid={`checkbox-member-${member?.id}`}
+                            >
+                              {selectedMembers.has(member.id) ? (
+                                <CheckSquare className="h-4 w-4 text-primary" />
+                              ) : (
+                                <Square className="h-4 w-4" />
+                              )}
+                            </button>
+                            <Avatar>
+                              <AvatarImage src={memberUser?.profileImageUrl || undefined} />
+                              <AvatarFallback>
+                                {(memberUser?.firstName?.[0] || "") + (memberUser?.lastName?.[0] || "") || "?"}
+                              </AvatarFallback>
+                            </Avatar>
+                            <div>
+                              <div className="flex items-center gap-2">
+                                <p className="text-sm font-medium">
+                                  {memberUser?.firstName || memberUser?.lastName
+                                    ? `${memberUser?.firstName || ""} ${memberUser?.lastName || ""}`.trim()
+                                    : member?.userId}
+                                </p>
+                                <Badge
+                                  variant={memberStatus === "active" ? "outline" : "destructive"}
+                                  className="text-xs"
+                                  data-testid={`badge-status-${member?.id}`}
+                                >
+                                  {memberStatus}
+                                </Badge>
+                              </div>
+                              <p className="text-xs text-muted-foreground">{memberUser?.email || "No email"}</p>
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <Select
+                              value={member?.role || "member"}
+                              onValueChange={(newRole) => updateMemberRoleMutation.mutate({ memberId: member?.id, role: newRole })}
+                            >
+                              <SelectTrigger className="w-28" data-testid={`select-member-role-${member?.id}`}>
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="member">Member</SelectItem>
+                                <SelectItem value="admin">Admin</SelectItem>
+                                <SelectItem value="owner">Owner</SelectItem>
+                              </SelectContent>
+                            </Select>
+                            <Select
+                              value={memberPlatformRole}
+                              onValueChange={(newPlatformRole) => updatePlatformRoleMutation.mutate({ memberId: member?.id, platformRole: newPlatformRole })}
+                            >
+                              <SelectTrigger className="w-36" data-testid={`select-platform-role-${member?.id}`}>
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="student">Student</SelectItem>
+                                <SelectItem value="educator">Educator</SelectItem>
+                                <SelectItem value="homeschool_parent">Homeschool Parent</SelectItem>
+                                <SelectItem value="campus_admin">Campus Admin</SelectItem>
+                              </SelectContent>
+                            </Select>
+                            <Button
+                              size="icon"
+                              variant="ghost"
+                              onClick={() => updateMemberStatusMutation.mutate({
+                                memberId: member?.id,
+                                status: memberStatus === "active" ? "suspended" : "active",
+                              })}
+                              disabled={updateMemberStatusMutation.isPending}
+                              data-testid={`button-toggle-status-${member?.id}`}
+                            >
+                              {memberStatus === "active" ? (
+                                <Ban className="h-4 w-4" />
+                              ) : (
+                                <PlayCircle className="h-4 w-4" />
+                              )}
+                            </Button>
+                            <Button
+                              size="icon"
+                              variant="ghost"
+                              onClick={() => removeMemberMutation.mutate(member?.id)}
+                              disabled={removeMemberMutation.isPending}
+                              data-testid={`button-remove-member-${member?.id}`}
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
                           </div>
                         </div>
-                        <div className="flex items-center gap-2">
-                          <Select
-                            value={member.role || "member"}
-                            onValueChange={(newRole) => updateMemberRoleMutation.mutate({ memberId: member.id, role: newRole })}
-                          >
-                            <SelectTrigger className="w-28" data-testid={`select-member-role-${member.id}`}>
-                              <SelectValue />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="member">Member</SelectItem>
-                              <SelectItem value="admin">Admin</SelectItem>
-                              <SelectItem value="owner">Owner</SelectItem>
-                            </SelectContent>
-                          </Select>
-                          <Badge variant="outline" className="text-xs">
-                            {member.user?.role || "user"}
-                          </Badge>
-                          <Button
-                            size="icon"
-                            variant="ghost"
-                            onClick={() => removeMemberMutation.mutate(member.id)}
-                            disabled={removeMemberMutation.isPending}
-                            data-testid={`button-remove-member-${member.id}`}
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
-                        </div>
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 )}
               </div>
@@ -787,6 +948,298 @@ export default function DistrictAdmin() {
                 </div>
               )}
             </div>
+          )}
+        </TabsContent>
+
+        <TabsContent value="settings" className="space-y-6">
+          <div>
+            <h2 className="font-oswald text-xl">Organization Settings</h2>
+            <p className="text-sm text-muted-foreground">Configure organization details and policies</p>
+          </div>
+
+          <div className="w-full max-w-sm">
+            <Label htmlFor="settings-org-select" className="text-sm text-muted-foreground mb-1 block">Select an organization to configure</Label>
+            <Select value={selectedOrgForSettings} onValueChange={setSelectedOrgForSettings}>
+              <SelectTrigger data-testid="select-settings-org">
+                <SelectValue placeholder="Choose an organization..." />
+              </SelectTrigger>
+              <SelectContent>
+                {(myAdminOrgs.length > 0 ? myAdminOrgs : allSelectableOrgs).map((org: any) => (
+                  <SelectItem key={org.id} value={org.id}>{org.name}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          {!selectedOrgForSettings ? (
+            <Card>
+              <CardContent className="py-12 text-center">
+                <Settings className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+                <p className="text-muted-foreground font-medium">No organization selected</p>
+                <p className="text-sm text-muted-foreground mt-1">Choose an organization from the dropdown above to configure its settings</p>
+              </CardContent>
+            </Card>
+          ) : settingsLoading ? (
+            <div className="flex items-center justify-center py-8">
+              <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+            </div>
+          ) : (
+            <div className="grid lg:grid-cols-2 gap-6">
+              <Card>
+                <CardHeader>
+                  <CardTitle className="font-oswald">Organization Details</CardTitle>
+                  <CardDescription>Basic organization information</CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="grid gap-2">
+                    <Label htmlFor="settings-name">Organization Name</Label>
+                    <Input
+                      id="settings-name"
+                      value={settingsForm.name}
+                      onChange={(e) => setSettingsForm(prev => ({ ...prev, name: e.target.value }))}
+                      data-testid="input-settings-name"
+                    />
+                  </div>
+                  <div className="grid gap-2">
+                    <Label htmlFor="settings-address">Address</Label>
+                    <Input
+                      id="settings-address"
+                      value={settingsForm.address}
+                      onChange={(e) => setSettingsForm(prev => ({ ...prev, address: e.target.value }))}
+                      data-testid="input-settings-address"
+                    />
+                  </div>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="grid gap-2">
+                      <Label htmlFor="settings-city">City</Label>
+                      <Input
+                        id="settings-city"
+                        value={settingsForm.city}
+                        onChange={(e) => setSettingsForm(prev => ({ ...prev, city: e.target.value }))}
+                        data-testid="input-settings-city"
+                      />
+                    </div>
+                    <div className="grid gap-2">
+                      <Label htmlFor="settings-state">State</Label>
+                      <Input
+                        id="settings-state"
+                        value={settingsForm.state}
+                        onChange={(e) => setSettingsForm(prev => ({ ...prev, state: e.target.value }))}
+                        data-testid="input-settings-state"
+                      />
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="grid gap-2">
+                      <Label htmlFor="settings-country">Country</Label>
+                      <Input
+                        id="settings-country"
+                        value={settingsForm.country}
+                        onChange={(e) => setSettingsForm(prev => ({ ...prev, country: e.target.value }))}
+                        data-testid="input-settings-country"
+                      />
+                    </div>
+                    <div className="grid gap-2">
+                      <Label htmlFor="settings-zip">Zip Code</Label>
+                      <Input
+                        id="settings-zip"
+                        value={settingsForm.zipCode}
+                        onChange={(e) => setSettingsForm(prev => ({ ...prev, zipCode: e.target.value }))}
+                        data-testid="input-settings-zip"
+                      />
+                    </div>
+                  </div>
+                  <div className="grid gap-2">
+                    <Label htmlFor="settings-phone">Phone</Label>
+                    <Input
+                      id="settings-phone"
+                      value={settingsForm.phone}
+                      onChange={(e) => setSettingsForm(prev => ({ ...prev, phone: e.target.value }))}
+                      data-testid="input-settings-phone"
+                    />
+                  </div>
+                  <div className="grid gap-2">
+                    <Label htmlFor="settings-website">Website</Label>
+                    <Input
+                      id="settings-website"
+                      value={settingsForm.website}
+                      onChange={(e) => setSettingsForm(prev => ({ ...prev, website: e.target.value }))}
+                      data-testid="input-settings-website"
+                    />
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader>
+                  <CardTitle className="font-oswald">Policies & Defaults</CardTitle>
+                  <CardDescription>Registration and role assignment settings</CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-6">
+                  <div className="flex items-center justify-between gap-4">
+                    <div>
+                      <Label>Allow Self Registration</Label>
+                      <p className="text-xs text-muted-foreground">Allow users to register and join this organization without an invitation</p>
+                    </div>
+                    <Switch
+                      checked={settingsForm.settings.allowSelfRegistration}
+                      onCheckedChange={(checked) => setSettingsForm(prev => ({
+                        ...prev,
+                        settings: { ...prev.settings, allowSelfRegistration: checked },
+                      }))}
+                      data-testid="switch-allow-self-registration"
+                    />
+                  </div>
+                  <div className="flex items-center justify-between gap-4">
+                    <div>
+                      <Label>Require Email Domain</Label>
+                      <p className="text-xs text-muted-foreground">Restrict registration to specific email domains</p>
+                    </div>
+                    <Switch
+                      checked={settingsForm.settings.requireEmailDomain}
+                      onCheckedChange={(checked) => setSettingsForm(prev => ({
+                        ...prev,
+                        settings: { ...prev.settings, requireEmailDomain: checked },
+                      }))}
+                      data-testid="switch-require-email-domain"
+                    />
+                  </div>
+                  <div className="grid gap-2">
+                    <Label>Default User Role</Label>
+                    <p className="text-xs text-muted-foreground">Role assigned to new members by default</p>
+                    <Select
+                      value={settingsForm.settings.defaultUserRole}
+                      onValueChange={(val) => setSettingsForm(prev => ({
+                        ...prev,
+                        settings: { ...prev.settings, defaultUserRole: val },
+                      }))}
+                    >
+                      <SelectTrigger data-testid="select-default-role">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="student">Student</SelectItem>
+                        <SelectItem value="educator">Educator</SelectItem>
+                        <SelectItem value="homeschool_parent">Homeschool Parent</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </CardContent>
+              </Card>
+
+              <div className="lg:col-span-2">
+                <Button
+                  onClick={() => updateSettingsMutation.mutate(settingsForm)}
+                  disabled={updateSettingsMutation.isPending}
+                  data-testid="button-save-settings"
+                >
+                  {updateSettingsMutation.isPending ? (
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  ) : (
+                    <Save className="h-4 w-4 mr-2" />
+                  )}
+                  Save Settings
+                </Button>
+              </div>
+            </div>
+          )}
+        </TabsContent>
+
+        <TabsContent value="activity" className="space-y-6">
+          <div>
+            <h2 className="font-oswald text-xl">Activity Overview</h2>
+            <p className="text-sm text-muted-foreground">View educator activity, login stats, and content creation metrics</p>
+          </div>
+
+          <div className="w-full max-w-sm">
+            <Label htmlFor="activity-org-select" className="text-sm text-muted-foreground mb-1 block">Select an organization</Label>
+            <Select value={selectedOrgForActivity} onValueChange={setSelectedOrgForActivity}>
+              <SelectTrigger data-testid="select-activity-org">
+                <SelectValue placeholder="Choose an organization..." />
+              </SelectTrigger>
+              <SelectContent>
+                {(myAdminOrgs.length > 0 ? myAdminOrgs : allSelectableOrgs).map((org: any) => (
+                  <SelectItem key={org.id} value={org.id}>{org.name}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          {!selectedOrgForActivity ? (
+            <Card>
+              <CardContent className="py-12 text-center">
+                <Activity className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+                <p className="text-muted-foreground font-medium">No organization selected</p>
+                <p className="text-sm text-muted-foreground mt-1">Choose an organization from the dropdown above to view activity metrics</p>
+              </CardContent>
+            </Card>
+          ) : activityLoading ? (
+            <div className="flex items-center justify-center py-8">
+              <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+            </div>
+          ) : sortedActivityData.length === 0 ? (
+            <Card>
+              <CardContent className="py-12 text-center">
+                <Activity className="h-10 w-10 text-muted-foreground mx-auto mb-3" />
+                <p className="text-muted-foreground text-sm">No activity data available</p>
+                <p className="text-xs text-muted-foreground mt-1">Activity will appear once members start using the platform</p>
+              </CardContent>
+            </Card>
+          ) : (
+            <Card>
+              <CardContent className="p-0">
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm" data-testid="table-activity">
+                    <thead>
+                      <tr className="border-b bg-muted/30">
+                        <th className="text-left p-3 font-medium">Name</th>
+                        <th className="text-left p-3 font-medium">Email</th>
+                        <th className="text-left p-3 font-medium">Role</th>
+                        <th className="text-left p-3 font-medium">Last Login</th>
+                        <th className="text-right p-3 font-medium">Login Count</th>
+                        <th className="text-right p-3 font-medium">Lessons Created</th>
+                        <th className="text-right p-3 font-medium">Scopes Created</th>
+                        <th className="text-left p-3 font-medium">Member Since</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {sortedActivityData.map((row: any, idx: number) => (
+                        <tr
+                          key={row.userId || idx}
+                          className={`border-b ${isInactive(row.lastLoginAt) ? "text-muted-foreground" : ""}`}
+                          data-testid={`activity-row-${row.userId || idx}`}
+                        >
+                          <td className="p-3 font-medium">
+                            {row.firstName || row.lastName
+                              ? `${row.firstName || ""} ${row.lastName || ""}`.trim()
+                              : "Unknown"}
+                          </td>
+                          <td className="p-3">{row.email || "—"}</td>
+                          <td className="p-3">
+                            <Badge variant="outline" className="text-xs capitalize">{row.role || "—"}</Badge>
+                          </td>
+                          <td className="p-3">
+                            {row.lastLoginAt ? (
+                              <span className={isInactive(row.lastLoginAt) ? "text-destructive" : ""}>
+                                {new Date(row.lastLoginAt).toLocaleDateString()}
+                              </span>
+                            ) : (
+                              <span className="text-destructive">Never</span>
+                            )}
+                          </td>
+                          <td className="p-3 text-right">{row.loginCount ?? 0}</td>
+                          <td className="p-3 text-right">{row.lessonCount ?? 0}</td>
+                          <td className="p-3 text-right">{row.scopeCount ?? 0}</td>
+                          <td className="p-3">
+                            {row.createdAt ? new Date(row.createdAt).toLocaleDateString() : "—"}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </CardContent>
+            </Card>
           )}
         </TabsContent>
 

@@ -548,6 +548,22 @@ export interface IStorage {
   
   // Organization Memberships
   getOrganizationMembers(orgId: string): Promise<OrgMembership[]>;
+  getOrganizationMembersWithDetails(orgId: string): Promise<Array<{
+    membership: OrgMembership;
+    user: Pick<User, 'id' | 'email' | 'firstName' | 'lastName' | 'profileImageUrl' | 'role' | 'tier' | 'lastLoginAt' | 'loginCount' | 'createdAt'>;
+  }>>;
+  getEducatorActivityStats(orgId: string): Promise<Array<{
+    userId: string;
+    email: string | null;
+    firstName: string | null;
+    lastName: string | null;
+    role: string | null;
+    lastLoginAt: Date | null;
+    loginCount: number | null;
+    createdAt: Date | null;
+    lessonCount: number;
+    scopeCount: number;
+  }>>;
   getUserOrganizations(userId: string): Promise<OrgMembership[]>;
   getOrgMembership(orgId: string, userId: string): Promise<OrgMembership | undefined>;
   createOrgMembership(membership: InsertOrgMembership): Promise<OrgMembership>;
@@ -4338,6 +4354,73 @@ export class DatabaseStorage implements IStorage {
   async getOrganizationMembers(orgId: string): Promise<OrgMembership[]> {
     return await db.select().from(organizationMemberships)
       .where(eq(organizationMemberships.organizationId, orgId));
+  }
+
+  async getOrganizationMembersWithDetails(orgId: string): Promise<Array<{
+    membership: OrgMembership;
+    user: Pick<User, 'id' | 'email' | 'firstName' | 'lastName' | 'profileImageUrl' | 'role' | 'tier' | 'lastLoginAt' | 'loginCount' | 'createdAt'>;
+  }>> {
+    const results = await db.select({
+      membership: organizationMemberships,
+      user: {
+        id: users.id,
+        email: users.email,
+        firstName: users.firstName,
+        lastName: users.lastName,
+        profileImageUrl: users.profileImageUrl,
+        role: users.role,
+        tier: users.tier,
+        lastLoginAt: users.lastLoginAt,
+        loginCount: users.loginCount,
+        createdAt: users.createdAt,
+      },
+    })
+    .from(organizationMemberships)
+    .innerJoin(users, eq(organizationMemberships.userId, users.id))
+    .where(eq(organizationMemberships.organizationId, orgId));
+    return results;
+  }
+
+  async getEducatorActivityStats(orgId: string): Promise<Array<{
+    userId: string;
+    email: string | null;
+    firstName: string | null;
+    lastName: string | null;
+    role: string | null;
+    lastLoginAt: Date | null;
+    loginCount: number | null;
+    createdAt: Date | null;
+    lessonCount: number;
+    scopeCount: number;
+  }>> {
+    const members = await db.select({
+      userId: users.id,
+      email: users.email,
+      firstName: users.firstName,
+      lastName: users.lastName,
+      role: users.role,
+      lastLoginAt: users.lastLoginAt,
+      loginCount: users.loginCount,
+      createdAt: users.createdAt,
+    })
+    .from(organizationMemberships)
+    .innerJoin(users, eq(organizationMemberships.userId, users.id))
+    .where(eq(organizationMemberships.organizationId, orgId));
+
+    const results = await Promise.all(members.map(async (m) => {
+      const userLessons = await db.select({ count: sql<number>`count(*)` })
+        .from(lessons)
+        .where(eq(lessons.userId, m.userId));
+      const userScopes = await db.select({ count: sql<number>`count(*)` })
+        .from(scopeSequences)
+        .where(eq(scopeSequences.userId, m.userId));
+      return {
+        ...m,
+        lessonCount: Number(userLessons[0]?.count || 0),
+        scopeCount: Number(userScopes[0]?.count || 0),
+      };
+    }));
+    return results;
   }
 
   async getUserOrganizations(userId: string): Promise<OrgMembership[]> {
