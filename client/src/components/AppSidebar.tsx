@@ -47,6 +47,7 @@ import {
   Trophy,
   DollarSign,
   UserPlus,
+  HelpCircle,
 } from "lucide-react";
 
 function hasMinRole(userRole: string, minRole: UserRole): boolean {
@@ -287,6 +288,14 @@ export function AppSidebar() {
               <Link href="/pricing" data-testid="nav-pricing">
                 <CreditCard className="h-4 w-4" />
                 <span>Plans & Pricing</span>
+              </Link>
+            </SidebarMenuButton>
+          </SidebarMenuItem>
+          <SidebarMenuItem key="footer-help">
+            <SidebarMenuButton asChild tooltip="Help Desk">
+              <Link href="/help" data-testid="nav-help-desk">
+                <HelpCircle className="h-4 w-4" />
+                <span>Help Desk</span>
               </Link>
             </SidebarMenuButton>
           </SidebarMenuItem>

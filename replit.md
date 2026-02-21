@@ -50,6 +50,7 @@ Preferred communication style: Simple, everyday language.
 -   **Student Matriculation & Achievement Tracking**: System-level tracking of student progress and achievements.
 -   **Onboarding Tour**: Role-aware guided tour for new users.
 -   **Scholarship & Mentorship System**: Comprehensive scholarship planning, essay builder, strengths inventory, campus activities tracker, and mentor connection features.
+-   **Help Desk**: Searchable knowledge base with 20+ categorized help articles covering common errors (login, AI features, safety, lesson planning, grades, integrations, etc.), quick-link shortcuts, expandable troubleshooting guides, and full article detail views. Accessible to all users via sidebar.
 
 ### Global Architecture
 -   **Educational Hierarchy**: Structured organization of students and classes.
