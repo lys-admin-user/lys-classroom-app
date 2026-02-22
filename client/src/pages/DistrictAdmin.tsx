@@ -60,6 +60,12 @@ export default function DistrictAdmin() {
   const [bulkImportResults, setBulkImportResults] = useState<{ success: number; failed: number; errors: { row: number; email: string; message: string }[] } | null>(null);
   const [selectedMembers, setSelectedMembers] = useState<Set<string>>(new Set());
   const [isBulkDeleteConfirmOpen, setIsBulkDeleteConfirmOpen] = useState(false);
+  const [confirmAction, setConfirmAction] = useState<{
+    type: "remove" | "suspend" | "platformRole" | "orgRoleOwner";
+    memberId: string;
+    memberName: string;
+    newValue?: string;
+  } | null>(null);
 
   const [selectedOrgForSettings, setSelectedOrgForSettings] = useState<string>("");
   const [settingsForm, setSettingsForm] = useState({
@@ -760,6 +766,55 @@ export default function DistrictAdmin() {
             )}
           </div>
 
+          <Dialog open={!!confirmAction} onOpenChange={(open) => { if (!open) setConfirmAction(null); }}>
+            <DialogContent data-testid="dialog-confirm-action">
+              <DialogHeader>
+                <DialogTitle className="flex items-center gap-2">
+                  {(confirmAction?.type === "remove" || confirmAction?.type === "suspend") && (
+                    <AlertTriangle className="h-5 w-5 text-destructive" />
+                  )}
+                  {confirmAction?.type === "remove" && "Remove Member"}
+                  {confirmAction?.type === "suspend" && "Suspend Member"}
+                  {confirmAction?.type === "platformRole" && "Change Platform Role"}
+                  {confirmAction?.type === "orgRoleOwner" && "Promote to Owner"}
+                </DialogTitle>
+                <DialogDescription>
+                  {confirmAction?.type === "remove" && `Are you sure you want to remove ${confirmAction.memberName} from this organization? This cannot be undone.`}
+                  {confirmAction?.type === "suspend" && `Are you sure you want to suspend ${confirmAction.memberName}? They will lose access to this organization immediately.`}
+                  {confirmAction?.type === "platformRole" && `Are you sure you want to change ${confirmAction.memberName}'s platform role to ${confirmAction.newValue}? This will change what they can access across the entire platform.`}
+                  {confirmAction?.type === "orgRoleOwner" && `Are you sure you want to make ${confirmAction.memberName} an Owner? Owners have full control over this organization.`}
+                </DialogDescription>
+              </DialogHeader>
+              <DialogFooter>
+                <Button variant="outline" onClick={() => setConfirmAction(null)} data-testid="button-cancel-action">
+                  Cancel
+                </Button>
+                <Button
+                  variant={(confirmAction?.type === "remove" || confirmAction?.type === "suspend") ? "destructive" : "default"}
+                  data-testid="button-confirm-action"
+                  disabled={removeMemberMutation.isPending || updateMemberStatusMutation.isPending || updatePlatformRoleMutation.isPending || updateMemberRoleMutation.isPending}
+                  onClick={() => {
+                    if (!confirmAction) return;
+                    if (confirmAction.type === "remove") {
+                      removeMemberMutation.mutate(confirmAction.memberId, { onSettled: () => setConfirmAction(null) });
+                    } else if (confirmAction.type === "suspend") {
+                      updateMemberStatusMutation.mutate({ memberId: confirmAction.memberId, status: "suspended" }, { onSettled: () => setConfirmAction(null) });
+                    } else if (confirmAction.type === "platformRole") {
+                      updatePlatformRoleMutation.mutate({ memberId: confirmAction.memberId, platformRole: confirmAction.newValue! }, { onSettled: () => setConfirmAction(null) });
+                    } else if (confirmAction.type === "orgRoleOwner") {
+                      updateMemberRoleMutation.mutate({ memberId: confirmAction.memberId, role: confirmAction.newValue! }, { onSettled: () => setConfirmAction(null) });
+                    }
+                  }}
+                >
+                  {(removeMemberMutation.isPending || updateMemberStatusMutation.isPending || updatePlatformRoleMutation.isPending || updateMemberRoleMutation.isPending) && (
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  )}
+                  Confirm
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
+
           {!selectedCampusForPeople ? (
             <Card>
               <CardContent className="py-12 text-center">
@@ -857,7 +912,16 @@ export default function DistrictAdmin() {
                           <div className="flex items-center gap-2 flex-wrap">
                             <Select
                               value={member?.role || "member"}
-                              onValueChange={(newRole) => updateMemberRoleMutation.mutate({ memberId: member?.id, role: newRole })}
+                              onValueChange={(newRole) => {
+                                const name = (memberUser?.firstName && memberUser?.lastName)
+                                  ? `${memberUser.firstName} ${memberUser.lastName}`.trim()
+                                  : "this member";
+                                if (newRole === "owner") {
+                                  setConfirmAction({ type: "orgRoleOwner", memberId: member?.id, memberName: name, newValue: newRole });
+                                } else {
+                                  updateMemberRoleMutation.mutate({ memberId: member?.id, role: newRole });
+                                }
+                              }}
                             >
                               <SelectTrigger className="w-28" data-testid={`select-member-role-${member?.id}`}>
                                 <SelectValue />
@@ -870,7 +934,12 @@ export default function DistrictAdmin() {
                             </Select>
                             <Select
                               value={memberPlatformRole}
-                              onValueChange={(newPlatformRole) => updatePlatformRoleMutation.mutate({ memberId: member?.id, platformRole: newPlatformRole })}
+                              onValueChange={(newPlatformRole) => {
+                                const name = (memberUser?.firstName && memberUser?.lastName)
+                                  ? `${memberUser.firstName} ${memberUser.lastName}`.trim()
+                                  : "this member";
+                                setConfirmAction({ type: "platformRole", memberId: member?.id, memberName: name, newValue: newPlatformRole });
+                              }}
                             >
                               <SelectTrigger className="w-36" data-testid={`select-platform-role-${member?.id}`}>
                                 <SelectValue />
@@ -885,10 +954,16 @@ export default function DistrictAdmin() {
                             <Button
                               size="icon"
                               variant="ghost"
-                              onClick={() => updateMemberStatusMutation.mutate({
-                                memberId: member?.id,
-                                status: memberStatus === "active" ? "suspended" : "active",
-                              })}
+                              onClick={() => {
+                                if (memberStatus === "active") {
+                                  const name = (memberUser?.firstName && memberUser?.lastName)
+                                    ? `${memberUser.firstName} ${memberUser.lastName}`.trim()
+                                    : "this member";
+                                  setConfirmAction({ type: "suspend", memberId: member?.id, memberName: name });
+                                } else {
+                                  updateMemberStatusMutation.mutate({ memberId: member?.id, status: "active" });
+                                }
+                              }}
                               disabled={updateMemberStatusMutation.isPending}
                               data-testid={`button-toggle-status-${member?.id}`}
                             >
@@ -901,8 +976,12 @@ export default function DistrictAdmin() {
                             <Button
                               size="icon"
                               variant="ghost"
-                              onClick={() => removeMemberMutation.mutate(member?.id)}
-                              disabled={removeMemberMutation.isPending}
+                              onClick={() => {
+                                const name = (memberUser?.firstName && memberUser?.lastName)
+                                  ? `${memberUser.firstName} ${memberUser.lastName}`.trim()
+                                  : "this member";
+                                setConfirmAction({ type: "remove", memberId: member?.id, memberName: name });
+                              }}
                               data-testid={`button-remove-member-${member?.id}`}
                             >
                               <Trash2 className="h-4 w-4" />
