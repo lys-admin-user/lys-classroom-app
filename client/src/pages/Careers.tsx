@@ -121,6 +121,19 @@ const demandLabels: Record<string, { label: string; color: string }> = {
   low: { label: "Low Demand", color: "text-amber-600" },
 };
 
+const categoryLabels: Record<string, string> = {
+  technology: "Computer & IT",
+  healthcare: "Healthcare",
+  business: "Business & Management",
+  science: "Science & Environment",
+  creative: "Arts & Design",
+  trades: "Construction & Trades",
+  public_safety: "Protective Service",
+  personal_services: "Personal Care",
+  legal: "Legal",
+  education: "Education & Training",
+};
+
 interface RecommendedCareersResponse {
   hasAssessment: boolean;
   message?: string;
@@ -314,7 +327,7 @@ export default function Careers() {
               <div className="flex flex-wrap items-start justify-between gap-4">
                 <div>
                   <div className="flex flex-wrap gap-2 mb-2">
-                    <Badge className="font-roboto capitalize">{selectedCareer.category}</Badge>
+                    <Badge className="font-roboto">{categoryLabels[selectedCareer.category] || selectedCareer.category}</Badge>
                     {selectedCareer.jobOutlook && (
                       <Badge className={`${outlookLabels[selectedCareer.jobOutlook]?.color} font-roboto`}>
                         <TrendingUp className="h-3 w-3 mr-1" />
@@ -572,7 +585,7 @@ export default function Careers() {
                 KNOW: Career Pathways
               </h1>
               <p className="font-roboto text-muted-foreground">
-                Explore careers based on BLS data, market trends, and growth projections
+                40+ careers across tech, healthcare, trades, science, and more — powered by Bureau of Labor Statistics data
               </p>
             </div>
           </div>
@@ -687,7 +700,7 @@ export default function Careers() {
                             <div className="flex items-start justify-between gap-2 mb-2">
                               <div>
                                 <h4 className="font-oswald text-lg">{rec.career.title}</h4>
-                                <Badge className="capitalize font-roboto text-xs">{rec.career.category}</Badge>
+                                <Badge className="font-roboto text-xs">{categoryLabels[rec.career.category] || rec.career.category}</Badge>
                               </div>
                               <div className="text-right">
                                 <div className="flex items-center gap-1 text-lys-teal">
@@ -841,8 +854,8 @@ export default function Careers() {
                   <Card key={career.id} className="hover-elevate cursor-pointer" onClick={() => setSelectedCareer(career)}>
                     <CardHeader className="pb-2">
                       <div className="flex items-start justify-between gap-2">
-                        <Badge variant="secondary" className="capitalize font-roboto text-xs">
-                          {career.category}
+                        <Badge variant="secondary" className="font-roboto text-xs">
+                          {categoryLabels[career.category] || career.category}
                         </Badge>
                         <div className="flex gap-1">
                           {career.jobOutlook === "much_faster" && (
@@ -924,7 +937,7 @@ export default function Careers() {
               </p>
             </div>
             <div className="grid md:grid-cols-2 gap-6">
-              {trendingCareers.slice(0, 8).map((career, index) => (
+              {trendingCareers.slice(0, 10).map((career, index) => (
                 <Card 
                   key={career.id} 
                   className="hover-elevate cursor-pointer" 
@@ -1050,7 +1063,7 @@ export default function Careers() {
                             </span>
                             <div className="flex-1">
                               <p className="font-roboto font-medium">{career.title}</p>
-                              <p className="text-xs text-muted-foreground capitalize">{career.category}</p>
+                              <p className="text-xs text-muted-foreground">{categoryLabels[career.category] || career.category}</p>
                             </div>
                             <Badge className="bg-green-500/10 text-green-600 font-oswald">
                               +{career.growth}%
@@ -1102,10 +1115,10 @@ export default function Careers() {
         <div className="mt-12 p-6 rounded-lg bg-gradient-to-r from-lys-red/10 to-lys-teal/10 border border-lys-red/20">
           <div className="flex flex-wrap items-center gap-6">
             <div className="flex-1 min-w-[200px]">
-              <h2 className="font-oswald text-xl font-semibold mb-2">Discover What You Need to Know</h2>
+              <h2 className="font-oswald text-xl font-semibold mb-2">Every Path Leads Somewhere Great</h2>
               <p className="font-roboto text-muted-foreground text-sm">
-                Understanding career options is key to making informed decisions. Explore salaries, 
-                education requirements, and multiple pathways to each career — college isn't the only way!
+                From AI engineering to welding, drone piloting to nursing — explore 40+ careers with real salary data,
+                growth projections, and multiple pathways including trade school, certifications, and military service. College isn't the only way!
               </p>
             </div>
             <Badge className="bg-lys-red/20 text-lys-red font-oswald text-lg px-4 py-2">

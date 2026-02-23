@@ -104,7 +104,7 @@ const STUDENT_STEPS: TourStep[] = [
   {
     id: "know-careers",
     title: "KNOW - Explore Careers",
-    description: "Discover career pathways that match your interests and strengths. Explore salary data, education requirements, and growth outlook.",
+    description: "Browse 40+ careers across tech, healthcare, trades, science, and more. See real salary data, education paths, and job growth — college isn't the only way!",
     icon: Briefcase,
     targetSelector: '[data-testid="nav-career-explorer"]',
     navPath: "/careers",
@@ -312,7 +312,7 @@ const EDUCATOR_STEPS: TourStep[] = [
   {
     id: "know-careers",
     title: "KNOW - Career Explorer",
-    description: "Help students explore career pathways with salary data, education requirements, and growth projections.",
+    description: "Help students explore 40+ career pathways — from AI to welding — with salary data, growth projections, and multiple education paths.",
     icon: Briefcase,
     targetSelector: '[data-testid="nav-career-explorer"]',
     navPath: "/careers",
@@ -430,7 +430,7 @@ const HOMESCHOOL_PARENT_STEPS: TourStep[] = [
   {
     id: "know-careers",
     title: "KNOW - Career Explorer",
-    description: "Explore career pathways together to connect learning with real-world opportunities.",
+    description: "Explore 40+ career pathways together — from robotics to healthcare — and connect learning with real-world opportunities.",
     icon: Briefcase,
     targetSelector: '[data-testid="nav-career-explorer"]',
     navPath: "/careers",
