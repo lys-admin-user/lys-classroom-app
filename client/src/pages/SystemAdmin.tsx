@@ -175,7 +175,7 @@ export default function SystemAdminPage() {
     if (urlTab !== activeTab) {
       setActiveTab(urlTab);
     }
-  }, [routeParams?.tab]);
+  }, [routeParams?.tab, activeTab]);
 
   const handleTabChange = useCallback((value: string) => {
     setActiveTab(value);
