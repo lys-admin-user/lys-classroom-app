@@ -35,7 +35,9 @@ import {
   Target,
   Heart,
   Brain,
-  Zap
+  Zap,
+  Shield,
+  Scissors
 } from "lucide-react";
 import type { Career, SavedCareer } from "@shared/schema";
 import { useAuth } from "@/hooks/use-auth";
@@ -52,8 +54,19 @@ const categories = [
   { value: "business", label: "Business", icon: Building2 },
   { value: "creative", label: "Creative Arts", icon: Palette },
   { value: "trades", label: "Skilled Trades", icon: Wrench },
+  { value: "public_safety", label: "Public Safety", icon: Shield },
+  { value: "personal_services", label: "Personal Services", icon: Scissors },
   { value: "legal", label: "Legal & Law", icon: Scale },
   { value: "education", label: "Education", icon: BookOpen },
+];
+
+const educationPathways = [
+  { value: "all", label: "All Education Levels" },
+  { value: "no_degree", label: "No Degree Required" },
+  { value: "certification", label: "Certification Only" },
+  { value: "trade_apprenticeship", label: "Trade School / Apprenticeship" },
+  { value: "associates", label: "Associate's Degree" },
+  { value: "bachelors_plus", label: "Bachelor's Degree +" },
 ];
 
 const gradeLevels = [
@@ -74,6 +87,10 @@ const usStates = [
   { value: "VA", label: "Virginia" },
   { value: "AZ", label: "Arizona" },
   { value: "IA", label: "Iowa" },
+  { value: "OH", label: "Ohio" },
+  { value: "LA", label: "Louisiana" },
+  { value: "MI", label: "Michigan" },
+  { value: "PA", label: "Pennsylvania" },
   { value: "OK", label: "Oklahoma" },
 ];
 
@@ -135,6 +152,7 @@ export default function Careers() {
   const [selectedCategory, setSelectedCategory] = useState("all");
   const [selectedGrade, setSelectedGrade] = useState("all");
   const [selectedState, setSelectedState] = useState("all");
+  const [selectedPathway, setSelectedPathway] = useState("all");
   const [selectedCareer, setSelectedCareer] = useState<Career | null>(null);
   const [activeTab, setActiveTab] = useState("explore");
   const { isAuthenticated } = useAuth();
@@ -224,11 +242,36 @@ export default function Careers() {
     },
   });
 
+  const matchesEducationPathway = (career: Career, pathway: string): boolean => {
+    if (pathway === "all") return true;
+    const edu = (career.educationRequired || "").toLowerCase();
+    const training = (career.onTheJobTraining || "").toLowerCase();
+    const pathwayTypes = career.pathways?.map(p => p.type) || [];
+    
+    switch (pathway) {
+      case "no_degree":
+        return edu.includes("high school") || edu.includes("cdl") || edu.includes("certificate") || 
+               edu.includes("no formal") || training.includes("on-the-job") ||
+               (!edu.includes("bachelor") && !edu.includes("master") && !edu.includes("doctor") && !edu.includes("associate"));
+      case "certification":
+        return pathwayTypes.includes("certification") || edu.includes("certif") || edu.includes("license");
+      case "trade_apprenticeship":
+        return pathwayTypes.includes("trade") || edu.includes("apprentice") || edu.includes("trade") || edu.includes("technical");
+      case "associates":
+        return edu.includes("associate");
+      case "bachelors_plus":
+        return edu.includes("bachelor") || edu.includes("master") || edu.includes("doctor");
+      default:
+        return true;
+    }
+  };
+
   const filteredCareers = careers.filter((career) => {
     const matchesSearch = career.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
       career.description.toLowerCase().includes(searchQuery.toLowerCase());
     const matchesCategory = selectedCategory === "all" || career.category === selectedCategory;
-    return matchesSearch && matchesCategory;
+    const matchesPathway = matchesEducationPathway(career, selectedPathway);
+    return matchesSearch && matchesCategory && matchesPathway;
   });
 
   const formatSalary = (amount: number) => {
@@ -727,6 +770,19 @@ export default function Careers() {
                   {usStates.map((state) => (
                     <SelectItem key={state.value} value={state.value} className="font-roboto">
                       {state.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <Select value={selectedPathway} onValueChange={setSelectedPathway}>
+                <SelectTrigger className="w-[220px] font-roboto" data-testid="select-pathway">
+                  <GraduationCap className="h-4 w-4 mr-2" />
+                  <SelectValue placeholder="Education Path" />
+                </SelectTrigger>
+                <SelectContent>
+                  {educationPathways.map((path) => (
+                    <SelectItem key={path.value} value={path.value} className="font-roboto">
+                      {path.label}
                     </SelectItem>
                   ))}
                 </SelectContent>

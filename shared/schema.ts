@@ -295,7 +295,9 @@ export const CAREER_FIELDS = [
   { id: "humanities", name: "Humanities & Social Sciences", subjects: ["history", "social studies", "psychology", "sociology", "philosophy"] },
   { id: "education", name: "Education & Training", subjects: ["education", "child development", "teaching"] },
   { id: "law", name: "Law & Government", subjects: ["government", "civics", "criminal justice", "law", "political science"] },
-  { id: "trades", name: "Skilled Trades", subjects: ["woodworking", "auto shop", "welding", "construction", "hvac", "electrical"] },
+  { id: "trades", name: "Skilled Trades", subjects: ["woodworking", "auto shop", "welding", "construction", "hvac", "electrical", "plumbing", "diesel", "automotive"] },
+  { id: "public_safety", name: "Public Safety", subjects: ["fire science", "emergency management", "emt", "paramedic", "criminal justice", "public safety"] },
+  { id: "personal_services", name: "Personal Services", subjects: ["cosmetology", "barbering", "beauty", "real estate", "hospitality"] },
   { id: "communications", name: "Communications & Media", subjects: ["english", "journalism", "communications", "media", "writing"] },
   { id: "agriculture", name: "Agriculture & Environment", subjects: ["agriculture", "environmental science", "ecology", "forestry"] },
 ] as const;

@@ -1681,6 +1681,691 @@ let seedCareers: Career[] = [
       FL: { min: 65000, max: 130000, median: 95000, employment: 21500, demandLevel: "high" }
     },
     blsLastUpdated: "2024-09"
+  },
+  {
+    id: "16",
+    title: "Plumber",
+    category: "trades",
+    description: "Install, repair, and maintain piping systems for water, gas, and drainage in residential and commercial buildings.",
+    salaryMin: 38000,
+    salaryMax: 100000,
+    salaryMedian: 61550,
+    educationRequired: "High School + Apprenticeship",
+    yearsExperience: "0-4 years",
+    growthRate: "+2%",
+    skills: ["Pipe Fitting", "Blueprint Reading", "Problem Solving", "Physical Stamina", "Math"],
+    relatedCareers: ["Pipefitter", "Steamfitter", "HVAC Technician"],
+    pathways: [
+      { type: "trade", description: "Complete a 4-5 year apprenticeship program combining classroom and hands-on training.", duration: "4-5 years", cost: "Paid training" },
+      { type: "military", description: "Train as a military plumber/utilities specialist and earn certifications.", duration: "4+ years", cost: "Free + Benefits" },
+    ],
+    bkdAlignment: {
+      be: 50,
+      know: 60,
+      do: 95,
+      primaryPillar: "do",
+      careerPersonality: "Practical problem solver who enjoys hands-on work and helping people maintain their homes"
+    },
+    blsCode: "47-2152",
+    jobOutlook: "average",
+    projectedGrowth: 2,
+    projectedOpenings: 42600,
+    demandLevel: "high",
+    appropriateGrades: ["middle_school", "high_school", "post_secondary"],
+    entryPointsForGrades: {
+      middle_school: "Take shop classes, learn basic tools, explore maker spaces and plumbing basics",
+      high_school: "Enroll in vocational programs, join SkillsUSA, get pre-apprenticeship training",
+      post_secondary: "Begin apprenticeship, attend trade school, work toward journeyman license"
+    },
+    workEnvironment: "Homes, businesses, construction sites. Physical work, sometimes in tight spaces.",
+    typicalEntryEducation: "High school diploma",
+    onTheJobTraining: "Apprenticeship",
+    stateSalaryData: {
+      TX: { min: 40000, max: 85000, median: 55000, employment: 45200, demandLevel: "high" },
+      CA: { min: 55000, max: 115000, median: 75000, employment: 38900, demandLevel: "high" },
+      NY: { min: 50000, max: 110000, median: 80000, employment: 28100, demandLevel: "high" },
+      FL: { min: 38000, max: 80000, median: 52000, employment: 29400, demandLevel: "moderate" }
+    },
+    blsLastUpdated: "2024-09"
+  },
+  {
+    id: "17",
+    title: "HVAC Technician",
+    category: "trades",
+    description: "Install, maintain, and repair heating, ventilation, air conditioning, and refrigeration systems.",
+    salaryMin: 38000,
+    salaryMax: 85000,
+    salaryMedian: 57300,
+    educationRequired: "Technical Certificate or Apprenticeship",
+    yearsExperience: "0-3 years",
+    growthRate: "+6%",
+    skills: ["HVAC Systems", "Electrical Knowledge", "Troubleshooting", "Customer Service", "Physical Fitness"],
+    relatedCareers: ["Electrician", "Plumber", "Refrigeration Mechanic"],
+    pathways: [
+      { type: "trade", description: "Complete HVAC training program or apprenticeship.", duration: "6 months - 2 years", cost: "$5,000-$15,000" },
+      { type: "certification", description: "Earn EPA 608 certification and manufacturer-specific credentials.", duration: "3-6 months", cost: "$2,000-$5,000" },
+      { type: "military", description: "Train in military HVAC/refrigeration roles and transition to civilian work.", duration: "4+ years", cost: "Free + Benefits" },
+    ],
+    bkdAlignment: {
+      be: 50,
+      know: 65,
+      do: 90,
+      primaryPillar: "do",
+      careerPersonality: "Technical troubleshooter who enjoys diagnosing and fixing complex mechanical systems"
+    },
+    blsCode: "49-9021",
+    jobOutlook: "faster_than_average",
+    projectedGrowth: 6,
+    projectedOpenings: 38500,
+    demandLevel: "high",
+    appropriateGrades: ["middle_school", "high_school", "post_secondary"],
+    entryPointsForGrades: {
+      middle_school: "Learn basic mechanics, take shop classes, explore how heating and cooling systems work",
+      high_school: "Enroll in HVAC vocational programs, take physics and electrical courses, join SkillsUSA",
+      post_secondary: "Complete HVAC training, earn EPA certification, begin apprenticeship or entry-level work"
+    },
+    workEnvironment: "Homes, businesses, construction sites. Indoor and outdoor work in varying temperatures.",
+    typicalEntryEducation: "Postsecondary nondegree award",
+    onTheJobTraining: "Long-term on-the-job training",
+    stateSalaryData: {
+      TX: { min: 40000, max: 80000, median: 52000, employment: 42800, demandLevel: "very_high" },
+      CA: { min: 48000, max: 95000, median: 65000, employment: 32100, demandLevel: "high" },
+      FL: { min: 38000, max: 75000, median: 50000, employment: 35600, demandLevel: "very_high" },
+      AZ: { min: 42000, max: 82000, median: 55000, employment: 12400, demandLevel: "very_high" }
+    },
+    blsLastUpdated: "2024-09"
+  },
+  {
+    id: "18",
+    title: "Welder",
+    category: "trades",
+    description: "Join metal parts together using heat and pressure. Work in manufacturing, construction, and repair industries.",
+    salaryMin: 36000,
+    salaryMax: 75000,
+    salaryMedian: 48000,
+    educationRequired: "High School + Training",
+    yearsExperience: "0-2 years",
+    growthRate: "+2%",
+    skills: ["Welding Techniques", "Blueprint Reading", "Physical Stamina", "Attention to Detail", "Safety"],
+    relatedCareers: ["Pipefitter", "Sheet Metal Worker", "Ironworker"],
+    pathways: [
+      { type: "trade", description: "Complete welding program at a technical or community college.", duration: "6 months - 2 years", cost: "$5,000-$15,000" },
+      { type: "certification", description: "Earn AWS (American Welding Society) certifications for specialized welding.", duration: "3-6 months", cost: "$1,000-$5,000" },
+      { type: "military", description: "Train as a military welder and gain advanced certifications.", duration: "4+ years", cost: "Free + Benefits" },
+    ],
+    bkdAlignment: {
+      be: 45,
+      know: 55,
+      do: 95,
+      primaryPillar: "do",
+      careerPersonality: "Detail-focused craftsperson who takes pride in precise, skilled manual work"
+    },
+    blsCode: "51-4121",
+    jobOutlook: "average",
+    projectedGrowth: 2,
+    projectedOpenings: 42300,
+    demandLevel: "high",
+    appropriateGrades: ["middle_school", "high_school", "post_secondary"],
+    entryPointsForGrades: {
+      middle_school: "Take metal shop classes, explore maker spaces, learn about different metals",
+      high_school: "Enroll in welding vocational programs, join SkillsUSA, take physics and math",
+      post_secondary: "Complete welding certification, specialize in TIG/MIG/stick welding, gain field experience"
+    },
+    workEnvironment: "Factories, construction sites, repair shops. Physical work with heat and safety gear.",
+    typicalEntryEducation: "High school diploma",
+    onTheJobTraining: "Moderate-term on-the-job training",
+    stateSalaryData: {
+      TX: { min: 38000, max: 72000, median: 48000, employment: 52100, demandLevel: "high" },
+      CA: { min: 42000, max: 80000, median: 55000, employment: 28400, demandLevel: "moderate" },
+      OH: { min: 36000, max: 65000, median: 45000, employment: 18900, demandLevel: "high" },
+      LA: { min: 40000, max: 85000, median: 55000, employment: 14200, demandLevel: "very_high" }
+    },
+    blsLastUpdated: "2024-09"
+  },
+  {
+    id: "19",
+    title: "Automotive Technician",
+    category: "trades",
+    description: "Diagnose, repair, and maintain automobiles and light trucks. Use diagnostic equipment and hand tools.",
+    salaryMin: 32000,
+    salaryMax: 75000,
+    salaryMedian: 46990,
+    educationRequired: "Technical Certificate or Associate's",
+    yearsExperience: "0-3 years",
+    growthRate: "+4%",
+    skills: ["Automotive Diagnostics", "Engine Repair", "Electrical Systems", "Customer Service", "Problem Solving"],
+    relatedCareers: ["Diesel Mechanic", "Auto Body Repairer", "Service Advisor"],
+    pathways: [
+      { type: "trade", description: "Complete automotive technology program at a trade school.", duration: "6 months - 2 years", cost: "$5,000-$20,000" },
+      { type: "certification", description: "Earn ASE (Automotive Service Excellence) certifications.", duration: "6-12 months", cost: "$1,000-$5,000" },
+      { type: "military", description: "Train as a military vehicle mechanic and transition to civilian auto repair.", duration: "4+ years", cost: "Free + Benefits" },
+    ],
+    bkdAlignment: {
+      be: 45,
+      know: 65,
+      do: 90,
+      primaryPillar: "do",
+      careerPersonality: "Mechanically curious problem solver who loves figuring out how things work"
+    },
+    blsCode: "49-3023",
+    jobOutlook: "average",
+    projectedGrowth: 4,
+    projectedOpenings: 69000,
+    demandLevel: "high",
+    appropriateGrades: ["middle_school", "high_school", "post_secondary"],
+    entryPointsForGrades: {
+      middle_school: "Learn basic mechanics, take shop classes, explore how cars and engines work",
+      high_school: "Enroll in auto tech programs, join SkillsUSA, work on personal vehicle projects",
+      post_secondary: "Complete automotive technology program, earn ASE certifications, gain shop experience"
+    },
+    workEnvironment: "Auto repair shops and dealerships. Standing, bending, and lifting required.",
+    typicalEntryEducation: "Postsecondary nondegree award",
+    onTheJobTraining: "Short-term on-the-job training",
+    stateSalaryData: {
+      TX: { min: 35000, max: 70000, median: 45000, employment: 68900, demandLevel: "high" },
+      CA: { min: 40000, max: 82000, median: 55000, employment: 58200, demandLevel: "moderate" },
+      FL: { min: 32000, max: 65000, median: 42000, employment: 42100, demandLevel: "moderate" },
+      MI: { min: 38000, max: 75000, median: 50000, employment: 24800, demandLevel: "high" }
+    },
+    blsLastUpdated: "2024-09"
+  },
+  {
+    id: "20",
+    title: "CDL Truck Driver",
+    category: "trades",
+    description: "Transport goods over long or short distances using large trucks. Requires a Commercial Driver's License (CDL).",
+    salaryMin: 35000,
+    salaryMax: 80000,
+    salaryMedian: 54320,
+    educationRequired: "CDL Training Program",
+    yearsExperience: "0-1 years",
+    growthRate: "+4%",
+    skills: ["Driving", "Navigation", "Time Management", "Safety", "Physical Stamina"],
+    relatedCareers: ["Delivery Driver", "Bus Driver", "Heavy Equipment Operator"],
+    pathways: [
+      { type: "certification", description: "Complete CDL training program and pass CDL exam.", duration: "3-8 weeks", cost: "$3,000-$7,000" },
+      { type: "trade", description: "Attend truck driving school for comprehensive training.", duration: "2-4 months", cost: "$5,000-$10,000" },
+      { type: "military", description: "Drive military vehicles and convert to civilian CDL.", duration: "4+ years", cost: "Free + Benefits" },
+    ],
+    bkdAlignment: {
+      be: 55,
+      know: 45,
+      do: 85,
+      primaryPillar: "do",
+      careerPersonality: "Independent self-starter who enjoys the open road and working on their own schedule"
+    },
+    blsCode: "53-3032",
+    jobOutlook: "average",
+    projectedGrowth: 4,
+    projectedOpenings: 240300,
+    demandLevel: "very_high",
+    appropriateGrades: ["high_school", "post_secondary"],
+    entryPointsForGrades: {
+      high_school: "Learn about logistics, take driver education, understand vehicle maintenance basics",
+      post_secondary: "Enroll in CDL training program, pass CDL test, start with a carrier company"
+    },
+    workEnvironment: "On the road for long hours. May be away from home for days or weeks at a time.",
+    typicalEntryEducation: "Postsecondary nondegree award",
+    onTheJobTraining: "Short-term on-the-job training",
+    stateSalaryData: {
+      TX: { min: 40000, max: 80000, median: 55000, employment: 198400, demandLevel: "very_high" },
+      CA: { min: 45000, max: 85000, median: 58000, employment: 145200, demandLevel: "very_high" },
+      FL: { min: 38000, max: 72000, median: 50000, employment: 98700, demandLevel: "high" },
+      OH: { min: 38000, max: 70000, median: 48000, employment: 75200, demandLevel: "high" }
+    },
+    blsLastUpdated: "2024-09"
+  },
+  {
+    id: "21",
+    title: "Diesel Mechanic",
+    category: "trades",
+    description: "Inspect, repair, and maintain diesel engines and vehicles including trucks, buses, and heavy equipment.",
+    salaryMin: 38000,
+    salaryMax: 78000,
+    salaryMedian: 58350,
+    educationRequired: "Technical Certificate or Associate's",
+    yearsExperience: "0-3 years",
+    growthRate: "+5%",
+    skills: ["Diesel Engine Repair", "Diagnostics", "Hydraulics", "Electrical Systems", "Problem Solving"],
+    relatedCareers: ["Automotive Technician", "Heavy Equipment Mechanic", "Marine Mechanic"],
+    pathways: [
+      { type: "trade", description: "Complete diesel technology program at a trade school.", duration: "1-2 years", cost: "$5,000-$20,000" },
+      { type: "certification", description: "Earn ASE diesel certifications and manufacturer credentials.", duration: "6-12 months", cost: "$2,000-$8,000" },
+      { type: "military", description: "Train as a military diesel mechanic on heavy vehicles and equipment.", duration: "4+ years", cost: "Free + Benefits" },
+    ],
+    bkdAlignment: {
+      be: 45,
+      know: 65,
+      do: 90,
+      primaryPillar: "do",
+      careerPersonality: "Mechanically skilled troubleshooter who enjoys working with powerful engines and heavy machinery"
+    },
+    blsCode: "49-3031",
+    jobOutlook: "faster_than_average",
+    projectedGrowth: 5,
+    projectedOpenings: 28400,
+    demandLevel: "high",
+    appropriateGrades: ["middle_school", "high_school", "post_secondary"],
+    entryPointsForGrades: {
+      middle_school: "Learn about engines and mechanics, take shop classes, explore how diesel vehicles work",
+      high_school: "Enroll in diesel tech programs, work on small engines, join SkillsUSA",
+      post_secondary: "Complete diesel technology program, earn ASE diesel certifications, gain shop experience"
+    },
+    workEnvironment: "Repair shops, truck stops, fleet garages. Physical work with heavy machinery.",
+    typicalEntryEducation: "Postsecondary nondegree award",
+    onTheJobTraining: "Long-term on-the-job training",
+    stateSalaryData: {
+      TX: { min: 42000, max: 78000, median: 58000, employment: 28900, demandLevel: "high" },
+      CA: { min: 48000, max: 85000, median: 65000, employment: 18200, demandLevel: "high" },
+      OH: { min: 40000, max: 72000, median: 52000, employment: 12400, demandLevel: "moderate" },
+      PA: { min: 42000, max: 75000, median: 55000, employment: 11800, demandLevel: "moderate" }
+    },
+    blsLastUpdated: "2024-09"
+  },
+  {
+    id: "22",
+    title: "Medical Assistant",
+    category: "healthcare",
+    description: "Perform clinical and administrative tasks in physician offices, hospitals, and healthcare facilities.",
+    salaryMin: 30000,
+    salaryMax: 50000,
+    salaryMedian: 42000,
+    educationRequired: "Certificate or Associate's Degree",
+    yearsExperience: "0-1 years",
+    growthRate: "+14%",
+    skills: ["Patient Care", "Medical Terminology", "Vital Signs", "EHR Systems", "Communication"],
+    relatedCareers: ["Licensed Vocational Nurse", "Phlebotomist", "Dental Assistant"],
+    pathways: [
+      { type: "certification", description: "Complete medical assistant certificate program and earn CMA credential.", duration: "9-12 months", cost: "$5,000-$15,000" },
+      { type: "trade", description: "Complete associate's degree in medical assisting.", duration: "2 years", cost: "$10,000-$25,000" },
+    ],
+    bkdAlignment: {
+      be: 75,
+      know: 65,
+      do: 80,
+      primaryPillar: "be",
+      careerPersonality: "Caring multitasker who thrives in fast-paced healthcare environments"
+    },
+    blsCode: "31-9092",
+    jobOutlook: "much_faster",
+    projectedGrowth: 14,
+    projectedOpenings: 119200,
+    demandLevel: "very_high",
+    appropriateGrades: ["high_school", "post_secondary"],
+    entryPointsForGrades: {
+      high_school: "Take health science courses, volunteer at clinics, earn CPR/First Aid certification",
+      post_secondary: "Enroll in medical assistant program, complete externship, earn CMA certification"
+    },
+    workEnvironment: "Doctor's offices, clinics, hospitals. Regular hours with some evening/weekend shifts.",
+    typicalEntryEducation: "Postsecondary nondegree award",
+    onTheJobTraining: "None",
+    stateSalaryData: {
+      TX: { min: 30000, max: 45000, median: 36000, employment: 58900, demandLevel: "very_high" },
+      CA: { min: 38000, max: 55000, median: 45000, employment: 82400, demandLevel: "very_high" },
+      FL: { min: 30000, max: 42000, median: 35000, employment: 48200, demandLevel: "high" },
+      NY: { min: 35000, max: 50000, median: 42000, employment: 35800, demandLevel: "high" }
+    },
+    blsLastUpdated: "2024-09"
+  },
+  {
+    id: "23",
+    title: "Pharmacy Technician",
+    category: "healthcare",
+    description: "Assist pharmacists in dispensing medications, managing inventory, and serving patients at pharmacies.",
+    salaryMin: 30000,
+    salaryMax: 50000,
+    salaryMedian: 38350,
+    educationRequired: "Certificate or High School + Training",
+    yearsExperience: "0-1 years",
+    growthRate: "+6%",
+    skills: ["Medication Knowledge", "Attention to Detail", "Customer Service", "Math", "Organization"],
+    relatedCareers: ["Pharmacist", "Medical Assistant", "Phlebotomist"],
+    pathways: [
+      { type: "certification", description: "Complete pharmacy technician certificate program and pass PTCB exam.", duration: "6-12 months", cost: "$3,000-$10,000" },
+      { type: "trade", description: "Complete associate's degree in pharmacy technology.", duration: "2 years", cost: "$10,000-$20,000" },
+    ],
+    bkdAlignment: {
+      be: 60,
+      know: 75,
+      do: 70,
+      primaryPillar: "know",
+      careerPersonality: "Detail-oriented person who values accuracy and helping patients with their health needs"
+    },
+    blsCode: "29-2052",
+    jobOutlook: "faster_than_average",
+    projectedGrowth: 6,
+    projectedOpenings: 43500,
+    demandLevel: "high",
+    appropriateGrades: ["high_school", "post_secondary"],
+    entryPointsForGrades: {
+      high_school: "Take chemistry and biology, learn about medications, develop strong math skills",
+      post_secondary: "Enroll in pharmacy tech program, pass PTCB exam, gain retail or hospital pharmacy experience"
+    },
+    workEnvironment: "Retail pharmacies, hospitals, mail-order pharmacies. Regular hours with some evenings/weekends.",
+    typicalEntryEducation: "High school diploma",
+    onTheJobTraining: "Moderate-term on-the-job training",
+    stateSalaryData: {
+      TX: { min: 30000, max: 45000, median: 36000, employment: 35200, demandLevel: "high" },
+      CA: { min: 38000, max: 58000, median: 48000, employment: 42100, demandLevel: "high" },
+      NY: { min: 32000, max: 48000, median: 40000, employment: 22800, demandLevel: "moderate" },
+      FL: { min: 30000, max: 42000, median: 35000, employment: 28400, demandLevel: "moderate" }
+    },
+    blsLastUpdated: "2024-09"
+  },
+  {
+    id: "24",
+    title: "EMT & Paramedic",
+    category: "public_safety",
+    description: "Respond to emergency calls, provide medical care, and transport patients to hospitals.",
+    salaryMin: 30000,
+    salaryMax: 65000,
+    salaryMedian: 38930,
+    educationRequired: "Certificate (EMT) or Associate's (Paramedic)",
+    yearsExperience: "0-2 years",
+    growthRate: "+5%",
+    skills: ["Emergency Medicine", "CPR/First Aid", "Decision Making", "Physical Fitness", "Stress Management"],
+    relatedCareers: ["Firefighter", "Registered Nurse", "Physician Assistant"],
+    pathways: [
+      { type: "certification", description: "Complete EMT-Basic certification (120-150 hours of training).", duration: "3-6 months", cost: "$1,000-$3,000" },
+      { type: "trade", description: "Complete paramedic program for advanced certification.", duration: "1-2 years", cost: "$5,000-$15,000" },
+      { type: "military", description: "Train as a military combat medic and earn civilian EMT/Paramedic certification.", duration: "4+ years", cost: "Free + Benefits" },
+    ],
+    bkdAlignment: {
+      be: 85,
+      know: 70,
+      do: 90,
+      primaryPillar: "be",
+      careerPersonality: "Courageous first responder driven by urgency and compassion to save lives"
+    },
+    blsCode: "29-2040",
+    jobOutlook: "faster_than_average",
+    projectedGrowth: 5,
+    projectedOpenings: 19600,
+    demandLevel: "high",
+    appropriateGrades: ["high_school", "post_secondary"],
+    entryPointsForGrades: {
+      high_school: "Get CPR/First Aid certified, volunteer with local EMS, take health science courses",
+      post_secondary: "Complete EMT-Basic program, gain field experience, advance to Paramedic certification"
+    },
+    workEnvironment: "Ambulances, emergency scenes, hospitals. Shift work with high-stress situations.",
+    typicalEntryEducation: "Postsecondary nondegree award",
+    onTheJobTraining: "None",
+    stateSalaryData: {
+      TX: { min: 32000, max: 55000, median: 38000, employment: 24800, demandLevel: "high" },
+      CA: { min: 40000, max: 75000, median: 48000, employment: 22100, demandLevel: "high" },
+      NY: { min: 35000, max: 65000, median: 45000, employment: 18900, demandLevel: "moderate" },
+      FL: { min: 30000, max: 52000, median: 36000, employment: 19200, demandLevel: "high" }
+    },
+    blsLastUpdated: "2024-09"
+  },
+  {
+    id: "25",
+    title: "Dental Hygienist",
+    category: "healthcare",
+    description: "Clean teeth, examine patients for oral diseases, and educate patients on proper oral health care.",
+    salaryMin: 60000,
+    salaryMax: 105000,
+    salaryMedian: 87530,
+    educationRequired: "Associate's Degree",
+    yearsExperience: "0-2 years",
+    growthRate: "+7%",
+    skills: ["Dental Procedures", "Patient Care", "Attention to Detail", "Communication", "Dexterity"],
+    relatedCareers: ["Dental Assistant", "Dentist", "Dental Lab Technician"],
+    pathways: [
+      { type: "trade", description: "Complete associate's degree in dental hygiene from an accredited program.", duration: "2-3 years", cost: "$15,000-$50,000" },
+    ],
+    bkdAlignment: {
+      be: 70,
+      know: 75,
+      do: 80,
+      primaryPillar: "do",
+      careerPersonality: "Detail-oriented caregiver who values preventive health and patient education"
+    },
+    blsCode: "29-1292",
+    jobOutlook: "faster_than_average",
+    projectedGrowth: 7,
+    projectedOpenings: 15600,
+    demandLevel: "high",
+    appropriateGrades: ["high_school", "post_secondary"],
+    entryPointsForGrades: {
+      high_school: "Take biology and chemistry, shadow dental offices, volunteer in healthcare settings",
+      post_secondary: "Complete dental hygiene program, pass national and state board exams, obtain licensure"
+    },
+    workEnvironment: "Dental offices. Regular hours, part-time work common. Clean clinical environment.",
+    typicalEntryEducation: "Associate's degree",
+    onTheJobTraining: "None",
+    stateSalaryData: {
+      TX: { min: 65000, max: 95000, median: 82000, employment: 16800, demandLevel: "high" },
+      CA: { min: 85000, max: 120000, median: 105000, employment: 24200, demandLevel: "high" },
+      NY: { min: 70000, max: 100000, median: 88000, employment: 12400, demandLevel: "moderate" },
+      FL: { min: 60000, max: 90000, median: 75000, employment: 14100, demandLevel: "moderate" }
+    },
+    blsLastUpdated: "2024-09"
+  },
+  {
+    id: "26",
+    title: "Licensed Vocational Nurse (LVN/LPN)",
+    category: "healthcare",
+    description: "Provide basic nursing care under the direction of registered nurses and doctors.",
+    salaryMin: 38000,
+    salaryMax: 65000,
+    salaryMedian: 55860,
+    educationRequired: "Certificate or Associate's Degree",
+    yearsExperience: "0-1 years",
+    growthRate: "+5%",
+    skills: ["Patient Care", "Medication Administration", "Vital Signs", "Communication", "Compassion"],
+    relatedCareers: ["Registered Nurse", "Certified Nursing Assistant", "Medical Assistant"],
+    pathways: [
+      { type: "trade", description: "Complete LVN/LPN program at a vocational school or community college.", duration: "12-18 months", cost: "$10,000-$25,000" },
+      { type: "certification", description: "Pass the NCLEX-PN exam to obtain licensure.", duration: "12-18 months", cost: "$10,000-$25,000" },
+    ],
+    bkdAlignment: {
+      be: 80,
+      know: 70,
+      do: 75,
+      primaryPillar: "be",
+      careerPersonality: "Compassionate caregiver who finds purpose in direct patient care and support"
+    },
+    blsCode: "29-2061",
+    jobOutlook: "faster_than_average",
+    projectedGrowth: 5,
+    projectedOpenings: 54400,
+    demandLevel: "high",
+    appropriateGrades: ["high_school", "post_secondary"],
+    entryPointsForGrades: {
+      high_school: "Take health science courses, become a CNA, volunteer at nursing facilities",
+      post_secondary: "Complete LVN/LPN program, pass NCLEX-PN, gain clinical experience"
+    },
+    workEnvironment: "Hospitals, nursing facilities, clinics. Shift work including evenings and weekends.",
+    typicalEntryEducation: "Postsecondary nondegree award",
+    onTheJobTraining: "None",
+    stateSalaryData: {
+      TX: { min: 40000, max: 60000, median: 52000, employment: 82400, demandLevel: "very_high" },
+      CA: { min: 50000, max: 75000, median: 65000, employment: 68100, demandLevel: "high" },
+      FL: { min: 38000, max: 55000, median: 48000, employment: 52800, demandLevel: "high" },
+      NY: { min: 42000, max: 62000, median: 55000, employment: 38200, demandLevel: "moderate" }
+    },
+    blsLastUpdated: "2024-09"
+  },
+  {
+    id: "27",
+    title: "Certified Nursing Assistant (CNA)",
+    category: "healthcare",
+    description: "Assist patients with daily activities, take vital signs, and provide basic care in healthcare settings.",
+    salaryMin: 25000,
+    salaryMax: 42000,
+    salaryMedian: 35760,
+    educationRequired: "Certificate (4-12 weeks training)",
+    yearsExperience: "None required",
+    growthRate: "+4%",
+    skills: ["Patient Care", "Physical Stamina", "Compassion", "Communication", "Attention to Detail"],
+    relatedCareers: ["Licensed Vocational Nurse", "Medical Assistant", "Home Health Aide"],
+    pathways: [
+      { type: "certification", description: "Complete state-approved CNA training program and pass certification exam.", duration: "4-12 weeks", cost: "$500-$2,000" },
+    ],
+    bkdAlignment: {
+      be: 85,
+      know: 50,
+      do: 75,
+      primaryPillar: "be",
+      careerPersonality: "Deeply caring individual who finds fulfillment in helping others with basic needs"
+    },
+    blsCode: "31-1131",
+    jobOutlook: "average",
+    projectedGrowth: 4,
+    projectedOpenings: 220200,
+    demandLevel: "very_high",
+    appropriateGrades: ["high_school", "post_secondary"],
+    entryPointsForGrades: {
+      high_school: "Take health classes, volunteer at nursing homes, earn CPR certification",
+      post_secondary: "Complete CNA training (often free through employers), pass state certification exam"
+    },
+    workEnvironment: "Nursing homes, hospitals, assisted living. Physically demanding shift work.",
+    typicalEntryEducation: "Postsecondary nondegree award",
+    onTheJobTraining: "Short-term on-the-job training",
+    stateSalaryData: {
+      TX: { min: 26000, max: 38000, median: 32000, employment: 98400, demandLevel: "very_high" },
+      CA: { min: 35000, max: 48000, median: 42000, employment: 108200, demandLevel: "very_high" },
+      FL: { min: 25000, max: 36000, median: 30000, employment: 82100, demandLevel: "high" },
+      NY: { min: 32000, max: 45000, median: 38000, employment: 72400, demandLevel: "high" }
+    },
+    blsLastUpdated: "2024-09"
+  },
+  {
+    id: "28",
+    title: "Real Estate Agent",
+    category: "business",
+    description: "Help people buy, sell, and rent properties. Market listings, negotiate deals, and guide clients through transactions.",
+    salaryMin: 30000,
+    salaryMax: 120000,
+    salaryMedian: 56620,
+    educationRequired: "Real Estate License (state-specific)",
+    yearsExperience: "0-2 years",
+    growthRate: "+3%",
+    skills: ["Negotiation", "Sales", "Marketing", "Communication", "Market Analysis"],
+    relatedCareers: ["Property Manager", "Real Estate Broker", "Mortgage Loan Officer"],
+    pathways: [
+      { type: "certification", description: "Complete state-required pre-licensing courses and pass real estate exam.", duration: "2-6 months", cost: "$1,000-$3,000" },
+    ],
+    bkdAlignment: {
+      be: 70,
+      know: 60,
+      do: 85,
+      primaryPillar: "do",
+      careerPersonality: "Entrepreneurial self-starter with strong people skills and drive to close deals"
+    },
+    blsCode: "41-9022",
+    jobOutlook: "average",
+    projectedGrowth: 3,
+    projectedOpenings: 51600,
+    demandLevel: "moderate",
+    appropriateGrades: ["high_school", "post_secondary"],
+    entryPointsForGrades: {
+      high_school: "Take business and marketing courses, learn about real estate markets, develop sales skills",
+      post_secondary: "Complete real estate pre-licensing course, pass state exam, join a brokerage"
+    },
+    workEnvironment: "Self-employed or brokerage. Flexible but often includes evenings and weekends.",
+    typicalEntryEducation: "High school diploma",
+    onTheJobTraining: "Moderate-term on-the-job training",
+    stateSalaryData: {
+      TX: { min: 32000, max: 110000, median: 55000, employment: 42100, demandLevel: "moderate" },
+      CA: { min: 40000, max: 150000, median: 72000, employment: 58200, demandLevel: "moderate" },
+      FL: { min: 30000, max: 105000, median: 50000, employment: 48900, demandLevel: "moderate" },
+      NY: { min: 35000, max: 130000, median: 65000, employment: 28400, demandLevel: "moderate" }
+    },
+    blsLastUpdated: "2024-09"
+  },
+  {
+    id: "29",
+    title: "Cosmetologist / Barber",
+    category: "personal_services",
+    description: "Cut, color, and style hair. May also provide skin care, nail services, and other beauty treatments.",
+    salaryMin: 25000,
+    salaryMax: 65000,
+    salaryMedian: 35080,
+    educationRequired: "State-Licensed Cosmetology Program",
+    yearsExperience: "0-1 years",
+    growthRate: "+8%",
+    skills: ["Hair Styling", "Color Theory", "Customer Service", "Creativity", "Business Skills"],
+    relatedCareers: ["Esthetician", "Nail Technician", "Makeup Artist"],
+    pathways: [
+      { type: "trade", description: "Complete state-licensed cosmetology or barbering program.", duration: "9-18 months", cost: "$5,000-$20,000" },
+      { type: "certification", description: "Pass state licensing exam and build clientele.", duration: "9-18 months", cost: "$5,000-$20,000" },
+    ],
+    bkdAlignment: {
+      be: 75,
+      know: 55,
+      do: 85,
+      primaryPillar: "be",
+      careerPersonality: "Creative artist with strong interpersonal skills who helps people look and feel confident"
+    },
+    blsCode: "39-5012",
+    jobOutlook: "faster_than_average",
+    projectedGrowth: 8,
+    projectedOpenings: 77600,
+    demandLevel: "high",
+    appropriateGrades: ["high_school", "post_secondary"],
+    entryPointsForGrades: {
+      high_school: "Practice styling on friends and family, take art classes, explore beauty as a career",
+      post_secondary: "Enroll in cosmetology/barber school, complete required hours, pass state board exam"
+    },
+    workEnvironment: "Salons, barbershops, or self-employed. Standing for long periods. Flexible schedules possible.",
+    typicalEntryEducation: "Postsecondary nondegree award",
+    onTheJobTraining: "None",
+    stateSalaryData: {
+      TX: { min: 25000, max: 55000, median: 32000, employment: 58200, demandLevel: "high" },
+      CA: { min: 30000, max: 70000, median: 42000, employment: 82100, demandLevel: "high" },
+      NY: { min: 28000, max: 65000, median: 38000, employment: 42800, demandLevel: "moderate" },
+      FL: { min: 25000, max: 52000, median: 30000, employment: 48900, demandLevel: "moderate" }
+    },
+    blsLastUpdated: "2024-09"
+  },
+  {
+    id: "30",
+    title: "Firefighter",
+    category: "public_safety",
+    description: "Respond to fires, accidents, and other emergencies. Rescue people and protect property and communities.",
+    salaryMin: 38000,
+    salaryMax: 95000,
+    salaryMedian: 57120,
+    educationRequired: "High School + Fire Academy",
+    yearsExperience: "0-2 years",
+    growthRate: "+4%",
+    skills: ["Emergency Response", "Physical Fitness", "Teamwork", "Problem Solving", "First Aid"],
+    relatedCareers: ["EMT & Paramedic", "Fire Inspector", "Emergency Management Director"],
+    pathways: [
+      { type: "certification", description: "Complete fire academy training and earn EMT certification.", duration: "3-6 months", cost: "$3,000-$10,000" },
+      { type: "trade", description: "Earn fire science associate's degree and complete academy.", duration: "2 years", cost: "$10,000-$25,000" },
+      { type: "military", description: "Serve as a military firefighter and transition to civilian fire service.", duration: "4+ years", cost: "Free + Benefits" },
+    ],
+    bkdAlignment: {
+      be: 90,
+      know: 60,
+      do: 90,
+      primaryPillar: "be",
+      careerPersonality: "Brave, physically fit team player driven by a deep sense of duty to protect communities"
+    },
+    blsCode: "33-2011",
+    jobOutlook: "average",
+    projectedGrowth: 4,
+    projectedOpenings: 24300,
+    demandLevel: "high",
+    appropriateGrades: ["middle_school", "high_school", "post_secondary"],
+    entryPointsForGrades: {
+      middle_school: "Build physical fitness, learn about fire safety, join explorer scout programs",
+      high_school: "Join fire explorer programs, earn CPR/First Aid certification, volunteer with local departments",
+      post_secondary: "Complete fire academy, earn EMT certification, apply to fire departments"
+    },
+    workEnvironment: "Fire stations and emergency scenes. 24-hour shifts common. Physically demanding and hazardous.",
+    typicalEntryEducation: "Postsecondary nondegree award",
+    onTheJobTraining: "Long-term on-the-job training",
+    stateSalaryData: {
+      TX: { min: 40000, max: 80000, median: 55000, employment: 28400, demandLevel: "high" },
+      CA: { min: 55000, max: 120000, median: 82000, employment: 32100, demandLevel: "high" },
+      NY: { min: 50000, max: 110000, median: 78000, employment: 18900, demandLevel: "moderate" },
+      FL: { min: 38000, max: 72000, median: 52000, employment: 22400, demandLevel: "high" }
+    },
+    blsLastUpdated: "2024-09"
   }
 ];
 
