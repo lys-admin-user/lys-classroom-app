@@ -238,6 +238,61 @@ export const bkdCareerAlignmentSchema = z.object({
   careerPersonality: z.string().optional(), // Brief description of ideal personality fit
 });
 
+// BLS Occupational Outlook Handbook (OOH) Occupation Groups
+export const blsOohGroups = [
+  "architecture-and-engineering",
+  "arts-and-design",
+  "building-and-grounds-cleaning",
+  "business-and-financial",
+  "community-and-social-service",
+  "computer-and-information-technology",
+  "construction-and-extraction",
+  "education-training-and-library",
+  "entertainment-and-sports",
+  "farming-fishing-and-forestry",
+  "food-preparation-and-serving",
+  "healthcare",
+  "installation-maintenance-and-repair",
+  "legal",
+  "life-physical-and-social-science",
+  "management",
+  "math",
+  "media-and-communication",
+  "military",
+  "office-and-administrative-support",
+  "personal-care-and-service",
+  "production",
+  "protective-service",
+  "sales",
+  "transportation-and-material-moving",
+] as const;
+export type BlsOohGroup = typeof blsOohGroups[number];
+
+// NAICS (North American Industry Classification System) 2-digit Sector Codes
+export const naicsSectors = [
+  "11", // Agriculture, Forestry, Fishing and Hunting
+  "21", // Mining, Quarrying, and Oil and Gas Extraction
+  "22", // Utilities
+  "23", // Construction
+  "31-33", // Manufacturing
+  "42", // Wholesale Trade
+  "44-45", // Retail Trade
+  "48-49", // Transportation and Warehousing
+  "51", // Information
+  "52", // Finance and Insurance
+  "53", // Real Estate and Rental and Leasing
+  "54", // Professional, Scientific, and Technical Services
+  "55", // Management of Companies and Enterprises
+  "56", // Administrative and Support and Waste Management
+  "61", // Educational Services
+  "62", // Health Care and Social Assistance
+  "71", // Arts, Entertainment, and Recreation
+  "72", // Accommodation and Food Services
+  "81", // Other Services (except Public Administration)
+  "92", // Public Administration
+] as const;
+export type NaicsSector = typeof naicsSectors[number];
+
 // Career Pathway Schema (KNOW - Strategy & Resources)
 export const careerSchema = z.object({
   id: z.string(),
@@ -262,6 +317,8 @@ export const careerSchema = z.object({
   bkdAlignment: bkdCareerAlignmentSchema.optional(),
   // BLS and Market Data
   blsCode: z.string().optional(), // BLS Standard Occupational Classification (SOC) code
+  blsOohGroup: z.string().optional(), // BLS Occupational Outlook Handbook occupation group
+  naicsCode: z.string().optional(), // NAICS 2-6 digit industry classification code
   jobOutlook: jobOutlook.optional(), // BLS job outlook category
   projectedGrowth: z.number().optional(), // Projected employment change percentage (2023-2033)
   projectedOpenings: z.number().optional(), // Annual job openings
@@ -298,8 +355,9 @@ export const CAREER_FIELDS = [
   { id: "trades", name: "Skilled Trades", subjects: ["woodworking", "auto shop", "welding", "construction", "hvac", "electrical", "plumbing", "diesel", "automotive"] },
   { id: "public_safety", name: "Public Safety", subjects: ["fire science", "emergency management", "emt", "paramedic", "criminal justice", "public safety"] },
   { id: "personal_services", name: "Personal Services", subjects: ["cosmetology", "barbering", "beauty", "real estate", "hospitality"] },
+  { id: "science", name: "Science & Environment", subjects: ["environmental science", "ecology", "sustainability", "biotech", "genetics", "laboratory science", "chemistry", "biology"] },
   { id: "communications", name: "Communications & Media", subjects: ["english", "journalism", "communications", "media", "writing"] },
-  { id: "agriculture", name: "Agriculture & Environment", subjects: ["agriculture", "environmental science", "ecology", "forestry"] },
+  { id: "agriculture", name: "Agriculture & Environment", subjects: ["agriculture", "forestry"] },
 ] as const;
 
 export type CareerFieldId = typeof CAREER_FIELDS[number]["id"];

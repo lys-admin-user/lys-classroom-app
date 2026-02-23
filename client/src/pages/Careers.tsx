@@ -37,7 +37,8 @@ import {
   Brain,
   Zap,
   Shield,
-  Scissors
+  Scissors,
+  FlaskConical
 } from "lucide-react";
 import type { Career, SavedCareer } from "@shared/schema";
 import { useAuth } from "@/hooks/use-auth";
@@ -49,15 +50,16 @@ import { Link } from "wouter";
 
 const categories = [
   { value: "all", label: "All Categories", icon: Briefcase },
-  { value: "technology", label: "Technology", icon: Code },
+  { value: "technology", label: "Computer & IT", icon: Code },
   { value: "healthcare", label: "Healthcare", icon: Stethoscope },
-  { value: "business", label: "Business", icon: Building2 },
-  { value: "creative", label: "Creative Arts", icon: Palette },
-  { value: "trades", label: "Skilled Trades", icon: Wrench },
-  { value: "public_safety", label: "Public Safety", icon: Shield },
-  { value: "personal_services", label: "Personal Services", icon: Scissors },
-  { value: "legal", label: "Legal & Law", icon: Scale },
-  { value: "education", label: "Education", icon: BookOpen },
+  { value: "business", label: "Business & Management", icon: Building2 },
+  { value: "science", label: "Science & Environment", icon: FlaskConical },
+  { value: "creative", label: "Arts & Design", icon: Palette },
+  { value: "trades", label: "Construction & Trades", icon: Wrench },
+  { value: "public_safety", label: "Protective Service", icon: Shield },
+  { value: "personal_services", label: "Personal Care", icon: Scissors },
+  { value: "legal", label: "Legal", icon: Scale },
+  { value: "education", label: "Education & Training", icon: BookOpen },
 ];
 
 const educationPathways = [
@@ -86,10 +88,13 @@ const usStates = [
   { value: "WA", label: "Washington" },
   { value: "VA", label: "Virginia" },
   { value: "AZ", label: "Arizona" },
+  { value: "CO", label: "Colorado" },
   { value: "IA", label: "Iowa" },
+  { value: "MA", label: "Massachusetts" },
+  { value: "MI", label: "Michigan" },
+  { value: "NJ", label: "New Jersey" },
   { value: "OH", label: "Ohio" },
   { value: "LA", label: "Louisiana" },
-  { value: "MI", label: "Michigan" },
   { value: "PA", label: "Pennsylvania" },
   { value: "OK", label: "Oklahoma" },
 ];
@@ -328,9 +333,24 @@ export default function Careers() {
                     {selectedCareer.description}
                   </CardDescription>
                   {selectedCareer.blsCode && (
-                    <p className="text-xs text-muted-foreground mt-2 font-roboto">
-                      BLS Code: {selectedCareer.blsCode} | Last Updated: {selectedCareer.blsLastUpdated || "2024"}
-                    </p>
+                    <div className="flex flex-wrap items-center gap-2 mt-2">
+                      <Badge variant="outline" className="text-xs font-roboto" data-testid="badge-bls-code">
+                        SOC {selectedCareer.blsCode}
+                      </Badge>
+                      {selectedCareer.blsOohGroup && (
+                        <Badge variant="outline" className="text-xs font-roboto" data-testid="badge-bls-group">
+                          {selectedCareer.blsOohGroup.split("-").map((w: string) => w.charAt(0).toUpperCase() + w.slice(1)).join(" ")}
+                        </Badge>
+                      )}
+                      {selectedCareer.naicsCode && (
+                        <Badge variant="outline" className="text-xs font-roboto" data-testid="badge-naics">
+                          NAICS {selectedCareer.naicsCode}
+                        </Badge>
+                      )}
+                      <span className="text-xs text-muted-foreground font-roboto">
+                        Updated {selectedCareer.blsLastUpdated || "2024"}
+                      </span>
+                    </div>
                   )}
                 </div>
                 {isAuthenticated && (

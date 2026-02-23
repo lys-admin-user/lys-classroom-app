@@ -1038,6 +1038,8 @@ let seedCareers: Career[] = [
       careerPersonality: "Analytical problem-solver who enjoys building things and continuous learning"
     },
     blsCode: "15-1252",
+    blsOohGroup: "computer-and-information-technology",
+    naicsCode: "51",
     jobOutlook: "much_faster",
     projectedGrowth: 25,
     projectedOpenings: 153900,
@@ -1086,6 +1088,8 @@ let seedCareers: Career[] = [
       careerPersonality: "Compassionate caregiver with strong empathy and dedication to helping others"
     },
     blsCode: "29-1141",
+    blsOohGroup: "healthcare",
+    naicsCode: "62",
     jobOutlook: "faster_than_average",
     projectedGrowth: 6,
     projectedOpenings: 193100,
@@ -1132,6 +1136,8 @@ let seedCareers: Career[] = [
       careerPersonality: "Creative strategist who thrives on influencing outcomes and driving results"
     },
     blsCode: "11-2021",
+    blsOohGroup: "management",
+    naicsCode: "54",
     jobOutlook: "faster_than_average",
     projectedGrowth: 8,
     projectedOpenings: 34000,
@@ -1176,6 +1182,8 @@ let seedCareers: Career[] = [
       careerPersonality: "Hands-on problem solver who takes pride in practical, tangible work"
     },
     blsCode: "47-2111",
+    blsOohGroup: "construction-and-extraction",
+    naicsCode: "23",
     jobOutlook: "faster_than_average",
     projectedGrowth: 6,
     projectedOpenings: 73500,
@@ -1221,6 +1229,8 @@ let seedCareers: Career[] = [
       careerPersonality: "Creative visionary who expresses identity through visual storytelling"
     },
     blsCode: "27-1024",
+    blsOohGroup: "arts-and-design",
+    naicsCode: "54",
     jobOutlook: "average",
     projectedGrowth: 3,
     projectedOpenings: 22800,
@@ -1266,6 +1276,8 @@ let seedCareers: Career[] = [
       careerPersonality: "Detail-oriented researcher who excels in organization and information gathering"
     },
     blsCode: "23-2011",
+    blsOohGroup: "legal",
+    naicsCode: "54",
     jobOutlook: "average",
     projectedGrowth: 4,
     projectedOpenings: 36400,
@@ -1310,6 +1322,8 @@ let seedCareers: Career[] = [
       careerPersonality: "Curious analytical mind driven by discovering patterns and insights in data"
     },
     blsCode: "15-2051",
+    blsOohGroup: "math",
+    naicsCode: "54",
     jobOutlook: "much_faster",
     projectedGrowth: 36,
     projectedOpenings: 17700,
@@ -1354,6 +1368,8 @@ let seedCareers: Career[] = [
       careerPersonality: "Physically capable hands-on worker passionate about renewable energy and outdoor work"
     },
     blsCode: "49-9081",
+    blsOohGroup: "installation-maintenance-and-repair",
+    naicsCode: "22",
     jobOutlook: "much_faster",
     projectedGrowth: 45,
     projectedOpenings: 1400,
@@ -1397,6 +1413,8 @@ let seedCareers: Career[] = [
       careerPersonality: "Dedicated learner with deep medical knowledge and compassion for patient care"
     },
     blsCode: "29-1071",
+    blsOohGroup: "healthcare",
+    naicsCode: "62",
     jobOutlook: "much_faster",
     projectedGrowth: 28,
     projectedOpenings: 14100,
@@ -1442,6 +1460,8 @@ let seedCareers: Career[] = [
       careerPersonality: "Vigilant protector with strong ethics and passion for continuous technical learning"
     },
     blsCode: "15-1212",
+    blsOohGroup: "computer-and-information-technology",
+    naicsCode: "54",
     jobOutlook: "much_faster",
     projectedGrowth: 33,
     projectedOpenings: 16800,
@@ -1487,6 +1507,8 @@ let seedCareers: Career[] = [
       careerPersonality: "Environmentally conscious hands-on worker who enjoys physical outdoor work"
     },
     blsCode: "47-2231",
+    blsOohGroup: "construction-and-extraction",
+    naicsCode: "23",
     jobOutlook: "much_faster",
     projectedGrowth: 22,
     projectedOpenings: 3500,
@@ -1531,6 +1553,8 @@ let seedCareers: Career[] = [
       careerPersonality: "Nurturing guide with strong purpose who finds fulfillment in shaping young minds"
     },
     blsCode: "25-2021",
+    blsOohGroup: "education-training-and-library",
+    naicsCode: "61",
     jobOutlook: "little_change",
     projectedGrowth: 1,
     projectedOpenings: 107100,
@@ -1574,6 +1598,8 @@ let seedCareers: Career[] = [
       careerPersonality: "Hands-on healer who combines scientific knowledge with direct patient care"
     },
     blsCode: "29-1123",
+    blsOohGroup: "healthcare",
+    naicsCode: "62",
     jobOutlook: "much_faster",
     projectedGrowth: 15,
     projectedOpenings: 12800,
@@ -1617,6 +1643,8 @@ let seedCareers: Career[] = [
       careerPersonality: "Compassionate animal lover with deep dedication to animal welfare and healing"
     },
     blsCode: "29-1131",
+    blsOohGroup: "healthcare",
+    naicsCode: "54",
     jobOutlook: "much_faster",
     projectedGrowth: 19,
     projectedOpenings: 4600,
@@ -1663,6 +1691,8 @@ let seedCareers: Career[] = [
       careerPersonality: "Natural leader who excels at coordinating teams and seeing projects through to completion"
     },
     blsCode: "11-9021",
+    blsOohGroup: "management",
+    naicsCode: "23",
     jobOutlook: "faster_than_average",
     projectedGrowth: 5,
     projectedOpenings: 45100,
@@ -1707,6 +1737,8 @@ let seedCareers: Career[] = [
       careerPersonality: "Practical problem solver who enjoys hands-on work and helping people maintain their homes"
     },
     blsCode: "47-2152",
+    blsOohGroup: "construction-and-extraction",
+    naicsCode: "23",
     jobOutlook: "average",
     projectedGrowth: 2,
     projectedOpenings: 42600,
@@ -1754,6 +1786,8 @@ let seedCareers: Career[] = [
       careerPersonality: "Technical troubleshooter who enjoys diagnosing and fixing complex mechanical systems"
     },
     blsCode: "49-9021",
+    blsOohGroup: "installation-maintenance-and-repair",
+    naicsCode: "23",
     jobOutlook: "faster_than_average",
     projectedGrowth: 6,
     projectedOpenings: 38500,
@@ -1801,6 +1835,8 @@ let seedCareers: Career[] = [
       careerPersonality: "Detail-focused craftsperson who takes pride in precise, skilled manual work"
     },
     blsCode: "51-4121",
+    blsOohGroup: "production",
+    naicsCode: "31-33",
     jobOutlook: "average",
     projectedGrowth: 2,
     projectedOpenings: 42300,
@@ -1848,6 +1884,8 @@ let seedCareers: Career[] = [
       careerPersonality: "Mechanically curious problem solver who loves figuring out how things work"
     },
     blsCode: "49-3023",
+    blsOohGroup: "installation-maintenance-and-repair",
+    naicsCode: "81",
     jobOutlook: "average",
     projectedGrowth: 4,
     projectedOpenings: 69000,
@@ -1895,6 +1933,8 @@ let seedCareers: Career[] = [
       careerPersonality: "Independent self-starter who enjoys the open road and working on their own schedule"
     },
     blsCode: "53-3032",
+    blsOohGroup: "transportation-and-material-moving",
+    naicsCode: "48-49",
     jobOutlook: "average",
     projectedGrowth: 4,
     projectedOpenings: 240300,
@@ -1941,6 +1981,8 @@ let seedCareers: Career[] = [
       careerPersonality: "Mechanically skilled troubleshooter who enjoys working with powerful engines and heavy machinery"
     },
     blsCode: "49-3031",
+    blsOohGroup: "installation-maintenance-and-repair",
+    naicsCode: "81",
     jobOutlook: "faster_than_average",
     projectedGrowth: 5,
     projectedOpenings: 28400,
@@ -1987,6 +2029,8 @@ let seedCareers: Career[] = [
       careerPersonality: "Caring multitasker who thrives in fast-paced healthcare environments"
     },
     blsCode: "31-9092",
+    blsOohGroup: "healthcare",
+    naicsCode: "62",
     jobOutlook: "much_faster",
     projectedGrowth: 14,
     projectedOpenings: 119200,
@@ -2032,6 +2076,8 @@ let seedCareers: Career[] = [
       careerPersonality: "Detail-oriented person who values accuracy and helping patients with their health needs"
     },
     blsCode: "29-2052",
+    blsOohGroup: "healthcare",
+    naicsCode: "44-45",
     jobOutlook: "faster_than_average",
     projectedGrowth: 6,
     projectedOpenings: 43500,
@@ -2078,6 +2124,8 @@ let seedCareers: Career[] = [
       careerPersonality: "Courageous first responder driven by urgency and compassion to save lives"
     },
     blsCode: "29-2040",
+    blsOohGroup: "healthcare",
+    naicsCode: "62",
     jobOutlook: "faster_than_average",
     projectedGrowth: 5,
     projectedOpenings: 19600,
@@ -2122,6 +2170,8 @@ let seedCareers: Career[] = [
       careerPersonality: "Detail-oriented caregiver who values preventive health and patient education"
     },
     blsCode: "29-1292",
+    blsOohGroup: "healthcare",
+    naicsCode: "62",
     jobOutlook: "faster_than_average",
     projectedGrowth: 7,
     projectedOpenings: 15600,
@@ -2167,6 +2217,8 @@ let seedCareers: Career[] = [
       careerPersonality: "Compassionate caregiver who finds purpose in direct patient care and support"
     },
     blsCode: "29-2061",
+    blsOohGroup: "healthcare",
+    naicsCode: "62",
     jobOutlook: "faster_than_average",
     projectedGrowth: 5,
     projectedOpenings: 54400,
@@ -2211,6 +2263,8 @@ let seedCareers: Career[] = [
       careerPersonality: "Deeply caring individual who finds fulfillment in helping others with basic needs"
     },
     blsCode: "31-1131",
+    blsOohGroup: "healthcare",
+    naicsCode: "62",
     jobOutlook: "average",
     projectedGrowth: 4,
     projectedOpenings: 220200,
@@ -2255,6 +2309,8 @@ let seedCareers: Career[] = [
       careerPersonality: "Entrepreneurial self-starter with strong people skills and drive to close deals"
     },
     blsCode: "41-9022",
+    blsOohGroup: "sales",
+    naicsCode: "53",
     jobOutlook: "average",
     projectedGrowth: 3,
     projectedOpenings: 51600,
@@ -2300,6 +2356,8 @@ let seedCareers: Career[] = [
       careerPersonality: "Creative artist with strong interpersonal skills who helps people look and feel confident"
     },
     blsCode: "39-5012",
+    blsOohGroup: "personal-care-and-service",
+    naicsCode: "81",
     jobOutlook: "faster_than_average",
     projectedGrowth: 8,
     projectedOpenings: 77600,
@@ -2346,6 +2404,8 @@ let seedCareers: Career[] = [
       careerPersonality: "Brave, physically fit team player driven by a deep sense of duty to protect communities"
     },
     blsCode: "33-2011",
+    blsOohGroup: "protective-service",
+    naicsCode: "92",
     jobOutlook: "average",
     projectedGrowth: 4,
     projectedOpenings: 24300,
@@ -2364,6 +2424,482 @@ let seedCareers: Career[] = [
       CA: { min: 55000, max: 120000, median: 82000, employment: 32100, demandLevel: "high" },
       NY: { min: 50000, max: 110000, median: 78000, employment: 18900, demandLevel: "moderate" },
       FL: { min: 38000, max: 72000, median: 52000, employment: 22400, demandLevel: "high" }
+    },
+    blsLastUpdated: "2024-09"
+  },
+  {
+    id: "31",
+    title: "AI / Machine Learning Engineer",
+    category: "technology",
+    description: "Design, build, and deploy artificial intelligence and machine learning models that power intelligent applications, automation, and data-driven decision making.",
+    salaryMin: 100000,
+    salaryMax: 250000,
+    salaryMedian: 161000,
+    educationRequired: "Bachelor's or Master's Degree",
+    yearsExperience: "0-5 years",
+    growthRate: "+40%",
+    skills: ["Python/PyTorch/TensorFlow", "Machine Learning", "Mathematics", "Data Engineering", "Cloud Computing"],
+    relatedCareers: ["Data Scientist", "Software Developer", "Research Scientist"],
+    pathways: [
+      { type: "college", description: "Earn a degree in Computer Science, AI, or Data Science with ML focus.", duration: "4-6 years", cost: "$50,000-$250,000" },
+      { type: "certification", description: "Complete AI/ML bootcamp and earn cloud AI certifications (AWS ML, Google AI).", duration: "6-12 months", cost: "$10,000-$25,000" },
+    ],
+    bkdAlignment: {
+      be: 50,
+      know: 95,
+      do: 85,
+      primaryPillar: "know",
+      careerPersonality: "Innovative problem solver who loves pushing the boundaries of what machines can learn and do"
+    },
+    blsCode: "15-2051",
+    blsOohGroup: "computer-and-information-technology",
+    naicsCode: "51",
+    jobOutlook: "much_faster",
+    projectedGrowth: 40,
+    projectedOpenings: 21500,
+    demandLevel: "very_high",
+    appropriateGrades: ["high_school", "post_secondary"],
+    entryPointsForGrades: {
+      high_school: "Learn Python programming, explore AI concepts through online courses, participate in data science competitions",
+      post_secondary: "Major in CS/AI, build ML projects, contribute to open-source AI frameworks, pursue internships at AI companies"
+    },
+    workEnvironment: "Office or remote. Highly collaborative, research-oriented teams.",
+    typicalEntryEducation: "Master's degree",
+    onTheJobTraining: "None",
+    stateSalaryData: {
+      CA: { min: 130000, max: 280000, median: 195000, employment: 18200, demandLevel: "very_high" },
+      WA: { min: 120000, max: 260000, median: 185000, employment: 8400, demandLevel: "very_high" },
+      NY: { min: 110000, max: 230000, median: 170000, employment: 7800, demandLevel: "very_high" },
+      TX: { min: 100000, max: 210000, median: 155000, employment: 6200, demandLevel: "very_high" }
+    },
+    blsLastUpdated: "2024-09"
+  },
+  {
+    id: "32",
+    title: "Cloud Architect",
+    category: "technology",
+    description: "Design and oversee cloud computing strategies, including cloud adoption plans, application design, and cloud management and monitoring.",
+    salaryMin: 100000,
+    salaryMax: 200000,
+    salaryMedian: 151150,
+    educationRequired: "Bachelor's Degree + Certifications",
+    yearsExperience: "3-7 years",
+    growthRate: "+23%",
+    skills: ["AWS/Azure/GCP", "System Architecture", "DevOps", "Security", "Networking"],
+    relatedCareers: ["Software Developer", "Cybersecurity Analyst", "DevOps Engineer"],
+    pathways: [
+      { type: "college", description: "Earn a degree in Computer Science, IT, or related field.", duration: "4 years", cost: "$40,000-$200,000" },
+      { type: "certification", description: "Earn cloud certifications (AWS Solutions Architect, Azure Architect, GCP Professional).", duration: "6-12 months", cost: "$5,000-$15,000" },
+      { type: "military", description: "Gain IT experience in military and transition with cloud certifications.", duration: "4+ years", cost: "Free + Benefits" },
+    ],
+    bkdAlignment: {
+      be: 55,
+      know: 90,
+      do: 85,
+      primaryPillar: "know",
+      careerPersonality: "Strategic systems thinker who designs scalable infrastructure for the digital age"
+    },
+    blsCode: "15-1241",
+    blsOohGroup: "computer-and-information-technology",
+    naicsCode: "54",
+    jobOutlook: "much_faster",
+    projectedGrowth: 23,
+    projectedOpenings: 14200,
+    demandLevel: "very_high",
+    appropriateGrades: ["high_school", "post_secondary"],
+    entryPointsForGrades: {
+      high_school: "Learn programming and networking basics, explore cloud free tiers, take IT courses",
+      post_secondary: "Study CS or IT, earn cloud certifications, gain experience in system administration"
+    },
+    workEnvironment: "Office or remote. Cross-team collaboration with developers and operations.",
+    typicalEntryEducation: "Bachelor's degree",
+    onTheJobTraining: "None",
+    stateSalaryData: {
+      CA: { min: 130000, max: 230000, median: 175000, employment: 12400, demandLevel: "very_high" },
+      WA: { min: 120000, max: 220000, median: 165000, employment: 6800, demandLevel: "very_high" },
+      TX: { min: 105000, max: 195000, median: 150000, employment: 8200, demandLevel: "very_high" },
+      VA: { min: 110000, max: 200000, median: 155000, employment: 7100, demandLevel: "very_high" }
+    },
+    blsLastUpdated: "2024-09"
+  },
+  {
+    id: "33",
+    title: "UX/UI Designer",
+    category: "creative",
+    description: "Research, design, and test user interfaces for websites, apps, and digital products to create intuitive and enjoyable user experiences.",
+    salaryMin: 60000,
+    salaryMax: 140000,
+    salaryMedian: 91600,
+    educationRequired: "Bachelor's Degree or Portfolio",
+    yearsExperience: "0-3 years",
+    growthRate: "+16%",
+    skills: ["User Research", "Wireframing/Prototyping", "Figma/Sketch", "Visual Design", "Accessibility"],
+    relatedCareers: ["Graphic Designer", "Product Manager", "Web Developer"],
+    pathways: [
+      { type: "college", description: "Earn a degree in UX Design, HCI, or Design.", duration: "4 years", cost: "$40,000-$180,000" },
+      { type: "certification", description: "Complete UX design bootcamp and build portfolio.", duration: "3-6 months", cost: "$5,000-$15,000" },
+    ],
+    bkdAlignment: {
+      be: 75,
+      know: 70,
+      do: 85,
+      primaryPillar: "do",
+      careerPersonality: "Empathetic designer who combines creativity with user psychology to craft meaningful digital experiences"
+    },
+    blsCode: "15-1255",
+    blsOohGroup: "arts-and-design",
+    naicsCode: "54",
+    jobOutlook: "much_faster",
+    projectedGrowth: 16,
+    projectedOpenings: 19400,
+    demandLevel: "very_high",
+    appropriateGrades: ["middle_school", "high_school", "post_secondary"],
+    entryPointsForGrades: {
+      middle_school: "Create digital art, learn basic web design, explore how apps are designed",
+      high_school: "Build simple websites, learn design tools like Figma, study psychology",
+      post_secondary: "Complete UX program or bootcamp, build case study portfolio, gain internship experience"
+    },
+    workEnvironment: "Office or remote. Collaborative work with developers and product teams.",
+    typicalEntryEducation: "Bachelor's degree",
+    onTheJobTraining: "None",
+    stateSalaryData: {
+      CA: { min: 80000, max: 160000, median: 115000, employment: 14200, demandLevel: "very_high" },
+      NY: { min: 70000, max: 140000, median: 100000, employment: 8900, demandLevel: "high" },
+      TX: { min: 65000, max: 130000, median: 90000, employment: 6800, demandLevel: "high" },
+      WA: { min: 75000, max: 150000, median: 108000, employment: 5200, demandLevel: "very_high" }
+    },
+    blsLastUpdated: "2024-09"
+  },
+  {
+    id: "34",
+    title: "Robotics Technician",
+    category: "technology",
+    description: "Build, install, test, and maintain robotic systems used in manufacturing, healthcare, logistics, and other industries.",
+    salaryMin: 45000,
+    salaryMax: 90000,
+    salaryMedian: 61000,
+    educationRequired: "Associate's Degree or Technical Certificate",
+    yearsExperience: "0-3 years",
+    growthRate: "+11%",
+    skills: ["Robotics Systems", "PLC Programming", "Electrical Systems", "Mechanical Skills", "Troubleshooting"],
+    relatedCareers: ["Industrial Engineer", "Automation Technician", "Mechatronics Engineer"],
+    pathways: [
+      { type: "trade", description: "Complete robotics or mechatronics technology program.", duration: "2 years", cost: "$10,000-$30,000" },
+      { type: "certification", description: "Earn robotics certifications (FANUC, ABB, or universal robotics).", duration: "6-12 months", cost: "$3,000-$10,000" },
+      { type: "military", description: "Train in military electronics or robotics systems.", duration: "4+ years", cost: "Free + Benefits" },
+    ],
+    bkdAlignment: {
+      be: 50,
+      know: 70,
+      do: 90,
+      primaryPillar: "do",
+      careerPersonality: "Mechanically gifted innovator who loves building and programming machines of the future"
+    },
+    blsCode: "17-3024",
+    blsOohGroup: "architecture-and-engineering",
+    naicsCode: "31-33",
+    jobOutlook: "faster_than_average",
+    projectedGrowth: 11,
+    projectedOpenings: 8200,
+    demandLevel: "high",
+    appropriateGrades: ["middle_school", "high_school", "post_secondary"],
+    entryPointsForGrades: {
+      middle_school: "Join robotics clubs (FIRST, VEX), learn basic programming, build simple robots",
+      high_school: "Compete in robotics competitions, take electronics courses, learn Arduino/Raspberry Pi",
+      post_secondary: "Complete robotics technology program, earn industry certifications, gain manufacturing experience"
+    },
+    workEnvironment: "Manufacturing plants, warehouses, labs. Hands-on work with advanced equipment.",
+    typicalEntryEducation: "Associate's degree",
+    onTheJobTraining: "Moderate-term on-the-job training",
+    stateSalaryData: {
+      MI: { min: 50000, max: 88000, median: 65000, employment: 4200, demandLevel: "very_high" },
+      OH: { min: 48000, max: 82000, median: 60000, employment: 3800, demandLevel: "high" },
+      TX: { min: 48000, max: 85000, median: 62000, employment: 3200, demandLevel: "high" },
+      CA: { min: 55000, max: 95000, median: 72000, employment: 2800, demandLevel: "high" }
+    },
+    blsLastUpdated: "2024-09"
+  },
+  {
+    id: "35",
+    title: "Sustainability Analyst",
+    category: "science",
+    description: "Help organizations reduce their environmental impact by analyzing data, developing sustainability strategies, and ensuring regulatory compliance.",
+    salaryMin: 55000,
+    salaryMax: 110000,
+    salaryMedian: 76480,
+    educationRequired: "Bachelor's Degree",
+    yearsExperience: "0-3 years",
+    growthRate: "+8%",
+    skills: ["Environmental Analysis", "Data Analytics", "ESG Reporting", "Project Management", "Communication"],
+    relatedCareers: ["Environmental Scientist", "Climate Data Scientist", "Energy Auditor"],
+    pathways: [
+      { type: "college", description: "Earn a degree in Environmental Science, Sustainability, or related field.", duration: "4 years", cost: "$40,000-$180,000" },
+      { type: "certification", description: "Earn sustainability certifications (LEED AP, ISSP, GRI).", duration: "3-6 months", cost: "$2,000-$8,000" },
+    ],
+    bkdAlignment: {
+      be: 80,
+      know: 80,
+      do: 75,
+      primaryPillar: "be",
+      careerPersonality: "Purpose-driven analyst who combines environmental passion with business acumen to create lasting change"
+    },
+    blsCode: "19-2041",
+    blsOohGroup: "life-physical-and-social-science",
+    naicsCode: "54",
+    jobOutlook: "faster_than_average",
+    projectedGrowth: 8,
+    projectedOpenings: 7200,
+    demandLevel: "high",
+    appropriateGrades: ["high_school", "post_secondary"],
+    entryPointsForGrades: {
+      high_school: "Join environmental clubs, study science and data analysis, volunteer for conservation",
+      post_secondary: "Major in environmental science or sustainability, intern at green companies, earn certifications"
+    },
+    workEnvironment: "Office, field work, or remote. Cross-functional collaboration with corporate teams.",
+    typicalEntryEducation: "Bachelor's degree",
+    onTheJobTraining: "None",
+    stateSalaryData: {
+      CA: { min: 65000, max: 125000, median: 90000, employment: 4800, demandLevel: "very_high" },
+      NY: { min: 60000, max: 115000, median: 85000, employment: 3200, demandLevel: "high" },
+      TX: { min: 55000, max: 100000, median: 75000, employment: 2800, demandLevel: "moderate" },
+      WA: { min: 62000, max: 118000, median: 88000, employment: 2100, demandLevel: "high" }
+    },
+    blsLastUpdated: "2024-09"
+  },
+  {
+    id: "36",
+    title: "Biotech Research Associate",
+    category: "science",
+    description: "Conduct laboratory research in biotechnology, genetics, pharmaceuticals, or agriculture to develop new treatments, products, and innovations.",
+    salaryMin: 50000,
+    salaryMax: 95000,
+    salaryMedian: 64000,
+    educationRequired: "Bachelor's Degree in Biology/Biochemistry",
+    yearsExperience: "0-3 years",
+    growthRate: "+10%",
+    skills: ["Laboratory Techniques", "Molecular Biology", "Data Analysis", "Scientific Writing", "Quality Control"],
+    relatedCareers: ["Biochemist", "Medical Scientist", "Microbiologist"],
+    pathways: [
+      { type: "college", description: "Earn a degree in Biology, Biochemistry, or Biotechnology.", duration: "4 years", cost: "$40,000-$200,000" },
+      { type: "certification", description: "Earn lab certifications and gain research experience through internships.", duration: "1-2 years", cost: "$5,000-$15,000" },
+    ],
+    bkdAlignment: {
+      be: 60,
+      know: 90,
+      do: 80,
+      primaryPillar: "know",
+      careerPersonality: "Curious scientist driven by discovery and the potential to improve human health and food systems"
+    },
+    blsCode: "19-1029",
+    blsOohGroup: "life-physical-and-social-science",
+    naicsCode: "54",
+    jobOutlook: "faster_than_average",
+    projectedGrowth: 10,
+    projectedOpenings: 5800,
+    demandLevel: "high",
+    appropriateGrades: ["high_school", "post_secondary"],
+    entryPointsForGrades: {
+      high_school: "Excel in biology and chemistry, participate in science fairs, explore genetic concepts",
+      post_secondary: "Major in biology/biochemistry, gain lab research experience, pursue grad school or industry internships"
+    },
+    workEnvironment: "Laboratories and research facilities. Precise, detail-oriented work with specialized equipment.",
+    typicalEntryEducation: "Bachelor's degree",
+    onTheJobTraining: "None",
+    stateSalaryData: {
+      CA: { min: 60000, max: 105000, median: 78000, employment: 18200, demandLevel: "very_high" },
+      MA: { min: 58000, max: 100000, median: 75000, employment: 12400, demandLevel: "very_high" },
+      NJ: { min: 55000, max: 95000, median: 72000, employment: 8100, demandLevel: "high" },
+      TX: { min: 50000, max: 88000, median: 65000, employment: 6400, demandLevel: "moderate" }
+    },
+    blsLastUpdated: "2024-09"
+  },
+  {
+    id: "37",
+    title: "Drone Pilot / Remote Sensing Technician",
+    category: "technology",
+    description: "Operate unmanned aerial vehicles (drones) for surveying, inspection, agriculture, photography, emergency response, and infrastructure monitoring.",
+    salaryMin: 40000,
+    salaryMax: 95000,
+    salaryMedian: 58000,
+    educationRequired: "FAA Part 107 License + Training",
+    yearsExperience: "0-2 years",
+    growthRate: "+30%",
+    skills: ["Drone Operation", "GIS/Mapping", "Photography", "Data Analysis", "FAA Regulations"],
+    relatedCareers: ["Surveyor", "Aerial Photographer", "GIS Specialist"],
+    pathways: [
+      { type: "certification", description: "Earn FAA Part 107 Remote Pilot Certificate and specialized drone training.", duration: "1-3 months", cost: "$500-$3,000" },
+      { type: "trade", description: "Complete drone technology program with GIS and mapping specialization.", duration: "6-12 months", cost: "$5,000-$15,000" },
+      { type: "military", description: "Gain UAV experience in military drone operations.", duration: "4+ years", cost: "Free + Benefits" },
+    ],
+    bkdAlignment: {
+      be: 55,
+      know: 65,
+      do: 90,
+      primaryPillar: "do",
+      careerPersonality: "Tech-savvy pilot who loves combining flying technology with real-world problem solving"
+    },
+    blsCode: "53-6051",
+    blsOohGroup: "transportation-and-material-moving",
+    naicsCode: "54",
+    jobOutlook: "much_faster",
+    projectedGrowth: 30,
+    projectedOpenings: 8500,
+    demandLevel: "high",
+    appropriateGrades: ["middle_school", "high_school", "post_secondary"],
+    entryPointsForGrades: {
+      middle_school: "Join drone clubs, learn basic programming and photography, explore aviation concepts",
+      high_school: "Get hands-on with drone flying, study for FAA Part 107, learn GIS and mapping software",
+      post_secondary: "Earn FAA certification, specialize in industry application (agriculture, construction, inspection)"
+    },
+    workEnvironment: "Outdoor field work with some office analysis time. Variable locations and conditions.",
+    typicalEntryEducation: "Postsecondary nondegree award",
+    onTheJobTraining: "Moderate-term on-the-job training",
+    stateSalaryData: {
+      TX: { min: 42000, max: 90000, median: 58000, employment: 3200, demandLevel: "high" },
+      CA: { min: 50000, max: 105000, median: 68000, employment: 4100, demandLevel: "high" },
+      FL: { min: 40000, max: 85000, median: 55000, employment: 2800, demandLevel: "moderate" },
+      CO: { min: 45000, max: 92000, median: 62000, employment: 1800, demandLevel: "high" }
+    },
+    blsLastUpdated: "2024-09"
+  },
+  {
+    id: "38",
+    title: "Health Informatics Specialist",
+    category: "healthcare",
+    description: "Bridge healthcare and technology by managing health data systems, electronic health records, and clinical data analytics to improve patient outcomes.",
+    salaryMin: 60000,
+    salaryMax: 120000,
+    salaryMedian: 62800,
+    educationRequired: "Bachelor's or Master's Degree",
+    yearsExperience: "0-3 years",
+    growthRate: "+16%",
+    skills: ["Health Data Systems", "EHR Management", "Data Analytics", "HIPAA Compliance", "Clinical Workflows"],
+    relatedCareers: ["Data Analyst", "Health IT Specialist", "Clinical Informatics Manager"],
+    pathways: [
+      { type: "college", description: "Earn a degree in Health Informatics, Health IT, or related field.", duration: "4-6 years", cost: "$40,000-$200,000" },
+      { type: "certification", description: "Earn health informatics certifications (RHIA, CAHIMS, CPHIMS).", duration: "6-12 months", cost: "$5,000-$15,000" },
+    ],
+    bkdAlignment: {
+      be: 65,
+      know: 85,
+      do: 75,
+      primaryPillar: "know",
+      careerPersonality: "Analytical bridge-builder who connects healthcare knowledge with technology to save lives through data"
+    },
+    blsCode: "15-1211",
+    blsOohGroup: "computer-and-information-technology",
+    naicsCode: "62",
+    jobOutlook: "much_faster",
+    projectedGrowth: 16,
+    projectedOpenings: 9800,
+    demandLevel: "high",
+    appropriateGrades: ["high_school", "post_secondary"],
+    entryPointsForGrades: {
+      high_school: "Take health science and computer courses, learn about health data, volunteer in healthcare",
+      post_secondary: "Major in health informatics or health IT, gain clinical data experience, earn certifications"
+    },
+    workEnvironment: "Hospitals, health systems, insurance companies. Office-based with regular hours.",
+    typicalEntryEducation: "Bachelor's degree",
+    onTheJobTraining: "None",
+    stateSalaryData: {
+      TX: { min: 62000, max: 115000, median: 82000, employment: 4800, demandLevel: "high" },
+      CA: { min: 72000, max: 135000, median: 98000, employment: 6200, demandLevel: "high" },
+      NY: { min: 68000, max: 125000, median: 92000, employment: 4100, demandLevel: "moderate" },
+      FL: { min: 58000, max: 108000, median: 78000, employment: 3500, demandLevel: "moderate" }
+    },
+    blsLastUpdated: "2024-09"
+  },
+  {
+    id: "39",
+    title: "EV / Battery Technician",
+    category: "trades",
+    description: "Service, diagnose, and repair electric vehicles and battery systems. Work with high-voltage systems, charging infrastructure, and EV powertrains.",
+    salaryMin: 40000,
+    salaryMax: 85000,
+    salaryMedian: 56000,
+    educationRequired: "Technical Certificate or Associate's",
+    yearsExperience: "0-2 years",
+    growthRate: "+25%",
+    skills: ["EV Systems", "High-Voltage Safety", "Battery Technology", "Diagnostics", "Electrical Systems"],
+    relatedCareers: ["Automotive Technician", "Electrician", "Solar Installer"],
+    pathways: [
+      { type: "trade", description: "Complete EV technology program at a trade school.", duration: "6-12 months", cost: "$5,000-$15,000" },
+      { type: "certification", description: "Earn EV manufacturer certifications (Tesla, Ford, GM) and ASE xEV.", duration: "3-6 months", cost: "$2,000-$8,000" },
+    ],
+    bkdAlignment: {
+      be: 55,
+      know: 65,
+      do: 90,
+      primaryPillar: "do",
+      careerPersonality: "Forward-thinking technician passionate about clean energy and the future of transportation"
+    },
+    blsCode: "49-3023",
+    blsOohGroup: "installation-maintenance-and-repair",
+    naicsCode: "81",
+    jobOutlook: "much_faster",
+    projectedGrowth: 25,
+    projectedOpenings: 12400,
+    demandLevel: "very_high",
+    appropriateGrades: ["high_school", "post_secondary"],
+    entryPointsForGrades: {
+      high_school: "Study electronics and physics, learn about EV technology, take auto tech courses",
+      post_secondary: "Complete EV technician program, earn manufacturer certifications, gain dealership experience"
+    },
+    workEnvironment: "EV dealerships, charging stations, fleet garages. Clean-tech shop environments.",
+    typicalEntryEducation: "Postsecondary nondegree award",
+    onTheJobTraining: "Moderate-term on-the-job training",
+    stateSalaryData: {
+      CA: { min: 50000, max: 95000, median: 68000, employment: 8200, demandLevel: "very_high" },
+      TX: { min: 42000, max: 82000, median: 58000, employment: 4800, demandLevel: "high" },
+      MI: { min: 45000, max: 85000, median: 62000, employment: 3200, demandLevel: "very_high" },
+      FL: { min: 40000, max: 78000, median: 55000, employment: 3800, demandLevel: "high" }
+    },
+    blsLastUpdated: "2024-09"
+  },
+  {
+    id: "40",
+    title: "Product Manager",
+    category: "business",
+    description: "Lead the strategy, development, and launch of products. Define product vision, prioritize features, and work with engineering, design, and marketing teams.",
+    salaryMin: 80000,
+    salaryMax: 180000,
+    salaryMedian: 131000,
+    educationRequired: "Bachelor's Degree",
+    yearsExperience: "2-5 years",
+    growthRate: "+10%",
+    skills: ["Product Strategy", "User Research", "Data Analysis", "Cross-Team Leadership", "Agile/Scrum"],
+    relatedCareers: ["UX/UI Designer", "Marketing Manager", "Software Developer"],
+    pathways: [
+      { type: "college", description: "Earn a degree in Business, Computer Science, or Engineering.", duration: "4 years", cost: "$40,000-$200,000" },
+      { type: "certification", description: "Complete product management bootcamp and build a product portfolio.", duration: "3-6 months", cost: "$5,000-$15,000" },
+    ],
+    bkdAlignment: {
+      be: 70,
+      know: 80,
+      do: 85,
+      primaryPillar: "do",
+      careerPersonality: "Strategic leader who thrives at the intersection of technology, business, and user needs"
+    },
+    blsCode: "11-2021",
+    blsOohGroup: "management",
+    naicsCode: "51",
+    jobOutlook: "faster_than_average",
+    projectedGrowth: 10,
+    projectedOpenings: 18200,
+    demandLevel: "very_high",
+    appropriateGrades: ["high_school", "post_secondary"],
+    entryPointsForGrades: {
+      high_school: "Build small projects (apps, websites), join FBLA/DECA, develop leadership and analytical skills",
+      post_secondary: "Study business or CS, gain experience in tech companies, build case studies and product sense"
+    },
+    workEnvironment: "Office or remote. Highly collaborative, fast-paced product teams.",
+    typicalEntryEducation: "Bachelor's degree",
+    onTheJobTraining: "None",
+    stateSalaryData: {
+      CA: { min: 110000, max: 200000, median: 155000, employment: 18400, demandLevel: "very_high" },
+      WA: { min: 100000, max: 190000, median: 148000, employment: 8200, demandLevel: "very_high" },
+      NY: { min: 95000, max: 180000, median: 140000, employment: 12100, demandLevel: "high" },
+      TX: { min: 85000, max: 165000, median: 125000, employment: 8800, demandLevel: "high" }
     },
     blsLastUpdated: "2024-09"
   }
