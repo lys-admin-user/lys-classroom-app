@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { BKDCard } from "@/components/BKDCard";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -19,11 +20,13 @@ import {
   GraduationCap,
   Flame,
   Award,
-  FolderOpen
+  FolderOpen,
+  Play
 } from "lucide-react";
 import { Link } from "wouter";
 import { useQuery } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/use-auth";
+import { DemoVideoModal } from "@/components/DemoVideoModal";
 import type { StudentJourneyProgress, StudentJourneyMilestone, StudentJourneyActivity, Career } from "@shared/schema";
 
 interface JourneyData {
@@ -487,6 +490,7 @@ function StudentDashboard() {
 
 function EducatorDashboard() {
   const { isAuthenticated } = useAuth();
+  const [showDemo, setShowDemo] = useState(false);
   
   return (
     <div className="min-h-screen bg-background" data-testid="educator-dashboard">
@@ -518,8 +522,10 @@ function EducatorDashboard() {
                   size="lg" 
                   variant="outline" 
                   className="font-oswald gap-2 border-lys-yellow text-lys-yellow hover:bg-lys-yellow/10"
+                  onClick={() => setShowDemo(true)}
                   data-testid="button-watch-demo"
                 >
+                  <Play className="h-4 w-4" />
                   Watch 2min Demo
                 </Button>
               </div>
@@ -772,6 +778,8 @@ function EducatorDashboard() {
           </div>
         </div>
       </section>
+
+      <DemoVideoModal open={showDemo} onOpenChange={setShowDemo} />
     </div>
   );
 }
