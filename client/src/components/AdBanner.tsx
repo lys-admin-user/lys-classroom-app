@@ -2,6 +2,7 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { X, Sparkles } from "lucide-react";
 import { useState } from "react";
+import { Link } from "wouter";
 
 interface AdBannerProps {
   position?: "sidebar" | "inline" | "footer";
@@ -48,15 +49,17 @@ export function AdBanner({ position = "inline", className = "" }: AdBannerProps)
             </div>
           </div>
           <div className="flex items-center gap-2">
-            <Button 
-              variant="outline" 
-              size="sm"
-              className="text-xs gap-1"
-              data-testid="button-upgrade-ad"
-            >
-              <Sparkles className="h-3 w-3" />
-              Remove Ads
-            </Button>
+            <Link href="/pricing">
+              <Button 
+                variant="outline" 
+                size="sm"
+                className="text-xs gap-1"
+                data-testid="button-upgrade-ad"
+              >
+                <Sparkles className="h-3 w-3" />
+                Remove Ads
+              </Button>
+            </Link>
             <Button 
               variant="ghost" 
               size="icon" 
@@ -82,15 +85,17 @@ export function AdBanner({ position = "inline", className = "" }: AdBannerProps)
           </div>
         </div>
         <div className="flex items-center gap-2">
-          <Button 
-            variant="outline" 
-            size="sm"
-            className="text-xs gap-1"
-            data-testid="button-upgrade-inline"
-          >
-            <Sparkles className="h-3 w-3" />
-            Go Ad-Free
-          </Button>
+          <Link href="/pricing">
+            <Button 
+              variant="outline" 
+              size="sm"
+              className="text-xs gap-1"
+              data-testid="button-upgrade-inline"
+            >
+              <Sparkles className="h-3 w-3" />
+              Go Ad-Free
+            </Button>
+          </Link>
           <Button 
             variant="ghost" 
             size="icon" 

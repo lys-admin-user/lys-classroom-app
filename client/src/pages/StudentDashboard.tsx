@@ -599,7 +599,7 @@ export default function StudentDashboard() {
                           You haven't created a portfolio yet. Start showcasing your best work!
                         </p>
                         <Button asChild>
-                          <Link href="/portfolio/builder">
+                          <Link href="/portfolio">
                             <FolderOpen className="w-4 h-4 mr-2" />
                             Create Portfolio
                           </Link>
@@ -616,7 +616,7 @@ export default function StudentDashboard() {
                             <Badge variant="outline">{portfolio.privacy}</Badge>
                             <Badge variant="secondary">{portfolio.viewCount || 0} views</Badge>
                             <Button variant="outline" size="sm" asChild>
-                              <Link href="/portfolio/builder">
+                              <Link href="/portfolio">
                                 <Edit3 className="w-4 h-4 mr-1" />
                                 Edit
                               </Link>
