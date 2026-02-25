@@ -56,6 +56,7 @@ import StrengthsInventory from "@/pages/StrengthsInventory";
 import MentorConnect from "@/pages/MentorConnect";
 import DistrictAdmin from "@/pages/DistrictAdmin";
 import HelpDesk from "@/pages/HelpDesk";
+import DevDocs from "@/pages/DevDocs";
 import NotFound from "@/pages/not-found";
 import { EmbedRouter } from "@/pages/EmbedRouter";
 
@@ -157,6 +158,7 @@ function Router() {
       <Route path="/district-admin" component={DistrictAdmin} />
       <Route path="/district-admin/campuses" component={DistrictAdmin} />
       <Route path="/help" component={HelpDesk} />
+      <Route path="/dev-docs" component={DevDocs} />
       <Route component={NotFound} />
     </Switch>
   );

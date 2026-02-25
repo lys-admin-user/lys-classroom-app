@@ -177,6 +177,7 @@ const navigationGroups: NavGroup[] = [
     items: [
       { title: "System Dashboard", url: "/system-admin", icon: Settings, requiresAuth: true },
       { title: "Manage Users", url: "/system-admin/users", icon: Users, requiresAuth: true },
+      { title: "Dev Docs", url: "/dev-docs", icon: FileText, requiresAuth: true, minRole: "site_admin" },
     ],
   },
 ];

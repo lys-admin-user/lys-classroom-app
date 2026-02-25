@@ -1,0 +1,1297 @@
+import { useState } from "react";
+import { useAuth } from "@/hooks/use-auth";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
+import { Separator } from "@/components/ui/separator";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import {
+  Search,
+  Server,
+  Database,
+  Shield,
+  Lock,
+  Code,
+  Globe,
+  Cpu,
+  FileText,
+  Users,
+  Building2,
+  Eye,
+  Zap,
+  AlertTriangle,
+  BookOpen,
+  Layers,
+  Network,
+  ChevronRight,
+  ChevronDown,
+  Copy,
+  Check,
+  ArrowLeft,
+} from "lucide-react";
+import { Link } from "wouter";
+
+interface DocSection {
+  id: string;
+  title: string;
+  icon: React.ComponentType<{ className?: string }>;
+  category: string;
+  content: DocContent[];
+}
+
+interface DocContent {
+  heading: string;
+  body: string;
+  code?: string;
+  language?: string;
+  items?: string[];
+  table?: { headers: string[]; rows: string[][] };
+  warning?: string;
+  note?: string;
+}
+
+const docSections: DocSection[] = [
+  {
+    id: "architecture",
+    title: "Platform Architecture",
+    icon: Layers,
+    category: "Core",
+    content: [
+      {
+        heading: "Monorepo Structure",
+        body: "LYS is a full-stack TypeScript monorepo with three main directories. All code shares types and validation schemas, ensuring type safety from database to UI.",
+        items: [
+          "/client — React 18 frontend with Vite bundler, Wouter routing, TanStack React Query, and shadcn/ui components",
+          "/server — Express.js backend with RESTful JSON API, Drizzle ORM, and WebSocket support",
+          "/shared — Shared TypeScript types, Drizzle schema definitions, and validation models used by both client and server",
+        ],
+      },
+      {
+        heading: "Frontend Architecture",
+        body: "The frontend uses a component-based architecture with page-level routing. State management is handled through TanStack React Query for server state and React hooks for local state.",
+        items: [
+          "Pages: /client/src/pages/ — each file represents a top-level route",
+          "Components: /client/src/components/ — reusable UI components, organized by feature",
+          "Hooks: /client/src/hooks/ — custom React hooks (use-auth, use-tier, use-toast, use-mobile)",
+          "Lib: /client/src/lib/ — utility functions, query client configuration, ad config",
+          "Routing: Wouter (lightweight alternative to React Router) — routes defined in App.tsx",
+          "Data fetching: TanStack React Query v5 with object-form queries and default fetcher",
+          "UI library: shadcn/ui built on Radix UI primitives with Tailwind CSS styling",
+        ],
+      },
+      {
+        heading: "Backend Architecture",
+        body: "The backend is an Express.js server that serves both the API and the Vite-built frontend. All database operations go through a storage interface abstraction.",
+        items: [
+          "Entry point: server/index.ts — Express app setup, middleware, and server initialization",
+          "Routes: server/routes.ts — all API endpoint definitions",
+          "Storage: server/storage.ts — IStorage interface and DatabaseStorage implementation",
+          "Services: server/services/ — business logic (PII sanitizer, content filter, audit log, data governance, BLS sync)",
+          "Auth: server/replit_integrations/auth/ — Replit Auth OIDC integration",
+          "AI: server/openai.ts — OpenAI API integration with mock fallback",
+          "WebSocket: server/websocket.ts — real-time collaboration server",
+          "Vite: server/vite.ts — Vite dev server integration (DO NOT MODIFY)",
+        ],
+      },
+      {
+        heading: "Design System",
+        body: "LYS uses a custom design system built on Tailwind CSS with specific brand colors and typography.",
+        items: [
+          "Primary Red (lys-red): Brand accent color for BE pillar and primary CTAs",
+          "Warm Yellow (lys-yellow): KNOW pillar accent and highlight color",
+          "Dark Teal (lys-teal): DO pillar accent and success indicators",
+          "Typography: Permanent Marker (headers/logo), Oswald (subheaders), Roboto (body text)",
+          "Components: shadcn/ui with custom theme tokens defined in client/src/index.css",
+          "Icons: lucide-react for UI icons, react-icons/si for brand/company logos",
+          "Dark mode: Supported via class-based toggle on document root element",
+        ],
+      },
+    ],
+  },
+  {
+    id: "database",
+    title: "Database Schema & Data Model",
+    icon: Database,
+    category: "Core",
+    content: [
+      {
+        heading: "Database Overview",
+        body: "LYS uses PostgreSQL managed by Drizzle ORM. The schema is defined in /shared/schema.ts. All migrations are handled through Drizzle's push mechanism. Never modify the database directly — always update the schema file and run db:push.",
+        warning: "Schema changes must go through /shared/schema.ts and 'npm run db:push'. Direct SQL modifications will cause drift between code and database state.",
+      },
+      {
+        heading: "Core Tables",
+        body: "The primary tables that drive the platform's core functionality.",
+        table: {
+          headers: ["Table", "Purpose", "Key Columns", "Relationships"],
+          rows: [
+            ["users", "User accounts and profiles", "id (PK), email, role, tier, loginCount, onboardingCompleted", "Referenced by lessons, goals, memberships, journey data"],
+            ["organizations", "Schools, districts, universities", "id (PK), slug, type (school/district/university), parentOrganizationId", "Self-referential hierarchy; parent org for districts"],
+            ["organization_memberships", "User-to-org links", "id (PK), organizationId (FK), userId (FK), role (member/admin/owner)", "Joins users to organizations with org-level roles"],
+            ["lessons", "Generated lesson plans", "id (PK), userId (FK), shareId, subject, gradeLevel, topic", "Linked to user; shareable via shareId"],
+            ["goals", "Student action plans", "id (PK), userId (FK), title, status, progress", "Linked to user account"],
+            ["assignments", "Class assignments", "id (PK), userId (FK), lessonId, title, dueDate", "Linked to lesson and creator"],
+            ["sessions", "Express session storage", "sid (PK), sess (JSON), expire", "Used by connect-pg-simple for session persistence"],
+          ],
+        },
+      },
+      {
+        heading: "Student Journey Tables",
+        body: "These tables track student progress through the Be-Know-Do methodology. They form the backbone of the platform's educational analytics.",
+        table: {
+          headers: ["Table", "Purpose", "Key Columns"],
+          rows: [
+            ["student_journey_entries", "General event log for user activity", "id, studentId, entryType, category (be/know/do), data (JSONB)"],
+            ["student_journey_progress", "Aggregated progress scores per student", "id, studentId, beScore, knowScore, doScore, overallScore, currentFocus"],
+            ["student_journey_milestones", "Specific milestone achievements", "id, studentId, title, category, status, targetValue, currentValue, pointsEarned"],
+            ["student_journey_activities", "Detailed activity log for analytics", "id, studentId, activityType, title, category, pointsEarned, metadata (JSONB)"],
+          ],
+        },
+      },
+      {
+        heading: "Educational Standards Tables",
+        body: "Standards are organized hierarchically to support multi-state, multi-subject lesson alignment.",
+        table: {
+          headers: ["Table", "Purpose", "Key Columns"],
+          rows: [
+            ["standard_sets", "Groupings of standards by state/jurisdiction", "id, name, state, jurisdiction, subject, gradeLevel"],
+            ["educational_standards", "Individual standard codes and descriptions", "id, standardSetId (FK), code, description, gradeLevel, subject"],
+          ],
+        },
+      },
+      {
+        heading: "Governance & Safety Tables",
+        body: "Tables supporting data governance, safety compliance, and audit trails.",
+        table: {
+          headers: ["Table", "Purpose", "Key Columns"],
+          rows: [
+            ["parental_consents", "COPPA consent records", "id, studentUserId, parentEmail, consentGiven, verifiedAt"],
+            ["safety_vault", "Intercepted PII and safety events", "id, userId, eventType, content, metadata"],
+            ["audit_logs", "Platform-wide audit trail", "id, userId, action, resourceType, resourceId, metadata, timestamp"],
+          ],
+        },
+      },
+      {
+        heading: "Storage Interface Pattern",
+        body: "All database operations MUST go through the IStorage interface defined in server/storage.ts. Routes should never write raw SQL or direct Drizzle queries. The storage layer provides typed CRUD methods for every table.",
+        code: `interface IStorage {
+  getUser(id: string): Promise<User | undefined>;
+  upsertUser(user: UpsertUser): Promise<User>;
+  getLessons(userId: string): Promise<Lesson[]>;
+  createLesson(lesson: InsertLesson): Promise<Lesson>;
+  // ... typed methods for all tables
+}`,
+        language: "typescript",
+      },
+    ],
+  },
+  {
+    id: "api-reference",
+    title: "API Endpoints Reference",
+    icon: Code,
+    category: "Core",
+    content: [
+      {
+        heading: "API Conventions",
+        body: "All API endpoints are defined in server/routes.ts and follow RESTful conventions. Responses use JSON format with appropriate HTTP status codes. Authentication is required for most endpoints via session cookies.",
+        items: [
+          "Base path: All endpoints start with /api/",
+          "Auth: Session-based via Replit Auth — cookies sent automatically",
+          "Validation: Request bodies validated with Zod schemas before processing",
+          "Errors: JSON responses with { message: string } format and appropriate status codes",
+          "Pagination: List endpoints support ?limit and ?offset query parameters where applicable",
+        ],
+      },
+      {
+        heading: "Authentication Endpoints",
+        body: "Handles user authentication via Replit Auth OIDC flow.",
+        table: {
+          headers: ["Method", "Path", "Auth", "Description"],
+          rows: [
+            ["GET", "/api/auth/user", "No", "Returns current authenticated user or 401"],
+            ["POST", "/api/auth/logout", "Yes", "Destroys session and logs user out"],
+            ["POST", "/api/onboarding/skip", "Yes", "Increments onboarding skip count"],
+            ["POST", "/api/onboarding/complete", "Yes", "Marks onboarding as completed"],
+          ],
+        },
+      },
+      {
+        heading: "Lesson & AI Endpoints",
+        body: "Manages lesson plans and AI-powered generation.",
+        table: {
+          headers: ["Method", "Path", "Auth", "Description"],
+          rows: [
+            ["GET", "/api/lessons", "Yes", "List user's saved lessons"],
+            ["POST", "/api/lessons", "Yes", "Save a new lesson plan"],
+            ["GET", "/api/lessons/:id", "Yes", "Get a specific lesson by ID"],
+            ["DELETE", "/api/lessons/:id", "Yes", "Delete a lesson"],
+            ["POST", "/api/lessons/generate", "Yes", "Generate AI lesson plan (rate limited: 5/min)"],
+            ["POST", "/api/lessons/generate-guest", "No", "Guest AI generation (IP limited: 3 total)"],
+            ["POST", "/api/assignments/generate", "Yes", "Generate AI assignment (rate limited: 5/min)"],
+          ],
+        },
+      },
+      {
+        heading: "Organization Endpoints",
+        body: "Manages organizations, memberships, and invitations.",
+        table: {
+          headers: ["Method", "Path", "Auth", "Description"],
+          rows: [
+            ["GET", "/api/organizations", "Yes", "List user's organizations"],
+            ["POST", "/api/organizations", "Yes", "Create new organization (campus_admin+)"],
+            ["GET", "/api/organizations/:id", "Yes", "Get organization details"],
+            ["GET", "/api/organizations/:id/members", "Yes", "List organization members"],
+            ["POST", "/api/organizations/:id/invite", "Yes", "Invite member to organization"],
+          ],
+        },
+      },
+      {
+        heading: "Org-Admin Self-Service Endpoints",
+        body: "Allows campus and district admins to manage their organizations without system admin assistance.",
+        table: {
+          headers: ["Method", "Path", "Auth", "Description"],
+          rows: [
+            ["GET", "/api/org-admin/my-orgs", "Yes", "List orgs the user can admin"],
+            ["GET", "/api/org-admin/orgs/:orgId/members", "Yes", "List members of managed org"],
+            ["PATCH", "/api/org-admin/orgs/:orgId/members/:memberId", "Yes", "Update member role (role ceiling enforced)"],
+            ["DELETE", "/api/org-admin/orgs/:orgId/members/:memberId", "Yes", "Remove member from org"],
+            ["GET", "/api/org-admin/orgs/:orgId/settings", "Yes", "Get org settings"],
+            ["PATCH", "/api/org-admin/orgs/:orgId/settings", "Yes", "Update org settings"],
+            ["GET", "/api/org-admin/orgs/:orgId/activity", "Yes", "View educator activity for org"],
+          ],
+        },
+      },
+      {
+        heading: "System Admin Endpoints",
+        body: "Platform-wide administrative endpoints. Require site_admin or system_admin role.",
+        table: {
+          headers: ["Method", "Path", "Auth", "Description"],
+          rows: [
+            ["GET", "/api/admin/analytics", "site_admin+", "Platform-wide analytics and metrics"],
+            ["GET", "/api/admin/users", "site_admin+", "List all platform users with search/filter"],
+            ["GET", "/api/admin/organizations", "site_admin+", "List all organizations"],
+            ["GET", "/api/admin/billing", "site_admin+", "Billing and subscription data"],
+            ["GET", "/api/admin/affiliates", "site_admin+", "Affiliate program data"],
+            ["GET", "/api/admin/user-analytics", "site_admin+", "Detailed per-user analytics"],
+            ["GET", "/api/admin/content-library", "site_admin+", "Manage content library items"],
+          ],
+        },
+      },
+      {
+        heading: "Student Journey Endpoints",
+        body: "Track student progress through the Be-Know-Do methodology.",
+        table: {
+          headers: ["Method", "Path", "Auth", "Description"],
+          rows: [
+            ["GET", "/api/my-journey", "Yes", "Get current user's journey data"],
+            ["GET", "/api/student-journey/:studentId", "Yes", "Get specific student's journey (educators+)"],
+            ["POST", "/api/student-journey/entries", "Yes", "Log a journey event"],
+            ["POST", "/api/student-journey/milestones", "Yes", "Create a milestone"],
+            ["PATCH", "/api/student-journey/milestones/:id", "Yes", "Update milestone progress"],
+          ],
+        },
+      },
+      {
+        heading: "Standards & Curriculum Endpoints",
+        body: "Educational standards management and curriculum tools.",
+        table: {
+          headers: ["Method", "Path", "Auth", "Description"],
+          rows: [
+            ["GET", "/api/standards", "No", "Search available standards"],
+            ["GET", "/api/standards/states/:country", "No", "List states/jurisdictions for a country"],
+            ["POST", "/api/standards/import", "site_admin+", "Import standards from CSP API"],
+            ["POST", "/api/standards/auto-match", "Yes", "AI-powered standards alignment"],
+            ["GET", "/api/scopes", "Yes", "List user's scope & sequence documents"],
+            ["POST", "/api/scopes", "Yes", "Create new scope & sequence"],
+          ],
+        },
+      },
+    ],
+  },
+  {
+    id: "rbac",
+    title: "Role-Based Access Control (RBAC)",
+    icon: Shield,
+    category: "Security",
+    content: [
+      {
+        heading: "Role Hierarchy",
+        body: "LYS uses a 7-level hierarchical role system. Higher roles inherit all permissions of lower roles. Role checks compare numeric levels, so a campus_admin (level 3) passes any check requiring educator (level 2) or below.",
+        table: {
+          headers: ["Role", "Level", "Scope", "Key Permissions"],
+          rows: [
+            ["student", "0", "Own data only", "View own journey, take assessments, explore careers, build portfolio"],
+            ["homeschool_parent", "1", "Own + children", "All student permissions plus lesson generation, gradebook, scope & sequence"],
+            ["educator", "2", "Own classes", "All parent permissions plus classroom management, assignments, collaboration, SIS"],
+            ["campus_admin", "3", "Single campus", "All educator permissions plus org member management, standards admin, transfer approvals"],
+            ["district_admin", "4", "District + campuses", "All campus admin permissions plus cross-campus management, district analytics"],
+            ["site_admin", "5", "Platform-wide", "All district permissions plus system dashboard, user management, billing, standards import"],
+            ["system_admin", "6", "Full system", "All permissions including feature flags, governance, technical configuration"],
+          ],
+        },
+      },
+      {
+        heading: "Server-Side Middleware",
+        body: "Access control is enforced server-side using middleware functions. These must be applied to every protected route.",
+        code: `// Authentication check
+app.get("/api/lessons", isAuthenticated, handler);
+
+// Role-based check (user must be at least this role)
+app.get("/api/admin/users", isAuthenticated, requireRole("site_admin"), handler);
+
+// Convenience aliases
+const requireCampusAdmin = requireRole("campus_admin");
+const requireDistrictAdmin = requireRole("district_admin");
+const requireSiteAdmin = requireRole("site_admin");
+const requireSystemAdmin = requireRole("system_admin");`,
+        language: "typescript",
+        warning: "Never rely on frontend role checks alone. All authorization MUST be enforced server-side via middleware. Frontend checks are for UI display only.",
+      },
+      {
+        heading: "Organization Roles vs Platform Roles",
+        body: "Users have TWO types of roles that operate independently. Platform roles determine what features a user can access. Organization roles determine what a user can do within a specific organization.",
+        table: {
+          headers: ["Type", "Values", "Where Stored", "Purpose"],
+          rows: [
+            ["Platform Role", "student, homeschool_parent, educator, campus_admin, district_admin, site_admin, system_admin", "users.role", "Controls feature access across the platform"],
+            ["Organization Role", "member, admin, owner", "organization_memberships.role", "Controls what a user can do within a specific org"],
+          ],
+        },
+      },
+      {
+        heading: "Role Ceiling Enforcement",
+        body: "When org admins change a member's platform role, the role ceiling restricts them to only assign roles up to campus_admin. This prevents privilege escalation — an org admin cannot create site_admins or system_admins.",
+        items: [
+          "Campus admins can set roles: student, homeschool_parent, educator, campus_admin",
+          "District admins can set roles: student, homeschool_parent, educator, campus_admin (same ceiling)",
+          "Only site_admin and system_admin can assign site_admin or higher roles",
+          "Role ceiling is enforced in the org-admin PATCH endpoint for member role changes",
+        ],
+      },
+      {
+        heading: "Org Admin Authorization",
+        body: "The verifyOrgAdminAccess() function checks both organization membership role AND platform role before allowing org-admin operations.",
+        code: `// verifyOrgAdminAccess checks:
+// 1. User has org membership with role 'admin' or 'owner'
+// 2. OR user is a district_admin whose district is parent of this org
+// 3. OR user is site_admin/system_admin (bypasses org checks)
+
+// getAdminManagedOrgIds returns:
+// - All orgs where user has admin/owner membership
+// - Plus child orgs if user is a district admin`,
+        language: "typescript",
+      },
+    ],
+  },
+  {
+    id: "security",
+    title: "Security Infrastructure",
+    icon: Lock,
+    category: "Security",
+    content: [
+      {
+        heading: "Security Middleware Stack",
+        body: "The server applies multiple layers of security middleware in server/index.ts.",
+        table: {
+          headers: ["Middleware", "Configuration", "Purpose"],
+          rows: [
+            ["Helmet", "CSP and COEP disabled for dev compatibility; all other protections active", "HTTP security headers (HSTS, X-Frame-Options, X-Content-Type-Options, etc.)"],
+            ["API Rate Limiter", "200 requests per 15 minutes for /api/* routes", "Prevents API abuse and brute-force attacks"],
+            ["Auth Rate Limiter", "20 requests per 15 minutes for login/register endpoints", "Protects authentication endpoints"],
+            ["AI Rate Limiter", "5 requests per minute for /api/lessons/generate and /api/assignments/generate", "Prevents excessive AI API usage and cost"],
+            ["Session Security", "httpOnly, secure, sameSite: 'lax' cookies via connect-pg-simple", "Prevents XSS cookie theft, CSRF protection"],
+          ],
+        },
+      },
+      {
+        heading: "PII Sanitization Pipeline",
+        body: "All user content is processed through a PII sanitization pipeline before being sent to external AI services. The pipeline is defined in server/services/piiSanitizer.ts.",
+        items: [
+          "Email addresses: Detected and redacted via regex pattern matching",
+          "Phone numbers: US and international formats detected and stripped",
+          "Social Security Numbers: SSN patterns (XXX-XX-XXXX) are redacted",
+          "Student IDs: Common student ID formats are detected and removed",
+          "Physical addresses: Street address patterns are sanitized",
+          "Dates of birth: DOB patterns are identified and stripped",
+          "sanitizeForAI(): Deep-cleanses entire objects (recursively) before LLM calls",
+          "All PII stripping events are logged to the safety vault with before/after hashes (not actual PII)",
+        ],
+        warning: "NEVER bypass the PII sanitizer when sending data to OpenAI. Always use sanitizePromptText() or sanitizeForAI() before external API calls.",
+      },
+      {
+        heading: "Content Filtering",
+        body: "User-generated content is filtered for safety using server/services/contentFilter.ts. The system uses keyword detection with educational exceptions to avoid false positives.",
+        items: [
+          "HARMFUL_KEYWORDS: List of violence, drug, and inappropriate content terms",
+          "EDUCATIONAL_EXCEPTIONS: Allows legitimate educational content (e.g., 'drug education', 'war history')",
+          "Severity levels: low (warning), medium (flag for review), high (auto-block)",
+          "Student messages are auto-blocked if high-severity content is detected",
+          "Content filter results include confidence scores and matched terms",
+          "Filtered content is logged in the safety vault for admin review",
+        ],
+      },
+      {
+        heading: "Audit Logging",
+        body: "The platform maintains comprehensive audit logs for compliance and security monitoring, defined in server/services/auditLog.ts.",
+        items: [
+          "Categories: authentication, data_access, data_modify, security, admin_action",
+          "Logged events: login/logout, role changes, content creation/deletion, data exports, PII blocks, fraud strikes",
+          "Each log entry includes: userId, action, resourceType, resourceId, metadata (JSONB), timestamp",
+          "Audit logs are queryable from the System Admin > Governance tab",
+          "Logs support filtering by date range, user, action type, and resource",
+          "Export capability for external compliance reporting",
+        ],
+      },
+    ],
+  },
+  {
+    id: "data-governance",
+    title: "Zero-Trust Data Governance",
+    icon: Eye,
+    category: "Security",
+    content: [
+      {
+        heading: "7-Rule Framework Overview",
+        body: "LYS implements a Zero-Trust Data Governance framework with 7 rules designed specifically for educational environments. These rules protect student data, enforce compliance, and provide auditability. The governance dashboard in the System Admin panel shows real-time status of all rules.",
+      },
+      {
+        heading: "Rule 1: Immutable Success Ledger",
+        body: "Student achievements (success marks) become permanent records after a 24-hour edit window. This prevents retroactive grade tampering and ensures the integrity of student accomplishment records.",
+        items: [
+          "New achievements can be edited or deleted within 24 hours of creation",
+          "After 24 hours, records are locked and cannot be modified or deleted",
+          "Provides a tamper-proof history of student accomplishments",
+          "Admins can view but not modify locked records",
+        ],
+      },
+      {
+        heading: "Rule 2: Communication Safety Intercept",
+        body: "All student communications are scanned for PII before processing. Cross-tenant data leakage is blocked to prevent information from one school reaching another.",
+        items: [
+          "checkMessagePII() scans messages for personal identifiable information",
+          "Messages containing PII are blocked and logged to the safety vault",
+          "Cross-tenant lockdown prevents data from leaking between organizations",
+          "Intercepted messages are available for admin review in the governance dashboard",
+        ],
+      },
+      {
+        heading: "Rule 3: App-Level Tenant Scoping",
+        body: "All database queries are automatically scoped to the user's organization or tenant. This prevents users in one school from accessing data belonging to another school.",
+        items: [
+          "Query scoping is applied at the storage layer, not the route layer",
+          "Users can only see data associated with their organization memberships",
+          "System admins and site admins can bypass tenant scoping when necessary",
+          "Tenant isolation is tested via ownership checks on every data access",
+        ],
+      },
+      {
+        heading: "Rule 4: Data Residency Stubs",
+        body: "Region tagging on data records supports future geographic data residency requirements. Records can be tagged with their data region for compliance with local regulations.",
+      },
+      {
+        heading: "Rule 5: COPPA Restricted State",
+        body: "Users under 13 have restricted feature access until verified parental consent is obtained. The isCoppaRestricted() function checks the user's birthdate to determine restriction status.",
+        items: [
+          "Birthdate comparison determines if user is under 13",
+          "Restricted users cannot access AI features, messaging, or certain social features",
+          "Parental consent records are stored in the parental_consents table",
+          "Consent must include parent email, verification, and explicit consent flag",
+          "COPPA status is checked on relevant API endpoints before processing",
+        ],
+      },
+      {
+        heading: "Rule 6: Marketplace Security",
+        body: "Shared resources and lesson templates are scanned for safety before being published to the community marketplace. Content must pass safety checks before becoming publicly available.",
+      },
+      {
+        heading: "Rule 7: VPN/Fraud 3-Strike Protection",
+        body: "Suspicious activity triggers a warning system with account restrictions after 3 strikes.",
+        items: [
+          "Strike triggers: VPN detection, rapid account switching, unusual access patterns, geo-IP anomalies",
+          "Strike 1: Warning notification to user",
+          "Strike 2: Enhanced monitoring and temporary feature restrictions",
+          "Strike 3: Account suspension requiring admin review to restore",
+          "Strike events are logged with IP metadata in audit logs",
+          "System admins can view and manage strikes from the Governance dashboard",
+        ],
+      },
+    ],
+  },
+  {
+    id: "coppa",
+    title: "COPPA Compliance System",
+    icon: AlertTriangle,
+    category: "Security",
+    content: [
+      {
+        heading: "Overview",
+        body: "COPPA (Children's Online Privacy Protection Act) compliance is enforced for users under 13. The system tracks birthdate, restricts features, and manages parental consent workflows.",
+      },
+      {
+        heading: "Implementation Details",
+        body: "COPPA restrictions are checked at both the API and UI levels to ensure consistent enforcement.",
+        items: [
+          "isCoppaRestricted(birthdate): Returns true if user is under 13 based on birthdate field",
+          "Restricted features: AI lesson generation, messaging/chat, community sharing, portfolio publishing",
+          "Parental consent flow: Parent receives email → clicks verification link → consent recorded",
+          "parental_consents table stores: studentUserId, parentEmail, consentGiven, verifiedAt",
+          "Once consent is verified, COPPA restrictions are lifted for that student",
+          "If a user turns 13 while using the platform, restrictions are automatically lifted",
+        ],
+      },
+      {
+        heading: "Data Collection Restrictions",
+        body: "Under COPPA, the platform limits what data is collected from users under 13.",
+        items: [
+          "No behavioral tracking or analytics for COPPA-restricted users",
+          "No third-party data sharing (including AI services) without parental consent",
+          "Ad monetization is completely disabled for K-7 students (regardless of consent)",
+          "Profile information is minimal — no photos, bio, or social features",
+        ],
+      },
+    ],
+  },
+  {
+    id: "ai-integration",
+    title: "AI Integration & Safety",
+    icon: Cpu,
+    category: "Integration",
+    content: [
+      {
+        heading: "OpenAI Integration",
+        body: "LYS integrates with OpenAI's API for AI-powered lesson generation, assignment creation, and educational standards extraction. The integration code lives in server/openai.ts.",
+        items: [
+          "API key: OPENAI_API_KEY must be set in Replit secrets for live AI features",
+          "Without API key: Platform uses mock/template responses (fully functional without AI)",
+          "Model: Uses GPT models for lesson generation and standards alignment",
+          "Rate limiting: 5 AI requests per minute per user (enforced by AI rate limiter middleware)",
+        ],
+      },
+      {
+        heading: "AI Safety Pipeline",
+        body: "Every AI request passes through a multi-stage safety pipeline before reaching OpenAI.",
+        items: [
+          "Stage 1 — Content Filter: User input checked for harmful content via contentFilter.ts",
+          "Stage 2 — PII Strip: sanitizePromptText() removes all personal identifiable information",
+          "Stage 3 — Prompt Construction: Sanitized input wrapped in structured educational prompts",
+          "Stage 4 — API Call: Request sent to OpenAI with appropriate model and parameters",
+          "Stage 5 — Response Filter: AI output checked for safety before returning to user",
+          "Stage 6 — Cache: Successful responses cached in database to reduce duplicate API calls",
+        ],
+      },
+      {
+        heading: "Lesson Plan Caching",
+        body: "AI-generated lesson plans are cached to reduce API costs and improve response times. Cache keys are based on the input parameters (subject, grade, topic, standards).",
+        items: [
+          "Cache lookup happens before AI call — identical requests return cached results instantly",
+          "Cache includes the full generated lesson plan with rubric scores",
+          "Cache entries are stored in the database, not in memory (persists across restarts)",
+          "No automatic cache expiration — cached plans remain until manually cleared",
+        ],
+      },
+      {
+        heading: "Tier-Based Usage Limits",
+        body: "AI lesson generation is limited based on user subscription tier.",
+        table: {
+          headers: ["Tier", "AI Lessons/Month", "Guest Access"],
+          rows: [
+            ["Guest (not logged in)", "3 total (IP-based)", "Basic generation only"],
+            ["Free", "5 per month", "Standard generation"],
+            ["Pro", "Unlimited", "Priority generation"],
+            ["Campus", "Unlimited", "Priority + batch generation"],
+            ["Enterprise", "Unlimited", "Full API access"],
+          ],
+        },
+      },
+    ],
+  },
+  {
+    id: "multi-tenancy",
+    title: "Multi-Tenant Architecture",
+    icon: Building2,
+    category: "Architecture",
+    content: [
+      {
+        heading: "Organization Hierarchy",
+        body: "LYS supports a hierarchical organization structure that mirrors real educational governance. Districts contain campuses (schools), and universities operate independently.",
+        table: {
+          headers: ["Org Type", "Parent", "Description"],
+          rows: [
+            ["district", "None", "Top-level educational authority managing multiple campuses"],
+            ["school (campus)", "District or none", "Individual school/campus; can be standalone or under a district"],
+            ["university", "None", "Independent higher-education institution"],
+          ],
+        },
+      },
+      {
+        heading: "Data Isolation",
+        body: "Data isolation ensures users in one organization cannot access another organization's data. This is critical for educational privacy compliance.",
+        items: [
+          "All data queries are scoped to user's organization memberships by default",
+          "Users can belong to multiple organizations (e.g., educator at two campuses)",
+          "Organization-scoped data: members, classes, students, grades, assignments",
+          "User-scoped data: lessons, goals, portfolio, journey progress (belong to user, not org)",
+          "System admins bypass tenant scoping for administrative purposes",
+        ],
+      },
+      {
+        heading: "Resource Cascade",
+        body: "Resources and settings cascade downward through the organization hierarchy.",
+        items: [
+          "District-level resources are automatically available to all child campuses",
+          "District SIS integrations cascade to campus educators",
+          "Organization tier (free/campus/enterprise) determines available features for all members",
+          "District admins can view analytics aggregated across all child campuses",
+          "Campus-level settings can override some district defaults",
+        ],
+      },
+    ],
+  },
+  {
+    id: "authentication",
+    title: "Authentication & Sessions",
+    icon: Users,
+    category: "Architecture",
+    content: [
+      {
+        heading: "Replit Auth Integration",
+        body: "LYS uses Replit Auth via OpenID Connect (OIDC) for authentication. The integration is configured in server/replit_integrations/auth/replitAuth.ts.",
+        items: [
+          "Users authenticate through Replit's OIDC flow — no custom password storage",
+          "First login creates a user record via upsertUser() in the storage layer",
+          "Session is established with express-session and stored in PostgreSQL via connect-pg-simple",
+          "Session cookies: httpOnly (no JS access), secure (HTTPS only), sameSite: 'lax' (CSRF protection)",
+          "User data is available server-side via req.user after authentication middleware",
+        ],
+      },
+      {
+        heading: "Session Management",
+        body: "Sessions are stored in PostgreSQL for persistence across server restarts.",
+        items: [
+          "Session store: connect-pg-simple using the 'sessions' table",
+          "Session secret: SESSION_SECRET environment variable (Replit secret)",
+          "Session lifetime: Configurable, defaults to standard express-session settings",
+          "Logout: POST /api/auth/logout destroys session and clears cookie",
+          "Multiple sessions: Users can have active sessions across multiple devices",
+        ],
+      },
+      {
+        heading: "Frontend Auth Hook",
+        body: "The useAuth() hook in client/src/hooks/use-auth.ts provides authentication state to all components.",
+        code: `const { user, isAuthenticated, isLoading } = useAuth();
+
+// user: Full user object or null
+// isAuthenticated: Boolean — true if logged in
+// isLoading: Boolean — true while checking auth status`,
+        language: "typescript",
+      },
+    ],
+  },
+  {
+    id: "websocket",
+    title: "Real-Time Collaboration",
+    icon: Network,
+    category: "Architecture",
+    content: [
+      {
+        heading: "WebSocket Server",
+        body: "LYS includes a WebSocket server for real-time collaboration features. The server is defined in server/websocket.ts and handles live cursor positions, user presence, and chat.",
+        items: [
+          "Protocol: WebSocket (ws://) with token-based authentication",
+          "Features: Live cursor positions, user presence indicators, real-time chat, edit history",
+          "Rooms: Collaboration sessions use invite codes to create isolated rooms",
+          "Presence: Users see who else is viewing/editing the same lesson plan",
+          "Chat: In-session messaging with content filtering applied",
+          "Role differentiation: Owners have full edit rights, collaborators have limited permissions",
+        ],
+      },
+      {
+        heading: "Collaboration Flow",
+        body: "Educators can collaborate on lesson plans in real-time using invite codes.",
+        items: [
+          "Creator generates an invite code for a lesson plan",
+          "Collaborators join via the code on the /collaboration page",
+          "WebSocket connection established with token authentication",
+          "Changes are broadcast to all connected users in the same room",
+          "Edit history is preserved for review and rollback",
+          "Session ends when all users disconnect",
+        ],
+      },
+    ],
+  },
+  {
+    id: "payments",
+    title: "Payment & Subscription System",
+    icon: Globe,
+    category: "Integration",
+    content: [
+      {
+        heading: "Payment Methods",
+        body: "LYS supports multiple payment methods to accommodate different institutional needs.",
+        table: {
+          headers: ["Method", "Integration", "Status", "Use Case"],
+          rows: [
+            ["Stripe (Credit/Debit)", "Replit Stripe connector", "Demo mode until configured", "Individual subscriptions"],
+            ["PayPal", "@paypal/paypal-server-sdk (lazy-loaded)", "Demo mode until credentials provided", "Alternative individual payment"],
+            ["Purchase Order", "Custom implementation", "Active", "Institutional billing for schools/districts"],
+            ["Bank Transfer / ACH", "Custom implementation", "Active", "Annual plans with reference number tracking"],
+          ],
+        },
+      },
+      {
+        heading: "Subscription Tiers",
+        body: "Users and organizations have subscription tiers that control feature access and usage limits.",
+        table: {
+          headers: ["Tier", "Target", "Key Features"],
+          rows: [
+            ["Free", "Individual users", "Basic access, 5 AI lessons/month, ad-supported"],
+            ["Pro", "Individual educators", "Unlimited AI, no ads, focus mode, advanced analytics"],
+            ["Campus", "Schools", "All Pro features + org management, SIS integration, collaboration"],
+            ["Enterprise", "Districts/Universities", "All Campus features + multi-campus, priority support, custom branding"],
+          ],
+        },
+      },
+      {
+        heading: "Country Affordability Index (CAI)",
+        body: "LYS uses a Country Affordability Index for equitable global pricing based on local purchasing power. Prices are adjusted using a custom formula that considers GDP per capita, cost of living, and education spending ratios.",
+      },
+      {
+        heading: "Ad Monetization",
+        body: "Free-tier users see educational advertisements as part of the platform's revenue model.",
+        items: [
+          "Ad slots follow IAB standard sizes (leaderboard, medium rectangle, in-feed, native card)",
+          "eCPM-based pricing using EdTech advertising rates",
+          "K-7 students are NEVER shown ads regardless of tier (COPPA compliance)",
+          "Pro and above tiers are completely ad-free",
+          "Focus Mode (Pro feature) removes all ads and distracting elements",
+          "Ad components: AdSlot.tsx (full-featured), AdBanner.tsx (legacy/simple), FocusModeUpsell.tsx",
+        ],
+      },
+    ],
+  },
+  {
+    id: "sis-integration",
+    title: "SIS Integration System",
+    icon: Zap,
+    category: "Integration",
+    content: [
+      {
+        heading: "Supported Providers",
+        body: "LYS integrates with major Student Information Systems to import student rosters, class schedules, and course data.",
+        table: {
+          headers: ["Provider", "Auth Method", "Features"],
+          rows: [
+            ["Clever", "OAuth 2.0", "Student import, course sync, roster management"],
+            ["PowerSchool", "OAuth 2.0", "Student/course import, grade sync"],
+            ["Canvas LMS", "OAuth 2.0", "Course import, assignment sync"],
+            ["Infinite Campus", "OAuth 2.0", "Student/course import"],
+            ["Skyward", "OAuth 2.0", "Student/course import"],
+            ["OneRoster", "OAuth 2.0 / API Key", "Standards-based data exchange"],
+          ],
+        },
+      },
+      {
+        heading: "Integration Cascade",
+        body: "SIS connections cascade through the organization hierarchy. A district-level SIS connection is automatically available to all campus educators within that district.",
+        items: [
+          "Campus-level: SIS configured for a single school, available to all educators at that campus",
+          "District-level: SIS configured at district, cascades to all child campuses",
+          "Educator view: Educators see SIS data from their campus or parent district",
+          "Sync frequency: Configurable per integration (daily, weekly, manual)",
+          "Data mapping: Configurable field mapping between SIS and LYS data models",
+        ],
+      },
+    ],
+  },
+  {
+    id: "standards",
+    title: "Educational Standards Ingestion",
+    icon: BookOpen,
+    category: "Integration",
+    content: [
+      {
+        heading: "Three-Tier Ingestion System",
+        body: "LYS uses a three-tier approach to importing educational standards into the platform.",
+        items: [
+          "Tier 1 — CSP API: Direct integration with the Common Standards Project API for state-level standards. Primary source for TEKS, Common Core, NGSS, and other state standards.",
+          "Tier 2 — CASE Protocol (Planned): Competency and Academic Standards Exchange protocol for structured standards data from participating publishers.",
+          "Tier 3 — LLM Extraction: Fallback method using AI to extract standards from documents when API sources are unavailable. Processes PDFs and text documents to identify standard codes, descriptions, and hierarchical relationships.",
+        ],
+      },
+      {
+        heading: "Standards Data Model",
+        body: "Standards are stored hierarchically to support multi-state, multi-subject lesson alignment.",
+        items: [
+          "Standard Sets: Group standards by state, subject, and grade level",
+          "Individual Standards: Code, description, grade level, subject, parent standard (for hierarchy)",
+          "Alignment: AI-powered matching of lesson topics to relevant standards via /api/standards/auto-match",
+          "User preferences: Educators can set their default state/jurisdiction for automatic standards alignment",
+          "Admin management: System admins import, review, and activate standards from Standards Admin page",
+        ],
+      },
+    ],
+  },
+  {
+    id: "hubspot",
+    title: "HubSpot CRM Integration",
+    icon: Globe,
+    category: "Integration",
+    content: [
+      {
+        heading: "Overview",
+        body: "LYS integrates with HubSpot CRM for contact, company, and deal management. The connection uses Replit's HubSpot connector for authentication.",
+        items: [
+          "Contact sync: User signups can create HubSpot contacts for sales pipeline tracking",
+          "Company records: Organizations (schools/districts) mapped to HubSpot companies",
+          "Deal tracking: Subscription upgrades and institutional purchases tracked as deals",
+          "Pipeline management: Sales stages for lead → trial → purchase → renewal",
+        ],
+      },
+    ],
+  },
+  {
+    id: "wordpress",
+    title: "WordPress Integration",
+    icon: Globe,
+    category: "Integration",
+    content: [
+      {
+        heading: "Embedding Options",
+        body: "LYS can be embedded within WordPress sites using multiple methods.",
+        items: [
+          "Iframe Embeds: Full page or widget embedded via iframe with responsive sizing",
+          "Shortcodes: WordPress shortcode support for embedding specific LYS components",
+          "oEmbed: Auto-embed support for LYS URLs pasted into WordPress editors",
+          "REST API: WordPress plugin can communicate with LYS API for data exchange",
+          "Downloadable Plugin: WordPress plugin available for simplified integration setup",
+          "Embed routes: /embed/* paths serve stripped-down versions of components for iframe use",
+        ],
+      },
+    ],
+  },
+  {
+    id: "environment",
+    title: "Environment & Configuration",
+    icon: Server,
+    category: "Operations",
+    content: [
+      {
+        heading: "Environment Variables",
+        body: "Critical environment variables needed for the platform to function.",
+        table: {
+          headers: ["Variable", "Required", "Purpose"],
+          rows: [
+            ["DATABASE_URL", "Yes", "PostgreSQL connection string (auto-configured by Replit)"],
+            ["SESSION_SECRET", "Yes", "Secret for signing session cookies"],
+            ["OPENAI_API_KEY", "No", "OpenAI API key for AI features (uses mock fallback without it)"],
+            ["REPL_ID", "Auto", "Replit environment identifier"],
+            ["REPLIT_DB_URL", "Auto", "Replit database URL (auto-configured)"],
+          ],
+        },
+      },
+      {
+        heading: "Running the Platform",
+        body: "The platform runs as a single process serving both frontend and backend.",
+        items: [
+          "Development: 'npm run dev' starts Express + Vite dev server on port 5000",
+          "The Vite dev server is integrated into Express (server/vite.ts) — do not run separately",
+          "Hot module replacement (HMR) is active in development for frontend changes",
+          "Backend changes require server restart (handled by tsx watch mode)",
+          "Production: 'npm run build' creates optimized bundles, then 'npm start' serves them",
+        ],
+        warning: "NEVER modify server/vite.ts, vite.config.ts, or drizzle.config.ts. These files are configured correctly and changes will break the build system.",
+      },
+      {
+        heading: "Database Operations",
+        body: "Common database operations for development and maintenance.",
+        items: [
+          "Schema push: 'npm run db:push' applies schema changes to the database",
+          "Schema definition: All tables defined in /shared/schema.ts using Drizzle ORM",
+          "Storage interface: /server/storage.ts provides typed CRUD methods for all tables",
+          "Direct SQL: Avoid direct SQL — use the storage interface for all operations",
+          "Migrations: Drizzle handles schema diffing and migration generation automatically",
+        ],
+      },
+    ],
+  },
+  {
+    id: "troubleshooting",
+    title: "Troubleshooting Guide",
+    icon: FileText,
+    category: "Operations",
+    content: [
+      {
+        heading: "Common Issues",
+        body: "Frequently encountered issues and their resolutions.",
+        table: {
+          headers: ["Issue", "Cause", "Resolution"],
+          rows: [
+            ["AI features return template/mock data", "OPENAI_API_KEY not set", "Add API key to Replit secrets"],
+            ["Session not persisting", "SESSION_SECRET not set or sessions table missing", "Verify secret exists; run db:push to create sessions table"],
+            ["User sees 401 on all API calls", "Session expired or cookie not sent", "Clear cookies and re-authenticate; check sameSite cookie settings"],
+            ["Org admin can't see members", "User doesn't have admin/owner role in org_membership", "Verify org membership role in database"],
+            ["Standards import fails", "CSP API unreachable or rate limited", "Check network; retry after delay; use LLM extraction fallback"],
+            ["WebSocket connection fails", "Port mismatch or token expired", "Check WebSocket server is running; verify token generation"],
+            ["Schema push fails", "Conflicting column types or missing dependencies", "Review schema changes; check for breaking changes in column types"],
+            ["Rate limit hit", "Too many requests in time window", "Wait for rate limit window to reset (15 min for API, 1 min for AI)"],
+          ],
+        },
+      },
+      {
+        heading: "Debugging Checklist",
+        body: "Steps to follow when investigating an issue.",
+        items: [
+          "1. Check server logs for error messages and stack traces",
+          "2. Verify environment variables are set correctly in Replit secrets",
+          "3. Check database connectivity — can you query the sessions table?",
+          "4. Verify the user's role and org membership — are middleware checks passing?",
+          "5. Check browser console for frontend errors (network tab for API failures)",
+          "6. Review audit logs for security-related events (PII blocks, fraud strikes)",
+          "7. Test the specific API endpoint directly (curl or Postman) to isolate frontend vs backend issues",
+          "8. Check rate limit status — has the user exceeded request limits?",
+        ],
+      },
+      {
+        heading: "Performance Monitoring",
+        body: "Key metrics to monitor for platform health.",
+        items: [
+          "API response times: Monitor via server logs (response time logged per request)",
+          "Database query performance: Watch for slow queries in PostgreSQL logs",
+          "AI API latency: OpenAI calls can take 5-15 seconds; cache hits are instant",
+          "WebSocket connections: Monitor active connection count for capacity planning",
+          "Memory usage: Watch for memory leaks in long-running WebSocket connections",
+          "Session table size: Prune expired sessions periodically for database performance",
+        ],
+      },
+    ],
+  },
+];
+
+const categories = [
+  { id: "all", label: "All Sections" },
+  { id: "Core", label: "Core Platform" },
+  { id: "Security", label: "Security & Compliance" },
+  { id: "Architecture", label: "Architecture" },
+  { id: "Integration", label: "Integrations" },
+  { id: "Operations", label: "Operations" },
+];
+
+function CodeBlock({ code, language }: { code: string; language?: string }) {
+  const [copied, setCopied] = useState(false);
+
+  const handleCopy = () => {
+    navigator.clipboard.writeText(code);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
+
+  return (
+    <div className="relative group rounded-lg border bg-muted/50 dark:bg-muted/20">
+      <div className="flex items-center justify-between px-4 py-2 border-b bg-muted/30">
+        <span className="text-xs text-muted-foreground font-mono">{language || "code"}</span>
+        <Button
+          variant="ghost"
+          size="sm"
+          className="h-6 px-2 text-xs opacity-0 group-hover:opacity-100 transition-opacity"
+          onClick={handleCopy}
+          data-testid="button-copy-code"
+        >
+          {copied ? <Check className="h-3 w-3 mr-1" /> : <Copy className="h-3 w-3 mr-1" />}
+          {copied ? "Copied" : "Copy"}
+        </Button>
+      </div>
+      <pre className="p-4 overflow-x-auto text-sm">
+        <code className="font-mono text-foreground/90">{code}</code>
+      </pre>
+    </div>
+  );
+}
+
+function DocTable({ headers, rows }: { headers: string[]; rows: string[][] }) {
+  return (
+    <div className="rounded-lg border overflow-x-auto">
+      <table className="w-full text-sm">
+        <thead>
+          <tr className="bg-muted/50">
+            {headers.map((header, i) => (
+              <th key={i} className="px-4 py-2 text-left font-oswald font-medium text-foreground/80 border-b">
+                {header}
+              </th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map((row, i) => (
+            <tr key={i} className="border-b last:border-b-0 hover:bg-muted/20">
+              {row.map((cell, j) => (
+                <td key={j} className="px-4 py-2.5 font-roboto text-foreground/80">
+                  {cell}
+                </td>
+              ))}
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+function SectionContent({ section }: { section: DocSection }) {
+  return (
+    <div className="space-y-8">
+      {section.content.map((block, index) => (
+        <div key={index} className="space-y-3">
+          <h3 className="font-oswald text-lg font-medium text-foreground">{block.heading}</h3>
+          <p className="font-roboto text-sm text-muted-foreground leading-relaxed">{block.body}</p>
+
+          {block.warning && (
+            <div className="flex items-start gap-3 p-3 rounded-lg bg-destructive/10 border border-destructive/20">
+              <AlertTriangle className="h-4 w-4 text-destructive shrink-0 mt-0.5" />
+              <p className="text-sm font-roboto text-destructive/90">{block.warning}</p>
+            </div>
+          )}
+
+          {block.note && (
+            <div className="flex items-start gap-3 p-3 rounded-lg bg-blue-500/10 border border-blue-500/20">
+              <FileText className="h-4 w-4 text-blue-500 shrink-0 mt-0.5" />
+              <p className="text-sm font-roboto text-blue-600 dark:text-blue-400">{block.note}</p>
+            </div>
+          )}
+
+          {block.items && (
+            <ul className="space-y-1.5 ml-1">
+              {block.items.map((item, i) => (
+                <li key={i} className="flex items-start gap-2 text-sm font-roboto text-muted-foreground">
+                  <span className="text-lys-teal mt-1 shrink-0">&#8226;</span>
+                  <span>{item}</span>
+                </li>
+              ))}
+            </ul>
+          )}
+
+          {block.code && (
+            <CodeBlock code={block.code} language={block.language} />
+          )}
+
+          {block.table && (
+            <DocTable headers={block.table.headers} rows={block.table.rows} />
+          )}
+        </div>
+      ))}
+    </div>
+  );
+}
+
+export default function DevDocs() {
+  const { user } = useAuth();
+  const [searchQuery, setSearchQuery] = useState("");
+  const [activeCategory, setActiveCategory] = useState("all");
+  const [activeSection, setActiveSection] = useState<string | null>(null);
+  const [expandedSections, setExpandedSections] = useState<Set<string>>(new Set());
+
+  const userRole = user?.role || "student";
+  const isSystemAdmin = userRole === "system_admin" || userRole === "site_admin";
+
+  const filteredSections = docSections.filter((section) => {
+    const matchesCategory = activeCategory === "all" || section.category === activeCategory;
+    if (!matchesCategory) return false;
+
+    if (!searchQuery) return true;
+
+    const query = searchQuery.toLowerCase();
+    if (section.title.toLowerCase().includes(query)) return true;
+    if (section.category.toLowerCase().includes(query)) return true;
+
+    return section.content.some(
+      (block) =>
+        block.heading.toLowerCase().includes(query) ||
+        block.body.toLowerCase().includes(query) ||
+        block.items?.some((item) => item.toLowerCase().includes(query)) ||
+        block.code?.toLowerCase().includes(query) ||
+        block.table?.rows.some((row) => row.some((cell) => cell.toLowerCase().includes(query)))
+    );
+  });
+
+  const toggleSection = (id: string) => {
+    setExpandedSections((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) {
+        next.delete(id);
+      } else {
+        next.add(id);
+      }
+      return next;
+    });
+  };
+
+  const selectedSection = activeSection
+    ? docSections.find((s) => s.id === activeSection)
+    : null;
+
+  if (!isSystemAdmin) {
+    return (
+      <div className="container max-w-4xl mx-auto py-12 px-4">
+        <Card>
+          <CardContent className="py-12 text-center">
+            <Shield className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+            <h2 className="font-oswald text-xl mb-2">Access Restricted</h2>
+            <p className="text-muted-foreground font-roboto mb-4">
+              Developer documentation is available to System Administrators only.
+            </p>
+            <Button asChild variant="outline">
+              <Link href="/" data-testid="link-back-dashboard">
+                <ArrowLeft className="h-4 w-4 mr-2" />
+                Back to Dashboard
+              </Link>
+            </Button>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  if (selectedSection) {
+    return (
+      <div className="container max-w-5xl mx-auto py-8 px-4">
+        <div className="flex items-center gap-3 mb-6">
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => setActiveSection(null)}
+            data-testid="button-back-docs"
+          >
+            <ArrowLeft className="h-4 w-4 mr-1" />
+            Back
+          </Button>
+          <Separator orientation="vertical" className="h-5" />
+          <Badge variant="outline" className="text-xs">{selectedSection.category}</Badge>
+          <h1 className="font-oswald text-2xl font-bold">{selectedSection.title}</h1>
+        </div>
+
+        <Card>
+          <CardContent className="p-6 md:p-8">
+            <SectionContent section={selectedSection} />
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  return (
+    <div className="container max-w-6xl mx-auto py-8 px-4">
+      <div className="mb-8">
+        <div className="flex items-center gap-3 mb-2">
+          <Code className="h-6 w-6 text-lys-teal" />
+          <h1 className="font-marker text-3xl text-lys-red" data-testid="text-dev-docs-title">
+            Developer Documentation
+          </h1>
+        </div>
+        <p className="text-muted-foreground font-roboto">
+          Internal technical reference for the LYS platform. Covers architecture, security, APIs, integrations, and operations.
+        </p>
+      </div>
+
+      <div className="flex flex-col md:flex-row gap-4 mb-6">
+        <div className="relative flex-1">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <Input
+            placeholder="Search documentation..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="pl-9 font-roboto"
+            data-testid="input-search-docs"
+          />
+        </div>
+        <div className="flex flex-wrap gap-2">
+          {categories.map((cat) => (
+            <Button
+              key={cat.id}
+              variant={activeCategory === cat.id ? "default" : "outline"}
+              size="sm"
+              onClick={() => setActiveCategory(cat.id)}
+              className="text-xs"
+              data-testid={`button-category-${cat.id}`}
+            >
+              {cat.label}
+            </Button>
+          ))}
+        </div>
+      </div>
+
+      <div className="grid gap-3">
+        {filteredSections.length === 0 ? (
+          <Card>
+            <CardContent className="py-12 text-center">
+              <Search className="h-8 w-8 text-muted-foreground mx-auto mb-3" />
+              <p className="font-roboto text-muted-foreground">
+                No documentation sections match your search.
+              </p>
+            </CardContent>
+          </Card>
+        ) : (
+          filteredSections.map((section) => {
+            const Icon = section.icon;
+            const isExpanded = expandedSections.has(section.id);
+
+            return (
+              <Card
+                key={section.id}
+                className="overflow-hidden transition-colors hover:border-lys-teal/30"
+                data-testid={`card-doc-${section.id}`}
+              >
+                <div
+                  className="flex items-center gap-3 p-4 cursor-pointer select-none"
+                  onClick={() => toggleSection(section.id)}
+                >
+                  <div className="flex items-center justify-center w-10 h-10 rounded-lg bg-lys-teal/10 shrink-0">
+                    <Icon className="h-5 w-5 text-lys-teal" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2">
+                      <h3 className="font-oswald text-base font-medium">{section.title}</h3>
+                      <Badge variant="secondary" className="text-[10px]">{section.category}</Badge>
+                    </div>
+                    <p className="text-xs text-muted-foreground font-roboto mt-0.5">
+                      {section.content.length} topic{section.content.length !== 1 ? "s" : ""}
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-2 shrink-0">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="text-xs"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setActiveSection(section.id);
+                      }}
+                      data-testid={`button-view-${section.id}`}
+                    >
+                      Full View
+                    </Button>
+                    {isExpanded ? (
+                      <ChevronDown className="h-4 w-4 text-muted-foreground" />
+                    ) : (
+                      <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                    )}
+                  </div>
+                </div>
+
+                {isExpanded && (
+                  <>
+                    <Separator />
+                    <div className="p-4 bg-muted/5">
+                      <ScrollArea className="max-h-[600px]">
+                        <SectionContent section={section} />
+                      </ScrollArea>
+                    </div>
+                  </>
+                )}
+              </Card>
+            );
+          })
+        )}
+      </div>
+    </div>
+  );
+}
