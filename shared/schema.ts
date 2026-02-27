@@ -811,7 +811,7 @@ export const AFFILIATE_POINT_CONFIG = {
 } as const;
 
 export const AFFILIATE_CONVERSION_RATE = {
-  pointsPerDollar: 100,
+  pointsPerDollar: 1000,
   minimumPayoutCents: 5000,
   minimumPointsToConvert: 5000,
   tier2CommissionPercent: 10,

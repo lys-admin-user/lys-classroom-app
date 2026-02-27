@@ -506,7 +506,7 @@ export default function EducatorInfluence() {
                     <div className="mt-4 p-3 rounded-md bg-gradient-to-r from-lys-teal/10 to-lys-yellow/10 border border-lys-teal/20">
                       <p className="font-oswald text-sm mb-1">Points to Cash</p>
                       <p className="font-roboto text-xs text-muted-foreground">
-                        Convert {configData?.conversionRate.pointsPerDollar || 100} points = $1.00. Minimum {((configData?.conversionRate.minimumPointsToConvert || 5000)).toLocaleString()} points to convert.
+                        Convert {configData?.conversionRate.pointsPerDollar || 1000} points = $1.00. Minimum {((configData?.conversionRate.minimumPointsToConvert || 5000)).toLocaleString()} points to convert.
                       </p>
                     </div>
                   </CardContent>
@@ -559,7 +559,7 @@ export default function EducatorInfluence() {
                       Convert Points to Cash
                     </CardTitle>
                     <CardDescription className="font-roboto">
-                      {configData?.conversionRate.pointsPerDollar || 100} points = $1.00 · Min {((configData?.conversionRate.minimumPointsToConvert || 5000)).toLocaleString()} points
+                      {configData?.conversionRate.pointsPerDollar || 1000} points = $1.00 · Min {((configData?.conversionRate.minimumPointsToConvert || 5000)).toLocaleString()} points
                     </CardDescription>
                   </CardHeader>
                   <CardContent>
@@ -580,7 +580,7 @@ export default function EducatorInfluence() {
                         <div className="p-3 rounded-md bg-emerald-500/10 border border-emerald-500/20">
                           <p className="font-roboto text-sm">
                             You'll receive: <span className="font-bold text-emerald-600">
-                              ${(Number(convertAmount) / (configData?.conversionRate.pointsPerDollar || 100)).toFixed(2)}
+                              ${(Number(convertAmount) / (configData?.conversionRate.pointsPerDollar || 1000)).toFixed(2)}
                             </span>
                           </p>
                         </div>

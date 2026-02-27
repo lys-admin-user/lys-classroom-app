@@ -790,7 +790,7 @@ const helpArticles: HelpArticle[] = [
       "Share your referral link with colleagues, students, or on social media",
       "You earn points for different actions: 100 pts for a signup, 500 pts for a course completion, 50 pts for a verified review, and more",
       "Track your earnings, views, shares, and referrals in real-time on the Overview tab",
-      "Once you reach 5,000 points ($50), you can convert points to cash in the Wallet tab",
+      "Once you reach 5,000 points ($5), you can convert points to cash in the Wallet tab",
       "After 5 referrals, you automatically upgrade to Pro mode for enhanced features",
     ],
     relatedArticles: ["affiliate-wallet", "affiliate-promo-studio", "affiliate-network"],
@@ -802,7 +802,7 @@ const helpArticles: HelpArticle[] = [
     tags: ["wallet", "points", "cash", "convert", "payout", "balance", "money", "earnings"],
     severity: "info",
     symptom: "You want to understand how to convert your earned points to cash and request payouts.",
-    explanation: "The Wallet tab shows your dual balance — points and cash. Points are earned through referral activities and can be converted to cash at a rate of 100 points = $1.00. You need a minimum of 5,000 points ($50) to convert. Once converted, cash can be paid out to your bank account via Stripe Connect. All transactions are logged in your transaction history.",
+    explanation: "The Wallet tab shows your dual balance — points and cash. Points are earned through referral activities and can be converted to cash at a rate of 1,000 points = $1.00. You need a minimum of 5,000 points ($5) to convert. Once converted, cash can be paid out to your bank account via Stripe Connect. All transactions are logged in your transaction history.",
     steps: [
       "Go to Educator Influence and click the 'Wallet' tab",
       "View your current points balance and cash balance at the top",
