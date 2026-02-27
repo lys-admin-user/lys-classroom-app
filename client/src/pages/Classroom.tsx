@@ -624,7 +624,7 @@ export default function Classroom() {
 
   const downloadAttendanceRoster = () => {
     if (!attendanceClass || attendanceClassStudents.length === 0) return;
-    const dateFormatted = new Date(attendanceDate + "T00:00:00").toLocaleDateString("en-US", {
+    const dateFormatted = new Date(attendanceDate + "T00:00:00").toLocaleDateString(undefined, {
       weekday: "long", year: "numeric", month: "long", day: "numeric"
     });
     const headers = ["#", "First Name", "Last Name", "Student ID", "Grade Level", "Attendance Status", "Notes"];

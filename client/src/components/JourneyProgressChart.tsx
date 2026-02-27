@@ -140,7 +140,7 @@ function SimpleLineChart({ history }: { history: StudentJourneyProgressHistory[]
                 fill="currentColor"
                 opacity={0.6}
               >
-                {date.toLocaleDateString("en-US", { month: "short", day: "numeric" })}
+                {date.toLocaleDateString(undefined, { month: "short", day: "numeric" })}
               </text>
             );
           }

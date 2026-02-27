@@ -293,7 +293,7 @@ export default function Careers() {
   });
 
   const formatSalary = (amount: number) => {
-    return new Intl.NumberFormat("en-US", {
+    return new Intl.NumberFormat(undefined, {
       style: "currency",
       currency: "USD",
       minimumFractionDigits: 0,
@@ -302,7 +302,7 @@ export default function Careers() {
   };
 
   const formatNumber = (num: number) => {
-    return new Intl.NumberFormat("en-US").format(num);
+    return new Intl.NumberFormat(undefined).format(num);
   };
 
   if (selectedCareer) {
@@ -725,7 +725,7 @@ export default function Careers() {
                             <div className="flex flex-wrap items-center gap-2 mt-3 pt-3 border-t">
                               <span className="text-sm font-oswald text-lys-yellow flex items-center gap-1">
                                 <DollarSign className="h-3 w-3" />
-                                {new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(rec.career.salaryMedian)}
+                                {new Intl.NumberFormat(undefined, { style: "currency", currency: "USD", minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(rec.career.salaryMedian)}
                               </span>
                               {rec.career.jobOutlook && (
                                 <Badge className={`${outlookLabels[rec.career.jobOutlook]?.color} text-xs font-roboto`}>

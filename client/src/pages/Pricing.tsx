@@ -92,7 +92,7 @@ const baseTiers = [
     id: "pro",
     name: "Pro",
     subtitle: "Focus Mode",
-    basePrice: 14.99,
+    basePrice: 19,
     period: "/class/month",
     description: "Per-class billing with assignment generation and student distribution (35 students max per class)",
     icon: Eye,
@@ -117,7 +117,7 @@ const baseTiers = [
     id: "campus",
     name: "Campus",
     subtitle: "Focus Mode + Team",
-    basePrice: 39.99,
+    basePrice: 99,
     period: "/month",
     description: "For schools and districts with multiple educators and admin tools",
     icon: Building2,
@@ -135,6 +135,27 @@ const baseTiers = [
       { name: "Custom Branding", included: true },
     ],
     cta: "Upgrade to Campus",
+    popular: false,
+  },
+  {
+    id: "enterprise",
+    name: "Enterprise",
+    subtitle: "Full Platform",
+    basePrice: 299,
+    period: "/month",
+    description: "State-wide or national deployment with full platform access and dedicated support",
+    icon: Building2,
+    features: [
+      { name: "Everything in Campus", included: true, highlight: true },
+      { name: "Multi-District Management", included: true },
+      { name: "Custom API Access", included: true },
+      { name: "Advanced Analytics", included: true },
+      { name: "White-Label Options", included: true },
+      { name: "Custom Integrations", included: true },
+      { name: "SLA Guarantee", included: true },
+      { name: "Dedicated Support Team", included: true },
+    ],
+    cta: "Contact Sales",
     popular: false,
   },
 ];
@@ -442,7 +463,7 @@ export default function Pricing() {
           </div>
         )}
 
-        <div className="grid md:grid-cols-3 gap-8 mb-12">
+        <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6 mb-12">
           {baseTiers.map((tier) => {
             const action = getButtonAction(tier.id);
             const isCurrentPlan = tier.id === currentTier;

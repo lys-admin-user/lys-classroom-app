@@ -167,20 +167,15 @@ export default function SystemAdminPage() {
   const [, setLocation] = useLocation();
   const { toast } = useToast();
   const [, routeParams] = useRoute("/system-admin/:tab");
-  const initialTab = routeParams?.tab || "overview";
-  const [activeTab, setActiveTab] = useState(initialTab);
-
-  useEffect(() => {
-    const urlTab = routeParams?.tab || "overview";
-    if (urlTab !== activeTab) {
-      setActiveTab(urlTab);
-    }
-  }, [routeParams?.tab, activeTab]);
+  const activeTab = routeParams?.tab || "overview";
 
   const handleTabChange = useCallback((value: string) => {
-    setActiveTab(value);
-    setLocation(value === "overview" ? "/system-admin" : `/system-admin/${value}`);
-  }, [setLocation]);
+    if (value !== activeTab) {
+      setTimeout(() => {
+        setLocation(value === "overview" ? "/system-admin" : `/system-admin/${value}`);
+      }, 0);
+    }
+  }, [setLocation, activeTab]);
   const [userSearch, setUserSearch] = useState("");
   const [userRoleFilter, setUserRoleFilter] = useState<string>("all");
   const [userTierFilter, setUserTierFilter] = useState<string>("all");

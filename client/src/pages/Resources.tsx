@@ -188,7 +188,7 @@ export default function Resources() {
   const formatAmount = (amount?: string | number) => {
     if (!amount) return "Varies";
     if (typeof amount === "string") return amount;
-    return new Intl.NumberFormat("en-US", {
+    return new Intl.NumberFormat(undefined, {
       style: "currency",
       currency: "USD",
       minimumFractionDigits: 0,
