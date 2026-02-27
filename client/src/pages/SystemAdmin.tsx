@@ -873,6 +873,10 @@ export default function SystemAdminPage() {
             <Lock className="h-4 w-4" />
             <span className="hidden sm:inline">Data Governance</span>
           </TabsTrigger>
+          <TabsTrigger value="trials" className="gap-2" data-testid="tab-trials">
+            <Zap className="h-4 w-4" />
+            <span className="hidden sm:inline">Trials</span>
+          </TabsTrigger>
         </TabsList>
 
         <TabsContent value="overview" className="space-y-6">
@@ -3145,6 +3149,10 @@ export default function SystemAdminPage() {
         <TabsContent value="governance" className="space-y-6">
           <DataGovernanceTab />
         </TabsContent>
+
+        <TabsContent value="trials" className="space-y-6">
+          <TrialMonitoringTab />
+        </TabsContent>
       </Tabs>
     </div>
   );
@@ -4346,6 +4354,213 @@ function DataGovernanceTab() {
               </div>
             </div>
           </div>
+        </CardContent>
+      </Card>
+    </>
+  );
+}
+
+function TrialMonitoringTab() {
+  const { data: trialStats, isLoading } = useQuery<{
+    totalTrials: number;
+    activeTrials: number;
+    expiredTrials: number;
+    boundTrials: number;
+    unboundTrials: number;
+    abuseFlagged: number;
+    uniqueIPs: number;
+    recentTrials: Array<{
+      id: string;
+      ipAddress: string;
+      userId: string | null;
+      fingerprint: string | null;
+      trialStartDate: string;
+      trialEndDate: string;
+      isActive: boolean;
+      abuseFlags: number;
+      createdAt: string;
+    }>;
+    conversionRate: number;
+  }>({
+    queryKey: ["/api/admin/trial-stats"],
+  });
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center py-12">
+        <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+      </div>
+    );
+  }
+
+  const stats = trialStats || {
+    totalTrials: 0, activeTrials: 0, expiredTrials: 0,
+    boundTrials: 0, unboundTrials: 0, abuseFlagged: 0,
+    uniqueIPs: 0, recentTrials: [], conversionRate: 0,
+  };
+
+  return (
+    <>
+      <div className="flex items-center justify-between">
+        <div>
+          <h3 className="text-lg font-semibold font-oswald" data-testid="text-trial-title">Free Trial Monitoring</h3>
+          <p className="text-sm text-muted-foreground font-roboto">10-day Pro-level trial system with abuse prevention</p>
+        </div>
+        <Badge variant="outline" className="gap-1" data-testid="badge-active-trials">
+          <Zap className="h-3 w-3" />
+          {stats.activeTrials} Active
+        </Badge>
+      </div>
+
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <Card>
+          <CardContent className="pt-6">
+            <div className="text-center">
+              <p className="text-2xl font-bold font-oswald" data-testid="text-total-trials">{stats.totalTrials}</p>
+              <p className="text-xs text-muted-foreground font-roboto">Total Trials</p>
+            </div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="pt-6">
+            <div className="text-center">
+              <p className="text-2xl font-bold font-oswald text-green-600" data-testid="text-active-trials">{stats.activeTrials}</p>
+              <p className="text-xs text-muted-foreground font-roboto">Active Trials</p>
+            </div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="pt-6">
+            <div className="text-center">
+              <p className="text-2xl font-bold font-oswald text-blue-600" data-testid="text-bound-trials">{stats.boundTrials}</p>
+              <p className="text-xs text-muted-foreground font-roboto">User-Bound</p>
+            </div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="pt-6">
+            <div className="text-center">
+              <p className="text-2xl font-bold font-oswald text-amber-600" data-testid="text-abuse-flagged">{stats.abuseFlagged}</p>
+              <p className="text-xs text-muted-foreground font-roboto">Abuse Flagged</p>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base font-oswald">Trial Breakdown</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            <div className="flex justify-between items-center">
+              <span className="text-sm font-roboto text-muted-foreground">Expired Trials</span>
+              <span className="font-medium font-roboto">{stats.expiredTrials}</span>
+            </div>
+            <Separator />
+            <div className="flex justify-between items-center">
+              <span className="text-sm font-roboto text-muted-foreground">Unbound (IP-only)</span>
+              <span className="font-medium font-roboto">{stats.unboundTrials}</span>
+            </div>
+            <Separator />
+            <div className="flex justify-between items-center">
+              <span className="text-sm font-roboto text-muted-foreground">Unique IPs</span>
+              <span className="font-medium font-roboto">{stats.uniqueIPs}</span>
+            </div>
+            <Separator />
+            <div className="flex justify-between items-center">
+              <span className="text-sm font-roboto text-muted-foreground">Trial → Paid Conversion</span>
+              <span className="font-medium font-roboto">{stats.conversionRate.toFixed(1)}%</span>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base font-oswald">System Configuration</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            <div className="flex justify-between items-center">
+              <span className="text-sm font-roboto text-muted-foreground">Trial Duration</span>
+              <Badge variant="secondary">10 days</Badge>
+            </div>
+            <Separator />
+            <div className="flex justify-between items-center">
+              <span className="text-sm font-roboto text-muted-foreground">Access Level</span>
+              <Badge variant="secondary">Pro Tier</Badge>
+            </div>
+            <Separator />
+            <div className="flex justify-between items-center">
+              <span className="text-sm font-roboto text-muted-foreground">Trials per IP</span>
+              <Badge variant="secondary">5 per 6 months</Badge>
+            </div>
+            <Separator />
+            <div className="flex justify-between items-center">
+              <span className="text-sm font-roboto text-muted-foreground">Abuse Prevention</span>
+              <Badge variant="secondary">IP + Fingerprint + User ID</Badge>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base font-oswald">Recent Trials</CardTitle>
+          <CardDescription className="font-roboto">Latest trial activations across the platform</CardDescription>
+        </CardHeader>
+        <CardContent>
+          {stats.recentTrials.length === 0 ? (
+            <p className="text-sm text-muted-foreground font-roboto text-center py-6" data-testid="text-no-trials">No trials recorded yet</p>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm" data-testid="table-trials">
+                <thead>
+                  <tr className="border-b">
+                    <th className="text-left py-2 font-roboto font-medium">IP Address</th>
+                    <th className="text-left py-2 font-roboto font-medium">User Bound</th>
+                    <th className="text-left py-2 font-roboto font-medium">Started</th>
+                    <th className="text-left py-2 font-roboto font-medium">Expires</th>
+                    <th className="text-left py-2 font-roboto font-medium">Status</th>
+                    <th className="text-left py-2 font-roboto font-medium">Flags</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {stats.recentTrials.map((trial) => (
+                    <tr key={trial.id} className="border-b last:border-0" data-testid={`row-trial-${trial.id}`}>
+                      <td className="py-2 font-mono text-xs">{trial.ipAddress.length > 12 ? trial.ipAddress.substring(0, 12) + "..." : trial.ipAddress}</td>
+                      <td className="py-2">
+                        {trial.userId ? (
+                          <Badge variant="default" className="text-xs">Bound</Badge>
+                        ) : (
+                          <Badge variant="outline" className="text-xs">IP Only</Badge>
+                        )}
+                      </td>
+                      <td className="py-2 font-roboto text-muted-foreground">
+                        {new Date(trial.trialStartDate).toLocaleDateString()}
+                      </td>
+                      <td className="py-2 font-roboto text-muted-foreground">
+                        {new Date(trial.trialEndDate).toLocaleDateString()}
+                      </td>
+                      <td className="py-2">
+                        {trial.isActive && new Date(trial.trialEndDate) > new Date() ? (
+                          <Badge className="bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400 text-xs">Active</Badge>
+                        ) : (
+                          <Badge variant="secondary" className="text-xs">Expired</Badge>
+                        )}
+                      </td>
+                      <td className="py-2">
+                        {trial.abuseFlags > 0 ? (
+                          <Badge variant="destructive" className="text-xs">{trial.abuseFlags} flags</Badge>
+                        ) : (
+                          <span className="text-muted-foreground">—</span>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
         </CardContent>
       </Card>
     </>

@@ -44,6 +44,7 @@ import {
   fraudStrikes as fraudStrikesTable,
   userDataRegions as userDataRegionsTable,
   organizationMemberships as orgMembershipsTable,
+  freeTrials,
   hasRolePrivilege,
 } from "@shared/schema";
 import { z } from "zod";
@@ -8008,6 +8009,62 @@ export async function registerRoutes(
       res.json(updated);
     } catch (error) {
       res.status(500).json({ error: "Failed to update affiliate" });
+    }
+  });
+
+  app.get("/api/admin/trial-stats", isAuthenticated, isSiteAdmin, async (req: any, res) => {
+    try {
+      const allTrials = await db.select().from(freeTrials).orderBy(desc(freeTrials.createdAt));
+      const now = new Date();
+
+      const totalTrials = allTrials.length;
+      const activeTrials = allTrials.filter(t => t.isActive && new Date(t.trialEndDate) > now).length;
+      const expiredTrials = allTrials.filter(t => !t.isActive || new Date(t.trialEndDate) <= now).length;
+      const boundTrials = allTrials.filter(t => t.userId != null).length;
+      const unboundTrials = allTrials.filter(t => t.userId == null).length;
+      const abuseFlagged = allTrials.filter(t => (t.abuseFlags || 0) > 0).length;
+      const uniqueIPs = new Set(allTrials.map(t => t.ipAddress)).size;
+
+      const completedBoundTrials = allTrials.filter(t => t.userId && (!t.isActive || new Date(t.trialEndDate) <= now));
+      const completedBoundUserIds = completedBoundTrials.map(t => t.userId!);
+      let paidConversions = 0;
+      if (completedBoundUserIds.length > 0) {
+        const paidUsers = await db.select().from(users).where(
+          and(
+            inArray(users.id, completedBoundUserIds),
+            inArray(users.tier as any, ["pro", "campus", "enterprise"])
+          )
+        );
+        paidConversions = paidUsers.length;
+      }
+      const conversionRate = completedBoundTrials.length > 0 ? (paidConversions / completedBoundTrials.length) * 100 : 0;
+
+      const recentTrials = allTrials.slice(0, 20).map(t => ({
+        id: t.id,
+        ipAddress: t.ipAddress,
+        userId: t.userId,
+        fingerprint: t.fingerprint,
+        trialStartDate: t.trialStartDate,
+        trialEndDate: t.trialEndDate,
+        isActive: t.isActive,
+        abuseFlags: t.abuseFlags,
+        createdAt: t.createdAt,
+      }));
+
+      res.json({
+        totalTrials,
+        activeTrials,
+        expiredTrials,
+        boundTrials,
+        unboundTrials,
+        abuseFlagged,
+        uniqueIPs,
+        recentTrials,
+        conversionRate,
+      });
+    } catch (error) {
+      console.error("Trial stats error:", error);
+      res.status(500).json({ error: "Failed to fetch trial stats" });
     }
   });
 
