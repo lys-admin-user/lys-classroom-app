@@ -8000,7 +8000,7 @@ export class DatabaseStorage implements IStorage {
   }
 
   async createFreeTrial(trial: InsertFreeTrial): Promise<FreeTrial> {
-    const [newTrial] = await db.insert(freeTrials).values(trial).returning();
+    const [newTrial] = await db.insert(freeTrials).values(trial as any).returning();
     return newTrial;
   }
 

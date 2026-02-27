@@ -123,7 +123,9 @@ export async function requestStripeConnectPayout(
       return { success: false, message: "No Stripe Connect account linked. Affiliate must onboard first.", demoMode: false };
     }
 
-    const stripe = (await import("stripe")).default;
+    // @ts-ignore - stripe is optionally available at runtime when STRIPE_CONNECT_SECRET is set
+    const stripeModule = await import("stripe") as any;
+    const stripe = stripeModule.default || stripeModule;
     const stripeClient = new stripe(STRIPE_CONNECT_SECRET!);
 
     const transfer = await stripeClient.transfers.create({

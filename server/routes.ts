@@ -4367,7 +4367,7 @@ export async function registerRoutes(
           quality: "standard",
           n: 1,
         });
-        imageUrl = imageResponse.data[0]?.url || "";
+        imageUrl = imageResponse.data?.[0]?.url || "";
       } catch (aiError) {
         console.log("AI promo generation unavailable, using fallback:", aiError);
         caption = `${displayName} recommends ${course} on LYS — empowering educators and students through the Be-Know-Do methodology. Join us and start building your path to success!`;
