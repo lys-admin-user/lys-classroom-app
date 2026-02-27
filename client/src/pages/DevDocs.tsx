@@ -882,7 +882,7 @@ const requireSystemAdmin = requireRole("system_admin");`,
         items: [
           "Dual wallet: Separate points balance and cash balance per affiliate",
           "Configurable point values: JSON-based point config for each action type",
-          "Points-to-cash conversion: 1,000 points = $1.00, minimum 5,000 points ($5) to convert",
+          "Points-to-cash conversion: 100 points = $1.00, minimum 5,000 points ($50) to convert",
           "Two-tier commission: Affiliates earn 10% bonus on their sub-affiliates' earnings",
           "Student vs Pro modes: Auto-upgrade to Pro at 5 referrals for enhanced features",
           "AI promo content: DALL-E 3 image generation + GPT-4o captions for branded marketing",
