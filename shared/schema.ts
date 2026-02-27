@@ -3079,6 +3079,25 @@ export const insertFraudStrikeSchema = createInsertSchema(fraudStrikes).omit({ i
 export type InsertFraudStrike = z.infer<typeof insertFraudStrikeSchema>;
 export type FraudStrike = typeof fraudStrikes.$inferSelect;
 
+// Free Trial Tracking
+export const freeTrials = pgTable("free_trials", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  ipAddress: varchar("ip_address").notNull(),
+  fingerprint: varchar("fingerprint"),
+  userId: varchar("user_id"),
+  trialStartDate: timestamp("trial_start_date").notNull().defaultNow(),
+  trialEndDate: timestamp("trial_end_date").notNull(),
+  isActive: boolean("is_active").notNull().default(true),
+  abuseFlags: integer("abuse_flags").notNull().default(0),
+  metadata: jsonb("metadata").$type<{ userAgent?: string; timezone?: string; screenResolution?: string; language?: string }>(),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertFreeTrialSchema = createInsertSchema(freeTrials).omit({ id: true, createdAt: true, updatedAt: true });
+export type InsertFreeTrial = z.infer<typeof insertFreeTrialSchema>;
+export type FreeTrial = typeof freeTrials.$inferSelect;
+
 // User data region tracking (Rule 4: Data Residency)
 export const userDataRegions = pgTable("user_data_regions", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),

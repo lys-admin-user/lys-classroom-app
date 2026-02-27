@@ -8,6 +8,7 @@ import { AppSidebar } from "@/components/AppSidebar";
 import { Header } from "@/components/Header";
 import { Footer } from "@/components/Footer";
 import { OnboardingReminderBanner } from "@/components/OnboardingReminderBanner";
+import { TrialBanner } from "@/components/TrialBanner";
 import { OnboardingTour } from "@/components/OnboardingTour";
 import { useAuth } from "@/hooks/use-auth";
 import { useEffect, useState } from "react";
@@ -218,6 +219,7 @@ function App() {
             <div className="flex min-h-screen w-full">
               <AppSidebar />
               <SidebarInset className="flex flex-col flex-1">
+                <TrialBanner />
                 <OnboardingReminderBanner />
                 <Header />
                 <main className="flex-1 overflow-auto">

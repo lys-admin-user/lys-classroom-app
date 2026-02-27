@@ -218,7 +218,15 @@ export async function registerRoutes(
       const userId = req.user?.claims?.sub;
       const tier = await storage.getUserTier(userId);
       const monthlyCount = await storage.countMonthlyGenerations(userId);
-      const limit = tier === "free" ? 3 : null;
+      
+      let hasActiveTrial = false;
+      if (tier === "free") {
+        const userTrial = await storage.getActiveTrialByUserId(userId);
+        hasActiveTrial = !!userTrial;
+      }
+
+      const isUnlimited = tier !== "free" || hasActiveTrial;
+      const limit = isUnlimited ? null : 3;
       const remaining = limit !== null ? Math.max(0, limit - monthlyCount) : null;
       
       res.json({
@@ -226,7 +234,8 @@ export async function registerRoutes(
         monthlyCount,
         limit,
         remaining,
-        unlimited: tier !== "free"
+        unlimited: isUnlimited,
+        hasActiveTrial,
       });
     } catch (error) {
       res.status(500).json({ error: "Failed to get usage info" });
@@ -278,6 +287,207 @@ export async function registerRoutes(
     }
   });
 
+  // Free Trial System
+  const TRIAL_DURATION_DAYS = 10;
+  const TRIAL_RESET_MONTHS = 6;
+  const MAX_TRIALS_PER_IP = 5;
+
+  function getTrialSinceDate(): number {
+    const d = new Date();
+    d.setMonth(d.getMonth() - TRIAL_RESET_MONTHS);
+    return d.getTime();
+  }
+
+  app.get("/api/trial/status", async (req: any, res) => {
+    try {
+      const ipAddress = getClientIP(req);
+      const userId = req.user?.claims?.sub || null;
+      const fingerprint = (req.query.fingerprint as string) || null;
+      const sinceDate = getTrialSinceDate();
+
+      let activeTrial = null;
+
+      if (userId) {
+        activeTrial = await storage.getActiveTrialByUserId(userId);
+      }
+      if (!activeTrial) {
+        activeTrial = await storage.getActiveTrialByIP(ipAddress);
+      }
+      if (!activeTrial && fingerprint) {
+        activeTrial = await storage.getActiveTrialByFingerprint(fingerprint);
+      }
+
+      if (activeTrial) {
+        const now = new Date();
+        const endDate = new Date(activeTrial.trialEndDate);
+        const daysRemaining = Math.max(0, Math.ceil((endDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24)));
+        const totalDays = TRIAL_DURATION_DAYS;
+
+        res.json({
+          hasTrial: true,
+          isActive: true,
+          daysRemaining,
+          totalDays,
+          trialStartDate: activeTrial.trialStartDate,
+          trialEndDate: activeTrial.trialEndDate,
+          trialId: activeTrial.id,
+        });
+        return;
+      }
+
+      const trialCount = await storage.getActiveTrialCount(ipAddress, sinceDate);
+      let fingerprintTrials: any[] = [];
+      if (fingerprint) {
+        fingerprintTrials = await storage.getTrialsByFingerprint(fingerprint, sinceDate);
+      }
+
+      const totalTrials = Math.max(trialCount, fingerprintTrials.length);
+      const canStartTrial = totalTrials < MAX_TRIALS_PER_IP;
+
+      const ipTrials = await storage.getTrialsByIP(ipAddress, sinceDate);
+      const lastTrial = ipTrials[0] || fingerprintTrials[0] || null;
+      let nextEligibleDate = null;
+      if (lastTrial && !canStartTrial) {
+        const lastCreated = new Date(lastTrial.createdAt!);
+        nextEligibleDate = new Date(lastCreated);
+        nextEligibleDate.setMonth(nextEligibleDate.getMonth() + TRIAL_RESET_MONTHS);
+      }
+
+      res.json({
+        hasTrial: false,
+        isActive: false,
+        canStartTrial,
+        trialsUsed: totalTrials,
+        trialsAllowed: MAX_TRIALS_PER_IP,
+        nextEligibleDate,
+      });
+    } catch (error) {
+      console.error("Trial status error:", error);
+      res.status(500).json({ error: "Failed to check trial status" });
+    }
+  });
+
+  app.post("/api/trial/start", async (req: any, res) => {
+    try {
+      const ipAddress = getClientIP(req);
+      const userId = req.user?.claims?.sub || null;
+      const { fingerprint, metadata } = req.body;
+      const sinceDate = getTrialSinceDate();
+
+      if (userId) {
+        const existingUserTrial = await storage.getActiveTrialByUserId(userId);
+        if (existingUserTrial) {
+          res.status(400).json({ error: "You already have an active trial" });
+          return;
+        }
+      }
+
+      const existingIPTrial = await storage.getActiveTrialByIP(ipAddress);
+      if (existingIPTrial) {
+        if (userId && !existingIPTrial.userId) {
+          await storage.bindTrialToUser(existingIPTrial.id, userId);
+        }
+        res.status(400).json({ error: "An active trial already exists for this network" });
+        return;
+      }
+
+      if (fingerprint) {
+        const existingFPTrial = await storage.getActiveTrialByFingerprint(fingerprint);
+        if (existingFPTrial) {
+          await storage.flagTrialAbuse(existingFPTrial.id);
+          res.status(400).json({ error: "An active trial already exists" });
+          return;
+        }
+      }
+
+      const trialCount = await storage.getActiveTrialCount(ipAddress, sinceDate);
+      if (trialCount >= MAX_TRIALS_PER_IP) {
+        res.status(403).json({ 
+          error: "Trial limit reached for this network. Trials reset every 6 months.",
+          nextEligibleDate: null,
+        });
+        return;
+      }
+
+      if (fingerprint) {
+        const fpTrials = await storage.getTrialsByFingerprint(fingerprint, sinceDate);
+        if (fpTrials.length >= MAX_TRIALS_PER_IP) {
+          res.status(403).json({ error: "Trial limit reached. Trials reset every 6 months." });
+          return;
+        }
+      }
+
+      const now = new Date();
+      const trialEndDate = new Date(now);
+      trialEndDate.setDate(trialEndDate.getDate() + TRIAL_DURATION_DAYS);
+
+      const trial = await storage.createFreeTrial({
+        ipAddress,
+        fingerprint: fingerprint || null,
+        userId,
+        trialStartDate: now,
+        trialEndDate,
+        isActive: true,
+        abuseFlags: 0,
+        metadata: metadata || null,
+      });
+
+      await logAuditEvent({
+        userId: userId || "guest",
+        action: "trial_started",
+        resourceType: "free_trial",
+        resourceId: trial.id,
+        category: "data_modify",
+        severity: "info",
+        details: { ipAddress, fingerprint: fingerprint ? "provided" : "none", durationDays: TRIAL_DURATION_DAYS },
+        ipAddress,
+      });
+
+      res.json({
+        success: true,
+        trialId: trial.id,
+        trialStartDate: trial.trialStartDate,
+        trialEndDate: trial.trialEndDate,
+        daysRemaining: TRIAL_DURATION_DAYS,
+        totalDays: TRIAL_DURATION_DAYS,
+      });
+    } catch (error) {
+      console.error("Trial start error:", error);
+      res.status(500).json({ error: "Failed to start trial" });
+    }
+  });
+
+  app.post("/api/trial/bind", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user?.claims?.sub;
+      const ipAddress = getClientIP(req);
+
+      const existingUserTrial = await storage.getActiveTrialByUserId(userId);
+      if (existingUserTrial) {
+        res.json({ success: true, trialId: existingUserTrial.id });
+        return;
+      }
+
+      const ipTrial = await storage.getActiveTrialByIP(ipAddress);
+      if (ipTrial && !ipTrial.userId) {
+        const updated = await storage.bindTrialToUser(ipTrial.id, userId);
+        res.json({ success: true, trialId: updated?.id });
+        return;
+      }
+
+      if (ipTrial && ipTrial.userId && ipTrial.userId !== userId) {
+        await storage.flagTrialAbuse(ipTrial.id);
+        res.status(403).json({ error: "Trial is bound to a different account" });
+        return;
+      }
+
+      res.json({ success: false, message: "No active trial found to bind" });
+    } catch (error) {
+      console.error("Trial bind error:", error);
+      res.status(500).json({ error: "Failed to bind trial" });
+    }
+  });
+
   // Lesson Plans - Generate (requires auth, free users limited to 3/month)
   app.post("/api/lessons/generate", isAuthenticated, async (req: any, res) => {
     try {
@@ -322,8 +532,14 @@ export async function registerRoutes(
       });
       
       const tier = await storage.getUserTier(userId);
+      
+      let hasActiveTrial = false;
       if (tier === "free") {
-        // Atomic check-and-reserve to prevent race conditions
+        const userTrial = await storage.getActiveTrialByUserId(userId);
+        hasActiveTrial = !!userTrial;
+      }
+
+      if (tier === "free" && !hasActiveTrial) {
         const { success, currentCount } = await storage.tryReserveLessonGeneration(userId, 3, validated.topic);
         if (!success) {
           res.status(403).json({ 
@@ -336,7 +552,6 @@ export async function registerRoutes(
           return;
         }
       } else {
-        // Pro/Campus users - just log without limit check
         await storage.logLessonGeneration(userId, validated.topic);
       }
       
@@ -900,7 +1115,14 @@ export async function registerRoutes(
       const profile = await storage.getEducatorProfile(userId);
       const tier = await storage.getUserTier(userId);
       const sponsoredAccess = await storage.getUserSponsoredAccess(userId);
-      res.json({ profile: profile || null, tier, sponsoredAccess: sponsoredAccess || null });
+      
+      let hasActiveTrial = false;
+      if (tier === "free") {
+        const userTrial = await storage.getActiveTrialByUserId(userId);
+        hasActiveTrial = !!userTrial;
+      }
+
+      res.json({ profile: profile || null, tier, sponsoredAccess: sponsoredAccess || null, hasActiveTrial });
     } catch (error) {
       res.status(500).json({ error: "Failed to fetch educator profile" });
     }

@@ -27,6 +27,7 @@ Preferred communication style: Simple, everyday language.
 -   **Automated Standards Ingestion**: Three-tier system for importing educational standards including CSP API, planned CASE Protocol, and LLM extraction.
 
 ### Feature Specifications
+-   **Free Trial System**: 10-day free trial for all users with layered abuse prevention — IP tracking (stored in database), browser fingerprinting (canvas + device attributes), and Replit user ID binding. Trials reset every 6 months, with a maximum of 5 trials per IP per reset window. Trial users get Pro-level access (unlimited AI lessons, no ads, focus mode). Components: `TrialBanner` (top bar), `TrialCard` (inline), `useTrial` hook. API routes at `/api/trial/*`. Database table: `free_trials`.
 -   **Be-Know-Do Framework**: Integrates self-discovery assessments (BE), career exploration (KNOW), and goal setting (DO).
 -   **Lesson Plan Rubric System**: Comprehensive rubric with 6 categories and 4 quality levels, used for AI lesson generation and quality scoring.
 -   **AI Lesson Plan Caching**: Database-backed cache for AI-generated lesson plans to reduce duplicate API calls.

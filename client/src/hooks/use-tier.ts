@@ -45,6 +45,7 @@ export function useTier(): TierData {
   const { data, isLoading } = useQuery<{ 
     profile: unknown; 
     tier: UserTier;
+    hasActiveTrial?: boolean;
     sponsoredAccess?: {
       adFreeAccess: boolean;
       focusModeEnabled: boolean;
@@ -56,7 +57,8 @@ export function useTier(): TierData {
   });
 
   const tier = data?.tier || "free";
-  const isPaid = tier === "paid" || tier === "campus" || tier === "enterprise";
+  const hasActiveTrial = data?.hasActiveTrial || false;
+  const isPaid = tier === "paid" || tier === "campus" || tier === "enterprise" || hasActiveTrial;
   const isCampus = tier === "campus";
   const isEnterprise = tier === "enterprise";
   const isFree = tier === "free";

@@ -281,6 +281,9 @@ import {
   type MentorConnection,
   type InsertMentorConnection,
   mentorConnections,
+  type FreeTrial,
+  type InsertFreeTrial,
+  freeTrials,
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, desc, and, asc, gte, sql, or, inArray } from "drizzle-orm";
@@ -916,6 +919,17 @@ export interface IStorage {
   getMentorConnectionsForMentor(mentorId: string): Promise<MentorConnection[]>;
   createMentorConnection(connection: InsertMentorConnection): Promise<MentorConnection>;
   updateMentorConnection(id: string, updates: Partial<MentorConnection>): Promise<MentorConnection | undefined>;
+
+  // Free Trials
+  getActiveTrialByIP(ipAddress: string): Promise<FreeTrial | undefined>;
+  getActiveTrialByFingerprint(fingerprint: string): Promise<FreeTrial | undefined>;
+  getActiveTrialByUserId(userId: string): Promise<FreeTrial | undefined>;
+  getTrialsByIP(ipAddress: string, sinceDateMs: number): Promise<FreeTrial[]>;
+  getTrialsByFingerprint(fingerprint: string, sinceDateMs: number): Promise<FreeTrial[]>;
+  createFreeTrial(trial: InsertFreeTrial): Promise<FreeTrial>;
+  bindTrialToUser(trialId: string, userId: string): Promise<FreeTrial | undefined>;
+  flagTrialAbuse(trialId: string): Promise<FreeTrial | undefined>;
+  getActiveTrialCount(ipAddress: string, sinceDateMs: number): Promise<number>;
 }
 
 // Performance Analytics Types
@@ -7818,6 +7832,98 @@ export class DatabaseStorage implements IStorage {
       .where(eq(mentorConnections.id, id))
       .returning();
     return updated;
+  }
+
+  async getActiveTrialByIP(ipAddress: string): Promise<FreeTrial | undefined> {
+    const now = new Date();
+    const [trial] = await db.select().from(freeTrials)
+      .where(and(
+        eq(freeTrials.ipAddress, ipAddress),
+        eq(freeTrials.isActive, true),
+        gte(freeTrials.trialEndDate, now)
+      ))
+      .orderBy(desc(freeTrials.createdAt))
+      .limit(1);
+    return trial;
+  }
+
+  async getActiveTrialByFingerprint(fingerprint: string): Promise<FreeTrial | undefined> {
+    if (!fingerprint) return undefined;
+    const now = new Date();
+    const [trial] = await db.select().from(freeTrials)
+      .where(and(
+        eq(freeTrials.fingerprint, fingerprint),
+        eq(freeTrials.isActive, true),
+        gte(freeTrials.trialEndDate, now)
+      ))
+      .orderBy(desc(freeTrials.createdAt))
+      .limit(1);
+    return trial;
+  }
+
+  async getActiveTrialByUserId(userId: string): Promise<FreeTrial | undefined> {
+    const now = new Date();
+    const [trial] = await db.select().from(freeTrials)
+      .where(and(
+        eq(freeTrials.userId, userId),
+        eq(freeTrials.isActive, true),
+        gte(freeTrials.trialEndDate, now)
+      ))
+      .orderBy(desc(freeTrials.createdAt))
+      .limit(1);
+    return trial;
+  }
+
+  async getTrialsByIP(ipAddress: string, sinceDateMs: number): Promise<FreeTrial[]> {
+    const sinceDate = new Date(sinceDateMs);
+    return db.select().from(freeTrials)
+      .where(and(
+        eq(freeTrials.ipAddress, ipAddress),
+        gte(freeTrials.createdAt, sinceDate)
+      ))
+      .orderBy(desc(freeTrials.createdAt));
+  }
+
+  async getTrialsByFingerprint(fingerprint: string, sinceDateMs: number): Promise<FreeTrial[]> {
+    if (!fingerprint) return [];
+    const sinceDate = new Date(sinceDateMs);
+    return db.select().from(freeTrials)
+      .where(and(
+        eq(freeTrials.fingerprint, fingerprint),
+        gte(freeTrials.createdAt, sinceDate)
+      ))
+      .orderBy(desc(freeTrials.createdAt));
+  }
+
+  async createFreeTrial(trial: InsertFreeTrial): Promise<FreeTrial> {
+    const [newTrial] = await db.insert(freeTrials).values(trial).returning();
+    return newTrial;
+  }
+
+  async bindTrialToUser(trialId: string, userId: string): Promise<FreeTrial | undefined> {
+    const [updated] = await db.update(freeTrials)
+      .set({ userId, updatedAt: new Date() })
+      .where(eq(freeTrials.id, trialId))
+      .returning();
+    return updated;
+  }
+
+  async flagTrialAbuse(trialId: string): Promise<FreeTrial | undefined> {
+    const [updated] = await db.update(freeTrials)
+      .set({ abuseFlags: sql`${freeTrials.abuseFlags} + 1`, updatedAt: new Date() })
+      .where(eq(freeTrials.id, trialId))
+      .returning();
+    return updated;
+  }
+
+  async getActiveTrialCount(ipAddress: string, sinceDateMs: number): Promise<number> {
+    const sinceDate = new Date(sinceDateMs);
+    const result = await db.select({ count: sql<number>`count(*)` }).from(freeTrials)
+      .where(and(
+        eq(freeTrials.ipAddress, ipAddress),
+        gte(freeTrials.createdAt, sinceDate)
+      ));
+    return Number(result[0]?.count || 0);
   }
 }
 
