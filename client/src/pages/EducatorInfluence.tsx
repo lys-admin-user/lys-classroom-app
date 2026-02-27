@@ -506,7 +506,7 @@ export default function EducatorInfluence() {
                     <div className="mt-4 p-3 rounded-md bg-gradient-to-r from-lys-teal/10 to-lys-yellow/10 border border-lys-teal/20">
                       <p className="font-oswald text-sm mb-1">Points to Cash</p>
                       <p className="font-roboto text-xs text-muted-foreground">
-                        Convert {configData?.conversionRate.pointsPerDollar || 100} points = $1.00. Minimum {((configData?.conversionRate.minimumPointsToConvert || 5000)).toLocaleString()} points.
+                        Convert {configData?.conversionRate.pointsPerDollar || 100} points = $1.00. Minimum {((configData?.conversionRate.minimumPointsToConvert || 5000)).toLocaleString()} points to convert.
                       </p>
                     </div>
                   </CardContent>

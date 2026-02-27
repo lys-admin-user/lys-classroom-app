@@ -54,13 +54,17 @@ export default function Settings() {
 
   const tierColors: Record<string, string> = {
     free: "bg-muted text-muted-foreground",
+    pro: "bg-lys-yellow/20 text-lys-yellow",
     paid: "bg-lys-yellow/20 text-lys-yellow",
-    enterprise: "bg-lys-teal/20 text-lys-teal",
+    campus: "bg-lys-teal/20 text-lys-teal",
+    enterprise: "bg-lys-red/20 text-lys-red",
   };
 
   const tierLabels: Record<string, string> = {
     free: "Free Plan",
-    paid: "Professional",
+    pro: "Pro",
+    paid: "Pro",
+    campus: "Campus",
     enterprise: "Enterprise",
   };
 

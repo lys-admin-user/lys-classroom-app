@@ -491,7 +491,29 @@ function StudentDashboard() {
 function EducatorDashboard() {
   const { isAuthenticated } = useAuth();
   const [showDemo, setShowDemo] = useState(false);
-  
+
+  const { data: lessonsData } = useQuery<any[]>({
+    queryKey: ["/api/lessons"],
+    enabled: isAuthenticated,
+  });
+
+  const { data: goalsData } = useQuery<any[]>({
+    queryKey: ["/api/goals"],
+    enabled: isAuthenticated,
+  });
+
+  const lessons = lessonsData || [];
+  const goals = goalsData || [];
+  const totalLessons = lessons.length;
+  const totalGoals = goals.length;
+
+  const recentLessons = lessons.slice(0, 3).map((l: any) => ({
+    title: l.title || l.topic,
+    type: "Lesson",
+    time: l.createdAt ? new Date(l.createdAt).toLocaleDateString() : "Recently",
+    badge: (l.bkdFocus || "know").toUpperCase(),
+  }));
+
   return (
     <div className="min-h-screen bg-background" data-testid="educator-dashboard">
       <section className="relative overflow-hidden bg-gradient-to-br from-lys-yellow/20 via-background to-lys-teal/10">
@@ -710,11 +732,9 @@ function EducatorDashboard() {
               </CardHeader>
               <CardContent>
                 <div className="space-y-4">
-                  {[
-                    { title: "Growth Mindset Workshop", type: "Lesson", time: "2 hours ago", badge: "BE" },
-                    { title: "Career Planning 101", type: "Lesson", time: "Yesterday", badge: "KNOW" },
-                    { title: "Goal Setting Activity", type: "Assessment", time: "2 days ago", badge: "DO" },
-                  ].map((item, i) => (
+                  {(recentLessons.length > 0 ? recentLessons : [
+                    { title: "No lessons yet", type: "Lesson", time: "Create your first!", badge: "BE" },
+                  ]).map((item, i) => (
                     <div key={i} className="flex items-center gap-4 p-3 rounded-md bg-muted/30 hover-elevate">
                       <div className="w-10 h-10 rounded-md bg-primary/10 flex items-center justify-center">
                         {item.type === "Lesson" ? (
@@ -755,17 +775,17 @@ function EducatorDashboard() {
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="text-center py-4">
-                  <p className="font-marker text-4xl text-lys-red mb-1">147</p>
-                  <p className="text-sm text-muted-foreground font-roboto">Students Reached</p>
+                  <p className="font-marker text-4xl text-lys-red mb-1" data-testid="text-total-lessons">{totalLessons}</p>
+                  <p className="text-sm text-muted-foreground font-roboto">Lessons Created</p>
                 </div>
                 <div className="grid grid-cols-2 gap-4">
                   <div className="text-center p-3 bg-lys-yellow/10 rounded-md">
-                    <p className="font-oswald text-xl font-semibold text-lys-yellow">23</p>
-                    <p className="text-xs text-muted-foreground font-roboto">Lessons Created</p>
+                    <p className="font-oswald text-xl font-semibold text-lys-yellow" data-testid="text-total-goals">{totalGoals}</p>
+                    <p className="text-xs text-muted-foreground font-roboto">Goals Set</p>
                   </div>
                   <div className="text-center p-3 bg-lys-teal/10 rounded-md">
-                    <p className="font-oswald text-xl font-semibold text-lys-teal">89</p>
-                    <p className="text-xs text-muted-foreground font-roboto">Goals Set</p>
+                    <p className="font-oswald text-xl font-semibold text-lys-teal" data-testid="text-goal-completion">{goals.filter((g: any) => g.status === "completed").length}</p>
+                    <p className="text-xs text-muted-foreground font-roboto">Goals Completed</p>
                   </div>
                 </div>
                 <div className="pt-4 border-t">

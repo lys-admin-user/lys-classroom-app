@@ -9,7 +9,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Check, X, Building2, GraduationCap, AlertCircle, Eye, Globe, Info, TrendingDown, CreditCard, FileText, Landmark, Loader2 } from "lucide-react";
+import { Check, X, Building2, GraduationCap, AlertCircle, Eye, Globe, Info, TrendingDown, CreditCard, FileText, Landmark, Loader2, Sparkles } from "lucide-react";
 import { SiPaypal } from "react-icons/si";
 import { useAuth } from "@/hooks/use-auth";
 import { useToast } from "@/hooks/use-toast";
@@ -77,7 +77,7 @@ const baseTiers = [
       { name: "Career Exploration", included: true },
       { name: "Action Plans (3 max)", included: true },
       { name: "Resource Library", included: true },
-      { name: "AI Lesson Generator (5/month)", included: true },
+      { name: "AI Lesson Generator (3/month)", included: true },
       { name: "Ad-Supported Experience", included: true, note: "Contextual sponsorships" },
       { name: "Scope & Sequence Builder", included: false },
       { name: "Standards Database Access", included: false },
@@ -344,6 +344,11 @@ export default function Pricing() {
             Whether you're a student discovering your future or an educator shaping the next generation, 
             LYS has the tools you need to succeed.
           </p>
+          <div className="mt-4 inline-flex items-center gap-2 bg-lys-yellow/10 border border-lys-yellow/30 rounded-full px-5 py-2 text-sm font-roboto">
+            <Sparkles className="h-4 w-4 text-lys-yellow" />
+            <span className="text-foreground font-medium">Try Pro free for 10 days</span>
+            <span className="text-muted-foreground">— No credit card required</span>
+          </div>
         </div>
 
         <div className="max-w-xl mx-auto mb-8">
