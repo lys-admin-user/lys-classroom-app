@@ -4012,13 +4012,8 @@ export async function registerRoutes(
         return;
       }
       
-      const pointsMap: Record<string, number> = {
-        view: 1,
-        share: 5,
-        copy_link: 2,
-        signup: 50,
-        lesson_save: 25,
-      };
+      const { AFFILIATE_POINT_CONFIG, AFFILIATE_CONVERSION_RATE } = await import("@shared/schema");
+      const points = (AFFILIATE_POINT_CONFIG as Record<string, number>)[eventType] || 0;
       
       const event = await storage.createReferralEvent({
         affiliateId: affiliate.id,
@@ -4026,17 +4021,67 @@ export async function registerRoutes(
         eventType,
         channel: channel || "direct",
         visitorId: visitorId || null,
-        pointsEarned: pointsMap[eventType] || 0,
+        pointsEarned: points,
       });
       
-      if (pointsMap[eventType] && pointsMap[eventType] > 0) {
+      if (points > 0) {
         await storage.createAffiliateReward({
           affiliateId: affiliate.id,
-          points: pointsMap[eventType],
+          points,
           rewardType: "earned",
           description: `${eventType} from ${channel || "direct"} link`,
           eventId: event.id,
         });
+
+        await storage.createWalletTransaction({
+          affiliateId: affiliate.id,
+          type: "points_earned",
+          pointsAmount: points,
+          cashAmountCents: 0,
+          description: `Earned ${points} pts for ${eventType}`,
+          status: "completed",
+        });
+      }
+
+      if (affiliate.parentAffiliateId && points > 0) {
+        const tier2Points = Math.floor(points * AFFILIATE_CONVERSION_RATE.tier2CommissionPercent / 100);
+        if (tier2Points > 0) {
+          const parent = await storage.getEducatorAffiliateById(affiliate.parentAffiliateId);
+          if (parent) {
+            await storage.createReferralEvent({
+              affiliateId: parent.id,
+              eventType: "tier2_commission",
+              channel: "tier2",
+              pointsEarned: tier2Points,
+              metadata: { sourceAffiliateId: affiliate.id, originalEvent: eventType },
+            });
+            await storage.createAffiliateReward({
+              affiliateId: parent.id,
+              points: tier2Points,
+              rewardType: "bonus",
+              description: `Tier-2 commission from ${affiliate.referralCode}: ${eventType}`,
+            });
+            await storage.createWalletTransaction({
+              affiliateId: parent.id,
+              type: "tier2_commission",
+              pointsAmount: tier2Points,
+              cashAmountCents: 0,
+              description: `Tier-2 bonus: ${tier2Points} pts from sub-affiliate`,
+              status: "completed",
+            });
+            await storage.updateEducatorAffiliate(parent.userId, {
+              tier2EarningsTotal: (parent.tier2EarningsTotal || 0) + tier2Points,
+              totalPoints: (parent.totalPoints || 0) + tier2Points,
+            });
+          }
+        }
+      }
+
+      if (eventType === "signup" && affiliate.affiliateMode !== "pro") {
+        const updatedAffiliate = await storage.getEducatorAffiliateById(affiliate.id);
+        if (updatedAffiliate && (updatedAffiliate.totalReferrals || 0) >= AFFILIATE_CONVERSION_RATE.proUpgradeThreshold) {
+          await storage.upgradeToProMode(affiliate.id);
+        }
       }
       
       res.json({ success: true });
@@ -4077,20 +4122,31 @@ export async function registerRoutes(
       }
       
       if (channel) {
+        const { AFFILIATE_POINT_CONFIG } = await import("@shared/schema");
+        const sharePoints = AFFILIATE_POINT_CONFIG.share;
         await storage.createReferralEvent({
           affiliateId: affiliate.id,
           lessonId: id,
           shareId,
           eventType: "share",
           channel,
-          pointsEarned: 5,
+          pointsEarned: sharePoints,
         });
         
         await storage.createAffiliateReward({
           affiliateId: affiliate.id,
-          points: 5,
+          points: sharePoints,
           rewardType: "earned",
           description: `Shared lesson via ${channel}`,
+        });
+
+        await storage.createWalletTransaction({
+          affiliateId: affiliate.id,
+          type: "points_earned",
+          pointsAmount: sharePoints,
+          cashAmountCents: 0,
+          description: `Earned ${sharePoints} pts for sharing via ${channel}`,
+          status: "completed",
         });
       }
       
@@ -4105,6 +4161,296 @@ export async function registerRoutes(
     } catch (error) {
       console.error("Generate share link error:", error);
       res.status(500).json({ error: "Failed to generate share link" });
+    }
+  });
+
+  // ================================
+  // Hybrid Affiliate Wallet & Integrations
+  // ================================
+
+  app.get("/api/affiliate/wallet", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user?.claims?.sub;
+      const affiliate = await storage.getEducatorAffiliate(userId);
+      if (!affiliate) {
+        res.status(404).json({ error: "Affiliate profile not found" });
+        return;
+      }
+
+      const transactions = await storage.getWalletTransactions(affiliate.id, 50);
+      const { AFFILIATE_CONVERSION_RATE } = await import("@shared/schema");
+
+      res.json({
+        pointsBalance: affiliate.totalPoints || 0,
+        cashBalanceCents: affiliate.cashBalance || 0,
+        affiliateMode: affiliate.affiliateMode || "student",
+        canConvert: (affiliate.totalPoints || 0) >= AFFILIATE_CONVERSION_RATE.minimumPointsToConvert,
+        conversionRate: AFFILIATE_CONVERSION_RATE,
+        transactions,
+      });
+    } catch (error) {
+      console.error("Get wallet error:", error);
+      res.status(500).json({ error: "Failed to get wallet" });
+    }
+  });
+
+  app.post("/api/affiliate/convert", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user?.claims?.sub;
+      const { pointsToConvert } = req.body;
+
+      if (!pointsToConvert || typeof pointsToConvert !== "number" || pointsToConvert <= 0) {
+        res.status(400).json({ error: "Invalid points amount" });
+        return;
+      }
+
+      const affiliate = await storage.getEducatorAffiliate(userId);
+      if (!affiliate) {
+        res.status(404).json({ error: "Affiliate profile not found" });
+        return;
+      }
+
+      const result = await storage.convertPointsToCash(affiliate.id, pointsToConvert);
+      if (!result.success) {
+        const { AFFILIATE_CONVERSION_RATE } = await import("@shared/schema");
+        res.status(400).json({
+          error: "Cannot convert points",
+          minimumRequired: AFFILIATE_CONVERSION_RATE.minimumPointsToConvert,
+          currentBalance: affiliate.totalPoints || 0,
+        });
+        return;
+      }
+
+      res.json({
+        success: true,
+        cashCreditedCents: result.cashCents,
+        remainingPoints: result.remainingPoints,
+        cashDollars: `$${(result.cashCents / 100).toFixed(2)}`,
+      });
+    } catch (error) {
+      console.error("Convert points error:", error);
+      res.status(500).json({ error: "Failed to convert points" });
+    }
+  });
+
+  app.post("/api/affiliate/payout", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user?.claims?.sub;
+      const { amountCents } = req.body;
+
+      const affiliate = await storage.getEducatorAffiliate(userId);
+      if (!affiliate) {
+        res.status(404).json({ error: "Affiliate profile not found" });
+        return;
+      }
+
+      if (affiliate.affiliateMode !== "pro") {
+        res.status(403).json({ error: "Cash payouts require Pro affiliate status. Refer 5+ users to upgrade." });
+        return;
+      }
+
+      const { AFFILIATE_CONVERSION_RATE } = await import("@shared/schema");
+      const payoutAmount = amountCents || (affiliate.cashBalance || 0);
+      if (payoutAmount < AFFILIATE_CONVERSION_RATE.minimumPayoutCents) {
+        res.status(400).json({
+          error: `Minimum payout is $${(AFFILIATE_CONVERSION_RATE.minimumPayoutCents / 100).toFixed(2)}`,
+          currentBalance: affiliate.cashBalance || 0,
+        });
+        return;
+      }
+
+      if (payoutAmount > (affiliate.cashBalance || 0)) {
+        res.status(400).json({ error: "Insufficient cash balance" });
+        return;
+      }
+
+      const { requestStripeConnectPayout } = await import("./services/affiliateIntegrations");
+      const payoutResult = await requestStripeConnectPayout(affiliate, payoutAmount);
+
+      if (payoutResult.success) {
+        await storage.updateEducatorAffiliate(userId, {
+          cashBalance: (affiliate.cashBalance || 0) - payoutAmount,
+        });
+        await storage.createWalletTransaction({
+          affiliateId: affiliate.id,
+          type: "cash_payout",
+          pointsAmount: 0,
+          cashAmountCents: -payoutAmount,
+          description: `Payout of $${(payoutAmount / 100).toFixed(2)}${payoutResult.demoMode ? " (demo)" : ""}`,
+          status: payoutResult.demoMode ? "pending" : "completed",
+          externalTransactionId: payoutResult.transactionId,
+        });
+      }
+
+      res.json({
+        success: payoutResult.success,
+        message: payoutResult.message,
+        demoMode: payoutResult.demoMode,
+        transactionId: payoutResult.transactionId,
+      });
+    } catch (error) {
+      console.error("Payout error:", error);
+      res.status(500).json({ error: "Failed to process payout" });
+    }
+  });
+
+  app.get("/api/affiliate/tier2", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user?.claims?.sub;
+      const affiliate = await storage.getEducatorAffiliate(userId);
+      if (!affiliate) {
+        res.status(404).json({ error: "Affiliate profile not found" });
+        return;
+      }
+
+      const subAffiliates = await storage.getTier2Affiliates(affiliate.id);
+
+      res.json({
+        parentAffiliate: {
+          id: affiliate.id,
+          referralCode: affiliate.referralCode,
+          tier2EarningsTotal: affiliate.tier2EarningsTotal || 0,
+        },
+        subAffiliates: subAffiliates.map(sub => ({
+          id: sub.id,
+          displayName: sub.displayName,
+          referralCode: sub.referralCode,
+          totalPoints: sub.totalPoints || 0,
+          totalReferrals: sub.totalReferrals || 0,
+          affiliateMode: sub.affiliateMode,
+          createdAt: sub.createdAt,
+        })),
+        tier2InviteLink: `${req.protocol}://${req.get("host")}?ref=${affiliate.referralCode}&tier=2`,
+      });
+    } catch (error) {
+      console.error("Get tier2 error:", error);
+      res.status(500).json({ error: "Failed to get tier-2 network" });
+    }
+  });
+
+  app.post("/api/affiliate/promo/generate", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user?.claims?.sub;
+      const { courseName } = req.body;
+
+      const affiliate = await storage.getEducatorAffiliate(userId);
+      if (!affiliate) {
+        res.status(404).json({ error: "Affiliate profile not found" });
+        return;
+      }
+
+      const displayName = affiliate.displayName || "An Educator";
+      const course = courseName || "LYS Educational Platform";
+      const referralLink = `${req.protocol}://${req.get("host")}?ref=${affiliate.referralCode}`;
+
+      let caption = "";
+      let imageUrl = "";
+
+      try {
+        const openai = (await import("openai")).default;
+        const client = new openai();
+
+        const captionResponse = await client.chat.completions.create({
+          model: "gpt-4o",
+          messages: [{
+            role: "user",
+            content: `Write a short, professional LinkedIn-style social media caption (2-3 sentences) for an educator named "${displayName}" who recommends "${course}" on the LYS platform. Include a call to action. Do not include hashtags or emojis. Keep it genuine and professional.`,
+          }],
+          max_tokens: 150,
+        });
+        caption = captionResponse.choices[0]?.message?.content || `${displayName} recommends ${course} on LYS — empowering the next generation of learners. Start your journey today!`;
+
+        const imageResponse = await client.images.generate({
+          model: "dall-e-3",
+          prompt: `Professional, clean LinkedIn promotional banner image for an educational platform. Features modern typography reading "${displayName} recommends ${course}" with a gradient background in warm red (#C41E3A) and teal (#006D6F) tones. Include subtle education icons (books, graduation cap, lightbulb). Corporate professional style, no faces or photos of people.`,
+          size: "1792x1024",
+          quality: "standard",
+          n: 1,
+        });
+        imageUrl = imageResponse.data[0]?.url || "";
+      } catch (aiError) {
+        console.log("AI promo generation unavailable, using fallback:", aiError);
+        caption = `${displayName} recommends ${course} on LYS — empowering educators and students through the Be-Know-Do methodology. Join us and start building your path to success!`;
+        imageUrl = "";
+      }
+
+      const asset = await storage.createPromoAsset({
+        affiliateId: affiliate.id,
+        imageUrl: imageUrl || null,
+        caption,
+        courseName: course,
+        referralLink,
+        status: imageUrl ? "completed" : "text_only",
+      });
+
+      res.json({
+        asset,
+        caption: `${caption}\n\n🔗 ${referralLink}`,
+      });
+    } catch (error) {
+      console.error("Promo generation error:", error);
+      res.status(500).json({ error: "Failed to generate promo content" });
+    }
+  });
+
+  app.get("/api/affiliate/promos", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user?.claims?.sub;
+      const affiliate = await storage.getEducatorAffiliate(userId);
+      if (!affiliate) {
+        res.status(404).json({ error: "Affiliate profile not found" });
+        return;
+      }
+
+      const promos = await storage.getPromoAssets(affiliate.id);
+      res.json(promos);
+    } catch (error) {
+      console.error("Get promos error:", error);
+      res.status(500).json({ error: "Failed to get promo assets" });
+    }
+  });
+
+  app.get("/api/affiliate/config", async (_req, res) => {
+    try {
+      const { AFFILIATE_POINT_CONFIG, AFFILIATE_CONVERSION_RATE } = await import("@shared/schema");
+      const { getIntegrationStatus } = await import("./services/affiliateIntegrations");
+
+      res.json({
+        pointConfig: AFFILIATE_POINT_CONFIG,
+        conversionRate: AFFILIATE_CONVERSION_RATE,
+        integrations: getIntegrationStatus(),
+      });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to get affiliate config" });
+    }
+  });
+
+  app.get("/api/affiliate/integrations", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user?.claims?.sub;
+      const affiliate = await storage.getEducatorAffiliate(userId);
+      if (!affiliate) {
+        res.status(404).json({ error: "Affiliate profile not found" });
+        return;
+      }
+
+      const { getIntegrationStatus, syncExternalCommissions } = await import("./services/affiliateIntegrations");
+      const status = getIntegrationStatus();
+      const { commissions, demoMode } = await syncExternalCommissions(affiliate);
+
+      res.json({
+        integrations: status,
+        externalCommissions: commissions,
+        demoMode,
+        affiliateExternalIds: {
+          rewardful: affiliate.externalRewardfulId,
+          partnerstack: affiliate.externalPartnerstackId,
+          stripeConnect: affiliate.stripeConnectAccountId,
+        },
+      });
+    } catch (error) {
+      console.error("Get integrations error:", error);
+      res.status(500).json({ error: "Failed to get integrations" });
     }
   });
 

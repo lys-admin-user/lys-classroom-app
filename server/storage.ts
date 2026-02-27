@@ -32,6 +32,11 @@ import {
   type InsertReferralEvent,
   type AffiliateReward,
   type InsertAffiliateReward,
+  type WalletTransaction,
+  type InsertWalletTransaction,
+  type PromoAsset,
+  type InsertPromoAsset,
+  AFFILIATE_CONVERSION_RATE,
   type StandardsJurisdiction,
   type InsertStandardsJurisdiction,
   type StandardSet,
@@ -121,6 +126,8 @@ import {
   educatorAffiliates,
   referralEvents,
   affiliateRewards,
+  affiliateWalletTransactions,
+  affiliatePromoAssets,
   standardsJurisdictions,
   standardSets,
   educationalStandardsDb,
@@ -390,6 +397,7 @@ export interface IStorage {
   // Affiliate System
   getEducatorAffiliate(userId: string): Promise<EducatorAffiliate | undefined>;
   getEducatorAffiliateByCode(referralCode: string): Promise<EducatorAffiliate | undefined>;
+  getEducatorAffiliateById(affiliateId: string): Promise<EducatorAffiliate | undefined>;
   createEducatorAffiliate(affiliate: InsertEducatorAffiliate): Promise<EducatorAffiliate>;
   updateEducatorAffiliate(userId: string, updates: Partial<EducatorAffiliate>): Promise<EducatorAffiliate | undefined>;
   
@@ -400,6 +408,17 @@ export interface IStorage {
   // Affiliate Rewards
   createAffiliateReward(reward: InsertAffiliateReward): Promise<AffiliateReward>;
   getAffiliateRewards(affiliateId: string): Promise<AffiliateReward[]>;
+
+  // Wallet & Hybrid Affiliate
+  getWalletTransactions(affiliateId: string, limit?: number): Promise<WalletTransaction[]>;
+  createWalletTransaction(tx: InsertWalletTransaction): Promise<WalletTransaction>;
+  convertPointsToCash(affiliateId: string, pointsToConvert: number): Promise<{ success: boolean; cashCents: number; remainingPoints: number }>;
+  getTier2Affiliates(parentAffiliateId: string): Promise<EducatorAffiliate[]>;
+  upgradeToProMode(affiliateId: string): Promise<EducatorAffiliate | undefined>;
+  
+  // Promo Assets
+  createPromoAsset(asset: InsertPromoAsset): Promise<PromoAsset>;
+  getPromoAssets(affiliateId: string): Promise<PromoAsset[]>;
   
   // Educational Standards Ingestion
   getJurisdictions(country?: string): Promise<StandardsJurisdiction[]>;
@@ -4008,6 +4027,12 @@ export class DatabaseStorage implements IStorage {
     return affiliate || undefined;
   }
 
+  async getEducatorAffiliateById(affiliateId: string): Promise<EducatorAffiliate | undefined> {
+    const [affiliate] = await db.select().from(educatorAffiliates)
+      .where(eq(educatorAffiliates.id, affiliateId));
+    return affiliate || undefined;
+  }
+
   async createEducatorAffiliate(affiliate: InsertEducatorAffiliate): Promise<EducatorAffiliate> {
     const [created] = await db.insert(educatorAffiliates).values(affiliate as any).returning();
     return created;
@@ -4069,6 +4094,85 @@ export class DatabaseStorage implements IStorage {
     return await db.select().from(affiliateRewards)
       .where(eq(affiliateRewards.affiliateId, affiliateId))
       .orderBy(desc(affiliateRewards.createdAt));
+  }
+
+  // Wallet & Hybrid Affiliate
+  async getWalletTransactions(affiliateId: string, limit: number = 50): Promise<WalletTransaction[]> {
+    return await db.select().from(affiliateWalletTransactions)
+      .where(eq(affiliateWalletTransactions.affiliateId, affiliateId))
+      .orderBy(desc(affiliateWalletTransactions.createdAt))
+      .limit(limit);
+  }
+
+  async createWalletTransaction(tx: InsertWalletTransaction): Promise<WalletTransaction> {
+    const [created] = await db.insert(affiliateWalletTransactions).values(tx as any).returning();
+    return created;
+  }
+
+  async convertPointsToCash(affiliateId: string, pointsToConvert: number): Promise<{ success: boolean; cashCents: number; remainingPoints: number }> {
+    const { pointsPerDollar, minimumPointsToConvert } = AFFILIATE_CONVERSION_RATE;
+    
+    if (pointsToConvert < minimumPointsToConvert) {
+      return { success: false, cashCents: 0, remainingPoints: 0 };
+    }
+
+    const affiliate = await this.getEducatorAffiliateById(affiliateId);
+    if (!affiliate || (affiliate.totalPoints || 0) < pointsToConvert) {
+      return { success: false, cashCents: 0, remainingPoints: affiliate?.totalPoints || 0 };
+    }
+
+    const cashCents = Math.floor((pointsToConvert / pointsPerDollar) * 100);
+    const newPoints = (affiliate.totalPoints || 0) - pointsToConvert;
+    const newCash = (affiliate.cashBalance || 0) + cashCents;
+
+    await db.update(educatorAffiliates)
+      .set({ totalPoints: newPoints, cashBalance: newCash, updatedAt: new Date() })
+      .where(eq(educatorAffiliates.id, affiliateId));
+
+    await this.createWalletTransaction({
+      affiliateId,
+      type: "points_redeemed",
+      pointsAmount: -pointsToConvert,
+      cashAmountCents: 0,
+      description: `Converted ${pointsToConvert} points`,
+      status: "completed",
+    });
+
+    await this.createWalletTransaction({
+      affiliateId,
+      type: "cash_conversion",
+      pointsAmount: 0,
+      cashAmountCents: cashCents,
+      description: `Cash credit from ${pointsToConvert} points ($${(cashCents / 100).toFixed(2)})`,
+      status: "completed",
+    });
+
+    return { success: true, cashCents, remainingPoints: newPoints };
+  }
+
+  async getTier2Affiliates(parentAffiliateId: string): Promise<EducatorAffiliate[]> {
+    return await db.select().from(educatorAffiliates)
+      .where(eq(educatorAffiliates.parentAffiliateId, parentAffiliateId));
+  }
+
+  async upgradeToProMode(affiliateId: string): Promise<EducatorAffiliate | undefined> {
+    const [updated] = await db.update(educatorAffiliates)
+      .set({ affiliateMode: "pro", proUpgradedAt: new Date(), updatedAt: new Date() })
+      .where(eq(educatorAffiliates.id, affiliateId))
+      .returning();
+    return updated || undefined;
+  }
+
+  // Promo Assets
+  async createPromoAsset(asset: InsertPromoAsset): Promise<PromoAsset> {
+    const [created] = await db.insert(affiliatePromoAssets).values(asset as any).returning();
+    return created;
+  }
+
+  async getPromoAssets(affiliateId: string): Promise<PromoAsset[]> {
+    return await db.select().from(affiliatePromoAssets)
+      .where(eq(affiliatePromoAssets.affiliateId, affiliateId))
+      .orderBy(desc(affiliatePromoAssets.createdAt));
   }
 
   // Educational Standards Ingestion

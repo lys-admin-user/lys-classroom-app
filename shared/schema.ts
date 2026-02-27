@@ -704,13 +704,21 @@ export type SavedCareer = typeof savedCareers.$inferSelect;
 export const educatorAffiliates = pgTable("educator_affiliates", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   userId: varchar("user_id").notNull(),
-  referralCode: varchar("referral_code").notNull(), // unique code like "TEACH123"
+  referralCode: varchar("referral_code").notNull(),
   displayName: text("display_name"),
   bio: text("bio"),
   totalPoints: integer("total_points").default(0),
+  cashBalance: integer("cash_balance").default(0),
   totalViews: integer("total_views").default(0),
   totalShares: integer("total_shares").default(0),
   totalReferrals: integer("total_referrals").default(0),
+  affiliateMode: text("affiliate_mode").default("student"),
+  parentAffiliateId: varchar("parent_affiliate_id"),
+  tier2EarningsTotal: integer("tier2_earnings_total").default(0),
+  proUpgradedAt: timestamp("pro_upgraded_at"),
+  externalRewardfulId: varchar("external_rewardful_id"),
+  externalPartnerstackId: varchar("external_partnerstack_id"),
+  stripeConnectAccountId: varchar("stripe_connect_account_id"),
   isActive: boolean("is_active").default(true),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
@@ -755,6 +763,61 @@ export const insertAffiliateRewardSchema = createInsertSchema(affiliateRewards).
 export type InsertAffiliateReward = z.infer<typeof insertAffiliateRewardSchema>;
 export type AffiliateReward = typeof affiliateRewards.$inferSelect;
 
+// Wallet Transactions (points + cash ledger)
+export const affiliateWalletTransactions = pgTable("affiliate_wallet_transactions", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  affiliateId: varchar("affiliate_id").notNull(),
+  type: text("type").notNull(),
+  pointsAmount: integer("points_amount").default(0),
+  cashAmountCents: integer("cash_amount_cents").default(0),
+  description: text("description"),
+  status: text("status").default("completed"),
+  externalTransactionId: varchar("external_transaction_id"),
+  metadata: jsonb("metadata").$type<Record<string, unknown>>(),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertWalletTransactionSchema = createInsertSchema(affiliateWalletTransactions).omit({ id: true, createdAt: true });
+export type InsertWalletTransaction = z.infer<typeof insertWalletTransactionSchema>;
+export type WalletTransaction = typeof affiliateWalletTransactions.$inferSelect;
+
+// Affiliate Promo Assets (AI-generated branded content)
+export const affiliatePromoAssets = pgTable("affiliate_promo_assets", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  affiliateId: varchar("affiliate_id").notNull(),
+  imageUrl: text("image_url"),
+  caption: text("caption"),
+  courseName: text("course_name"),
+  referralLink: text("referral_link"),
+  status: text("status").default("completed"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertPromoAssetSchema = createInsertSchema(affiliatePromoAssets).omit({ id: true, createdAt: true });
+export type InsertPromoAsset = z.infer<typeof insertPromoAssetSchema>;
+export type PromoAsset = typeof affiliatePromoAssets.$inferSelect;
+
+// Affiliate Point Configuration
+export const AFFILIATE_POINT_CONFIG = {
+  referral_signup: 100,
+  course_completion: 500,
+  daily_login_streak: 5,
+  verified_review: 50,
+  view: 1,
+  share: 5,
+  copy_link: 2,
+  lesson_save: 25,
+  signup: 50,
+} as const;
+
+export const AFFILIATE_CONVERSION_RATE = {
+  pointsPerDollar: 100,
+  minimumPayoutCents: 5000,
+  minimumPointsToConvert: 5000,
+  tier2CommissionPercent: 10,
+  proUpgradeThreshold: 5,
+} as const;
+
 // Affiliate Dashboard Stats (computed type for API response)
 export const affiliateDashboardSchema = z.object({
   affiliate: z.object({
@@ -764,9 +827,12 @@ export const affiliateDashboardSchema = z.object({
     displayName: z.string().nullable(),
     bio: z.string().nullable(),
     totalPoints: z.number().nullable(),
+    cashBalance: z.number().nullable(),
     totalViews: z.number().nullable(),
     totalShares: z.number().nullable(),
     totalReferrals: z.number().nullable(),
+    affiliateMode: z.string().nullable(),
+    tier2EarningsTotal: z.number().nullable(),
     isActive: z.boolean().nullable(),
   }),
   recentEvents: z.array(z.object({
