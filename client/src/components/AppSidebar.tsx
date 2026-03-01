@@ -164,10 +164,10 @@ const navigationGroups: NavGroup[] = [
     ],
   },
   {
-    label: "My District",
+    label: "My District / Network",
     minRole: "district_admin",
     items: [
-      { title: "District Admin", url: "/district-admin", icon: Presentation, requiresAuth: true },
+      { title: "District / Network Admin", url: "/district-admin", icon: Presentation, requiresAuth: true },
       { title: "Campuses", url: "/district-admin/campuses", icon: School, requiresAuth: true },
     ],
   },

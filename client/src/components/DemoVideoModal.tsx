@@ -34,6 +34,7 @@ import {
   Layers,
   Star,
   FileText,
+  Building2,
 } from "lucide-react";
 
 interface DemoSlide {
@@ -445,7 +446,7 @@ const slides: DemoSlide[] = [
   {
     title: "Multi-Tenant Security",
     subtitle: "7-Role RBAC & COPPA",
-    description: "7-role hierarchy, PII protection, audit logging, and self-service org admin.",
+    description: "7-role hierarchy with support for ISDs, charter networks (CMO/EMO), and single-campus charters. PII protection, audit logging, and self-service org admin.",
     icon: <Shield className="h-10 w-10" />,
     color: "text-lys-yellow",
     bgGradient: "from-lys-yellow/20 via-lys-red/5 to-transparent",
@@ -459,7 +460,7 @@ const slides: DemoSlide[] = [
           {[
             { role: "System Admin", color: "bg-red-500" },
             { role: "Site Admin", color: "bg-orange-500" },
-            { role: "District Admin", color: "bg-amber-500" },
+            { role: "Network / ISD Admin", color: "bg-amber-500" },
             { role: "Campus Admin", color: "bg-yellow-500" },
             { role: "Educator", color: "bg-emerald-500" },
             { role: "Parent", color: "bg-teal-500" },
@@ -478,9 +479,39 @@ const slides: DemoSlide[] = [
     ),
   },
   {
+    title: "Three Client Structures",
+    subtitle: "Charter, ISD & Network",
+    description: "LYS supports Single-Campus Charters, Traditional ISDs, and Multi-State Charter Networks (CMO/EMO) — each with tailored tiers and admin tools.",
+    icon: <Building2 className="h-10 w-10" />,
+    color: "text-lys-teal",
+    bgGradient: "from-lys-teal/20 via-lys-yellow/5 to-transparent",
+    features: [
+      { icon: <Layers className="h-4 w-4" />, text: "Flexible Hierarchy" },
+      { icon: <Globe className="h-4 w-4" />, text: "Multi-State Support" },
+    ],
+    visual: (
+      <div className="w-full max-w-xs mx-auto space-y-2">
+        {[
+          { type: "Single-Campus Charter", tier: "Campus — $99/mo", desc: "Independent school, full customization", color: "bg-lys-yellow" },
+          { type: "Traditional ISD", tier: "Enterprise — $299/mo", desc: "Multi-campus district, elected board", color: "bg-lys-teal" },
+          { type: "Charter Network (CMO/EMO)", tier: "Enterprise — $299/mo", desc: "Multi-state HQ with master dashboard", color: "bg-lys-red" },
+        ].map((s) => (
+          <div key={s.type} className="bg-card rounded-lg border p-2 flex items-center gap-2">
+            <div className={`w-2 h-full min-h-[2rem] rounded-full ${s.color}`} />
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-oswald">{s.type}</p>
+              <p className="text-[10px] text-muted-foreground truncate">{s.desc}</p>
+            </div>
+            <Badge variant="secondary" className="text-[10px] shrink-0">{s.tier}</Badge>
+          </div>
+        ))}
+      </div>
+    ),
+  },
+  {
     title: "Org Admin Self-Service",
-    subtitle: "Campus & District Management",
-    description: "Manage members, roles, invitations, and org settings without needing system admin help.",
+    subtitle: "Campus, ISD & Charter Network Management",
+    description: "Manage members, roles, invitations, and org settings for campuses, ISDs, and charter networks without needing system admin help.",
     icon: <Layers className="h-10 w-10" />,
     color: "text-lys-teal",
     bgGradient: "from-lys-teal/20 via-lys-yellow/5 to-transparent",
@@ -492,13 +523,13 @@ const slides: DemoSlide[] = [
       <div className="w-full max-w-xs mx-auto">
         <div className="bg-card rounded-lg border p-3 space-y-2">
           <div className="flex items-center justify-between text-xs">
-            <span className="font-oswald">Lincoln High School</span>
-            <Badge variant="secondary" className="text-[10px]">Campus</Badge>
+            <span className="font-oswald">KIPP Charter Network</span>
+            <Badge variant="secondary" className="text-[10px]">CMO</Badge>
           </div>
           {[
-            { action: "Invite sent to jane@school.edu", time: "2m ago" },
-            { action: "Role changed: Mr. Chen → Campus Admin", time: "1h ago" },
-            { action: "Registration policy updated", time: "3h ago" },
+            { action: "New campus added: KIPP Austin", time: "2m ago" },
+            { action: "Role changed: Mr. Chen \u2192 Campus Admin", time: "1h ago" },
+            { action: "Per-state compliance updated (TX)", time: "3h ago" },
           ].map((a) => (
             <div key={a.action} className="flex items-center gap-2 text-xs">
               <CheckCircle2 className="h-3 w-3 text-green-500 shrink-0" />

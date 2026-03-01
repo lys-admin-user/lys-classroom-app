@@ -255,11 +255,11 @@ export default function EducatorProfileForm({ onComplete, isOnboarding = false, 
           <Separator />
           <div className="space-y-4">
             <div className="space-y-2">
-              <Label className="text-base font-medium">School District (Optional)</Label>
+              <Label className="text-base font-medium">School District / Charter Network (Optional)</Label>
               <Input 
                 value={schoolDistrict} 
                 onChange={(e) => setSchoolDistrict(e.target.value)}
-                placeholder="e.g., Houston ISD"
+                placeholder="e.g., Houston ISD, KIPP Texas, or Green Dot Public Schools"
                 data-testid="input-school-district"
               />
             </div>

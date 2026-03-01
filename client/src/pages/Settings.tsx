@@ -68,6 +68,14 @@ export default function Settings() {
     enterprise: "Enterprise",
   };
 
+  const tierDescriptions: Record<string, string> = {
+    free: "Basic access to core features with limited usage.",
+    pro: "Full features for individual educators.",
+    paid: "Full features for individual educators.",
+    campus: "Single-campus license for independent schools and charter schools ($99/mo).",
+    enterprise: "Full organizational access for ISDs, charter networks (CMOs/EMOs), and multi-campus districts ($299/mo).",
+  };
+
   return (
     <div className="min-h-screen bg-background">
       <div className="max-w-4xl mx-auto px-4 sm:px-6 py-8">
@@ -107,14 +115,19 @@ export default function Settings() {
               </div>
             </CardHeader>
             <CardContent>
-              <div className="flex items-center gap-4">
-                <div className="flex-1">
-                  <p className="text-sm text-muted-foreground">
-                    {user?.firstName && user?.lastName 
-                      ? `Signed in as ${user.firstName} ${user.lastName}`
-                      : "Welcome to LYS!"}
-                  </p>
+              <div className="space-y-3">
+                <div className="flex items-center gap-4">
+                  <div className="flex-1">
+                    <p className="text-sm text-muted-foreground">
+                      {user?.firstName && user?.lastName 
+                        ? `Signed in as ${user.firstName} ${user.lastName}`
+                        : "Welcome to LYS!"}
+                    </p>
+                  </div>
                 </div>
+                <p className="text-sm text-muted-foreground font-roboto" data-testid="text-tier-description">
+                  {tierDescriptions[tier]}
+                </p>
               </div>
             </CardContent>
           </Card>

@@ -234,7 +234,7 @@ const docSections: DocSection[] = [
       },
       {
         heading: "Organization Endpoints",
-        body: "Manages organizations, memberships, and invitations.",
+        body: "Manages organizations (schools, ISDs, charter networks/CMO/EMOs, general networks), memberships, and invitations.",
         table: {
           headers: ["Method", "Path", "Auth", "Description"],
           rows: [
@@ -248,7 +248,7 @@ const docSections: DocSection[] = [
       },
       {
         heading: "Org-Admin Self-Service Endpoints",
-        body: "Allows campus and district admins to manage their organizations without system admin assistance.",
+        body: "Allows campus, district, and charter network admins to manage their organizations (single-campus charters, ISDs, CMO/EMO networks) without system admin assistance.",
         table: {
           headers: ["Method", "Path", "Auth", "Description"],
           rows: [
@@ -324,10 +324,10 @@ const docSections: DocSection[] = [
             ["student", "0", "Own data only", "View own journey, take assessments, explore careers, build portfolio"],
             ["homeschool_parent", "1", "Own + children", "All student permissions plus lesson generation, gradebook, scope & sequence"],
             ["educator", "2", "Own classes", "All parent permissions plus classroom management, assignments, collaboration, SIS"],
-            ["campus_admin", "3", "Single campus", "All educator permissions plus org member management, standards admin, transfer approvals"],
-            ["district_admin", "4", "District + campuses", "All campus admin permissions plus cross-campus management, district analytics"],
-            ["site_admin", "5", "Platform-wide", "All district permissions plus system dashboard, user management, billing, standards import"],
-            ["system_admin", "6", "Full system", "All permissions including feature flags, governance, technical configuration"],
+            ["campus_admin", "3", "Single campus", "All educator permissions plus org member management, standards admin, transfer approvals. Manages a single-campus charter or one school within an ISD/charter network."],
+            ["district_admin", "4", "District / charter network + campuses", "All campus admin permissions plus cross-campus management, district or charter network analytics. Manages Traditional ISDs, Multi-State Charter Networks (CMO/EMO), or general networks with child campuses."],
+            ["site_admin", "5", "Platform-wide", "All district permissions plus system dashboard, user management, billing, standards import. Oversees all client structures (single-campus charters, ISDs, charter networks)."],
+            ["system_admin", "6", "Full system", "All permissions including feature flags, governance, technical configuration. Full control over all organization types and hierarchies."],
           ],
         },
       },
@@ -361,25 +361,26 @@ const requireSystemAdmin = requireRole("system_admin");`,
       },
       {
         heading: "Role Ceiling Enforcement",
-        body: "When org admins change a member's platform role, the role ceiling restricts them to only assign roles up to campus_admin. This prevents privilege escalation — an org admin cannot create site_admins or system_admins.",
+        body: "When org admins change a member's platform role, the role ceiling restricts them to only assign roles up to campus_admin. This prevents privilege escalation — an org admin (whether managing an ISD, charter network, or single campus) cannot create site_admins or system_admins.",
         items: [
           "Campus admins can set roles: student, homeschool_parent, educator, campus_admin",
-          "District admins can set roles: student, homeschool_parent, educator, campus_admin (same ceiling)",
+          "District admins (ISD and charter network admins) can set roles: student, homeschool_parent, educator, campus_admin (same ceiling)",
           "Only site_admin and system_admin can assign site_admin or higher roles",
           "Role ceiling is enforced in the org-admin PATCH endpoint for member role changes",
+          "Charter network (CMO/EMO) admins use district_admin role and follow the same ceiling rules as traditional ISD admins",
         ],
       },
       {
         heading: "Org Admin Authorization",
-        body: "The verifyOrgAdminAccess() function checks both organization membership role AND platform role before allowing org-admin operations.",
+        body: "The verifyOrgAdminAccess() function checks both organization membership role AND platform role before allowing org-admin operations. This applies uniformly to ISD district admins, charter network (CMO/EMO) admins, and general network admins.",
         code: `// verifyOrgAdminAccess checks:
 // 1. User has org membership with role 'admin' or 'owner'
-// 2. OR user is a district_admin whose district is parent of this org
+// 2. OR user is a district_admin whose district/charter_network/network is parent of this org
 // 3. OR user is site_admin/system_admin (bypasses org checks)
 
 // getAdminManagedOrgIds returns:
 // - All orgs where user has admin/owner membership
-// - Plus child orgs if user is a district admin`,
+// - Plus child orgs if user is a district admin (ISD, charter network, or general network)`,
         language: "typescript",
       },
     ],
@@ -652,13 +653,14 @@ const requireSystemAdmin = requireRole("system_admin");`,
       },
       {
         heading: "Resource Cascade",
-        body: "Resources and settings cascade downward through the organization hierarchy.",
+        body: "Resources and settings cascade downward through the organization hierarchy for ISDs, charter networks (CMO/EMO), and general networks alike.",
         items: [
-          "District-level resources are automatically available to all child campuses",
-          "District SIS integrations cascade to campus educators",
+          "District-level and charter network-level resources are automatically available to all child campuses",
+          "District and charter network SIS integrations cascade to campus educators",
           "Organization tier (free/campus/enterprise) determines available features for all members",
-          "District admins can view analytics aggregated across all child campuses",
-          "Campus-level settings can override some district defaults",
+          "District and charter network admins can view analytics aggregated across all child campuses",
+          "Charter network admins can choose unified master dashboard or per-state management views",
+          "Campus-level settings can override some district or network defaults",
         ],
       },
     ],
@@ -762,8 +764,8 @@ const requireSystemAdmin = requireRole("system_admin");`,
           rows: [
             ["Free", "Individual users", "Basic access, 3 AI lessons/month, ad-supported"],
             ["Pro", "Individual educators", "Unlimited AI, no ads, focus mode, advanced analytics"],
-            ["Campus", "Schools", "All Pro features + org management, SIS integration, collaboration"],
-            ["Enterprise", "Districts/Universities", "All Campus features + multi-campus, priority support, custom branding"],
+            ["Campus", "Single-campus charters / Schools", "All Pro features + org management, SIS integration, collaboration"],
+            ["Enterprise", "ISDs / Charter Networks (CMO/EMO) / Universities", "All Campus features + multi-campus management, master dashboard, per-state management, priority support, custom branding"],
           ],
         },
       },
@@ -808,11 +810,12 @@ const requireSystemAdmin = requireRole("system_admin");`,
       },
       {
         heading: "Integration Cascade",
-        body: "SIS connections cascade through the organization hierarchy. A district-level SIS connection is automatically available to all campus educators within that district.",
+        body: "SIS connections cascade through the organization hierarchy. A district-level or charter network-level SIS connection is automatically available to all campus educators within that organization.",
         items: [
-          "Campus-level: SIS configured for a single school, available to all educators at that campus",
-          "District-level: SIS configured at district, cascades to all child campuses",
-          "Educator view: Educators see SIS data from their campus or parent district",
+          "Campus-level: SIS configured for a single school or single-campus charter, available to all educators at that campus",
+          "District-level: SIS configured at ISD district, cascades to all child campuses",
+          "Charter network-level: SIS configured at CMO/EMO network, cascades to all child campuses across states",
+          "Educator view: Educators see SIS data from their campus or parent district/charter network",
           "Sync frequency: Configurable per integration (daily, weekly, manual)",
           "Data mapping: Configurable field mapping between SIS and LYS data models",
         ],
@@ -858,7 +861,7 @@ const requireSystemAdmin = requireRole("system_admin");`,
         body: "LYS integrates with HubSpot CRM for contact, company, and deal management. The connection uses Replit's HubSpot connector for authentication.",
         items: [
           "Contact sync: User signups can create HubSpot contacts for sales pipeline tracking",
-          "Company records: Organizations (schools/districts) mapped to HubSpot companies",
+          "Company records: Organizations (schools, ISDs, charter networks/CMO/EMOs) mapped to HubSpot companies",
           "Deal tracking: Subscription upgrades and institutional purchases tracked as deals",
           "Pipeline management: Sales stages for lead → trial → purchase → renewal",
         ],

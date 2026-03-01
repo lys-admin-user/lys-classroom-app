@@ -83,7 +83,7 @@ export default function DistrictAdmin() {
   });
 
   const districtOrg = orgs?.find(
-    (o: any) => o.organization?.type === "district"
+    (o: any) => o.organization?.type === "district" || o.organization?.type === "charter_network" || o.organization?.type === "network"
   );
 
   const { data: childOrgs } = useQuery<any[]>({
@@ -335,7 +335,7 @@ export default function DistrictAdmin() {
           You need district administrator or higher privileges to access this page.
         </p>
         <p className="text-sm text-muted-foreground mt-1">
-          If you believe this is an error, contact your district or system administrator.
+          If you believe this is an error, contact your district, charter network, or system administrator.
         </p>
       </div>
     );
@@ -353,7 +353,7 @@ export default function DistrictAdmin() {
           My District
         </h1>
         <p className="text-muted-foreground mt-1">
-          Manage campuses, connected organizations, educators, and curriculum across your district
+          Manage campuses, connected organizations, educators, and curriculum across your district or charter network
           {districtOrg?.organization?.name && (
             <span className="font-medium"> — {districtOrg.organization.name}</span>
           )}
@@ -440,15 +440,15 @@ export default function DistrictAdmin() {
                   Campuses
                 </CardTitle>
                 <CardDescription>
-                  Schools and campuses in your district, each with their own internal teams and external partners
+                  Schools and campuses in your district or charter network, each with their own internal teams and external partners
                 </CardDescription>
               </CardHeader>
               <CardContent>
                 {campuses.length === 0 ? (
                   <div className="text-center py-6 text-muted-foreground">
                     <School className="h-10 w-10 mx-auto mb-3 opacity-50" />
-                    <p className="text-sm">No campuses found in your district.</p>
-                    <p className="text-xs mt-1">Create organizations and assign them as schools under your district.</p>
+                    <p className="text-sm">No campuses found in your district or charter network.</p>
+                    <p className="text-xs mt-1">Create organizations and assign them as schools under your district or charter network (CMO/EMO).</p>
                   </div>
                 ) : (
                   <div className="space-y-3">
@@ -486,7 +486,7 @@ export default function DistrictAdmin() {
                   Quick Actions
                 </CardTitle>
                 <CardDescription>
-                  Coordinate alignment, standards, and analytics across all campuses
+                  Coordinate alignment, standards, and analytics across all campuses in your district or charter network
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-3">
@@ -547,16 +547,16 @@ export default function DistrictAdmin() {
           <div className="flex items-center justify-between gap-4 flex-wrap">
             <div>
               <h2 className="font-oswald text-xl">People Management</h2>
-              <p className="text-sm text-muted-foreground">View and manage educators, students, mentors, and staff across all campuses and connected partner organizations in your district</p>
+              <p className="text-sm text-muted-foreground">View and manage educators, students, mentors, and staff across all campuses and connected partner organizations in your district or charter network</p>
             </div>
           </div>
 
           <div className="flex items-center gap-4 flex-wrap">
             <div className="w-full max-w-sm">
-              <Label htmlFor="people-campus-select" className="text-sm text-muted-foreground mb-1 block">Select a campus or district to view its members</Label>
+              <Label htmlFor="people-campus-select" className="text-sm text-muted-foreground mb-1 block">Select a campus, district, or charter network to view its members</Label>
               <Select value={selectedCampusForPeople} onValueChange={(v) => { setSelectedCampusForPeople(v); setSelectedMembers(new Set()); }}>
                 <SelectTrigger data-testid="select-people-campus">
-                  <SelectValue placeholder="Choose a campus or district..." />
+                  <SelectValue placeholder="Choose a campus, district, or network..." />
                 </SelectTrigger>
                 <SelectContent>
                   {allSelectableOrgs.map((org) => (
@@ -578,7 +578,7 @@ export default function DistrictAdmin() {
                     <DialogHeader>
                       <DialogTitle>Invite People</DialogTitle>
                       <DialogDescription>
-                        Send an email invitation to join the selected campus or district. They will receive a link to accept and join.
+                        Send an email invitation to join the selected campus, district, or charter network. They will receive a link to accept and join.
                       </DialogDescription>
                     </DialogHeader>
                     <div className="grid gap-4 py-4">
@@ -1462,7 +1462,7 @@ function DistrictSafetySuiteTab() {
             <div>
               <CardTitle className="font-oswald">Content Review Queue</CardTitle>
               <CardDescription className="font-roboto">
-                Flagged content across your district requiring review
+                Flagged content across your district or charter network requiring review
               </CardDescription>
             </div>
             <div className="flex items-center gap-2">

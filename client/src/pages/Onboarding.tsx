@@ -9,7 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue, SelectGr
 import { Checkbox } from "@/components/ui/checkbox";
 import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
-import { GraduationCap, BookOpen, Building2, ChevronRight, ChevronLeft, Sparkles, Target, Compass, BookMarked, School, Home, Presentation } from "lucide-react";
+import { GraduationCap, BookOpen, Building2, ChevronRight, ChevronLeft, Sparkles, Target, Compass, BookMarked, School, Home, Presentation, Shield, Globe } from "lucide-react";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import type { StandardsJurisdiction } from "@shared/schema";
@@ -142,6 +142,10 @@ const getAutoInterests = (role: string, primaryGoal: string): string[] => {
   } else if (role === "campus_admin") {
     interests.push("scope-sequence", "analytics", "ai-lessons", "safety-monitoring");
   } else if (role === "district_admin") {
+    interests.push("district-management", "analytics", "safety-monitoring", "scope-sequence");
+  } else if (role === "site_admin") {
+    interests.push("district-management", "analytics", "safety-monitoring", "scope-sequence");
+  } else if (role === "system_admin") {
     interests.push("district-management", "analytics", "safety-monitoring", "scope-sequence");
   }
   
@@ -276,6 +280,8 @@ export default function Onboarding() {
     if (primaryGoal === "lessons") return "/lesson-generator";
     if (primaryGoal === "curriculum") return "/scope-sequence";
     if (primaryGoal === "oversight") {
+      if (role === "system_admin") return "/system-admin";
+      if (role === "site_admin") return "/admin";
       if (role === "district_admin") return "/district-admin";
       return "/admin";
     }
@@ -308,8 +314,8 @@ export default function Onboarding() {
     });
   };
 
-  const isEducator = role === "educator" || role === "campus_admin" || role === "district_admin" || role === "homeschool_parent";
-  const isAdmin = role === "campus_admin" || role === "district_admin";
+  const isEducator = role === "educator" || role === "campus_admin" || role === "district_admin" || role === "homeschool_parent" || role === "site_admin" || role === "system_admin";
+  const isAdmin = role === "campus_admin" || role === "district_admin" || role === "site_admin" || role === "system_admin";
   const primaryGoals = isAdmin ? PRIMARY_GOALS_ADMIN : PRIMARY_GOALS_BASE;
 
   const steps: { key: StepKey; label: string }[] = isEducator
@@ -422,7 +428,7 @@ export default function Onboarding() {
                   <Building2 className="h-6 w-6 text-lys-red" />
                   <div>
                     <Label htmlFor="campus_admin" className="cursor-pointer font-medium">Campus Administrator</Label>
-                    <p className="text-sm text-muted-foreground">School principal or campus leadership</p>
+                    <p className="text-sm text-muted-foreground">Principal or campus leader at a single-campus charter or school site</p>
                   </div>
                 </div>
                 <div 
@@ -433,8 +439,32 @@ export default function Onboarding() {
                   <RadioGroupItem value="district_admin" id="district_admin" />
                   <Presentation className="h-6 w-6 text-lys-red" />
                   <div>
-                    <Label htmlFor="district_admin" className="cursor-pointer font-medium">District Administrator</Label>
-                    <p className="text-sm text-muted-foreground">District-level leadership overseeing multiple campuses</p>
+                    <Label htmlFor="district_admin" className="cursor-pointer font-medium">District / Charter Network Administrator</Label>
+                    <p className="text-sm text-muted-foreground">ISD, charter network (CMO/EMO), or multi-campus leadership overseeing multiple schools</p>
+                  </div>
+                </div>
+                <div 
+                  className={`flex items-center gap-4 p-4 rounded-md border cursor-pointer hover-elevate ${role === "site_admin" ? "border-lys-red bg-muted" : ""}`}
+                  onClick={() => { setRole("site_admin"); setPrimaryGoal(""); }}
+                  data-testid="option-site-admin"
+                >
+                  <RadioGroupItem value="site_admin" id="site_admin" />
+                  <Shield className="h-6 w-6 text-lys-red" />
+                  <div>
+                    <Label htmlFor="site_admin" className="cursor-pointer font-medium">Site Administrator</Label>
+                    <p className="text-sm text-muted-foreground">Platform admin managing all organizations, ISDs, and charter networks</p>
+                  </div>
+                </div>
+                <div 
+                  className={`flex items-center gap-4 p-4 rounded-md border cursor-pointer hover-elevate ${role === "system_admin" ? "border-lys-red bg-muted" : ""}`}
+                  onClick={() => { setRole("system_admin"); setPrimaryGoal(""); }}
+                  data-testid="option-system-admin"
+                >
+                  <RadioGroupItem value="system_admin" id="system_admin" />
+                  <Globe className="h-6 w-6 text-lys-red" />
+                  <div>
+                    <Label htmlFor="system_admin" className="cursor-pointer font-medium">System Administrator</Label>
+                    <p className="text-sm text-muted-foreground">Full platform oversight, global configuration, and system-wide settings</p>
                   </div>
                 </div>
               </RadioGroup>
@@ -449,7 +479,7 @@ export default function Onboarding() {
                 </Label>
                 <p className="text-sm text-muted-foreground mt-1 mb-4">
                   {isAdmin
-                    ? "Select all the grade levels in your campus or district. This helps us tailor standards and analytics."
+                    ? "Select all the grade levels in your campus, district, or charter network. This helps us tailor standards and analytics."
                     : "Select all the grade levels for your classes. This helps us show you relevant educational standards."
                   }
                 </p>

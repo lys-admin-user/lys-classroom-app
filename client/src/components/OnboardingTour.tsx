@@ -460,14 +460,14 @@ const CAMPUS_ADMIN_STEPS: TourStep[] = [
   {
     id: "welcome",
     title: "Welcome to LYS!",
-    description: "Your campus administration tools are ready. Let's explore how you can manage your school, monitor safety, and support educators.",
+    description: "Your campus administration tools are ready. Whether you manage a single-campus charter school, a campus within an ISD, or a site in a charter network (CMO/EMO), let's explore how to run your school effectively.",
     icon: Shield,
     pillar: "general",
   },
   {
     id: "campus-admin",
     title: "Campus Admin Dashboard",
-    description: "Your central hub for managing campus operations, reviewing safety metrics, and overseeing educator activity.",
+    description: "Your central hub for managing campus operations, reviewing safety metrics, and overseeing educator activity. Single-campus charters get full autonomy here; campuses within an ISD or charter network inherit district- or network-level policies.",
     icon: Shield,
     targetSelector: '[data-testid="nav-campus-admin"]',
     navPath: "/admin",
@@ -476,7 +476,7 @@ const CAMPUS_ADMIN_STEPS: TourStep[] = [
   {
     id: "standards",
     title: "Educational Standards",
-    description: "Manage and configure educational standards for your campus. Ensure lesson plans align with required standards.",
+    description: "Manage and configure educational standards for your campus. Independent charters set their own standards; ISD and charter network campuses align with district or network requirements.",
     icon: Database,
     targetSelector: '[data-testid="nav-standards"]',
     navPath: "/admin/standards",
@@ -494,7 +494,7 @@ const CAMPUS_ADMIN_STEPS: TourStep[] = [
   {
     id: "scope-sequence",
     title: "Scope & Sequence",
-    description: "Review and manage curriculum plans across your campus. Ensure consistent pacing and standards coverage.",
+    description: "Review and manage curriculum plans across your campus. Ensure consistent pacing and standards coverage aligned with your charter, ISD, or network guidelines.",
     icon: Map,
     targetSelector: '[data-testid="nav-scope-sequence"]',
     navPath: "/scope-sequence",
@@ -551,14 +551,14 @@ const DISTRICT_ADMIN_STEPS: TourStep[] = [
   {
     id: "welcome",
     title: "Welcome to LYS!",
-    description: "Your district administration tools are ready. Let's explore how you can oversee campuses, monitor safety, and manage district-wide operations.",
+    description: "Your administration tools are ready. Whether you manage a traditional ISD, a multi-state charter network (CMO/EMO), or another multi-campus organization, let's explore your management capabilities.",
     icon: Presentation,
     pillar: "general",
   },
   {
     id: "district-admin",
-    title: "District Admin Dashboard",
-    description: "Your command center for district-wide operations, safety monitoring, governance metrics, and campus oversight.",
+    title: "District / Network Admin Dashboard",
+    description: "Your command center for organization-wide operations. ISDs manage geographically bound campuses; charter networks (CMOs/EMOs) oversee schools across multiple states from a unified master dashboard or per-state view.",
     icon: Presentation,
     targetSelector: '[data-testid="nav-district-admin"]',
     navPath: "/district-admin",
@@ -567,7 +567,7 @@ const DISTRICT_ADMIN_STEPS: TourStep[] = [
   {
     id: "campuses",
     title: "Campus Management",
-    description: "View and manage all campuses in your district. Monitor performance, transfer students, and configure campus settings.",
+    description: "View and manage all campuses in your district or charter network. Monitor performance across sites, transfer students, and configure campus settings. Multi-state networks can organize campuses by state or region.",
     icon: School,
     targetSelector: '[data-testid="nav-campuses"]',
     navPath: "/district-admin/campuses",
@@ -576,7 +576,7 @@ const DISTRICT_ADMIN_STEPS: TourStep[] = [
   {
     id: "campus-admin",
     title: "Campus Admin Tools",
-    description: "Access campus-level administration including standards management and educator oversight.",
+    description: "Access campus-level administration including standards management and educator oversight for any campus in your ISD or charter network.",
     icon: Shield,
     targetSelector: '[data-testid="nav-campus-admin"]',
     navPath: "/admin",
@@ -584,8 +584,8 @@ const DISTRICT_ADMIN_STEPS: TourStep[] = [
   },
   {
     id: "analytics",
-    title: "District Analytics",
-    description: "Review district-wide performance analytics, student progress, standards coverage, and educator metrics.",
+    title: "Organization-Wide Analytics",
+    description: "Review performance analytics across your entire ISD or charter network, including student progress, standards coverage, and educator metrics across all campuses and states.",
     icon: BarChart3,
     targetSelector: '[data-testid="nav-analytics"]',
     navPath: "/analytics",
@@ -594,7 +594,7 @@ const DISTRICT_ADMIN_STEPS: TourStep[] = [
   {
     id: "scope-sequence",
     title: "Scope & Sequence",
-    description: "Oversee curriculum planning across the district. Ensure alignment and consistency across campuses.",
+    description: "Oversee curriculum planning across your district or charter network. Ensure alignment and consistency across all campuses, whether in one region or spanning multiple states.",
     icon: Map,
     targetSelector: '[data-testid="nav-scope-sequence"]',
     navPath: "/scope-sequence",
@@ -603,7 +603,7 @@ const DISTRICT_ADMIN_STEPS: TourStep[] = [
   {
     id: "sis-integration",
     title: "SIS Integration",
-    description: "Configure district-level SIS connections that automatically cascade to all campuses.",
+    description: "Configure organization-level SIS connections that automatically cascade to all campuses in your ISD or charter network.",
     icon: Link2,
     targetSelector: '[data-testid="nav-sis-integration"]',
     navPath: "/sis-integration",
@@ -648,8 +648,8 @@ const SYSTEM_ADMIN_STEPS: TourStep[] = [
   },
   {
     id: "district-admin",
-    title: "District Management",
-    description: "Oversee district-level operations and campus hierarchies across the entire platform.",
+    title: "District & Network Management",
+    description: "Oversee all organization types across the platform: single-campus charters, traditional ISDs, and multi-state charter networks (CMOs/EMOs). Manage campus hierarchies and network structures.",
     icon: Presentation,
     targetSelector: '[data-testid="nav-district-admin"]',
     navPath: "/district-admin",
@@ -658,7 +658,7 @@ const SYSTEM_ADMIN_STEPS: TourStep[] = [
   {
     id: "campus-admin",
     title: "Campus Administration",
-    description: "Access campus-level tools including standards management and educator oversight.",
+    description: "Access campus-level tools including standards management and educator oversight for any campus across ISDs, charter networks, or independent schools.",
     icon: Shield,
     targetSelector: '[data-testid="nav-campus-admin"]',
     navPath: "/admin",

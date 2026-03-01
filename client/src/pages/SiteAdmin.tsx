@@ -724,17 +724,25 @@ export default function SiteAdminPage() {
                       </SelectTrigger>
                       <SelectContent>
                         <SelectItem value="school">Internal - School / Campus Team</SelectItem>
-                        <SelectItem value="district">Internal - District</SelectItem>
+                        <SelectItem value="district">Internal - District (ISD)</SelectItem>
+                        <SelectItem value="network">Network - Multi-School Network</SelectItem>
+                        <SelectItem value="charter_network">Charter Network - CMO / EMO</SelectItem>
                         <SelectItem value="university">Internal - University / Higher Ed</SelectItem>
                         <SelectItem value="organization">External - Partner Organization</SelectItem>
                       </SelectContent>
                     </Select>
-                    <p className="text-xs text-muted-foreground">Internal teams are part of your campus. External partners connect to provide mentoring, scholarships, workforce opportunities, or enrichment resources.</p>
+                    <p className="text-xs text-muted-foreground">Internal teams are part of your campus. Districts (ISDs) manage multiple campuses locally. Charter Networks (CMO/EMO) manage schools across states. External partners connect to provide mentoring, scholarships, workforce opportunities, or enrichment resources.</p>
                   </div>
                   {newOrg.type === "organization" && (
                     <div className="p-3 rounded-md bg-amber-500/10 border border-amber-500/20">
                       <p className="text-sm font-medium text-amber-700 dark:text-amber-400">External Partner Notice</p>
                       <p className="text-xs text-muted-foreground mt-1">External partners do not have access to student academic data. Members of this organization will need to be assigned to a class within the campus to interact with students.</p>
+                    </div>
+                  )}
+                  {(newOrg.type === "network" || newOrg.type === "charter_network") && (
+                    <div className="p-3 rounded-md bg-primary/10 border border-primary/20">
+                      <p className="text-sm font-medium">{newOrg.type === "charter_network" ? "Charter Network (CMO/EMO)" : "Multi-School Network"}</p>
+                      <p className="text-xs text-muted-foreground mt-1">This organization manages multiple campuses{newOrg.type === "charter_network" ? " across states (e.g., KIPP, IDEA, Green Dot)" : ""}. Child campuses can be added under this organization. Enterprise tier ($299/mo) is recommended for unified master dashboard and per-state management capabilities.</p>
                     </div>
                   )}
                   <div className="grid gap-2">
@@ -824,7 +832,7 @@ export default function SiteAdminPage() {
                         <Users className="h-4 w-4" />
                         {(org as any).maxMembers || "Unlimited"} members allowed
                       </span>
-                      <span>Type: {org.type}</span>
+                      <span>Type: {org.type === "charter_network" ? "Charter Network (CMO/EMO)" : org.type === "network" ? "Network" : org.type === "district" ? "District (ISD)" : org.type}</span>
                     </div>
                   </CardContent>
                 </Card>
