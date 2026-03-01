@@ -127,7 +127,7 @@ const docSections: DocSection[] = [
           headers: ["Table", "Purpose", "Key Columns", "Relationships"],
           rows: [
             ["users", "User accounts and profiles", "id (PK), email, role, tier, loginCount, onboardingCompleted", "Referenced by lessons, goals, memberships, journey data"],
-            ["organizations", "Schools, districts, universities", "id (PK), slug, type (school/district/university), parentOrganizationId", "Self-referential hierarchy; parent org for districts"],
+            ["organizations", "Schools, districts, charter networks, university systems", "id (PK), slug, type (school/district/network/charter_network/...), parentOrganizationId", "Self-referential hierarchy; supports ISDs, CMO/EMO networks, single campuses"],
             ["organization_memberships", "User-to-org links", "id (PK), organizationId (FK), userId (FK), role (member/admin/owner)", "Joins users to organizations with org-level roles"],
             ["lessons", "Generated lesson plans", "id (PK), userId (FK), shareId, subject, gradeLevel, topic", "Linked to user; shareable via shareId"],
             ["goals", "Student action plans", "id (PK), userId (FK), title, status, progress", "Linked to user account"],
@@ -613,14 +613,29 @@ const requireSystemAdmin = requireRole("system_admin");`,
     category: "Architecture",
     content: [
       {
+        heading: "Client Structure Mapping",
+        body: "LYS serves three primary client structures based on governance, funding, and operational scale. All organization types map to one of these structures.",
+        table: {
+          headers: ["Client Structure", "Org Type", "Tier", "Description"],
+          rows: [
+            ["Single-Campus Charter", "school / campus", "Campus ($99/mo)", "Independent 'boutique' school. No parent org. Full customization, makes own rules."],
+            ["Traditional ISD", "district > school/campus", "Enterprise ($299/mo)", "Geographically bound, locally governed by elected board. Standardized calendar/curriculum. All districts are Enterprise tier regardless of size."],
+            ["Charter Network (CMO/EMO)", "charter_network > school/campus", "Enterprise ($299/mo)", "Central HQ managing schools across states (e.g., KIPP, IDEA, Green Dot). CMOs are non-profit, EMOs are for-profit. Supports unified master dashboard OR per-state management."],
+            ["General Network", "network > district/school", "Enterprise ($299/mo)", "Multi-school networks not charter-specific (e.g., university systems, consortiums)."],
+          ],
+        },
+      },
+      {
         heading: "Organization Hierarchy",
-        body: "LYS supports a hierarchical organization structure that mirrors real educational governance. Districts contain campuses (schools), and universities operate independently.",
+        body: "LYS supports a hierarchical organization structure: country > state/jurisdiction > network/charter_network > district > school/campus. Networks and charter networks sit above districts to model multi-state operations.",
         table: {
           headers: ["Org Type", "Parent", "Description"],
           rows: [
-            ["district", "None", "Top-level educational authority managing multiple campuses"],
-            ["school (campus)", "District or none", "Individual school/campus; can be standalone or under a district"],
-            ["university", "None", "Independent higher-education institution"],
+            ["network", "None or country/state", "General multi-school network or consortium"],
+            ["charter_network", "None or country/state", "CMO/EMO managing charter schools across states"],
+            ["district", "None, network, or charter_network", "Traditional ISD or geographically bound district"],
+            ["school / campus", "District, network, charter_network, or none", "Individual school; standalone or under a parent org"],
+            ["university", "None or network", "Independent higher-education institution"],
           ],
         },
       },

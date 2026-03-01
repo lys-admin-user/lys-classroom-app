@@ -1394,7 +1394,7 @@ export default function SystemAdminPage({ params }: { params?: { tab?: string } 
                     </div>
                     <div className="flex items-center gap-2">
                       <Badge variant={org.status === "active" ? "default" : "secondary"}>{org.status}</Badge>
-                      <Badge variant="outline" className="capitalize">{org.type}</Badge>
+                      <Badge variant="outline" className="capitalize">{org.type === "charter_network" ? "Charter Network" : org.type}</Badge>
                       <Button
                         size="icon"
                         variant="ghost"

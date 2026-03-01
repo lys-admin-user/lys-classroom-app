@@ -123,15 +123,32 @@ export type InsertEducatorProfile = z.infer<typeof insertEducatorProfileSchema>;
 export type EducatorProfile = typeof educatorProfiles.$inferSelect;
 
 // Organization types for multi-tenant support
-// Hierarchy: country > state/jurisdiction > district > school/campus > (classes)
-export type OrganizationType = "country" | "state" | "jurisdiction" | "district" | "school" | "campus" | "university" | "other";
+// Hierarchy: country > state/jurisdiction > network/charter_network > district > school/campus > (classes)
+//
+// Client Structure Mapping:
+//   - Single-Campus Charter: type="school" or "campus", tier="campus" ($99/mo)
+//     Independent school, no parent org, full customization, makes own rules
+//   - Traditional Public School District (ISD): type="district" with child "school"/"campus" orgs, tier="enterprise" ($299/mo)
+//     Geographically bound, locally governed, elected board, standardized calendar/curriculum
+//   - Multi-State Charter Network (CMO/EMO): type="charter_network" or "network" with child orgs, tier="enterprise" ($299/mo)
+//     Central HQ managing schools across states (e.g., KIPP, IDEA, Green Dot, Charter Schools USA)
+//     Supports unified master dashboard OR per-state management (admin's preference)
+//   - General Network: type="network", tier="enterprise" ($299/mo)
+//     Multi-school networks that aren't charter-specific (e.g., university systems)
+//
+// All districts are Enterprise tier regardless of size.
+// CMOs (non-profit) and EMOs (for-profit) both use "charter_network" type.
+export type OrganizationType = "country" | "state" | "jurisdiction" | "network" | "charter_network" | "district" | "school" | "campus" | "university" | "other";
 export type OrganizationStatus = "active" | "suspended" | "pending";
 
 // Organization hierarchy levels (ordered from top to bottom)
-export const organizationHierarchyLevels: OrganizationType[] = ["country", "state", "jurisdiction", "district", "school", "campus", "university"];
+export const organizationHierarchyLevels: OrganizationType[] = ["country", "state", "jurisdiction", "network", "charter_network", "district", "school", "campus", "university"];
 
 // Types that can directly contain classes and students
 export const classContainerTypes: OrganizationType[] = ["school", "campus", "university"];
+
+// Types that represent multi-site enterprise entities (always Enterprise tier)
+export const enterpriseOrgTypes: OrganizationType[] = ["network", "charter_network", "district"];
 
 // Governance models for global authority tree
 // bottom_heavy: US-style with strong local control (TEA, school districts)
@@ -140,7 +157,7 @@ export const classContainerTypes: OrganizationType[] = ["school", "campus", "uni
 export type GovernanceModel = "bottom_heavy" | "top_down_unitary" | "federal_hybrid";
 
 // Organizations table - represents educational entities at various levels
-// Hierarchy: country > state/jurisdiction > district > school/campus
+// Hierarchy: country > state/jurisdiction > network/charter_network > district > school/campus
 export const organizations = pgTable("organizations", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   name: varchar("name").notNull(),

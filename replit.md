@@ -23,7 +23,7 @@ Preferred communication style: Simple, everyday language.
 -   **Monorepo Structure**: `/client`, `/server`, and `/shared` directories.
 -   **AI Integration**: OpenAI API for AI-driven features, with mock data fallback.
 -   **Real-Time Collaboration**: WebSocket server for live cursor positions, presence, and chat.
--   **Multi-Tenancy**: Supports organizations (School, District, University) with hierarchical role-based access control (system_admin > site_admin > district_admin > campus_admin > educator > homeschool_parent > student), `requireRole()` middleware with DB lookups, and an invitation system.
+-   **Multi-Tenancy**: Supports organizations (School, District, Charter Network, Network, University) with hierarchical role-based access control (system_admin > site_admin > district_admin > campus_admin > educator > homeschool_parent > student), `requireRole()` middleware with DB lookups, and an invitation system. Three client structures: Single-Campus Charters (Campus tier, type=school/campus), Traditional ISDs (Enterprise tier, type=district), and Multi-State Charter Networks/CMO/EMOs (Enterprise tier, type=charter_network). All districts are Enterprise tier regardless of size. Charter networks support unified master dashboard OR per-state management at admin's preference.
 -   **Automated Standards Ingestion**: Three-tier system for importing educational standards including CSP API, planned CASE Protocol, and LLM extraction.
 
 ### Feature Specifications
@@ -56,7 +56,7 @@ Preferred communication style: Simple, everyday language.
 -   **Org Admin Self-Service**: Campus and district admins can manage their organizations without needing system admin help. Features include: member management (view, invite, change org/platform roles, suspend/reactivate, remove), org settings (name, address, contact info, registration policies), and educator activity monitoring (login counts, lesson/scope creation stats). District admins manage their district org plus all child campus orgs. Role ceiling enforces that org admins can only assign platform roles up to campus_admin. API routes at `/api/org-admin/*` with `verifyOrgAdminAccess()` authorization.
 
 ### Global Architecture
--   **Educational Hierarchy**: Structured organization of students and classes.
+-   **Educational Hierarchy**: Structured organization hierarchy: country > state/jurisdiction > network/charter_network > district > school/campus. Supports Single-Campus Charters, Traditional ISDs, and Multi-State Charter Networks (CMO/EMO).
 -   **Organization Inheritance**: Resources and settings cascade through the hierarchy.
 -   **Scope & Sequence Visibility**: Supports personal, campus, district, and system-level scopes.
 -   **SIS Integration Inheritance**: Campus/District SIS connections are automatically available to educators.
