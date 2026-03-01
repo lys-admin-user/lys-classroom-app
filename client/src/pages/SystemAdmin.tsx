@@ -1,6 +1,6 @@
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/use-auth";
-import { useLocation, useRoute } from "wouter";
+import { useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -162,12 +162,11 @@ interface BillingData {
   recentUpgrades: { id: string; email: string | null; name: string; tier: string | null; updatedAt: Date | null }[];
 }
 
-export default function SystemAdminPage() {
+export default function SystemAdminPage({ params }: { params?: { tab?: string } }) {
   const { user, isLoading: authLoading } = useAuth();
   const [, setLocation] = useLocation();
   const { toast } = useToast();
-  const [, routeParams] = useRoute("/system-admin/:tab");
-  const activeTab = routeParams?.tab || "overview";
+  const activeTab = params?.tab || "overview";
 
   const handleTabChange = useCallback((value: string) => {
     if (value !== activeTab) {
@@ -752,7 +751,6 @@ export default function SystemAdminPage() {
   }
 
   if (!user) {
-    setLocation("/login");
     return null;
   }
 

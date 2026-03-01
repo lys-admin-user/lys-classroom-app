@@ -557,7 +557,6 @@ export default function SiteAdminPage() {
   }
 
   if (!user) {
-    setLocation("/login");
     return null;
   }
 
