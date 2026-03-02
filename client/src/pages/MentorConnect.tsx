@@ -8,11 +8,12 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Textarea } from "@/components/ui/textarea";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
-import { Users, UserPlus, MessageCircle, CheckCircle, Clock, Filter, XCircle } from "lucide-react";
+import { Users, UserPlus, MessageCircle, CheckCircle, Clock, Filter, XCircle, Headphones, FileText, ExternalLink, Sparkles } from "lucide-react";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/use-auth";
 import { CAREER_FIELDS } from "@shared/schema";
+import type { RssContentItem } from "@shared/schema";
 
 interface MentorProfile {
   id: string;
@@ -68,6 +69,11 @@ export default function MentorConnect() {
 
   const { data: connections, isLoading: connectionsLoading } = useQuery<MentorConnection[]>({
     queryKey: ["/api/mentor-connections"],
+    enabled: isAuthenticated,
+  });
+
+  const { data: mentorContentRecommendations = [] } = useQuery<RssContentItem[]>({
+    queryKey: ["/api/mentor-content-recommendations"],
     enabled: isAuthenticated,
   });
 
@@ -369,6 +375,79 @@ export default function MentorConnect() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {mentorContentRecommendations.length > 0 && (
+        <div data-testid="section-mentor-resources">
+          <Card>
+            <CardHeader>
+              <div className="flex items-center justify-between gap-4 flex-wrap">
+                <div>
+                  <CardTitle className="flex items-center gap-2">
+                    <Sparkles className="w-5 h-5 text-amber-500" />
+                    Resources to Share
+                  </CardTitle>
+                  <p className="text-sm text-muted-foreground mt-1">Relevant content you can reference with your mentees</p>
+                </div>
+              </div>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {mentorContentRecommendations.map((item) => {
+                  const isPodcast = !!item.audioUrl;
+                  const TypeIcon = isPodcast ? Headphones : FileText;
+
+                  return (
+                    <Card key={item.id} className="hover-elevate" data-testid={`card-mentor-resource-${item.id}`}>
+                      <CardContent className="p-4 flex flex-col gap-3">
+                        <div className="flex items-start gap-3">
+                          <div className={`p-2 rounded-full flex-shrink-0 ${isPodcast ? "bg-purple-500/10" : "bg-blue-500/10"}`}>
+                            <TypeIcon className={`w-4 h-4 ${isPodcast ? "text-purple-500" : "text-blue-500"}`} />
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <p className="font-medium text-sm line-clamp-2" data-testid={`text-mentor-resource-title-${item.id}`}>
+                              {item.title}
+                            </p>
+                            {item.description && (
+                              <p className="text-xs text-muted-foreground mt-1 line-clamp-2" data-testid={`text-mentor-resource-description-${item.id}`}>
+                                {item.description}
+                              </p>
+                            )}
+                          </div>
+                        </div>
+                        <div className="flex items-center justify-between gap-2 flex-wrap">
+                          <div className="flex items-center gap-1.5 flex-wrap">
+                            <Badge variant="outline" className="text-xs" data-testid={`badge-mentor-resource-type-${item.id}`}>
+                              <TypeIcon className="w-3 h-3 mr-1" />
+                              {isPodcast ? "Podcast" : "Blog"}
+                            </Badge>
+                            {item.bkdPillar && (
+                              <Badge variant="secondary" className="text-xs" data-testid={`badge-mentor-resource-pillar-${item.id}`}>
+                                {item.bkdPillar === "be" ? "Being" : item.bkdPillar === "know" ? "Knowing" : item.bkdPillar === "do" ? "Doing" : item.bkdPillar}
+                              </Badge>
+                            )}
+                          </div>
+                          {item.contentUrl && (
+                            <a
+                              href={item.contentUrl}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="text-xs text-muted-foreground flex items-center gap-1 hover:text-foreground transition-colors"
+                              data-testid={`link-mentor-resource-${item.id}`}
+                            >
+                              <ExternalLink className="w-3 h-3" />
+                              View
+                            </a>
+                          )}
+                        </div>
+                      </CardContent>
+                    </Card>
+                  );
+                })}
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      )}
     </div>
   );
 }

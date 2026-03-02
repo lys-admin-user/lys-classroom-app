@@ -57,6 +57,8 @@ import { syncBlsData, getLastSyncStatus, getSyncHistory, startBlsScheduler, getS
 import { createPaypalOrder, capturePaypalOrder, loadPaypalDefault, isPayPalConfigured } from "./paypal";
 import * as hubspotService from "./services/hubspotService";
 import * as wordpressService from "./services/wordpressService";
+import { fetchAndProcessFeed, fetchAllActiveFeeds, startRssFeedScheduler } from "./services/rssFeedService";
+import { insertRssFeedSchema } from "@shared/schema";
 import { db } from "./db";
 import { logAuditEvent, getAuditLogs, getClientIP } from "./services/auditLog";
 import { filterChatMessage } from "./services/contentFilter";
@@ -8190,6 +8192,12 @@ export async function registerRoutes(
               description: "Lessons and learning materials",
             },
             {
+              name: "Content Hub (RSS)",
+              path: "/system-admin?tab=content-hub",
+              description: "RSS feed ingestion and content routing",
+              count: await storage.getPendingRssContentCount(),
+            },
+            {
               name: "Educational Standards",
               path: "/standards-admin",
               description: "Curriculum standards management",
@@ -13326,6 +13334,212 @@ export async function registerRoutes(
       res.status(500).json({ error: "Failed to fetch governance status" });
     }
   });
+
+  // ============ RSS Content Ingestion Routes ============
+
+  const requireSystemAdmin = async (req: any, res: any, next: any) => {
+    const userId = req.user?.claims?.sub;
+    if (!userId) return res.status(401).json({ error: "Unauthorized" });
+    const isAdmin = await storage.isSiteAdmin(userId);
+    if (!isAdmin) return res.status(403).json({ error: "System admin access required" });
+    next();
+  };
+
+  app.get("/api/admin/rss-feeds", isAuthenticated, requireSystemAdmin, async (req: any, res) => {
+    try {
+      const feeds = await storage.getRssFeeds();
+      res.json(feeds);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch RSS feeds" });
+    }
+  });
+
+  app.post("/api/admin/rss-feeds", isAuthenticated, requireSystemAdmin, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const parsed = insertRssFeedSchema.parse({ ...req.body, createdBy: userId });
+      const feed = await storage.createRssFeed(parsed);
+      res.json(feed);
+    } catch (error: any) {
+      res.status(400).json({ error: error.message || "Failed to create RSS feed" });
+    }
+  });
+
+  app.patch("/api/admin/rss-feeds/:id", isAuthenticated, requireSystemAdmin, async (req: any, res) => {
+    try {
+      const { name, url, feedType, description, isActive, fetchIntervalMinutes } = req.body;
+      const allowedUpdates: any = {};
+      if (name !== undefined) allowedUpdates.name = name;
+      if (url !== undefined) allowedUpdates.url = url;
+      if (feedType !== undefined) {
+        if (!["podcast", "blog"].includes(feedType)) return res.status(400).json({ error: "Invalid feed type" });
+        allowedUpdates.feedType = feedType;
+      }
+      if (description !== undefined) allowedUpdates.description = description;
+      if (isActive !== undefined) allowedUpdates.isActive = isActive;
+      if (fetchIntervalMinutes !== undefined) allowedUpdates.fetchIntervalMinutes = fetchIntervalMinutes;
+      const feed = await storage.updateRssFeed(req.params.id, allowedUpdates);
+      if (!feed) return res.status(404).json({ error: "Feed not found" });
+      res.json(feed);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to update RSS feed" });
+    }
+  });
+
+  app.delete("/api/admin/rss-feeds/:id", isAuthenticated, requireSystemAdmin, async (req: any, res) => {
+    try {
+      const deleted = await storage.deleteRssFeed(req.params.id);
+      if (!deleted) return res.status(404).json({ error: "Feed not found" });
+      res.json({ success: true });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to delete RSS feed" });
+    }
+  });
+
+  app.post("/api/admin/rss-feeds/:id/fetch", isAuthenticated, requireSystemAdmin, async (req: any, res) => {
+    try {
+      const feed = await storage.getRssFeed(req.params.id);
+      if (!feed) return res.status(404).json({ error: "Feed not found" });
+      const result = await fetchAndProcessFeed(feed);
+      res.json(result);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch RSS feed" });
+    }
+  });
+
+  app.get("/api/admin/rss-content", isAuthenticated, requireSystemAdmin, async (req: any, res) => {
+    try {
+      const filters: any = {};
+      if (req.query.feedId) filters.feedId = req.query.feedId;
+      if (req.query.status) filters.status = req.query.status;
+      if (req.query.placement) filters.placement = req.query.placement;
+      const items = await storage.getRssContentItems(filters);
+      res.json(items);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch RSS content items" });
+    }
+  });
+
+  app.get("/api/admin/rss-content/pending-count", isAuthenticated, requireSystemAdmin, async (req: any, res) => {
+    try {
+      const count = await storage.getPendingRssContentCount();
+      res.json({ count });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to get pending count" });
+    }
+  });
+
+  app.patch("/api/admin/rss-content/:id", isAuthenticated, requireSystemAdmin, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const { status, approvedPlacements, bkdPillar, aiUsageType, reviewNotes, careerFields, tags } = req.body;
+      const validStatuses = ["pending", "approved", "rejected", "archived"];
+      const validPlacements = ["know_resource", "ai_lesson", "featured", "mentor_connect"];
+      const validPillars = ["be", "know", "do"];
+      const validUsageTypes = ["supplemental", "primary"];
+      if (status && !validStatuses.includes(status)) return res.status(400).json({ error: "Invalid status" });
+      if (bkdPillar && !validPillars.includes(bkdPillar)) return res.status(400).json({ error: "Invalid BKD pillar" });
+      if (aiUsageType && !validUsageTypes.includes(aiUsageType)) return res.status(400).json({ error: "Invalid AI usage type" });
+      if (approvedPlacements && (!Array.isArray(approvedPlacements) || !approvedPlacements.every((p: string) => validPlacements.includes(p)))) return res.status(400).json({ error: "Invalid placements" });
+      const updates: any = {};
+      if (status) updates.status = status;
+      if (approvedPlacements) updates.approvedPlacements = approvedPlacements;
+      if (bkdPillar) updates.bkdPillar = bkdPillar;
+      if (aiUsageType) updates.aiUsageType = aiUsageType;
+      if (reviewNotes !== undefined) updates.reviewNotes = reviewNotes;
+      if (careerFields) updates.careerFields = careerFields;
+      if (tags) updates.tags = tags;
+      if (status === "approved" || status === "rejected") {
+        updates.reviewedBy = userId;
+        updates.reviewedAt = new Date();
+      }
+
+      const item = await storage.updateRssContentItem(req.params.id, updates);
+      if (!item) return res.status(404).json({ error: "Content item not found" });
+
+      if (status === "approved" && item.approvedPlacements) {
+        const placements = item.approvedPlacements as string[];
+        if (placements.includes("know_resource")) {
+          try {
+            const feed = await storage.getRssFeed(item.feedId);
+            const resourceType = feed?.feedType === "podcast" ? "podcast" : "website";
+            await storage.createKnowResource({
+              title: item.title,
+              description: item.description || undefined,
+              resourceType,
+              url: item.contentUrl || undefined,
+              imageUrl: item.imageUrl || undefined,
+              author: item.author || undefined,
+              rssFeedUrl: item.audioUrl || undefined,
+              tags: (item.tags as string[]) || [],
+              careerFields: (item.careerFields as string[]) || [],
+              isActive: true,
+              featured: false,
+              createdBy: userId,
+            });
+          } catch (err) {
+            console.error("Failed to create KNOW resource from RSS:", err);
+          }
+        }
+      }
+
+      res.json(item);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to update content item" });
+    }
+  });
+
+  app.get("/api/content-recommendations", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const bkdPillar = req.query.pillar as string | undefined;
+      const limit = parseInt(req.query.limit as string) || 10;
+
+      const journeyProgress = await storage.getStudentJourneyProgressByUserId(userId);
+      const savedCareersData = await storage.getSavedCareers(userId);
+
+      let targetPillar = bkdPillar;
+      if (!targetPillar && journeyProgress) {
+        const scores = {
+          be: journeyProgress.beScore || 0,
+          know: journeyProgress.knowScore || 0,
+          do: journeyProgress.doScore || 0,
+        };
+        targetPillar = scores.be <= scores.know && scores.be <= scores.do ? "be"
+          : scores.know <= scores.do ? "know" : "do";
+      }
+
+      const careerFields = savedCareersData.map((sc: any) => sc.careerField).filter(Boolean);
+
+      const featured = await storage.getApprovedRssContentByPlacement("featured", {
+        bkdPillar: targetPillar,
+        careerFields: careerFields.length > 0 ? careerFields : undefined,
+      });
+
+      const know = await storage.getApprovedRssContentByPlacement("know_resource", {
+        careerFields: careerFields.length > 0 ? careerFields : undefined,
+      });
+
+      const combined = [...featured, ...know]
+        .filter((item, idx, arr) => arr.findIndex(i => i.id === item.id) === idx)
+        .slice(0, limit);
+
+      res.json(combined);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to get content recommendations" });
+    }
+  });
+
+  app.get("/api/mentor-content-recommendations", isAuthenticated, async (req: any, res) => {
+    try {
+      const items = await storage.getApprovedRssContentByPlacement("mentor_connect");
+      res.json(items.slice(0, 20));
+    } catch (error) {
+      res.status(500).json({ error: "Failed to get mentor content" });
+    }
+  });
+
+  startRssFeedScheduler(60);
 
   return httpServer;
 }

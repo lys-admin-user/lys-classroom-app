@@ -1140,6 +1140,104 @@ const requireSystemAdmin = requireRole("system_admin");`,
       },
     ],
   },
+  {
+    id: "rss-content-ingestion",
+    title: "RSS Content Ingestion",
+    icon: Globe,
+    category: "Integration",
+    content: [
+      {
+        heading: "Overview",
+        body: "The RSS Content Ingestion system allows system administrators to manage RSS feeds from podcasts and blogs. Content from these feeds is automatically ingested and analyzed for metadata, including BKD pillar detection and placement suggestions. Approved content is routed to various platform surfaces such as KNOW Resources, AI Lessons, My Journey (featured), and Mentor Connect.",
+        items: [
+          "System admins add and manage RSS feed sources (podcast and blog feeds)",
+          "Content is auto-fetched from feeds with configurable fetch intervals",
+          "Metadata analysis extracts title, description, author, publication date, and keywords",
+          "BKD pillar (Be, Know, Do) is auto-detected from content metadata keywords",
+          "Placement type is suggested based on content characteristics (know_resource, ai_lesson, featured, mentor_connect)",
+          "All ingested content enters a pending approval queue for system admin review",
+        ],
+      },
+      {
+        heading: "Database Tables",
+        body: "The RSS ingestion system uses two primary database tables.",
+        table: {
+          headers: ["Table", "Purpose", "Key Columns"],
+          rows: [
+            ["rss_feeds", "Stores RSS feed source configurations", "id, feedUrl, title, description, feedType (podcast/blog), isActive, fetchIntervalMinutes, lastFetchedAt"],
+            ["rss_content_items", "Stores individual content items ingested from feeds", "id, feedId (FK), title, description, contentUrl, author, publishedAt, status (pending/approved/rejected), placementType, bkdPillar, metadata (JSONB)"],
+          ],
+        },
+      },
+      {
+        heading: "API Endpoints",
+        body: "All RSS admin endpoints require site_admin or system_admin role. Content recommendation endpoints are available to authenticated users.",
+        table: {
+          headers: ["Method", "Path", "Auth", "Description"],
+          rows: [
+            ["GET", "/api/admin/rss-feeds", "site_admin+", "List all configured RSS feeds"],
+            ["POST", "/api/admin/rss-feeds", "site_admin+", "Add a new RSS feed source"],
+            ["PATCH", "/api/admin/rss-feeds/:id", "site_admin+", "Update an RSS feed configuration"],
+            ["DELETE", "/api/admin/rss-feeds/:id", "site_admin+", "Remove an RSS feed source"],
+            ["GET", "/api/admin/rss-feeds/:id/fetch", "site_admin+", "Check fetch status for a feed"],
+            ["POST", "/api/admin/rss-feeds/:id/fetch", "site_admin+", "Trigger manual content fetch for a feed"],
+            ["GET", "/api/admin/rss-content", "site_admin+", "List all ingested content items with filtering"],
+            ["PATCH", "/api/admin/rss-content/:id", "site_admin+", "Update content item status or placement"],
+            ["GET", "/api/admin/rss-content/pending-count", "site_admin+", "Get count of content items awaiting approval"],
+            ["GET", "/api/content-recommendations", "Yes", "Get approved content recommendations for the current user"],
+            ["GET", "/api/mentor-content-recommendations", "Yes", "Get mentor-specific content recommendations"],
+          ],
+        },
+      },
+      {
+        heading: "Placement Types",
+        body: "Each ingested content item is assigned a placement type that determines where it appears on the platform.",
+        table: {
+          headers: ["Placement Type", "Surface", "Description"],
+          rows: [
+            ["know_resource", "KNOW Resources", "Content appears in the KNOW resource library as supplemental educational material"],
+            ["ai_lesson", "AI Lessons", "Approved content is injected as supplemental resources during AI lesson generation"],
+            ["featured", "My Journey", "Content is featured on the student My Journey page as recommended reading/listening"],
+            ["mentor_connect", "Mentor Connect", "Content is surfaced in Mentor Connect as discussion starters or reference material"],
+          ],
+        },
+      },
+      {
+        heading: "BKD Pillar Auto-Detection",
+        body: "The system automatically detects the relevant BKD (Be-Know-Do) pillar for each ingested content item by analyzing metadata keywords in the title, description, and tags.",
+        items: [
+          "BE pillar: Detected from keywords related to identity, values, character, self-awareness, social-emotional learning",
+          "KNOW pillar: Detected from keywords related to academic content, knowledge, curriculum, standards, facts, concepts",
+          "DO pillar: Detected from keywords related to skills, careers, projects, hands-on learning, real-world application",
+          "If no clear pillar is detected, the content defaults to KNOW and is flagged for manual review",
+          "Admins can override the auto-detected pillar during the approval process",
+        ],
+      },
+      {
+        heading: "Approval Workflow",
+        body: "All ingested content goes through a system admin approval workflow before appearing on the platform.",
+        items: [
+          "New content enters with status 'pending' and is added to the approval queue",
+          "System admins review pending content from the RSS Content management page",
+          "Admins can approve content (status changes to 'approved') or reject it (status changes to 'rejected')",
+          "During approval, admins can adjust the suggested placement type and BKD pillar",
+          "The pending count badge on the admin dashboard shows how many items await review",
+          "Only approved content is visible to end users through recommendation endpoints",
+        ],
+      },
+      {
+        heading: "AI Lesson Integration",
+        body: "Content items approved with the ai_lesson placement type are integrated into the AI lesson generation pipeline as supplemental resources.",
+        items: [
+          "When generating AI lessons, the system queries approved ai_lesson content relevant to the lesson topic",
+          "Matching content is injected into the lesson plan as supplemental resources with source attribution",
+          "Content relevance is determined by BKD pillar alignment, subject matter keywords, and grade level suitability",
+          "Educators see the supplemental resources listed in the generated lesson with links to the original content",
+          "This enriches AI-generated lessons with curated podcast episodes, blog articles, and other real-world resources",
+        ],
+      },
+    ],
+  },
 ];
 
 const categories = [

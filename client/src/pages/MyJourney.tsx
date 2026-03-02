@@ -40,9 +40,11 @@ import {
   PenLine,
   Send,
   FolderOpen,
-  ExternalLink
+  ExternalLink,
+  Headphones,
+  FileText
 } from "lucide-react";
-import type { StudentJourneyProgress, StudentJourneyMilestone, StudentJourneyActivity, StudentJourneyEntry, StudentJourneyProgressHistory, Career } from "@shared/schema";
+import type { StudentJourneyProgress, StudentJourneyMilestone, StudentJourneyActivity, StudentJourneyEntry, StudentJourneyProgressHistory, Career, RssContentItem } from "@shared/schema";
 import { JourneyProgressChart } from "@/components/JourneyProgressChart";
 
 interface JourneyData {
@@ -696,6 +698,11 @@ export default function MyJourney() {
     enabled: isAuthenticated,
   });
 
+  const { data: contentRecommendations = [] } = useQuery<RssContentItem[]>({
+    queryKey: ["/api/content-recommendations"],
+    enabled: isAuthenticated,
+  });
+
   const addMilestoneMutation = useMutation({
     mutationFn: (milestone: { title: string; description: string; category: string }) =>
       apiRequest("POST", "/api/my-journey/milestones", milestone),
@@ -930,6 +937,80 @@ export default function MyJourney() {
           savedCareersCount={savedCareers.length}
         />
       </div>
+
+      {contentRecommendations.length > 0 && (
+        <div className="mb-8" data-testid="section-recommended-content">
+          <Card>
+            <CardHeader>
+              <div className="flex items-center justify-between gap-4 flex-wrap">
+                <div>
+                  <CardTitle className="font-oswald flex items-center gap-2">
+                    <Sparkles className="w-5 h-5 text-lys-yellow" />
+                    Recommended for You
+                  </CardTitle>
+                  <CardDescription className="font-roboto">Content tailored to your journey</CardDescription>
+                </div>
+              </div>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {contentRecommendations.map((item) => {
+                  const isPodcast = !!item.audioUrl;
+                  const TypeIcon = isPodcast ? Headphones : FileText;
+                  const pillarConfig = item.bkdPillar ? baseCategoryStyles[item.bkdPillar as keyof typeof baseCategoryStyles] : null;
+
+                  return (
+                    <Card key={item.id} className="hover-elevate" data-testid={`card-recommended-content-${item.id}`}>
+                      <CardContent className="p-4 flex flex-col gap-3">
+                        <div className="flex items-start gap-3">
+                          <div className={`p-2 rounded-full flex-shrink-0 ${isPodcast ? "bg-purple-500/10" : "bg-blue-500/10"}`}>
+                            <TypeIcon className={`w-4 h-4 ${isPodcast ? "text-purple-500" : "text-blue-500"}`} />
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <p className="font-medium text-sm line-clamp-2" data-testid={`text-content-title-${item.id}`}>
+                              {item.title}
+                            </p>
+                            {item.description && (
+                              <p className="text-xs text-muted-foreground mt-1 line-clamp-2" data-testid={`text-content-description-${item.id}`}>
+                                {item.description}
+                              </p>
+                            )}
+                          </div>
+                        </div>
+                        <div className="flex items-center justify-between gap-2 flex-wrap">
+                          <div className="flex items-center gap-1.5 flex-wrap">
+                            <Badge variant="outline" className="text-xs" data-testid={`badge-content-type-${item.id}`}>
+                              <TypeIcon className="w-3 h-3 mr-1" />
+                              {isPodcast ? "Podcast" : "Blog"}
+                            </Badge>
+                            {pillarConfig && (
+                              <Badge variant="secondary" className={`text-xs ${pillarConfig.color}`} data-testid={`badge-content-pillar-${item.id}`}>
+                                {pillarConfig.label}
+                              </Badge>
+                            )}
+                          </div>
+                          {item.contentUrl && (
+                            <a
+                              href={item.contentUrl}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="text-xs text-muted-foreground flex items-center gap-1 hover:text-foreground transition-colors"
+                              data-testid={`link-content-${item.id}`}
+                            >
+                              <ExternalLink className="w-3 h-3" />
+                              View
+                            </a>
+                          )}
+                        </div>
+                      </CardContent>
+                    </Card>
+                  );
+                })}
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      )}
 
       <div className="grid lg:grid-cols-3 gap-6 mb-8">
         <div className="lg:col-span-2">

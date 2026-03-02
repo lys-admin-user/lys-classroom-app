@@ -186,6 +186,23 @@ IMPORTANT: Respond ONLY with a valid JSON object, no additional text.`;
   const subject = request.course || request.topic;
   const masterExamples = await getMasterLessonExamples(subject, request.gradeLevel);
 
+  let rssSupplementalSection = "";
+  try {
+    const rssContent = await storage.getApprovedRssContentByPlacement("ai_lesson", {
+      tags: request.course ? [request.course.toLowerCase()] : undefined,
+    });
+    if (rssContent.length > 0) {
+      const contentRefs = rssContent.slice(0, 5).map(item => {
+        const type = item.audioUrl ? "Podcast Episode" : "Article";
+        return `- [${type}] "${item.title}" by ${item.author || "LYS"} (${item.contentUrl || ""})`;
+      }).join("\n");
+      rssSupplementalSection = `\n\nSUPPLEMENTAL RESOURCES FROM LYS CONTENT LIBRARY (include as optional additional resources if relevant to the topic - educators may remove these):
+${contentRefs}`;
+    }
+  } catch (err) {
+    // Silently skip if RSS content unavailable
+  }
+
   const safeTopic = sanitizePromptText(request.topic);
   const safeCourse = request.course ? sanitizePromptText(request.course) : "";
   const safeUnit = request.unit ? sanitizePromptText(request.unit) : "";
@@ -199,7 +216,7 @@ ${safeUnit ? `- Unit: ${safeUnit}` : ""}
 - Duration: ${request.duration}
 ${request.lessonPart ? `- Lesson Part: ${request.lessonPart}` : ""}
 ${standardsInfo}
-${masterExamples}
+${masterExamples}${rssSupplementalSection}
 
 Generate a complete LYS lesson plan in JSON format. Include:
 1. A compelling title

@@ -1,6 +1,8 @@
 import { Link, useLocation } from "wouter";
+import { useQuery } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/use-auth";
 import { ROLE_HIERARCHY, type UserRole } from "@shared/models/auth";
+import { Badge } from "@/components/ui/badge";
 import {
   Sidebar,
   SidebarContent,
@@ -187,6 +189,12 @@ export function AppSidebar() {
   const { user, isAuthenticated } = useAuth();
   const userRole = user?.role || "student";
 
+  const { data: pendingCountData } = useQuery<{ count: number }>({
+    queryKey: ['/api/admin/rss-content/pending-count'],
+    enabled: isAuthenticated && hasMinRole(userRole, 'site_admin'),
+  });
+  const pendingCount = pendingCountData?.count ?? 0;
+
   const isActiveRoute = (url: string) => {
     if (url === "/") return location === "/";
     return location.startsWith(url);
@@ -261,6 +269,11 @@ export function AppSidebar() {
                           <Link href={item.url} data-testid={`nav-${item.title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '')}`}>
                             <Icon className="h-4 w-4" />
                             <span>{item.title}</span>
+                            {item.title === "System Dashboard" && pendingCount > 0 && (
+                              <Badge variant="destructive" className="ml-auto text-xs px-1.5 py-0" data-testid="badge-pending-rss-count">
+                                {pendingCount}
+                              </Badge>
+                            )}
                           </Link>
                         </SidebarMenuButton>
                       </SidebarMenuItem>

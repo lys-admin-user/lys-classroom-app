@@ -291,6 +291,14 @@ import {
   type FreeTrial,
   type InsertFreeTrial,
   freeTrials,
+  type RssFeed,
+  type InsertRssFeed,
+  rssFeeds,
+  type RssContentItem,
+  type InsertRssContentItem,
+  rssContentItems,
+  type RssContentStatus,
+  type RssPlacement,
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, desc, and, asc, gte, sql, or, inArray } from "drizzle-orm";
@@ -949,6 +957,22 @@ export interface IStorage {
   bindTrialToUser(trialId: string, userId: string): Promise<FreeTrial | undefined>;
   flagTrialAbuse(trialId: string): Promise<FreeTrial | undefined>;
   getActiveTrialCount(ipAddress: string, sinceDateMs: number): Promise<number>;
+
+  // RSS Feeds & Content Ingestion
+  getRssFeeds(): Promise<RssFeed[]>;
+  getRssFeed(id: string): Promise<RssFeed | undefined>;
+  createRssFeed(feed: InsertRssFeed): Promise<RssFeed>;
+  updateRssFeed(id: string, updates: Partial<RssFeed>): Promise<RssFeed | undefined>;
+  deleteRssFeed(id: string): Promise<boolean>;
+
+  getRssContentItems(filters?: { feedId?: string; status?: RssContentStatus; placement?: RssPlacement }): Promise<RssContentItem[]>;
+  getRssContentItem(id: string): Promise<RssContentItem | undefined>;
+  getRssContentItemByGuid(feedId: string, guid: string): Promise<RssContentItem | undefined>;
+  createRssContentItem(item: InsertRssContentItem): Promise<RssContentItem>;
+  updateRssContentItem(id: string, updates: Partial<RssContentItem>): Promise<RssContentItem | undefined>;
+  deleteRssContentItem(id: string): Promise<boolean>;
+  getPendingRssContentCount(): Promise<number>;
+  getApprovedRssContentByPlacement(placement: RssPlacement, filters?: { bkdPillar?: string; careerFields?: string[]; tags?: string[] }): Promise<RssContentItem[]>;
 }
 
 // Performance Analytics Types
@@ -8028,6 +8052,89 @@ export class DatabaseStorage implements IStorage {
         gte(freeTrials.createdAt, sinceDate)
       ));
     return Number(result[0]?.count || 0);
+  }
+
+  async getRssFeeds(): Promise<RssFeed[]> {
+    return db.select().from(rssFeeds).orderBy(desc(rssFeeds.createdAt));
+  }
+
+  async getRssFeed(id: string): Promise<RssFeed | undefined> {
+    const [feed] = await db.select().from(rssFeeds).where(eq(rssFeeds.id, id));
+    return feed;
+  }
+
+  async createRssFeed(feed: InsertRssFeed): Promise<RssFeed> {
+    const [created] = await db.insert(rssFeeds).values(feed).returning();
+    return created;
+  }
+
+  async updateRssFeed(id: string, updates: Partial<RssFeed>): Promise<RssFeed | undefined> {
+    const [updated] = await db.update(rssFeeds)
+      .set({ ...updates, updatedAt: new Date() })
+      .where(eq(rssFeeds.id, id))
+      .returning();
+    return updated;
+  }
+
+  async deleteRssFeed(id: string): Promise<boolean> {
+    const result = await db.delete(rssFeeds).where(eq(rssFeeds.id, id));
+    return (result.rowCount ?? 0) > 0;
+  }
+
+  async getRssContentItems(filters?: { feedId?: string; status?: RssContentStatus; placement?: RssPlacement }): Promise<RssContentItem[]> {
+    const conditions = [];
+    if (filters?.feedId) conditions.push(eq(rssContentItems.feedId, filters.feedId));
+    if (filters?.status) conditions.push(eq(rssContentItems.status, filters.status));
+    if (filters?.placement) conditions.push(sql`${rssContentItems.suggestedPlacements}::jsonb @> ${JSON.stringify([filters.placement])}::jsonb`);
+    return db.select().from(rssContentItems)
+      .where(conditions.length > 0 ? and(...conditions) : undefined)
+      .orderBy(desc(rssContentItems.createdAt));
+  }
+
+  async getRssContentItem(id: string): Promise<RssContentItem | undefined> {
+    const [item] = await db.select().from(rssContentItems).where(eq(rssContentItems.id, id));
+    return item;
+  }
+
+  async getRssContentItemByGuid(feedId: string, guid: string): Promise<RssContentItem | undefined> {
+    const [item] = await db.select().from(rssContentItems)
+      .where(and(eq(rssContentItems.feedId, feedId), eq(rssContentItems.guid, guid)));
+    return item;
+  }
+
+  async createRssContentItem(item: InsertRssContentItem): Promise<RssContentItem> {
+    const [created] = await db.insert(rssContentItems).values(item).returning();
+    return created;
+  }
+
+  async updateRssContentItem(id: string, updates: Partial<RssContentItem>): Promise<RssContentItem | undefined> {
+    const [updated] = await db.update(rssContentItems)
+      .set({ ...updates, updatedAt: new Date() })
+      .where(eq(rssContentItems.id, id))
+      .returning();
+    return updated;
+  }
+
+  async deleteRssContentItem(id: string): Promise<boolean> {
+    const result = await db.delete(rssContentItems).where(eq(rssContentItems.id, id));
+    return (result.rowCount ?? 0) > 0;
+  }
+
+  async getPendingRssContentCount(): Promise<number> {
+    const result = await db.select({ count: sql<number>`count(*)` }).from(rssContentItems)
+      .where(eq(rssContentItems.status, "pending"));
+    return Number(result[0]?.count || 0);
+  }
+
+  async getApprovedRssContentByPlacement(placement: RssPlacement, filters?: { bkdPillar?: string; careerFields?: string[]; tags?: string[] }): Promise<RssContentItem[]> {
+    const conditions = [
+      eq(rssContentItems.status, "approved"),
+      sql`${rssContentItems.approvedPlacements}::jsonb @> ${JSON.stringify([placement])}::jsonb`,
+    ];
+    if (filters?.bkdPillar) conditions.push(eq(rssContentItems.bkdPillar, filters.bkdPillar));
+    return db.select().from(rssContentItems)
+      .where(and(...conditions))
+      .orderBy(desc(rssContentItems.publishedAt));
   }
 }
 

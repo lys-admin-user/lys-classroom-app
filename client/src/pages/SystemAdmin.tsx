@@ -20,7 +20,7 @@ import {
   Eye, Edit2, Search, ChevronLeft, ChevronRight, Map, GraduationCap, DollarSign,
   Activity, Globe, FileText, Award, Zap, ExternalLink, UserCog, Library, Plus,
   Server, Database, Cpu, HardDrive, Wifi, Lock, Monitor, Code2, Layers, Check,
-  MapPin, Upload, X, Headphones, Video
+  MapPin, Upload, X, Headphones, Video, Rss, RefreshCw, Clock, CheckCircle, XCircle
 } from "lucide-react";
 import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
@@ -849,6 +849,10 @@ export default function SystemAdminPage({ params }: { params?: { tab?: string } 
           <TabsTrigger value="lesson-repository" className="gap-2" data-testid="tab-lesson-repository">
             <BookOpen className="h-4 w-4" />
             <span className="hidden sm:inline">Lesson Repository</span>
+          </TabsTrigger>
+          <TabsTrigger value="content-hub" className="gap-2" data-testid="tab-content-hub">
+            <Rss className="h-4 w-4" />
+            <span className="hidden sm:inline">Content Hub</span>
           </TabsTrigger>
           <TabsTrigger value="content-library" className="gap-2" data-testid="tab-content-library">
             <Library className="h-4 w-4" />
@@ -3143,6 +3147,10 @@ export default function SystemAdminPage({ params }: { params?: { tab?: string } 
           <DataGovernanceTab />
         </TabsContent>
 
+        <TabsContent value="content-hub" className="space-y-6">
+          <ContentHubTab />
+        </TabsContent>
+
         <TabsContent value="trials" className="space-y-6">
           <TrialMonitoringTab />
         </TabsContent>
@@ -4557,5 +4565,412 @@ function TrialMonitoringTab() {
         </CardContent>
       </Card>
     </>
+  );
+}
+
+function ContentHubTab() {
+  const { toast } = useToast();
+  const [showAddFeed, setShowAddFeed] = useState(false);
+  const [feedName, setFeedName] = useState("");
+  const [feedUrl, setFeedUrl] = useState("");
+  const [feedType, setFeedType] = useState<"podcast" | "blog">("podcast");
+  const [feedDescription, setFeedDescription] = useState("");
+  const [contentFilter, setContentFilter] = useState<"all" | "pending" | "approved" | "rejected">("pending");
+  const [selectedFeedFilter, setSelectedFeedFilter] = useState<string>("all");
+
+  const { data: feeds = [], isLoading: feedsLoading } = useQuery<any[]>({
+    queryKey: ["/api/admin/rss-feeds"],
+  });
+
+  const { data: contentItems = [], isLoading: contentLoading } = useQuery<any[]>({
+    queryKey: ["/api/admin/rss-content", contentFilter, selectedFeedFilter],
+    queryFn: async () => {
+      const params = new URLSearchParams();
+      if (contentFilter !== "all") params.set("status", contentFilter);
+      if (selectedFeedFilter !== "all") params.set("feedId", selectedFeedFilter);
+      const res = await fetch(`/api/admin/rss-content?${params.toString()}`, { credentials: "include" });
+      if (!res.ok) throw new Error("Failed to fetch");
+      return res.json();
+    },
+  });
+
+  const { data: pendingCount } = useQuery<{ count: number }>({
+    queryKey: ["/api/admin/rss-content/pending-count"],
+  });
+
+  const addFeedMutation = useMutation({
+    mutationFn: async () => {
+      return apiRequest("/api/admin/rss-feeds", {
+        method: "POST",
+        body: JSON.stringify({ name: feedName, url: feedUrl, feedType, description: feedDescription, isActive: true, fetchIntervalMinutes: 60 }),
+        headers: { "Content-Type": "application/json" },
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/rss-feeds"] });
+      setShowAddFeed(false);
+      setFeedName("");
+      setFeedUrl("");
+      setFeedDescription("");
+      toast({ title: "RSS feed added" });
+    },
+    onError: () => toast({ title: "Failed to add feed", variant: "destructive" }),
+  });
+
+  const fetchFeedMutation = useMutation({
+    mutationFn: async (feedId: string) => {
+      return apiRequest(`/api/admin/rss-feeds/${feedId}/fetch`, { method: "POST" });
+    },
+    onSuccess: (data: any) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/rss-content"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/rss-feeds"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/rss-content/pending-count"] });
+      toast({ title: `Fetched ${data?.newItems || 0} new items` });
+    },
+    onError: () => toast({ title: "Failed to fetch feed", variant: "destructive" }),
+  });
+
+  const deleteFeedMutation = useMutation({
+    mutationFn: async (feedId: string) => {
+      return apiRequest(`/api/admin/rss-feeds/${feedId}`, { method: "DELETE" });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/rss-feeds"] });
+      toast({ title: "Feed removed" });
+    },
+    onError: () => toast({ title: "Failed to remove feed", variant: "destructive" }),
+  });
+
+  const approveContentMutation = useMutation({
+    mutationFn: async ({ id, status, approvedPlacements, bkdPillar }: { id: string; status: string; approvedPlacements?: string[]; bkdPillar?: string }) => {
+      return apiRequest(`/api/admin/rss-content/${id}`, {
+        method: "PATCH",
+        body: JSON.stringify({ status, approvedPlacements, bkdPillar }),
+        headers: { "Content-Type": "application/json" },
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/rss-content"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/rss-content/pending-count"] });
+      toast({ title: "Content updated" });
+    },
+    onError: () => toast({ title: "Failed to update content", variant: "destructive" }),
+  });
+
+  const placementLabels: Record<string, { label: string; color: string }> = {
+    know_resource: { label: "KNOW Resources", color: "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200" },
+    ai_lesson: { label: "AI Lesson", color: "bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200" },
+    featured: { label: "My Journey", color: "bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-200" },
+    mentor_connect: { label: "Mentor Connect", color: "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200" },
+  };
+
+  const pillarLabels: Record<string, { label: string; color: string }> = {
+    be: { label: "BE", color: "bg-rose-100 text-rose-800 dark:bg-rose-900 dark:text-rose-200" },
+    know: { label: "KNOW", color: "bg-sky-100 text-sky-800 dark:bg-sky-900 dark:text-sky-200" },
+    do: { label: "DO", color: "bg-emerald-100 text-emerald-800 dark:bg-emerald-900 dark:text-emerald-200" },
+  };
+
+  return (
+    <>
+      <div className="flex items-center justify-between">
+        <div>
+          <h2 className="text-2xl font-bold" data-testid="text-content-hub-title">Content Hub</h2>
+          <p className="text-muted-foreground">Manage RSS feeds, review ingested content, and route to platform features</p>
+        </div>
+        {(pendingCount?.count || 0) > 0 && (
+          <Badge variant="destructive" className="text-sm px-3 py-1" data-testid="badge-pending-count">
+            {pendingCount?.count} pending
+          </Badge>
+        )}
+      </div>
+
+      <div className="grid gap-4 md:grid-cols-4">
+        <Card>
+          <CardHeader className="pb-2">
+            <CardDescription>Total Feeds</CardDescription>
+            <CardTitle className="text-2xl" data-testid="text-total-feeds">{feeds.length}</CardTitle>
+          </CardHeader>
+        </Card>
+        <Card>
+          <CardHeader className="pb-2">
+            <CardDescription>Active Feeds</CardDescription>
+            <CardTitle className="text-2xl" data-testid="text-active-feeds">{feeds.filter((f: any) => f.isActive).length}</CardTitle>
+          </CardHeader>
+        </Card>
+        <Card>
+          <CardHeader className="pb-2">
+            <CardDescription>Pending Review</CardDescription>
+            <CardTitle className="text-2xl text-amber-600" data-testid="text-pending-review">{pendingCount?.count || 0}</CardTitle>
+          </CardHeader>
+        </Card>
+        <Card>
+          <CardHeader className="pb-2">
+            <CardDescription>Total Content</CardDescription>
+            <CardTitle className="text-2xl" data-testid="text-total-content">{feeds.reduce((sum: number, f: any) => sum + (f.itemCount || 0), 0)}</CardTitle>
+          </CardHeader>
+        </Card>
+      </div>
+
+      <Card>
+        <CardHeader>
+          <div className="flex items-center justify-between">
+            <div>
+              <CardTitle className="flex items-center gap-2"><Rss className="h-5 w-5" /> RSS Feeds</CardTitle>
+              <CardDescription>Connected podcast and blog feeds</CardDescription>
+            </div>
+            <Button onClick={() => setShowAddFeed(true)} data-testid="button-add-feed">
+              <Plus className="h-4 w-4 mr-2" /> Add Feed
+            </Button>
+          </div>
+        </CardHeader>
+        <CardContent>
+          {showAddFeed && (
+            <div className="border rounded-lg p-4 mb-4 space-y-3 bg-muted/30">
+              <div className="grid gap-3 md:grid-cols-2">
+                <div>
+                  <Label>Feed Name</Label>
+                  <Input value={feedName} onChange={(e) => setFeedName(e.target.value)} placeholder="e.g., LYS Podcast" data-testid="input-feed-name" />
+                </div>
+                <div>
+                  <Label>Feed URL</Label>
+                  <Input value={feedUrl} onChange={(e) => setFeedUrl(e.target.value)} placeholder="https://feeds.example.com/rss" data-testid="input-feed-url" />
+                </div>
+              </div>
+              <div className="grid gap-3 md:grid-cols-2">
+                <div>
+                  <Label>Type</Label>
+                  <Select value={feedType} onValueChange={(v: any) => setFeedType(v)}>
+                    <SelectTrigger data-testid="select-feed-type"><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="podcast">Podcast</SelectItem>
+                      <SelectItem value="blog">Blog</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div>
+                  <Label>Description (optional)</Label>
+                  <Input value={feedDescription} onChange={(e) => setFeedDescription(e.target.value)} placeholder="Brief description" data-testid="input-feed-desc" />
+                </div>
+              </div>
+              <div className="flex gap-2">
+                <Button onClick={() => addFeedMutation.mutate()} disabled={!feedName || !feedUrl || addFeedMutation.isPending} data-testid="button-save-feed">
+                  {addFeedMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
+                  Save Feed
+                </Button>
+                <Button variant="outline" onClick={() => setShowAddFeed(false)} data-testid="button-cancel-feed">Cancel</Button>
+              </div>
+            </div>
+          )}
+
+          {feedsLoading ? (
+            <div className="flex justify-center py-8"><Loader2 className="h-6 w-6 animate-spin" /></div>
+          ) : feeds.length === 0 ? (
+            <p className="text-center text-muted-foreground py-8">No RSS feeds configured. Add your first feed to start ingesting content.</p>
+          ) : (
+            <div className="space-y-3">
+              {feeds.map((feed: any) => (
+                <div key={feed.id} className="flex items-center justify-between border rounded-lg p-3" data-testid={`card-feed-${feed.id}`}>
+                  <div className="flex items-center gap-3">
+                    {feed.feedType === "podcast" ? <Headphones className="h-5 w-5 text-purple-500" /> : <FileText className="h-5 w-5 text-blue-500" />}
+                    <div>
+                      <div className="font-medium">{feed.name}</div>
+                      <div className="text-sm text-muted-foreground">{feed.url}</div>
+                      <div className="flex items-center gap-3 text-xs text-muted-foreground mt-1">
+                        <span className="flex items-center gap-1"><Clock className="h-3 w-3" /> {feed.lastFetchedAt ? new Date(feed.lastFetchedAt).toLocaleDateString() : "Never fetched"}</span>
+                        <span>{feed.itemCount || 0} items</span>
+                        <Badge variant={feed.isActive ? "default" : "secondary"} className="text-xs">{feed.isActive ? "Active" : "Paused"}</Badge>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Button size="sm" variant="outline" onClick={() => fetchFeedMutation.mutate(feed.id)} disabled={fetchFeedMutation.isPending} data-testid={`button-fetch-${feed.id}`}>
+                      <RefreshCw className={`h-4 w-4 ${fetchFeedMutation.isPending ? "animate-spin" : ""}`} />
+                    </Button>
+                    <Button size="sm" variant="ghost" className="text-destructive" onClick={() => deleteFeedMutation.mutate(feed.id)} data-testid={`button-delete-feed-${feed.id}`}>
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <div className="flex items-center justify-between">
+            <div>
+              <CardTitle>Content Queue</CardTitle>
+              <CardDescription>Review and approve ingested content for platform placement</CardDescription>
+            </div>
+            <div className="flex items-center gap-2">
+              <Select value={selectedFeedFilter} onValueChange={setSelectedFeedFilter}>
+                <SelectTrigger className="w-[180px]" data-testid="select-feed-filter"><SelectValue placeholder="All Feeds" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Feeds</SelectItem>
+                  {feeds.map((f: any) => (
+                    <SelectItem key={f.id} value={f.id}>{f.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <Select value={contentFilter} onValueChange={(v: any) => setContentFilter(v)}>
+                <SelectTrigger className="w-[140px]" data-testid="select-status-filter"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Status</SelectItem>
+                  <SelectItem value="pending">Pending</SelectItem>
+                  <SelectItem value="approved">Approved</SelectItem>
+                  <SelectItem value="rejected">Rejected</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+        </CardHeader>
+        <CardContent>
+          {contentLoading ? (
+            <div className="flex justify-center py-8"><Loader2 className="h-6 w-6 animate-spin" /></div>
+          ) : contentItems.length === 0 ? (
+            <p className="text-center text-muted-foreground py-8">
+              {contentFilter === "pending" ? "No pending content to review. Fetch your RSS feeds to bring in new content." : "No content items found with the selected filters."}
+            </p>
+          ) : (
+            <div className="space-y-4">
+              {contentItems.map((item: any) => (
+                <ContentItemCard
+                  key={item.id}
+                  item={item}
+                  feeds={feeds}
+                  placementLabels={placementLabels}
+                  pillarLabels={pillarLabels}
+                  onApprove={(placements, pillar) => approveContentMutation.mutate({ id: item.id, status: "approved", approvedPlacements: placements, bkdPillar: pillar })}
+                  onReject={() => approveContentMutation.mutate({ id: item.id, status: "rejected" })}
+                  isPending={approveContentMutation.isPending}
+                />
+              ))}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+    </>
+  );
+}
+
+function ContentItemCard({ item, feeds, placementLabels, pillarLabels, onApprove, onReject, isPending }: {
+  item: any;
+  feeds: any[];
+  placementLabels: Record<string, { label: string; color: string }>;
+  pillarLabels: Record<string, { label: string; color: string }>;
+  onApprove: (placements: string[], pillar: string) => void;
+  onReject: () => void;
+  isPending: boolean;
+}) {
+  const [selectedPlacements, setSelectedPlacements] = useState<string[]>(item.suggestedPlacements || []);
+  const [selectedPillar, setSelectedPillar] = useState(item.bkdPillar || "know");
+  const feed = feeds.find((f: any) => f.id === item.feedId);
+
+  const togglePlacement = (p: string) => {
+    setSelectedPlacements(prev => prev.includes(p) ? prev.filter(x => x !== p) : [...prev, p]);
+  };
+
+  return (
+    <div className="border rounded-lg p-4 space-y-3" data-testid={`card-content-${item.id}`}>
+      <div className="flex items-start justify-between gap-4">
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2 mb-1">
+            {item.audioUrl ? <Headphones className="h-4 w-4 text-purple-500 shrink-0" /> : <FileText className="h-4 w-4 text-blue-500 shrink-0" />}
+            <h4 className="font-semibold truncate" data-testid={`text-title-${item.id}`}>{item.title}</h4>
+          </div>
+          <p className="text-sm text-muted-foreground line-clamp-2">{item.description}</p>
+          <div className="flex items-center gap-3 mt-2 text-xs text-muted-foreground">
+            {feed && <span className="flex items-center gap-1"><Rss className="h-3 w-3" /> {feed.name}</span>}
+            {item.author && <span>by {item.author}</span>}
+            {item.publishedAt && <span>{new Date(item.publishedAt).toLocaleDateString()}</span>}
+            {item.contentUrl && (
+              <a href={item.contentUrl} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1 text-primary hover:underline">
+                <ExternalLink className="h-3 w-3" /> View
+              </a>
+            )}
+          </div>
+        </div>
+        <div>
+          {item.status === "pending" && <Badge variant="outline" className="text-amber-600 border-amber-300">Pending</Badge>}
+          {item.status === "approved" && <Badge variant="default" className="bg-green-600">Approved</Badge>}
+          {item.status === "rejected" && <Badge variant="destructive">Rejected</Badge>}
+        </div>
+      </div>
+
+      <div className="flex items-center gap-2 flex-wrap">
+        <span className="text-xs font-medium text-muted-foreground mr-1">Placements:</span>
+        {Object.entries(placementLabels).map(([key, { label, color }]) => (
+          <button
+            key={key}
+            onClick={() => item.status === "pending" && togglePlacement(key)}
+            className={`text-xs px-2 py-0.5 rounded-full border transition-colors ${
+              selectedPlacements.includes(key) ? color + " border-transparent" : "bg-muted/50 text-muted-foreground border-border"
+            } ${item.status === "pending" ? "cursor-pointer hover:opacity-80" : "cursor-default"}`}
+            data-testid={`toggle-placement-${key}-${item.id}`}
+          >
+            {label}
+          </button>
+        ))}
+        <Separator orientation="vertical" className="h-4 mx-1" />
+        <span className="text-xs font-medium text-muted-foreground mr-1">Pillar:</span>
+        {Object.entries(pillarLabels).map(([key, { label, color }]) => (
+          <button
+            key={key}
+            onClick={() => item.status === "pending" && setSelectedPillar(key)}
+            className={`text-xs px-2 py-0.5 rounded-full border transition-colors ${
+              selectedPillar === key ? color + " border-transparent" : "bg-muted/50 text-muted-foreground border-border"
+            } ${item.status === "pending" ? "cursor-pointer hover:opacity-80" : "cursor-default"}`}
+            data-testid={`toggle-pillar-${key}-${item.id}`}
+          >
+            {label}
+          </button>
+        ))}
+      </div>
+
+      {item.careerFields && item.careerFields.length > 0 && (
+        <div className="flex items-center gap-1 flex-wrap">
+          <span className="text-xs text-muted-foreground">Career fields:</span>
+          {item.careerFields.map((cf: string) => (
+            <Badge key={cf} variant="outline" className="text-xs">{cf}</Badge>
+          ))}
+        </div>
+      )}
+
+      {item.status === "pending" && (
+        <div className="flex items-center gap-2 pt-1">
+          <Button
+            size="sm"
+            onClick={() => onApprove(selectedPlacements, selectedPillar)}
+            disabled={isPending || selectedPlacements.length === 0}
+            data-testid={`button-approve-${item.id}`}
+          >
+            <CheckCircle className="h-4 w-4 mr-1" /> Approve
+          </Button>
+          <Button
+            size="sm"
+            variant="outline"
+            className="text-destructive"
+            onClick={onReject}
+            disabled={isPending}
+            data-testid={`button-reject-${item.id}`}
+          >
+            <XCircle className="h-4 w-4 mr-1" /> Reject
+          </Button>
+        </div>
+      )}
+
+      {item.status === "approved" && item.approvedPlacements && (
+        <div className="flex items-center gap-1 flex-wrap">
+          <span className="text-xs font-medium text-green-700 dark:text-green-400">Approved for:</span>
+          {(item.approvedPlacements as string[]).map((p: string) => (
+            <span key={p} className={`text-xs px-2 py-0.5 rounded-full ${placementLabels[p]?.color || "bg-muted"}`}>
+              {placementLabels[p]?.label || p}
+            </span>
+          ))}
+        </div>
+      )}
+    </div>
   );
 }

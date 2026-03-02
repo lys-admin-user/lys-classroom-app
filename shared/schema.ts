@@ -3164,6 +3164,63 @@ export const insertFreeTrialSchema = createInsertSchema(freeTrials).omit({ id: t
 export type InsertFreeTrial = z.infer<typeof insertFreeTrialSchema>;
 export type FreeTrial = typeof freeTrials.$inferSelect;
 
+// RSS Feeds (System-level content ingestion)
+export type RssFeedType = "podcast" | "blog";
+export type RssContentStatus = "pending" | "approved" | "rejected" | "archived";
+export type RssPlacement = "know_resource" | "ai_lesson" | "featured" | "mentor_connect";
+export type RssAiUsageType = "supplemental" | "primary";
+export type RssBkdPillar = "be" | "know" | "do";
+
+export const rssFeeds = pgTable("rss_feeds", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  name: text("name").notNull(),
+  url: text("url").notNull(),
+  feedType: text("feed_type").notNull().$type<RssFeedType>(),
+  description: text("description"),
+  imageUrl: text("image_url"),
+  isActive: boolean("is_active").default(true),
+  fetchIntervalMinutes: integer("fetch_interval_minutes").default(60),
+  lastFetchedAt: timestamp("last_fetched_at"),
+  itemCount: integer("item_count").default(0),
+  createdBy: varchar("created_by").notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertRssFeedSchema = createInsertSchema(rssFeeds).omit({ id: true, createdAt: true, updatedAt: true, lastFetchedAt: true, itemCount: true });
+export type InsertRssFeed = z.infer<typeof insertRssFeedSchema>;
+export type RssFeed = typeof rssFeeds.$inferSelect;
+
+export const rssContentItems = pgTable("rss_content_items", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  feedId: varchar("feed_id").notNull(),
+  guid: text("guid").notNull(),
+  title: text("title").notNull(),
+  description: text("description"),
+  contentUrl: text("content_url"),
+  imageUrl: text("image_url"),
+  audioUrl: text("audio_url"),
+  author: text("author"),
+  publishedAt: timestamp("published_at"),
+  rawMetadata: jsonb("raw_metadata").$type<Record<string, any>>(),
+  suggestedPlacements: jsonb("suggested_placements").$type<RssPlacement[]>().default([]),
+  approvedPlacements: jsonb("approved_placements").$type<RssPlacement[]>().default([]),
+  status: text("status").notNull().$type<RssContentStatus>().default("pending"),
+  aiUsageType: text("ai_usage_type").$type<RssAiUsageType>().default("supplemental"),
+  bkdPillar: text("bkd_pillar").$type<RssBkdPillar>(),
+  careerFields: jsonb("career_fields").$type<string[]>().default([]),
+  tags: jsonb("tags").$type<string[]>().default([]),
+  reviewedBy: varchar("reviewed_by"),
+  reviewedAt: timestamp("reviewed_at"),
+  reviewNotes: text("review_notes"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertRssContentItemSchema = createInsertSchema(rssContentItems).omit({ id: true, createdAt: true, updatedAt: true, reviewedAt: true });
+export type InsertRssContentItem = z.infer<typeof insertRssContentItemSchema>;
+export type RssContentItem = typeof rssContentItems.$inferSelect;
+
 // User data region tracking (Rule 4: Data Residency)
 export const userDataRegions = pgTable("user_data_regions", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
