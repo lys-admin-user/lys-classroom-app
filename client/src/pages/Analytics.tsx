@@ -282,7 +282,7 @@ export default function Analytics() {
       <div className="min-h-screen bg-background p-6">
         <div className="max-w-7xl mx-auto space-y-6">
           <Skeleton className="h-12 w-64" />
-          <div className="grid md:grid-cols-4 gap-4">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
             {[1, 2, 3, 4].map((i) => (
               <Skeleton key={i} className="h-32" />
             ))}
@@ -336,10 +336,10 @@ export default function Analytics() {
   const isDistrictAdmin = districtData?.isDistrictAdmin ?? false;
 
   return (
-    <div className="min-h-screen bg-background p-6">
+    <div className="min-h-screen bg-background p-4 sm:p-6">
       <div className="max-w-7xl mx-auto space-y-6">
         <div>
-          <h1 className="font-permanent-marker text-3xl text-lys-red mb-2" data-testid="text-analytics-title">
+          <h1 className="font-permanent-marker text-2xl sm:text-3xl text-lys-red mb-2" data-testid="text-analytics-title">
             {isCampusAdmin ? (isDistrictAdmin ? "District Analytics" : "Campus Analytics") : "Your Analytics"}
           </h1>
           <p className="font-roboto text-muted-foreground">
@@ -552,16 +552,16 @@ function DistrictOverview({ data, onSchoolClick }: DistrictOverviewProps) {
               {data.schools.map((school) => (
                 <div 
                   key={school.id} 
-                  className="flex items-center justify-between p-4 rounded-md border bg-muted/20 hover-elevate cursor-pointer"
+                  className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-4 rounded-md border bg-muted/20 hover-elevate cursor-pointer"
                   onClick={() => onSchoolClick(school.id)}
                   data-testid={`school-card-${school.id}`}
                 >
                   <div className="flex items-center gap-4">
-                    <div className="w-10 h-10 rounded-md bg-lys-teal/10 flex items-center justify-center">
+                    <div className="w-10 h-10 rounded-md bg-lys-teal/10 flex items-center justify-center shrink-0">
                       <School className="h-5 w-5 text-lys-teal" />
                     </div>
-                    <div>
-                      <p className="font-oswald font-semibold">{school.name}</p>
+                    <div className="min-w-0">
+                      <p className="font-oswald font-semibold truncate">{school.name}</p>
                       <p className="text-sm text-muted-foreground font-roboto">
                         {school.educatorCount} educator{school.educatorCount !== 1 ? 's' : ''} | {school.studentCount} student{school.studentCount !== 1 ? 's' : ''}
                       </p>
@@ -605,10 +605,10 @@ interface SchoolDrillDownViewProps {
 function SchoolDrillDownView({ data, isLoading, onBack, onTeacherClick }: SchoolDrillDownViewProps) {
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-background p-6">
+      <div className="min-h-screen bg-background p-4 sm:p-6">
         <div className="max-w-7xl mx-auto space-y-6">
           <Skeleton className="h-12 w-64" />
-          <div className="grid md:grid-cols-4 gap-4">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
             {[1, 2, 3, 4].map((i) => (
               <Skeleton key={i} className="h-32" />
             ))}
@@ -630,7 +630,7 @@ function SchoolDrillDownView({ data, isLoading, onBack, onTeacherClick }: School
     .slice(0, 8);
 
   return (
-    <div className="min-h-screen bg-background p-6">
+    <div className="min-h-screen bg-background p-4 sm:p-6">
       <div className="max-w-7xl mx-auto space-y-6">
         {/* Header with Back Button */}
         <div className="flex items-center gap-4">
@@ -638,7 +638,7 @@ function SchoolDrillDownView({ data, isLoading, onBack, onTeacherClick }: School
             <ChevronLeft className="h-5 w-5" />
           </Button>
           <div>
-            <h1 className="font-permanent-marker text-3xl text-lys-red" data-testid="text-school-name">
+            <h1 className="font-permanent-marker text-2xl sm:text-3xl text-lys-red" data-testid="text-school-name">
               {data.school.name}
             </h1>
             <p className="font-roboto text-muted-foreground">
@@ -723,7 +723,7 @@ function SchoolDrillDownView({ data, isLoading, onBack, onTeacherClick }: School
                 {data.teachers.map((teacher, index) => (
                   <div 
                     key={teacher.id} 
-                    className="flex items-center justify-between p-4 rounded-md border bg-muted/20 hover-elevate cursor-pointer"
+                    className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-4 rounded-md border bg-muted/20 hover-elevate cursor-pointer"
                     onClick={() => onTeacherClick(teacher.id, data.school.name)}
                     data-testid={`teacher-card-${teacher.id}`}
                   >
@@ -741,7 +741,7 @@ function SchoolDrillDownView({ data, isLoading, onBack, onTeacherClick }: School
                         <p className="text-sm text-muted-foreground font-roboto">{teacher.email || "No email"}</p>
                       </div>
                     </div>
-                    <div className="flex items-center gap-4">
+                    <div className="flex items-center gap-2 sm:gap-4 flex-wrap">
                       <div className="text-right">
                         <p className="font-oswald font-bold text-lys-red">{teacher.lessonCount}</p>
                         <p className="text-xs text-muted-foreground font-roboto">Lessons</p>
@@ -862,10 +862,10 @@ interface TeacherDrillDownViewProps {
 function TeacherDrillDownView({ data, isLoading, onBack }: TeacherDrillDownViewProps) {
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-background p-6">
+      <div className="min-h-screen bg-background p-4 sm:p-6">
         <div className="max-w-7xl mx-auto space-y-6">
           <Skeleton className="h-12 w-64" />
-          <div className="grid md:grid-cols-4 gap-4">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
             {[1, 2, 3, 4].map((i) => (
               <Skeleton key={i} className="h-32" />
             ))}
@@ -887,7 +887,7 @@ function TeacherDrillDownView({ data, isLoading, onBack }: TeacherDrillDownViewP
     .slice(0, 8);
 
   return (
-    <div className="min-h-screen bg-background p-6">
+    <div className="min-h-screen bg-background p-4 sm:p-6">
       <div className="max-w-7xl mx-auto space-y-6">
         {/* Header with Back Button */}
         <div className="flex items-center gap-4">
@@ -895,7 +895,7 @@ function TeacherDrillDownView({ data, isLoading, onBack }: TeacherDrillDownViewP
             <ChevronLeft className="h-5 w-5" />
           </Button>
           <div>
-            <h1 className="font-permanent-marker text-3xl text-lys-red" data-testid="text-teacher-name">
+            <h1 className="font-permanent-marker text-2xl sm:text-3xl text-lys-red" data-testid="text-teacher-name">
               {data.teacher.name}
             </h1>
             <p className="font-roboto text-muted-foreground">
@@ -981,15 +981,15 @@ function TeacherDrillDownView({ data, isLoading, onBack }: TeacherDrillDownViewP
                 {data.recentLessons.map((lesson) => (
                   <div 
                     key={lesson.id} 
-                    className="flex items-center justify-between p-4 rounded-md border bg-muted/20"
+                    className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-4 rounded-md border bg-muted/20"
                   >
-                    <div>
-                      <p className="font-oswald font-semibold">{lesson.title}</p>
+                    <div className="min-w-0">
+                      <p className="font-oswald font-semibold truncate">{lesson.title}</p>
                       <p className="text-sm text-muted-foreground font-roboto">
                         {lesson.topic} | Grade {lesson.gradeLevel}
                       </p>
                     </div>
-                    <div className="flex items-center gap-3">
+                    <div className="flex items-center gap-3 shrink-0">
                       <Badge 
                         className={`font-roboto ${
                           lesson.bkdFocus === "be" ? "bg-lys-yellow/20 text-lys-yellow" :
@@ -1522,7 +1522,7 @@ function PersonalAnalytics({
         </Card>
       </div>
 
-      <div className="grid lg:grid-cols-3 gap-4">
+      <div className="grid gap-4 lg:grid-cols-3">
         <Card className="lg:col-span-2">
           <CardHeader>
             <CardTitle className="font-oswald flex items-center gap-2">

@@ -283,7 +283,7 @@ export default function Gradebook() {
 
         <div className="flex items-center gap-2">
           <Select value={selectedClassId} onValueChange={setSelectedClassId}>
-            <SelectTrigger className="w-[200px]" data-testid="select-class">
+            <SelectTrigger className="w-full sm:w-[200px]" data-testid="select-class">
               <SelectValue placeholder="Select a class" />
             </SelectTrigger>
             <SelectContent>
@@ -309,7 +309,7 @@ export default function Gradebook() {
         </Card>
       ) : (
         <>
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
             <Card>
               <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0 pb-2">
                 <CardTitle className="text-sm font-medium">Total Students</CardTitle>
@@ -360,7 +360,7 @@ export default function Gradebook() {
                   Add Grade
                 </Button>
               </DialogTrigger>
-              <DialogContent>
+              <DialogContent className="w-full max-w-lg">
                 <DialogHeader>
                   <DialogTitle>Add New Grade</DialogTitle>
                   <DialogDescription>Enter the grade details for a student</DialogDescription>
@@ -620,6 +620,7 @@ export default function Gradebook() {
                       No grades recorded yet. Click "Add Grade" to get started.
                     </div>
                   ) : (
+                    <div className="overflow-x-auto">
                     <Table>
                       <TableHeader>
                         <TableRow>
@@ -715,6 +716,7 @@ export default function Gradebook() {
                         ))}
                       </TableBody>
                     </Table>
+                    </div>
                   )}
                 </CardContent>
               </Card>
@@ -738,6 +740,7 @@ export default function Gradebook() {
                       No students enrolled in this class yet.
                     </div>
                   ) : (
+                    <div className="overflow-x-auto">
                     <Table>
                       <TableHeader>
                         <TableRow>
@@ -779,6 +782,7 @@ export default function Gradebook() {
                         })}
                       </TableBody>
                     </Table>
+                    </div>
                   )}
                 </CardContent>
               </Card>
@@ -830,6 +834,7 @@ export default function Gradebook() {
                           Based on grade performance in career-aligned skills
                         </p>
                       </div>
+                      <div className="overflow-x-auto">
                       <Table>
                         <TableHeader>
                           <TableRow>
@@ -890,6 +895,7 @@ export default function Gradebook() {
                           })}
                         </TableBody>
                       </Table>
+                      </div>
                       <p className="text-xs text-muted-foreground mt-2">
                         Students can explore careers aligned with this class in the Career Explorer to see how their grades connect to future opportunities.
                       </p>

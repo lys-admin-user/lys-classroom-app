@@ -270,9 +270,9 @@ export default function PortfolioBuilder() {
   // If no portfolio exists, show creation form
   if (!portfolio) {
     return (
-      <div className="max-w-2xl mx-auto p-6 space-y-6">
+      <div className="max-w-2xl mx-auto p-4 sm:p-6 space-y-6 overflow-hidden">
         <div className="text-center space-y-2">
-          <h1 className="text-3xl font-permanent-marker text-lys-red">Create Your Portfolio</h1>
+          <h1 className="text-2xl sm:text-3xl font-permanent-marker text-lys-red">Create Your Portfolio</h1>
           <p className="text-muted-foreground">
             Showcase your achievements to colleges, employers, and scholarship committees
           </p>
@@ -346,10 +346,10 @@ export default function PortfolioBuilder() {
     : null;
 
   return (
-    <div className="p-6 space-y-6">
+    <div className="p-4 sm:p-6 space-y-6 overflow-hidden">
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-permanent-marker text-lys-red">Portfolio Builder</h1>
+          <h1 className="text-xl sm:text-2xl font-permanent-marker text-lys-red">Portfolio Builder</h1>
           <p className="text-muted-foreground">
             Build and share your professional portfolio
           </p>
@@ -357,12 +357,12 @@ export default function PortfolioBuilder() {
         <div className="flex flex-wrap gap-2">
           {shareableUrl && (
             <>
-              <Button variant="outline" onClick={handleCopyLink} data-testid="button-copy-portfolio-link">
+              <Button variant="outline" className="w-full sm:w-auto" onClick={handleCopyLink} data-testid="button-copy-portfolio-link">
                 {copiedLink ? <Check className="w-4 h-4 mr-2" /> : <Copy className="w-4 h-4 mr-2" />}
                 {copiedLink ? "Copied!" : "Copy Link"}
               </Button>
               <Link href={`/p/${portfolio.shareableSlug}`}>
-                <Button variant="outline" data-testid="button-preview-portfolio">
+                <Button variant="outline" className="w-full sm:w-auto" data-testid="button-preview-portfolio">
                   <Eye className="w-4 h-4 mr-2" />
                   Preview
                 </Button>
@@ -510,6 +510,7 @@ export default function PortfolioBuilder() {
               <Separator />
 
               <Button
+                className="w-full sm:w-auto"
                 onClick={() => updatePortfolioMutation.mutate()}
                 disabled={updatePortfolioMutation.isPending}
                 data-testid="button-save-portfolio"
@@ -526,7 +527,7 @@ export default function PortfolioBuilder() {
         </TabsContent>
 
         <TabsContent value="items" className="space-y-4">
-          <div className="flex items-center justify-between">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
             <h3 className="text-lg font-oswald">Portfolio Items</h3>
             <Dialog open={addItemOpen} onOpenChange={setAddItemOpen}>
               <DialogTrigger asChild>
@@ -851,6 +852,7 @@ export default function PortfolioBuilder() {
               )}
 
               <Button
+                className="w-full sm:w-auto"
                 onClick={() => updatePortfolioMutation.mutate()}
                 disabled={updatePortfolioMutation.isPending}
                 data-testid="button-save-share-settings"
@@ -875,11 +877,11 @@ export default function PortfolioBuilder() {
             <CardContent>
               <div className="grid grid-cols-2 gap-4 text-center">
                 <div>
-                  <p className="text-3xl font-bold text-lys-teal">{portfolio.viewCount || 0}</p>
+                  <p className="text-2xl sm:text-3xl font-bold text-lys-teal">{portfolio.viewCount || 0}</p>
                   <p className="text-sm text-muted-foreground">Total Views</p>
                 </div>
                 <div>
-                  <p className="text-3xl font-bold text-lys-yellow">{items.length}</p>
+                  <p className="text-2xl sm:text-3xl font-bold text-lys-yellow">{items.length}</p>
                   <p className="text-sm text-muted-foreground">Portfolio Items</p>
                 </div>
               </div>

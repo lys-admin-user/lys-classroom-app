@@ -1106,7 +1106,7 @@ export default function HelpDesk() {
     const SeverityIcon = config.icon;
 
     return (
-      <div className="min-h-screen p-6 max-w-4xl mx-auto">
+      <div className="min-h-screen p-4 md:p-6 max-w-4xl mx-auto">
         <Button
           variant="ghost"
           className="mb-4"
@@ -1125,7 +1125,7 @@ export default function HelpDesk() {
                 selectedArticle.severity === "warning" ? "text-amber-600" : "text-blue-600"
               }`} />
               <div className="flex-1">
-                <CardTitle className="font-oswald text-2xl" data-testid="text-article-title">{selectedArticle.title}</CardTitle>
+                <CardTitle className="font-oswald text-xl md:text-2xl" data-testid="text-article-title">{selectedArticle.title}</CardTitle>
                 <div className="flex gap-2 mt-2">
                   <Badge className={config.color}>{config.label}</Badge>
                   <Badge variant="outline">{categories.find(c => c.id === selectedArticle.category)?.label}</Badge>
@@ -1170,10 +1170,10 @@ export default function HelpDesk() {
   }
 
   return (
-    <div className="min-h-screen p-6 max-w-6xl mx-auto space-y-6">
+    <div className="min-h-screen p-4 md:p-6 max-w-6xl mx-auto space-y-6">
       <div className="text-center space-y-2">
-        <h1 className="font-marker text-4xl text-lys-red" data-testid="text-help-title">Help Desk</h1>
-        <p className="text-muted-foreground font-roboto text-lg max-w-2xl mx-auto">
+        <h1 className="font-marker text-2xl md:text-4xl text-lys-red" data-testid="text-help-title">Help Desk</h1>
+        <p className="text-muted-foreground font-roboto text-base md:text-lg max-w-2xl mx-auto">
           Find answers to common questions and troubleshoot issues quickly
         </p>
       </div>
@@ -1211,7 +1211,7 @@ export default function HelpDesk() {
         </div>
       )}
 
-      <div className="flex flex-wrap gap-2 justify-center">
+      <div className="flex flex-wrap gap-2 justify-center overflow-x-auto">
         {categories.map(cat => {
           const Icon = cat.icon;
           return (

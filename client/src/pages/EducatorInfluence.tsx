@@ -226,7 +226,7 @@ export default function EducatorInfluence() {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 py-8">
         <div className="animate-pulse space-y-4">
           <div className="h-8 w-64 bg-muted rounded" />
-          <div className="grid md:grid-cols-4 gap-4">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
             {[1, 2, 3, 4].map((i) => <div key={i} className="h-32 bg-muted rounded-lg" />)}
           </div>
         </div>
@@ -353,7 +353,7 @@ export default function EducatorInfluence() {
           </Card>
 
           <Tabs defaultValue="overview" className="space-y-6">
-            <TabsList className="grid w-full grid-cols-4">
+            <TabsList className="grid w-full grid-cols-2 md:grid-cols-4">
               <TabsTrigger value="overview" className="font-oswald" data-testid="tab-overview">
                 <TrendingUp className="w-4 h-4 mr-2 hidden sm:inline" /> Overview
               </TabsTrigger>
@@ -515,7 +515,7 @@ export default function EducatorInfluence() {
             </TabsContent>
 
             <TabsContent value="wallet">
-              <div className="grid md:grid-cols-3 gap-4 mb-6">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
                 <Card className="border-2 border-lys-yellow/30">
                   <CardContent className="pt-6 text-center">
                     <div className="w-14 h-14 rounded-full bg-lys-yellow/20 flex items-center justify-center mx-auto mb-3">
@@ -821,7 +821,7 @@ export default function EducatorInfluence() {
                   </CardDescription>
                 </CardHeader>
                 <CardContent>
-                  <div className="grid md:grid-cols-3 gap-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
                     {[
                       { name: "Rewardful", key: "rewardful" as const, desc: "Sales tracking & commissions" },
                       { name: "PartnerStack", key: "partnerstack" as const, desc: "Partner ecosystem management" },

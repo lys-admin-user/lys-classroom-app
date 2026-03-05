@@ -347,7 +347,7 @@ export default function DistrictAdmin() {
   ];
 
   return (
-    <div className="p-6 max-w-7xl mx-auto space-y-6">
+    <div className="p-4 sm:p-6 max-w-7xl mx-auto space-y-6">
       <div>
         <h1 className="text-3xl font-marker text-lys-red" data-testid="text-district-title">
           My District
@@ -551,8 +551,8 @@ export default function DistrictAdmin() {
             </div>
           </div>
 
-          <div className="flex items-center gap-4 flex-wrap">
-            <div className="w-full max-w-sm">
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-4">
+            <div className="w-full sm:max-w-sm">
               <Label htmlFor="people-campus-select" className="text-sm text-muted-foreground mb-1 block">Select a campus, district, or charter network to view its members</Label>
               <Select value={selectedCampusForPeople} onValueChange={(v) => { setSelectedCampusForPeople(v); setSelectedMembers(new Set()); }}>
                 <SelectTrigger data-testid="select-people-campus">
@@ -845,7 +845,7 @@ export default function DistrictAdmin() {
                     </CardContent>
                   </Card>
                 ) : (
-                  <div className="space-y-2">
+                  <div className="space-y-2 overflow-x-auto">
                     <div className="flex items-center gap-3 px-3 py-2 rounded-md bg-muted/30">
                       <button
                         onClick={() => toggleAllMembers(orgAdminMembers.map((m: any) => ({ id: m.membership?.id })))}
@@ -870,13 +870,13 @@ export default function DistrictAdmin() {
                       return (
                         <div
                           key={member?.id}
-                          className={`flex items-center justify-between gap-4 p-3 rounded-md border ${selectedMembers.has(member?.id) ? "border-primary/30 bg-primary/5" : ""} ${memberStatus === "suspended" ? "opacity-60" : ""}`}
+                          className={`flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4 p-3 rounded-md border ${selectedMembers.has(member?.id) ? "border-primary/30 bg-primary/5" : ""} ${memberStatus === "suspended" ? "opacity-60" : ""}`}
                           data-testid={`member-row-${member?.id}`}
                         >
-                          <div className="flex items-center gap-3">
+                          <div className="flex items-center gap-3 min-w-0">
                             <button
                               onClick={() => toggleMemberSelection(member?.id)}
-                              className="text-muted-foreground hover:text-foreground"
+                              className="text-muted-foreground hover:text-foreground shrink-0"
                               data-testid={`checkbox-member-${member?.id}`}
                             >
                               {selectedMembers.has(member.id) ? (
@@ -891,9 +891,9 @@ export default function DistrictAdmin() {
                                 {(memberUser?.firstName?.[0] || "") + (memberUser?.lastName?.[0] || "") || "?"}
                               </AvatarFallback>
                             </Avatar>
-                            <div>
-                              <div className="flex items-center gap-2">
-                                <p className="text-sm font-medium">
+                            <div className="min-w-0">
+                              <div className="flex items-center gap-2 flex-wrap">
+                                <p className="text-sm font-medium truncate">
                                   {memberUser?.firstName || memberUser?.lastName
                                     ? `${memberUser?.firstName || ""} ${memberUser?.lastName || ""}`.trim()
                                     : member?.userId}
@@ -906,7 +906,7 @@ export default function DistrictAdmin() {
                                   {memberStatus}
                                 </Badge>
                               </div>
-                              <p className="text-xs text-muted-foreground">{memberUser?.email || "No email"}</p>
+                              <p className="text-xs text-muted-foreground truncate">{memberUser?.email || "No email"}</p>
                             </div>
                           </div>
                           <div className="flex items-center gap-2 flex-wrap">
@@ -1409,7 +1409,7 @@ function DistrictSafetySuiteTab() {
 
   return (
     <>
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         <Card>
           <CardContent className="p-4">
             <div className="flex items-center gap-2">
@@ -1458,14 +1458,14 @@ function DistrictSafetySuiteTab() {
 
       <Card>
         <CardHeader>
-          <div className="flex items-center justify-between">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
             <div>
               <CardTitle className="font-oswald">Content Review Queue</CardTitle>
               <CardDescription className="font-roboto">
                 Flagged content across your district or charter network requiring review
               </CardDescription>
             </div>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 flex-wrap">
               {selectedItems.length > 0 && (
                 <>
                   <Button
@@ -1490,7 +1490,7 @@ function DistrictSafetySuiteTab() {
                 </>
               )}
               <Select value={reviewFilter} onValueChange={setReviewFilter}>
-                <SelectTrigger className="w-[180px]" data-testid="select-district-review-filter">
+                <SelectTrigger className="w-full sm:w-[180px]" data-testid="select-district-review-filter">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -1604,7 +1604,7 @@ function DistrictSafetySuiteTab() {
 
       <Card>
         <CardHeader>
-          <div className="flex items-center justify-between">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
             <div>
               <CardTitle className="font-oswald">District Audit Log</CardTitle>
               <CardDescription className="font-roboto">
@@ -1612,7 +1612,7 @@ function DistrictSafetySuiteTab() {
               </CardDescription>
             </div>
             <Select value={auditCategory} onValueChange={setAuditCategory}>
-              <SelectTrigger className="w-[180px]" data-testid="select-district-audit-category">
+              <SelectTrigger className="w-full sm:w-[180px]" data-testid="select-district-audit-category">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>

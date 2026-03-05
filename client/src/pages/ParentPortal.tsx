@@ -175,10 +175,10 @@ function BeKnowDoProgress({ beScore, knowScore, doScore, overallScore }: { beSco
         </div>
       </div>
       
-      <div className="grid grid-cols-3 gap-4">
+      <div className="grid grid-cols-3 gap-2 sm:gap-4">
         <div className="text-center space-y-2">
-          <div className="mx-auto w-12 h-12 rounded-full bg-lys-red/10 flex items-center justify-center">
-            <Heart className="w-6 h-6 text-lys-red" />
+          <div className="mx-auto w-10 h-10 sm:w-12 sm:h-12 rounded-full bg-lys-red/10 flex items-center justify-center">
+            <Heart className="w-5 h-5 sm:w-6 sm:h-6 text-lys-red" />
           </div>
           <div>
             <p className="text-2xl font-bold text-lys-red">{beScore}%</p>

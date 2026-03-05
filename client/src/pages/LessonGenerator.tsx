@@ -621,7 +621,7 @@ ${addedResources.length > 0 ? addedResources.map(r => `- ${r.title}: ${r.url}`).
                     )}
                   </div>
                   
-                  <div className="grid grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div className="space-y-2">
                       <Label className="font-roboto text-sm text-muted-foreground flex items-center gap-1">
                         <Globe className="h-3 w-3" />
@@ -754,7 +754,7 @@ ${addedResources.length > 0 ? addedResources.map(r => `- ${r.title}: ${r.url}`).
 
                 <Separator />
 
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <Label htmlFor="course" className="font-oswald">Course</Label>
                     <Input
@@ -806,7 +806,7 @@ ${addedResources.length > 0 ? addedResources.map(r => `- ${r.title}: ${r.url}`).
                   </div>
                 </div>
 
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <Label htmlFor="duration" className="font-oswald">Duration</Label>
                     <Select value={duration} onValueChange={setDuration}>
@@ -905,7 +905,7 @@ ${addedResources.length > 0 ? addedResources.map(r => `- ${r.title}: ${r.url}`).
                   </CardDescription>
                 </div>
                 {generatedLesson && (
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-2 flex-wrap">
                     {isAuthenticated && (
                       <Button 
                         variant={isSaved ? "secondary" : "default"}
@@ -1248,7 +1248,7 @@ ${addedResources.length > 0 ? addedResources.map(r => `- ${r.title}: ${r.url}`).
                                 
                                 <TabsContent value="browse" className="flex-1 overflow-hidden flex flex-col mt-4">
                                   <div className="flex items-center gap-2 mb-4 flex-wrap">
-                                    <div className="relative flex-1 min-w-[200px]">
+                                    <div className="relative flex-1 min-w-0">
                                       <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                                       <Input
                                         placeholder="Search resources..."
@@ -1259,7 +1259,7 @@ ${addedResources.length > 0 ? addedResources.map(r => `- ${r.title}: ${r.url}`).
                                       />
                                     </div>
                                     <Select value={selectedResourceCategory} onValueChange={(v: any) => setSelectedResourceCategory(v)}>
-                                      <SelectTrigger className="w-[200px]" data-testid="select-resource-category">
+                                      <SelectTrigger className="w-full sm:w-[200px]" data-testid="select-resource-category">
                                         <SelectValue placeholder="Category" />
                                       </SelectTrigger>
                                       <SelectContent>

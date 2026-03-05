@@ -358,12 +358,12 @@ export default function Pricing() {
 
   return (
     <div className="min-h-screen bg-background">
-      <div className="max-w-7xl mx-auto px-4 py-12">
+      <div className="max-w-7xl mx-auto px-4 py-6 md:py-12">
         <div className="text-center mb-8">
-          <h1 className="text-4xl font-marker text-foreground mb-4">
+          <h1 className="text-2xl md:text-4xl font-marker text-foreground mb-4">
             Choose Your Path to Success
           </h1>
-          <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
+          <p className="text-base md:text-lg text-muted-foreground max-w-2xl mx-auto">
             Whether you're a student discovering your future or an educator shaping the next generation, 
             LYS has the tools you need to succeed.
           </p>
@@ -465,7 +465,7 @@ export default function Pricing() {
           </div>
         )}
 
-        <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6 mb-12">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-12">
           {baseTiers.map((tier) => {
             const action = getButtonAction(tier.id);
             const isCurrentPlan = tier.id === currentTier;
@@ -509,12 +509,12 @@ export default function Pricing() {
                             {adjustedPricing.savingsPercent}% off
                           </Badge>
                         </div>
-                        <span className="text-4xl font-bold text-foreground">{displayPrice}</span>
+                        <span className="text-3xl md:text-4xl font-bold text-foreground">{displayPrice}</span>
                         <span className="text-muted-foreground">{tier.period}</span>
                       </div>
                     ) : (
                       <>
-                        <span className="text-4xl font-bold text-foreground">{displayPrice}</span>
+                        <span className="text-3xl md:text-4xl font-bold text-foreground">{displayPrice}</span>
                         <span className="text-muted-foreground">{tier.period}</span>
                       </>
                     )}
@@ -642,7 +642,7 @@ export default function Pricing() {
         </div>
 
         <div className="text-center">
-          <h2 className="text-2xl font-oswald text-foreground mb-4">
+          <h2 className="text-xl md:text-2xl font-oswald text-foreground mb-4">
             Questions? We're here to help.
           </h2>
           <p className="text-muted-foreground mb-6">

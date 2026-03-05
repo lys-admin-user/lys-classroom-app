@@ -225,7 +225,7 @@ function StreakCard({ activities }: { activities: StudentJourneyActivity[] }) {
         </div>
         <div className="flex-1">
           <div className="flex items-baseline gap-2">
-            <span className="text-3xl font-bold">{streak}</span>
+            <span className="text-2xl sm:text-3xl font-bold">{streak}</span>
             <span className="text-muted-foreground">day streak</span>
           </div>
           <p className="text-sm text-muted-foreground">
@@ -834,9 +834,9 @@ export default function MyJourney() {
   const activities = journeyData.activities || [];
 
   return (
-    <div className="container mx-auto px-4 py-8" data-testid="my-journey-page">
+    <div className="container mx-auto px-4 py-8 overflow-hidden" data-testid="my-journey-page">
       <div className="flex flex-col gap-2 mb-8">
-        <h1 className="text-3xl font-bold font-marker">{roleContent.journeyTitle}</h1>
+        <h1 className="text-2xl sm:text-3xl font-bold font-marker">{roleContent.journeyTitle}</h1>
         <p className="text-muted-foreground font-roboto">
           {roleContent.journeySubtitle}
         </p>
@@ -854,7 +854,7 @@ export default function MyJourney() {
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="flex items-center justify-around flex-wrap gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
               <div className="flex flex-col items-center">
                 <ScoreRing score={progress.beScore} category="be" />
                 <span className="font-medium mt-2 font-oswald">{roleCategoryConfig.be.label}</span>
@@ -875,7 +875,7 @@ export default function MyJourney() {
             <div className="mt-8 p-4 bg-muted/30 rounded-lg">
               <div className="flex items-center justify-between mb-2">
                 <span className="font-medium font-oswald">Overall Progress</span>
-                <span className="text-2xl font-bold" data-testid="overall-score">{progress.overallScore}%</span>
+                <span className="text-xl sm:text-2xl font-bold" data-testid="overall-score">{progress.overallScore}%</span>
               </div>
               <Progress value={progress.overallScore} className="h-3" />
             </div>
@@ -1012,7 +1012,7 @@ export default function MyJourney() {
         </div>
       )}
 
-      <div className="grid lg:grid-cols-3 gap-6 mb-8">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
         <div className="lg:col-span-2">
           <SavedCareersCard careers={savedCareers} />
         </div>
@@ -1148,7 +1148,7 @@ export default function MyJourney() {
         </TabsContent>
 
         <TabsContent value="activities">
-          <div className="grid gap-6 lg:grid-cols-2">
+          <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
             <Card>
               <CardHeader>
                 <CardTitle className="font-oswald flex items-center gap-2">

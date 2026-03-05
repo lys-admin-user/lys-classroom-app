@@ -126,7 +126,7 @@ export default function MentorConnect() {
   }
 
   return (
-    <div className="flex flex-col gap-6 p-6 max-w-6xl mx-auto" data-testid="page-mentor-connect">
+    <div className="flex flex-col gap-6 p-4 md:p-6 max-w-6xl mx-auto" data-testid="page-mentor-connect">
       <div className="flex flex-col gap-2">
         <div className="flex items-center gap-3 flex-wrap">
           <Users className="h-7 w-7 text-muted-foreground" />
@@ -153,7 +153,7 @@ export default function MentorConnect() {
           <div className="flex items-center gap-3 flex-wrap">
             <Filter className="h-4 w-4 text-muted-foreground" />
             <Select value={careerFieldFilter} onValueChange={setCareerFieldFilter}>
-              <SelectTrigger className="w-[220px]" data-testid="select-career-field-filter">
+              <SelectTrigger className="w-full sm:w-[220px]" data-testid="select-career-field-filter">
                 <SelectValue placeholder="Filter by career field" />
               </SelectTrigger>
               <SelectContent>

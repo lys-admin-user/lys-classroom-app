@@ -247,13 +247,13 @@ export default function SelfDiscovery() {
     const results = calculateResults();
 
     return (
-      <div className="min-h-screen bg-background">
+      <div className="min-h-screen bg-background overflow-hidden">
         <div className="max-w-4xl mx-auto px-4 sm:px-6 py-8">
           <div className="mb-8 text-center">
-            <div className="w-16 h-16 rounded-full bg-lys-yellow/10 flex items-center justify-center mx-auto mb-4">
-              <Trophy className="h-8 w-8 text-lys-yellow" />
+            <div className="w-12 h-12 sm:w-16 sm:h-16 rounded-full bg-lys-yellow/10 flex items-center justify-center mx-auto mb-4">
+              <Trophy className="h-6 w-6 sm:h-8 sm:w-8 text-lys-yellow" />
             </div>
-            <h1 className="font-marker text-3xl sm:text-4xl text-foreground mb-2">
+            <h1 className="font-marker text-2xl sm:text-3xl md:text-4xl text-foreground mb-2">
               Your Be-Know-Do Profile
             </h1>
             <p className="font-roboto text-muted-foreground">
@@ -263,7 +263,7 @@ export default function SelfDiscovery() {
 
           {showAds && <AdBanner position="inline" className="mb-6" />}
 
-          <div className="grid md:grid-cols-3 gap-4 mb-8">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-8">
             {(["be", "know", "do"] as const).map((category) => {
               const info = getCategoryInfo(category);
               const Icon = info.icon;
@@ -322,8 +322,8 @@ export default function SelfDiscovery() {
             </CardContent>
           </Card>
 
-          <div className="flex flex-wrap justify-center gap-4">
-            <Button variant="outline" onClick={resetAssessment} className="gap-2" data-testid="button-retake">
+          <div className="flex flex-col sm:flex-row flex-wrap justify-center gap-4">
+            <Button variant="outline" onClick={resetAssessment} className="w-full sm:w-auto gap-2" data-testid="button-retake">
               <RotateCcw className="h-4 w-4" />
               Take Again
             </Button>
@@ -332,7 +332,7 @@ export default function SelfDiscovery() {
                 variant="outline" 
                 onClick={() => saveResultsMutation.mutate(results)}
                 disabled={saveResultsMutation.isPending}
-                className="gap-2" 
+                className="w-full sm:w-auto gap-2" 
                 data-testid="button-save-results"
               >
                 <Sparkles className="h-4 w-4" />
@@ -345,7 +345,7 @@ export default function SelfDiscovery() {
               </Badge>
             )}
             <Button 
-              className="bg-lys-red hover:bg-lys-red/90 text-white gap-2" 
+              className="w-full sm:w-auto bg-lys-red hover:bg-lys-red/90 text-white gap-2" 
               onClick={() => setLocation("/careers")}
               data-testid="button-explore-careers"
             >
@@ -362,15 +362,15 @@ export default function SelfDiscovery() {
   const CategoryIcon = categoryInfo.icon;
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-background overflow-hidden">
       <div className="max-w-2xl mx-auto px-4 sm:px-6 py-8">
         <div className="mb-8">
           <div className="flex items-center gap-3 mb-4">
-            <div className="w-12 h-12 rounded-full bg-lys-yellow/10 flex items-center justify-center">
-              <User className="h-6 w-6 text-lys-yellow" />
+            <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-full bg-lys-yellow/10 flex items-center justify-center">
+              <User className="h-5 w-5 sm:h-6 sm:w-6 text-lys-yellow" />
             </div>
             <div>
-              <h1 className="font-marker text-2xl sm:text-3xl text-foreground">
+              <h1 className="font-marker text-xl sm:text-2xl md:text-3xl text-foreground">
                 Self-Discovery Assessment
               </h1>
               <p className="font-roboto text-sm text-muted-foreground">

@@ -95,7 +95,7 @@ function AddApplicationDialog({ onClose }: { onClose: () => void }) {
             <Label htmlFor="scholarshipName">Scholarship Name</Label>
             <Input id="scholarshipName" value={form.scholarshipName} onChange={(e) => setForm({ ...form, scholarshipName: e.target.value })} required data-testid="input-scholarship-name" />
           </div>
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label htmlFor="amount">Amount ($)</Label>
               <Input id="amount" type="number" value={form.amount} onChange={(e) => setForm({ ...form, amount: e.target.value })} data-testid="input-amount" />

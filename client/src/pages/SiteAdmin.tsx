@@ -582,7 +582,7 @@ export default function SiteAdminPage() {
   }
 
   return (
-    <div className="container mx-auto px-4 py-8 max-w-7xl">
+    <div className="container mx-auto px-4 sm:px-6 py-6 sm:py-8 max-w-7xl">
       <div className="flex items-center gap-4 mb-8">
         <div className="w-12 h-12 rounded-md bg-destructive/10 flex items-center justify-center">
           <Shield className="h-6 w-6 text-destructive" />
@@ -597,7 +597,7 @@ export default function SiteAdminPage() {
         </div>
       </div>
 
-      <div className="grid gap-4 md:grid-cols-3 mb-8">
+      <div className="grid gap-4 grid-cols-2 lg:grid-cols-3 mb-8">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between gap-4 pb-2">
             <CardTitle className="text-sm font-medium">Campus Organizations</CardTitle>
@@ -827,7 +827,7 @@ export default function SiteAdminPage() {
                     </div>
                   </CardHeader>
                   <CardContent>
-                    <div className="flex items-center gap-4 text-sm text-muted-foreground">
+                    <div className="flex items-center gap-4 text-sm text-muted-foreground flex-wrap">
                       <span className="flex items-center gap-1">
                         <Users className="h-4 w-4" />
                         {(org as any).maxMembers || "Unlimited"} members allowed
@@ -889,8 +889,8 @@ export default function SiteAdminPage() {
             </div>
           </div>
 
-          <div className="flex items-center gap-4 flex-wrap">
-            <div className="w-full max-w-sm">
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-4">
+            <div className="w-full sm:max-w-sm">
               <Label htmlFor="people-org-select" className="text-sm text-muted-foreground mb-1 block">Select an organization to view its members</Label>
               <Select value={selectedOrgForPeople} onValueChange={(v) => { setSelectedOrgForPeople(v); setSelectedMembers(new Set()); }}>
                 <SelectTrigger data-testid="select-people-org">
@@ -1183,7 +1183,7 @@ export default function SiteAdminPage() {
                     </CardContent>
                   </Card>
                 ) : (
-                  <div className="space-y-2">
+                  <div className="space-y-2 overflow-x-auto">
                     <div className="flex items-center gap-3 px-3 py-2 rounded-md bg-muted/30">
                       <button
                         onClick={() => toggleAllMembers(orgAdminMembers.map((item: any) => item.membership))}
@@ -1208,13 +1208,13 @@ export default function SiteAdminPage() {
                       return (
                         <div
                           key={member.id}
-                          className={`flex items-center justify-between gap-4 p-3 rounded-md border ${selectedMembers.has(member.id) ? "border-primary/30 bg-primary/5" : ""} ${memberStatus === "suspended" ? "opacity-60" : ""}`}
+                          className={`flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4 p-3 rounded-md border ${selectedMembers.has(member.id) ? "border-primary/30 bg-primary/5" : ""} ${memberStatus === "suspended" ? "opacity-60" : ""}`}
                           data-testid={`member-row-${member.id}`}
                         >
-                          <div className="flex items-center gap-3">
+                          <div className="flex items-center gap-3 min-w-0">
                             <button
                               onClick={() => toggleMemberSelection(member.id)}
-                              className="text-muted-foreground hover:text-foreground"
+                              className="text-muted-foreground hover:text-foreground shrink-0"
                               data-testid={`checkbox-member-${member.id}`}
                             >
                               {selectedMembers.has(member.id) ? (
@@ -1229,9 +1229,9 @@ export default function SiteAdminPage() {
                                 {(memberUser?.firstName?.[0] || "") + (memberUser?.lastName?.[0] || "") || "?"}
                               </AvatarFallback>
                             </Avatar>
-                            <div>
-                              <div className="flex items-center gap-2">
-                                <p className="text-sm font-medium">
+                            <div className="min-w-0">
+                              <div className="flex items-center gap-2 flex-wrap">
+                                <p className="text-sm font-medium truncate">
                                   {memberUser?.firstName || memberUser?.lastName
                                     ? `${memberUser?.firstName || ""} ${memberUser?.lastName || ""}`.trim()
                                     : member.userId}
@@ -1244,7 +1244,7 @@ export default function SiteAdminPage() {
                                   {memberStatus}
                                 </Badge>
                               </div>
-                              <p className="text-xs text-muted-foreground">{memberUser?.email || "No email"}</p>
+                              <p className="text-xs text-muted-foreground truncate">{memberUser?.email || "No email"}</p>
                             </div>
                           </div>
                           <div className="flex items-center gap-2 flex-wrap">
@@ -1884,7 +1884,7 @@ export default function SiteAdminPage() {
 
           {/* System-Wide Overview */}
           {systemStatsLoading ? (
-            <div className="grid gap-4 md:grid-cols-4">
+            <div className="grid gap-4 grid-cols-2 lg:grid-cols-4">
               {[1, 2, 3, 4].map(i => (
                 <Card key={i}>
                   <CardContent className="pt-6">
@@ -1895,7 +1895,7 @@ export default function SiteAdminPage() {
             </div>
           ) : systemStats && (
             <>
-              <div className="grid gap-4 md:grid-cols-4" data-testid="performance-stats-grid">
+              <div className="grid gap-4 grid-cols-2 lg:grid-cols-4" data-testid="performance-stats-grid">
                 <Card data-testid="stat-card-goals">
                   <CardHeader className="flex flex-row items-center justify-between gap-4 pb-2">
                     <CardTitle className="text-sm font-medium">Goals Completion</CardTitle>
@@ -1960,7 +1960,7 @@ export default function SiteAdminPage() {
                     <div className="h-32 bg-muted animate-pulse rounded" />
                   ) : educatorTypeData ? (
                     <div className="space-y-4">
-                      <div className="grid gap-4 md:grid-cols-3">
+                      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
                         {educatorTypeData.breakdown.filter(b => b.type !== "unspecified").map(item => {
                           const percentage = educatorTypeData.totalEducators > 0 
                             ? Math.round((item.total / educatorTypeData.totalEducators) * 100) 
@@ -2122,7 +2122,7 @@ export default function SiteAdminPage() {
                                 </p>
                               </div>
                             </div>
-                            <div className="flex items-center gap-4 text-sm">
+                            <div className="flex items-center gap-2 sm:gap-4 text-sm flex-wrap">
                               <div className="text-center">
                                 <p className="font-bold">{campus.goalsCompletionRate}%</p>
                                 <p className="text-xs text-muted-foreground">Goals</p>
@@ -2198,7 +2198,7 @@ export default function SiteAdminPage() {
                                 </p>
                               </div>
                             </div>
-                            <div className="flex items-center gap-4 text-sm">
+                            <div className="flex items-center gap-2 sm:gap-4 text-sm flex-wrap">
                               <div className="text-center">
                                 <p className="font-bold">{org.goalsCompletionRate}%</p>
                                 <p className="text-xs text-muted-foreground">Goals</p>
@@ -2609,7 +2609,7 @@ function OrgSafetySuiteTab() {
 
   return (
     <>
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         <Card>
           <CardContent className="p-4">
             <div className="flex items-center gap-2">
@@ -2658,14 +2658,14 @@ function OrgSafetySuiteTab() {
 
       <Card>
         <CardHeader>
-          <div className="flex items-center justify-between">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
             <div>
               <CardTitle className="font-oswald">Content Review Queue</CardTitle>
               <CardDescription className="font-roboto">
                 Flagged content within your organization requiring review
               </CardDescription>
             </div>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 flex-wrap">
               {selectedItems.length > 0 && (
                 <>
                   <Button
@@ -2690,7 +2690,7 @@ function OrgSafetySuiteTab() {
                 </>
               )}
               <Select value={reviewFilter} onValueChange={setReviewFilter}>
-                <SelectTrigger className="w-[180px]" data-testid="select-org-review-filter">
+                <SelectTrigger className="w-full sm:w-[180px]" data-testid="select-org-review-filter">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -2804,7 +2804,7 @@ function OrgSafetySuiteTab() {
 
       <Card>
         <CardHeader>
-          <div className="flex items-center justify-between">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
             <div>
               <CardTitle className="font-oswald">Organization Audit Log</CardTitle>
               <CardDescription className="font-roboto">
@@ -2812,7 +2812,7 @@ function OrgSafetySuiteTab() {
               </CardDescription>
             </div>
             <Select value={auditCategory} onValueChange={setAuditCategory}>
-              <SelectTrigger className="w-[180px]" data-testid="select-org-audit-category">
+              <SelectTrigger className="w-full sm:w-[180px]" data-testid="select-org-audit-category">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
@@ -3012,7 +3012,7 @@ function LessonCacheSection({ isSiteAdmin }: { isSiteAdmin?: boolean }) {
           <div className="h-24 bg-muted animate-pulse rounded" />
         ) : stats ? (
           <div className="space-y-4">
-            <div className="grid gap-4 md:grid-cols-4">
+            <div className="grid gap-4 grid-cols-2 lg:grid-cols-4">
               <div className="text-center p-3 rounded-md bg-muted/50">
                 <p className="text-2xl font-bold" data-testid="stat-cache-total">{stats.totalEntries}</p>
                 <p className="text-xs text-muted-foreground">Total Cached</p>

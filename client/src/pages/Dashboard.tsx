@@ -71,19 +71,19 @@ function JourneyProgressCard() {
         </div>
       </CardHeader>
       <CardContent>
-        <div className="grid grid-cols-3 gap-4 mb-4">
-          <div className="text-center p-3 rounded-lg bg-lys-yellow/10">
-            <Heart className="w-5 h-5 mx-auto text-lys-yellow mb-1" />
+        <div className="grid grid-cols-3 gap-2 sm:gap-4 mb-4">
+          <div className="text-center p-2 sm:p-3 rounded-lg bg-lys-yellow/10">
+            <Heart className="w-4 h-4 sm:w-5 sm:h-5 mx-auto text-lys-yellow mb-1" />
             <div className="text-2xl font-bold text-lys-yellow">{progress.beScore || 0}%</div>
             <div className="text-xs text-muted-foreground font-roboto">Being</div>
           </div>
-          <div className="text-center p-3 rounded-lg bg-lys-teal/10">
-            <Compass className="w-5 h-5 mx-auto text-lys-teal mb-1" />
+          <div className="text-center p-2 sm:p-3 rounded-lg bg-lys-teal/10">
+            <Compass className="w-4 h-4 sm:w-5 sm:h-5 mx-auto text-lys-teal mb-1" />
             <div className="text-2xl font-bold text-lys-teal">{progress.knowScore || 0}%</div>
             <div className="text-xs text-muted-foreground font-roboto">Knowing</div>
           </div>
-          <div className="text-center p-3 rounded-lg bg-lys-red/10">
-            <Target className="w-5 h-5 mx-auto text-lys-red mb-1" />
+          <div className="text-center p-2 sm:p-3 rounded-lg bg-lys-red/10">
+            <Target className="w-4 h-4 sm:w-5 sm:h-5 mx-auto text-lys-red mb-1" />
             <div className="text-2xl font-bold text-lys-red">{progress.doScore || 0}%</div>
             <div className="text-xs text-muted-foreground font-roboto">Doing</div>
           </div>
@@ -169,19 +169,19 @@ function StudentDashboard() {
                 Ready to continue your journey? Your future is being built one step at a time.
               </p>
               
-              <div className="grid grid-cols-3 gap-3 mb-6">
-                <div className="text-center p-4 rounded-lg bg-lys-yellow/10 border border-lys-yellow/20">
-                  <Heart className="w-6 h-6 mx-auto text-lys-yellow mb-2" />
+              <div className="grid grid-cols-3 gap-2 sm:gap-3 mb-6">
+                <div className="text-center p-2 sm:p-4 rounded-lg bg-lys-yellow/10 border border-lys-yellow/20">
+                  <Heart className="w-5 h-5 sm:w-6 sm:h-6 mx-auto text-lys-yellow mb-2" />
                   <div className="text-2xl font-bold text-lys-yellow">{progress?.beScore || 0}%</div>
                   <div className="text-xs text-muted-foreground font-roboto">Being</div>
                 </div>
-                <div className="text-center p-4 rounded-lg bg-lys-teal/10 border border-lys-teal/20">
-                  <Compass className="w-6 h-6 mx-auto text-lys-teal mb-2" />
+                <div className="text-center p-2 sm:p-4 rounded-lg bg-lys-teal/10 border border-lys-teal/20">
+                  <Compass className="w-5 h-5 sm:w-6 sm:h-6 mx-auto text-lys-teal mb-2" />
                   <div className="text-2xl font-bold text-lys-teal">{progress?.knowScore || 0}%</div>
                   <div className="text-xs text-muted-foreground font-roboto">Knowing</div>
                 </div>
-                <div className="text-center p-4 rounded-lg bg-lys-red/10 border border-lys-red/20">
-                  <Target className="w-6 h-6 mx-auto text-lys-red mb-2" />
+                <div className="text-center p-2 sm:p-4 rounded-lg bg-lys-red/10 border border-lys-red/20">
+                  <Target className="w-5 h-5 sm:w-6 sm:h-6 mx-auto text-lys-red mb-2" />
                   <div className="text-2xl font-bold text-lys-red">{progress?.doScore || 0}%</div>
                   <div className="text-xs text-muted-foreground font-roboto">Doing</div>
                 </div>

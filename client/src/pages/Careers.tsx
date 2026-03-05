@@ -310,8 +310,8 @@ export default function Careers() {
     const entryPoint = selectedCareer.entryPointsForGrades?.[selectedGrade !== "all" ? selectedGrade : "high_school"];
     
     return (
-      <div className="min-h-screen bg-background">
-        <div className="max-w-4xl mx-auto px-4 sm:px-6 py-8">
+      <div className="min-h-screen bg-background overflow-x-hidden">
+        <div className="max-w-4xl mx-auto px-4 sm:px-6 py-8 overflow-y-auto">
           <Button
             variant="ghost"
             onClick={() => setSelectedCareer(null)}
@@ -341,7 +341,7 @@ export default function Careers() {
                       </Badge>
                     )}
                   </div>
-                  <CardTitle className="font-marker text-3xl">{selectedCareer.title}</CardTitle>
+                  <CardTitle className="font-marker text-2xl sm:text-3xl">{selectedCareer.title}</CardTitle>
                   <CardDescription className="font-roboto mt-2">
                     {selectedCareer.description}
                   </CardDescription>
@@ -394,23 +394,23 @@ export default function Careers() {
             </CardHeader>
             <CardContent className="p-6 space-y-8">
               {/* Salary & Stats */}
-              <div className="grid sm:grid-cols-4 gap-4">
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
                 <div className="p-4 rounded-md bg-lys-yellow/10 text-center">
                   <DollarSign className="h-6 w-6 text-lys-yellow mx-auto mb-2" />
                   <p className="text-xs text-muted-foreground font-roboto mb-1">
                     {stateData ? `${selectedState} Median` : "National Median"}
                   </p>
-                  <p className="font-oswald text-xl font-semibold">
+                  <p className="font-oswald text-lg sm:text-xl font-semibold truncate">
                     {formatSalary(stateData?.median || selectedCareer.salaryMedian)}
                   </p>
-                  <p className="text-xs text-muted-foreground font-roboto">
+                  <p className="text-xs text-muted-foreground font-roboto truncate">
                     Range: {formatSalary(stateData?.min || selectedCareer.salaryMin)} - {formatSalary(stateData?.max || selectedCareer.salaryMax)}
                   </p>
                 </div>
                 <div className="p-4 rounded-md bg-lys-teal/10 text-center">
                   <TrendingUp className="h-6 w-6 text-lys-teal mx-auto mb-2" />
                   <p className="text-xs text-muted-foreground font-roboto mb-1">Projected Growth</p>
-                  <p className="font-oswald text-xl font-semibold text-green-600">
+                  <p className="font-oswald text-lg sm:text-xl font-semibold text-green-600">
                     +{selectedCareer.projectedGrowth || 0}%
                   </p>
                   <p className="text-xs text-muted-foreground font-roboto">2023-2033</p>
@@ -418,7 +418,7 @@ export default function Careers() {
                 <div className="p-4 rounded-md bg-blue-500/10 text-center">
                   <Users className="h-6 w-6 text-blue-600 mx-auto mb-2" />
                   <p className="text-xs text-muted-foreground font-roboto mb-1">Annual Openings</p>
-                  <p className="font-oswald text-xl font-semibold">
+                  <p className="font-oswald text-lg sm:text-xl font-semibold truncate">
                     {selectedCareer.projectedOpenings ? formatNumber(selectedCareer.projectedOpenings) : "N/A"}
                   </p>
                   <p className="text-xs text-muted-foreground font-roboto">nationwide</p>
@@ -573,7 +573,7 @@ export default function Careers() {
   }
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-background overflow-hidden">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 py-8">
         <div className="mb-8">
           <div className="flex items-center gap-3 mb-2">
@@ -746,8 +746,8 @@ export default function Careers() {
 
           <TabsContent value="explore" className="mt-6">
             {/* Filters */}
-            <div className="flex flex-wrap gap-4 mb-8">
-              <div className="relative flex-1 min-w-[200px]">
+            <div className="flex flex-col sm:flex-row flex-wrap gap-4 mb-8">
+              <div className="relative flex-1 min-w-0 sm:min-w-[200px]">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                 <Input
                   placeholder="Search careers..."
@@ -768,7 +768,7 @@ export default function Careers() {
                 )}
               </div>
               <Select value={selectedCategory} onValueChange={setSelectedCategory}>
-                <SelectTrigger className="w-[180px] font-roboto" data-testid="select-category">
+                <SelectTrigger className="w-full sm:w-[180px] font-roboto" data-testid="select-category">
                   <SelectValue placeholder="Category" />
                 </SelectTrigger>
                 <SelectContent>
@@ -783,7 +783,7 @@ export default function Careers() {
                 </SelectContent>
               </Select>
               <Select value={selectedGrade} onValueChange={setSelectedGrade}>
-                <SelectTrigger className="w-[180px] font-roboto" data-testid="select-grade">
+                <SelectTrigger className="w-full sm:w-[180px] font-roboto" data-testid="select-grade">
                   <SelectValue placeholder="Grade Level" />
                 </SelectTrigger>
                 <SelectContent>
@@ -795,7 +795,7 @@ export default function Careers() {
                 </SelectContent>
               </Select>
               <Select value={selectedState} onValueChange={setSelectedState}>
-                <SelectTrigger className="w-[180px] font-roboto" data-testid="select-state">
+                <SelectTrigger className="w-full sm:w-[180px] font-roboto" data-testid="select-state">
                   <MapPin className="h-4 w-4 mr-2" />
                   <SelectValue placeholder="Location" />
                 </SelectTrigger>
@@ -808,7 +808,7 @@ export default function Careers() {
                 </SelectContent>
               </Select>
               <Select value={selectedPathway} onValueChange={setSelectedPathway}>
-                <SelectTrigger className="w-[220px] font-roboto" data-testid="select-pathway">
+                <SelectTrigger className="w-full sm:w-[220px] font-roboto" data-testid="select-pathway">
                   <GraduationCap className="h-4 w-4 mr-2" />
                   <SelectValue placeholder="Education Path" />
                 </SelectTrigger>
@@ -824,7 +824,7 @@ export default function Careers() {
 
             {/* Career Grid */}
             {isLoading ? (
-              <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
                 {[1, 2, 3, 4, 5, 6].map((i) => (
                   <Card key={i}>
                     <CardHeader>
@@ -849,7 +849,7 @@ export default function Careers() {
                 </p>
               </div>
             ) : (
-              <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
                 {filteredCareers.map((career) => (
                   <Card key={career.id} className="hover-elevate cursor-pointer" onClick={() => setSelectedCareer(career)}>
                     <CardHeader className="pb-2">
@@ -936,7 +936,7 @@ export default function Careers() {
                 Careers with the highest projected growth rates according to Bureau of Labor Statistics data
               </p>
             </div>
-            <div className="grid md:grid-cols-2 gap-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               {trendingCareers.slice(0, 10).map((career, index) => (
                 <Card 
                   key={career.id} 
@@ -1008,18 +1008,18 @@ export default function Careers() {
             {marketTrends && (
               <div className="space-y-6">
                 {/* Summary Stats */}
-                <div className="grid sm:grid-cols-4 gap-4">
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
                   <Card data-testid="card-stat-careers-tracked">
                     <CardContent className="p-6 text-center">
                       <BarChart3 className="h-8 w-8 text-lys-teal mx-auto mb-2" />
-                      <p className="text-2xl font-oswald font-bold" data-testid="text-careers-count">{marketTrends.summary.totalCareers}</p>
+                      <p className="text-xl sm:text-2xl font-oswald font-bold" data-testid="text-careers-count">{marketTrends.summary.totalCareers}</p>
                       <p className="text-sm text-muted-foreground font-roboto">Careers Tracked</p>
                     </CardContent>
                   </Card>
                   <Card data-testid="card-stat-annual-openings">
                     <CardContent className="p-6 text-center">
                       <Users className="h-8 w-8 text-lys-red mx-auto mb-2" />
-                      <p className="text-2xl font-oswald font-bold" data-testid="text-annual-openings">
+                      <p className="text-xl sm:text-2xl font-oswald font-bold truncate" data-testid="text-annual-openings">
                         {formatNumber(marketTrends.summary.totalProjectedOpenings)}
                       </p>
                       <p className="text-sm text-muted-foreground font-roboto">Annual Openings</p>
@@ -1028,7 +1028,7 @@ export default function Careers() {
                   <Card data-testid="card-stat-avg-growth">
                     <CardContent className="p-6 text-center">
                       <TrendingUp className="h-8 w-8 text-green-600 mx-auto mb-2" />
-                      <p className="text-2xl font-oswald font-bold text-green-600" data-testid="text-avg-growth">
+                      <p className="text-xl sm:text-2xl font-oswald font-bold text-green-600" data-testid="text-avg-growth">
                         +{marketTrends.summary.avgGrowthRate}%
                       </p>
                       <p className="text-sm text-muted-foreground font-roboto">Avg Growth Rate</p>
@@ -1037,7 +1037,7 @@ export default function Careers() {
                   <Card data-testid="card-stat-high-demand">
                     <CardContent className="p-6 text-center">
                       <Flame className="h-8 w-8 text-amber-500 mx-auto mb-2" />
-                      <p className="text-2xl font-oswald font-bold" data-testid="text-high-demand-count">
+                      <p className="text-xl sm:text-2xl font-oswald font-bold" data-testid="text-high-demand-count">
                         {marketTrends.demandDistribution.very_high + marketTrends.demandDistribution.high}
                       </p>
                       <p className="text-sm text-muted-foreground font-roboto">High-Demand Careers</p>
@@ -1045,7 +1045,7 @@ export default function Careers() {
                   </Card>
                 </div>
 
-                <div className="grid lg:grid-cols-2 gap-6">
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                   {/* Top Growing Careers */}
                   <Card>
                     <CardHeader>

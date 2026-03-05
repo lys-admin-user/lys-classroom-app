@@ -320,7 +320,7 @@ export default function ScopeSequencePage() {
                     )}
                   />
                   
-                  <div className="grid grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <FormField
                       control={form.control}
                       name="country"
@@ -388,7 +388,7 @@ export default function ScopeSequencePage() {
                     />
                   </div>
 
-                  <div className="grid grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <FormField
                       control={form.control}
                       name="subject"
@@ -450,7 +450,7 @@ export default function ScopeSequencePage() {
                     )}
                   />
 
-                  <div className="grid grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <FormField
                       control={form.control}
                       name="schoolYear"
@@ -579,7 +579,7 @@ export default function ScopeSequencePage() {
                     </Button>
                   </div>
                 </CardHeader>
-                <CardFooter className="flex justify-between gap-4 border-t pt-4">
+                <CardFooter className="flex flex-col sm:flex-row justify-between gap-4 border-t pt-4">
                   <div className="flex items-center gap-4 text-sm text-muted-foreground">
                     <span className="flex items-center gap-1">
                       <Calendar className="h-4 w-4" />
@@ -761,7 +761,7 @@ export default function ScopeSequencePage() {
               </DialogDescription>
             </DialogHeader>
             <div className="space-y-4 py-4">
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <Label>Country</Label>
                   <Select value={selectedCountry} onValueChange={setSelectedCountry}>

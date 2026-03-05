@@ -670,7 +670,7 @@ export default function Assignments() {
                     </div>
                   )}
 
-                  <div className="grid grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div>
                       <Label className="font-oswald">Questions</Label>
                       <Input
@@ -819,12 +819,12 @@ export default function Assignments() {
 
             {generatedAssignment && (
               <div className="space-y-4">
-                <div className="flex items-center justify-between gap-4 flex-wrap print:hidden">
+                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 flex-wrap print:hidden">
                   {isEditing ? (
                     <Input 
                       value={generatedAssignment.title} 
                       onChange={(e) => updateTitle(e.target.value)}
-                      className="font-oswald text-xl max-w-md"
+                      className="font-oswald text-xl w-full sm:max-w-md"
                       data-testid="input-edit-title"
                     />
                   ) : (
@@ -876,8 +876,8 @@ export default function Assignments() {
                 {/* Progress Summary Bar */}
                 <Card className="print:hidden">
                   <CardContent className="py-3 px-4">
-                    <div className="flex items-center justify-between gap-4 flex-wrap">
-                      <div className="flex items-center gap-6">
+                    <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 flex-wrap">
+                      <div className="flex items-center gap-4 sm:gap-6 flex-wrap">
                         <div className="flex items-center gap-2">
                           <BarChart3 className="h-4 w-4 text-muted-foreground" />
                           <span className="text-sm font-medium">{(generatedAssignment.questions || []).length} Questions</span>
@@ -886,7 +886,7 @@ export default function Assignments() {
                           <Target className="h-4 w-4 text-muted-foreground" />
                           <span className="text-sm font-medium">{generatedAssignment.totalPoints} Points</span>
                         </div>
-                        <Separator orientation="vertical" className="h-6" />
+                        <Separator orientation="vertical" className="h-6 hidden sm:block" />
                         <div className="flex items-center gap-3">
                           {(() => {
                             const counts = getBkdCounts();
@@ -937,7 +937,7 @@ export default function Assignments() {
                 <Card id="generated-assignment" className="print:shadow-none print:border-2 print:border-black">
                   <CardContent className="p-6 print:p-4">
                     <div className="border-b-2 border-foreground pb-4 mb-4">
-                      <div className="grid grid-cols-2 gap-4 text-sm">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">
                         <div className="flex gap-2 items-center">
                           <span className="font-semibold">Student Name:</span>
                           <span className="border-b border-foreground flex-1 min-w-[150px]"></span>
@@ -1554,7 +1554,7 @@ export default function Assignments() {
                 <CardDescription>Build your own assignment from scratch with custom questions</CardDescription>
               </CardHeader>
               <CardContent className="space-y-6">
-                <div className="grid md:grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <Label htmlFor="manual-title">Assignment Title *</Label>
                     <Input
@@ -1861,7 +1861,7 @@ export default function Assignments() {
                           </DialogHeader>
                           <div className="space-y-4 py-4">
                             <RadioGroup value={recipientType} onValueChange={(v) => setRecipientType(v as any)}>
-                              <div className="flex items-center gap-4">
+                              <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2 sm:gap-4">
                                 <div className="flex items-center gap-2">
                                   <RadioGroupItem value="student" id="student" />
                                   <Label htmlFor="student">Individual Students</Label>
