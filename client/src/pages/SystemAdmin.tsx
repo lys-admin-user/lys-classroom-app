@@ -4600,11 +4600,7 @@ function ContentHubTab() {
 
   const addFeedMutation = useMutation({
     mutationFn: async () => {
-      return apiRequest("/api/admin/rss-feeds", {
-        method: "POST",
-        body: JSON.stringify({ name: feedName, url: feedUrl, feedType, description: feedDescription, isActive: true, fetchIntervalMinutes: 60 }),
-        headers: { "Content-Type": "application/json" },
-      });
+      return apiRequest("POST", "/api/admin/rss-feeds", { name: feedName, url: feedUrl, feedType, description: feedDescription, isActive: true, fetchIntervalMinutes: 60 });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/admin/rss-feeds"] });
@@ -4619,7 +4615,8 @@ function ContentHubTab() {
 
   const fetchFeedMutation = useMutation({
     mutationFn: async (feedId: string) => {
-      return apiRequest(`/api/admin/rss-feeds/${feedId}/fetch`, { method: "POST" });
+      const res = await apiRequest("POST", `/api/admin/rss-feeds/${feedId}/fetch`);
+      return res.json();
     },
     onSuccess: (data: any) => {
       queryClient.invalidateQueries({ queryKey: ["/api/admin/rss-content"] });
@@ -4632,7 +4629,7 @@ function ContentHubTab() {
 
   const deleteFeedMutation = useMutation({
     mutationFn: async (feedId: string) => {
-      return apiRequest(`/api/admin/rss-feeds/${feedId}`, { method: "DELETE" });
+      return apiRequest("DELETE", `/api/admin/rss-feeds/${feedId}`);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/admin/rss-feeds"] });
@@ -4643,11 +4640,7 @@ function ContentHubTab() {
 
   const approveContentMutation = useMutation({
     mutationFn: async ({ id, status, approvedPlacements, bkdPillar }: { id: string; status: string; approvedPlacements?: string[]; bkdPillar?: string }) => {
-      return apiRequest(`/api/admin/rss-content/${id}`, {
-        method: "PATCH",
-        body: JSON.stringify({ status, approvedPlacements, bkdPillar }),
-        headers: { "Content-Type": "application/json" },
-      });
+      return apiRequest("PATCH", `/api/admin/rss-content/${id}`, { status, approvedPlacements, bkdPillar });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/admin/rss-content"] });
