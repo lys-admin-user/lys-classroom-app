@@ -972,7 +972,7 @@ export async function registerRoutes(
   });
 
   // Goals - works for all users, but data is session-based for non-auth
-  app.get("/api/goals", async (req: any, res) => {
+  app.get("/api/goals", isAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user?.claims?.sub;
       const goals = await storage.getGoals(userId);
@@ -982,7 +982,7 @@ export async function registerRoutes(
     }
   });
 
-  app.post("/api/goals", async (req: any, res) => {
+  app.post("/api/goals", isAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user?.claims?.sub || null;
       const validated = createGoalSchema.parse(req.body);
@@ -1006,7 +1006,7 @@ export async function registerRoutes(
     }
   });
 
-  app.patch("/api/goals/:id", async (req: any, res) => {
+  app.patch("/api/goals/:id", isAuthenticated, async (req: any, res) => {
     try {
       const { id } = req.params;
       const userId = req.user?.claims?.sub || null;
@@ -1064,7 +1064,7 @@ export async function registerRoutes(
     }
   });
 
-  app.delete("/api/goals/:id", async (req: any, res) => {
+  app.delete("/api/goals/:id", isAuthenticated, async (req: any, res) => {
     try {
       const { id } = req.params;
       const userId = req.user?.claims?.sub || null;
@@ -1079,7 +1079,7 @@ export async function registerRoutes(
     }
   });
 
-  app.patch("/api/goals/:goalId/milestones/:milestoneId", async (req: any, res) => {
+  app.patch("/api/goals/:goalId/milestones/:milestoneId", isAuthenticated, async (req: any, res) => {
     try {
       const { goalId, milestoneId } = req.params;
       const { completed } = req.body;
@@ -10046,9 +10046,10 @@ export async function registerRoutes(
       const { id: journeyProgressId } = req.params;
       const { category, title, description, targetDate } = req.body;
       
+      const userId = req.user?.claims?.sub;
       const milestone = await storage.createStudentJourneyMilestone({
         journeyProgressId,
-        studentId: req.body.studentId || "",
+        studentId: userId,
         category: category || "do",
         title,
         description: description || null,

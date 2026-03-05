@@ -345,7 +345,7 @@ export default function Gradebook() {
               <CardContent>
                 <div className="text-2xl font-bold">
                   {grades.length > 0
-                    ? Math.round(grades.filter(g => g.percentage).reduce((acc, g) => acc + (g.percentage || 0), 0) / grades.filter(g => g.percentage).length) + "%"
+                    ? Math.round(grades.filter(g => g.percentage != null).reduce((acc, g) => acc + (g.percentage || 0), 0) / grades.filter(g => g.percentage != null).length) + "%"
                     : "N/A"}
                 </div>
               </CardContent>
