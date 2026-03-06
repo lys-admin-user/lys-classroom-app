@@ -12,6 +12,9 @@ import { TrialBanner } from "@/components/TrialBanner";
 import { OnboardingTour } from "@/components/OnboardingTour";
 import { useAuth } from "@/hooks/use-auth";
 import { useEffect, useState } from "react";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { LogIn } from "lucide-react";
 import Dashboard from "@/pages/Dashboard";
 import LessonGenerator from "@/pages/LessonGenerator";
 import Assessments from "@/pages/Assessments";
@@ -105,59 +108,141 @@ function OnboardingGuard({ children }: { children: React.ReactNode }) {
   return <>{children}</>;
 }
 
+function AuthRequired({ children }: { children: React.ReactNode }) {
+  const { isAuthenticated, isLoading } = useAuth();
+  
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center min-h-[60vh]">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" />
+      </div>
+    );
+  }
+  
+  if (!isAuthenticated) {
+    return (
+      <div className="flex items-center justify-center min-h-[60vh] p-4">
+        <Card className="w-full max-w-md text-center">
+          <CardHeader>
+            <CardTitle className="font-permanent-marker text-2xl">Sign In Required</CardTitle>
+            <CardDescription className="font-roboto">
+              Please sign in with your Replit account to access this feature.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Button
+              size="lg"
+              className="bg-lys-yellow text-black font-oswald gap-2"
+              onClick={() => window.location.href = "/api/login"}
+              data-testid="button-auth-required-login"
+            >
+              <LogIn className="h-5 w-5" />
+              Sign In
+            </Button>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+  
+  return <>{children}</>;
+}
+
+function withAuth(Component: React.ComponentType<any>) {
+  return function AuthWrapped(props: any) {
+    return <AuthRequired><Component {...props} /></AuthRequired>;
+  };
+}
+
+const AuthDashboard = withAuth(Dashboard);
+const AuthLessonGenerator = withAuth(LessonGenerator);
+const AuthActionPlans = withAuth(ActionPlans);
+const AuthMyLessons = withAuth(MyLessons);
+const AuthSettings = withAuth(Settings);
+const AuthSISIntegration = withAuth(SISIntegration);
+const AuthAnalytics = withAuth(Analytics);
+const AuthScopeSequence = withAuth(ScopeSequence);
+const AuthScopeEditor = withAuth(ScopeEditor);
+const AuthEducatorInfluence = withAuth(EducatorInfluence);
+const AuthAssignments = withAuth(Assignments);
+const AuthCollaboration = withAuth(Collaboration);
+const AuthResourceLibrary = withAuth(ResourceLibrary);
+const AuthSiteAdmin = withAuth(SiteAdmin);
+const AuthSystemAdmin = withAuth(SystemAdmin);
+const AuthParentPortal = withAuth(ParentPortal);
+const AuthMilestones = withAuth(Milestones);
+const AuthClassroom = withAuth(Classroom);
+const AuthStudentJourney = withAuth(StudentJourney);
+const AuthStudentDashboard = withAuth(StudentDashboard);
+const AuthMyJourney = withAuth(MyJourney);
+const AuthProfessionalDevelopment = withAuth(ProfessionalDevelopment);
+const AuthPortfolioBuilder = withAuth(PortfolioBuilder);
+const AuthTransferApprovals = withAuth(TransferApprovals);
+const AuthGradebook = withAuth(Gradebook);
+const AuthLessonAuthoring = withAuth(LessonAuthoring);
+const AuthKnowResourcesAdmin = withAuth(KnowResourcesAdmin);
+const AuthMatriculationAdmin = withAuth(MatriculationAchievementAdmin);
+const AuthAlignmentDashboard = withAuth(AlignmentDashboard);
+const AuthScholarshipPlanner = withAuth(ScholarshipPlanner);
+const AuthEssayBuilder = withAuth(EssayBuilder);
+const AuthCampusActivities = withAuth(CampusActivities);
+const AuthStrengthsInventory = withAuth(StrengthsInventory);
+const AuthMentorConnect = withAuth(MentorConnect);
+const AuthDistrictAdmin = withAuth(DistrictAdmin);
+const AuthStandardsAdmin = withAuth(StandardsAdmin);
+
 function Router() {
   return (
     <Switch>
-      {/* Embed routes - handled separately without main layout */}
       <Route path="/embed/:rest*" component={EmbedRouter} />
       
-      <Route path="/" component={Dashboard} />
-      <Route path="/lesson-generator" component={LessonGenerator} />
+      <Route path="/" component={AuthDashboard} />
+      <Route path="/lesson-generator" component={AuthLessonGenerator} />
       <Route path="/assessments" component={Assessments} />
       <Route path="/careers" component={Careers} />
-      <Route path="/action-plans" component={ActionPlans} />
+      <Route path="/action-plans" component={AuthActionPlans} />
       <Route path="/resources" component={Resources} />
-      <Route path="/my-lessons" component={MyLessons} />
-      <Route path="/settings" component={Settings} />
-      <Route path="/sis-integration" component={SISIntegration} />
-      <Route path="/analytics" component={Analytics} />
-      <Route path="/scope-sequence" component={ScopeSequence} />
-      <Route path="/scope/:id" component={ScopeEditor} />
+      <Route path="/my-lessons" component={AuthMyLessons} />
+      <Route path="/settings" component={AuthSettings} />
+      <Route path="/sis-integration" component={AuthSISIntegration} />
+      <Route path="/analytics" component={AuthAnalytics} />
+      <Route path="/scope-sequence" component={AuthScopeSequence} />
+      <Route path="/scope/:id" component={AuthScopeEditor} />
       <Route path="/self-discovery" component={SelfDiscovery} />
-      <Route path="/educator-influence" component={EducatorInfluence} />
+      <Route path="/educator-influence" component={AuthEducatorInfluence} />
       <Route path="/shared/:shareId" component={SharedLesson} />
-      <Route path="/admin/standards" component={StandardsAdmin} />
+      <Route path="/admin/standards" component={AuthStandardsAdmin} />
       <Route path="/pricing" component={Pricing} />
       <Route path="/onboarding" component={Onboarding} />
-      <Route path="/assignments" component={Assignments} />
-      <Route path="/collaboration" component={Collaboration} />
-      <Route path="/collaboration/:id" component={Collaboration} />
-      <Route path="/resource-library" component={ResourceLibrary} />
-      <Route path="/admin" component={SiteAdmin} />
-      <Route path="/system-admin/:tab" component={SystemAdmin} />
-      <Route path="/system-admin" component={SystemAdmin} />
-      <Route path="/parent-portal" component={ParentPortal} />
-      <Route path="/milestones" component={Milestones} />
-      <Route path="/classroom" component={Classroom} />
-      <Route path="/student-journey/:studentId" component={StudentJourney} />
-      <Route path="/student-dashboard/:studentId" component={StudentDashboard} />
-      <Route path="/my-journey" component={MyJourney} />
-      <Route path="/professional-development" component={ProfessionalDevelopment} />
-      <Route path="/portfolio" component={PortfolioBuilder} />
+      <Route path="/assignments" component={AuthAssignments} />
+      <Route path="/collaboration" component={AuthCollaboration} />
+      <Route path="/collaboration/:id" component={AuthCollaboration} />
+      <Route path="/resource-library" component={AuthResourceLibrary} />
+      <Route path="/admin" component={AuthSiteAdmin} />
+      <Route path="/system-admin/:tab" component={AuthSystemAdmin} />
+      <Route path="/system-admin" component={AuthSystemAdmin} />
+      <Route path="/parent-portal" component={AuthParentPortal} />
+      <Route path="/milestones" component={AuthMilestones} />
+      <Route path="/classroom" component={AuthClassroom} />
+      <Route path="/student-journey/:studentId" component={AuthStudentJourney} />
+      <Route path="/student-dashboard/:studentId" component={AuthStudentDashboard} />
+      <Route path="/my-journey" component={AuthMyJourney} />
+      <Route path="/professional-development" component={AuthProfessionalDevelopment} />
+      <Route path="/portfolio" component={AuthPortfolioBuilder} />
       <Route path="/p/:slug" component={PortfolioView} />
-      <Route path="/transfer-approvals" component={TransferApprovals} />
-      <Route path="/gradebook" component={Gradebook} />
-      <Route path="/lesson-authoring" component={LessonAuthoring} />
-      <Route path="/admin/know-resources" component={KnowResourcesAdmin} />
-      <Route path="/admin/matriculation" component={MatriculationAchievementAdmin} />
-      <Route path="/alignment-dashboard" component={AlignmentDashboard} />
-      <Route path="/scholarship-planner" component={ScholarshipPlanner} />
-      <Route path="/essay-builder" component={EssayBuilder} />
-      <Route path="/campus-activities" component={CampusActivities} />
-      <Route path="/strengths-inventory" component={StrengthsInventory} />
-      <Route path="/mentor-connect" component={MentorConnect} />
-      <Route path="/district-admin" component={DistrictAdmin} />
-      <Route path="/district-admin/campuses" component={DistrictAdmin} />
+      <Route path="/transfer-approvals" component={AuthTransferApprovals} />
+      <Route path="/gradebook" component={AuthGradebook} />
+      <Route path="/lesson-authoring" component={AuthLessonAuthoring} />
+      <Route path="/admin/know-resources" component={AuthKnowResourcesAdmin} />
+      <Route path="/admin/matriculation" component={AuthMatriculationAdmin} />
+      <Route path="/alignment-dashboard" component={AuthAlignmentDashboard} />
+      <Route path="/scholarship-planner" component={AuthScholarshipPlanner} />
+      <Route path="/essay-builder" component={AuthEssayBuilder} />
+      <Route path="/campus-activities" component={AuthCampusActivities} />
+      <Route path="/strengths-inventory" component={AuthStrengthsInventory} />
+      <Route path="/mentor-connect" component={AuthMentorConnect} />
+      <Route path="/district-admin" component={AuthDistrictAdmin} />
+      <Route path="/district-admin/campuses" component={AuthDistrictAdmin} />
       <Route path="/help" component={HelpDesk} />
       <Route path="/dev-docs" component={DevDocs} />
       <Route component={NotFound} />
