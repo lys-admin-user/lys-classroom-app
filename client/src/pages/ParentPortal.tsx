@@ -41,7 +41,21 @@ import {
   GraduationCap,
   Milestone,
   Brain,
-  Compass
+  Compass,
+  Link2,
+  Copy,
+  Bell,
+  BellOff,
+  Megaphone,
+  MessageCircle,
+  CheckCircle,
+  XCircle,
+  PinIcon,
+  RefreshCw,
+  ChevronDown,
+  LogIn,
+  Home,
+  BookMarked
 } from "lucide-react";
 import { useAuth } from "@/hooks/use-auth";
 import { useTier } from "@/hooks/use-tier";
@@ -866,6 +880,15 @@ export default function ParentPortal() {
   const [lookupResult, setLookupResult] = useState<LookupResult | null>(null);
   const [lookupRelationship, setLookupRelationship] = useState("parent");
   const [isFindStudentOpen, setIsFindStudentOpen] = useState(false);
+  // v2 state: magic invite, messaging, notifications, broadcast
+  const [studentEmailRequest, setStudentEmailRequest] = useState("");
+  const [magicLinkResult, setMagicLinkResult] = useState<string | null>(null);
+  const [isMagicInviteOpen, setIsMagicInviteOpen] = useState(false);
+  const [magicInviteEmail, setMagicInviteEmail] = useState("");
+  const [magicInviteStudentId, setMagicInviteStudentId] = useState("");
+  const [selectedThreadId, setSelectedThreadId] = useState<string | null>(null);
+  const [newMessage, setNewMessage] = useState("");
+  const [activePortalTab, setActivePortalTab] = useState("overview");
   const { isAuthenticated, user } = useAuth();
   const { toast } = useToast();
   const { showAds } = useTier();
@@ -918,6 +941,41 @@ export default function ParentPortal() {
   const { data: schools = [] } = useQuery<SchoolOption[]>({
     queryKey: ["/api/parent-portal/schools"],
     enabled: isAuthenticated && !isStudent,
+  });
+
+  const isHomeschoolParent = userRole === 'homeschool_parent';
+
+  // v2 queries
+  const { data: broadcastPosts = [] } = useQuery<any[]>({
+    queryKey: ["/api/broadcast-posts"],
+    enabled: isAuthenticated,
+  });
+
+  const { data: messageThreads = [] } = useQuery<any[]>({
+    queryKey: ["/api/parent-messages/threads"],
+    enabled: isAuthenticated,
+  });
+
+  const { data: unreadCount = { count: 0 } } = useQuery<{ count: number }>({
+    queryKey: ["/api/parent-messages/unread-count"],
+    enabled: isAuthenticated,
+    refetchInterval: 30000,
+  });
+
+  const { data: threadMessages = [], isLoading: threadMessagesLoading } = useQuery<any[]>({
+    queryKey: ["/api/parent-messages/thread", selectedThreadId],
+    queryFn: async () => {
+      const res = await fetch(`/api/parent-messages/thread/${selectedThreadId}`);
+      if (!res.ok) return [];
+      return res.json();
+    },
+    enabled: isAuthenticated && !!selectedThreadId,
+    refetchInterval: selectedThreadId ? 10000 : false,
+  });
+
+  const { data: pendingRequests = [] } = useQuery<any[]>({
+    queryKey: ["/api/parent-portal/connection-requests"],
+    enabled: isAuthenticated && isStudent,
   });
 
   const lookupStudentMutation = useMutation({
@@ -1067,6 +1125,86 @@ export default function ParentPortal() {
         description: "Failed to add note. Please try again.",
         variant: "destructive",
       });
+    },
+  });
+
+  // v2 mutations
+  const requestByEmailMutation = useMutation({
+    mutationFn: async (data: { studentEmail: string; relationship: string }) => {
+      const response = await apiRequest("POST", "/api/parent-portal/request-by-email", data);
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/parent-portal/links"] });
+      setStudentEmailRequest("");
+      toast({ title: "Connection Requested", description: "Your request has been sent to the student for approval." });
+    },
+    onError: (error: any) => {
+      toast({ title: "Request Failed", description: error.message || "No LYS account found with that email.", variant: "destructive" });
+    },
+  });
+
+  const magicInviteMutation = useMutation({
+    mutationFn: async (data: { studentUserId: string; parentEmail: string; relationship: string; inviterType: string }) => {
+      const response = await apiRequest("POST", "/api/parent-portal/magic-invite", data);
+      return response.json();
+    },
+    onSuccess: (data: any) => {
+      setMagicLinkResult(data.magicLink);
+      queryClient.invalidateQueries({ queryKey: ["/api/parent-portal/invitations"] });
+    },
+    onError: () => {
+      toast({ title: "Error", description: "Failed to generate invite link.", variant: "destructive" });
+    },
+  });
+
+  const approveRequestMutation = useMutation({
+    mutationFn: async (linkId: string) => {
+      const response = await apiRequest("PATCH", `/api/parent-portal/connection-requests/${linkId}`, { action: "approve" });
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/parent-portal/connection-requests"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/parent-portal/links"] });
+      toast({ title: "Connection Approved", description: "The parent can now view your progress." });
+    },
+  });
+
+  const rejectRequestMutation = useMutation({
+    mutationFn: async (linkId: string) => {
+      const response = await apiRequest("PATCH", `/api/parent-portal/connection-requests/${linkId}`, { action: "reject" });
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/parent-portal/connection-requests"] });
+      toast({ title: "Request Declined", description: "The connection request has been declined." });
+    },
+  });
+
+  const sendMessageMutation = useMutation({
+    mutationFn: async (data: { threadId: string; content: string }) => {
+      const response = await apiRequest("POST", "/api/parent-messages/send", data);
+      return response.json();
+    },
+    onSuccess: () => {
+      setNewMessage("");
+      queryClient.invalidateQueries({ queryKey: ["/api/parent-messages/thread", selectedThreadId] });
+      queryClient.invalidateQueries({ queryKey: ["/api/parent-messages/threads"] });
+    },
+    onError: () => {
+      toast({ title: "Error", description: "Failed to send message.", variant: "destructive" });
+    },
+  });
+
+  const getOrCreateThreadMutation = useMutation({
+    mutationFn: async (data: { recipientUserId: string; linkId?: string }) => {
+      const response = await apiRequest("POST", "/api/parent-messages/thread", data);
+      return response.json();
+    },
+    onSuccess: (thread: any) => {
+      setSelectedThreadId(thread.id);
+      setActivePortalTab("messages");
+      queryClient.invalidateQueries({ queryKey: ["/api/parent-messages/threads"] });
     },
   });
 
@@ -1368,6 +1506,13 @@ export default function ParentPortal() {
               <Mail className="mr-2 h-4 w-4" />
               Pending ({invitations.filter(i => i.status === 'pending').length})
             </TabsTrigger>
+            {pendingRequests.length > 0 && (
+              <TabsTrigger value="requests" data-testid="tab-connection-requests" className="relative">
+                <UserPlus className="mr-2 h-4 w-4" />
+                Requests
+                <Badge className="ml-1 px-1.5 py-0 text-xs">{pendingRequests.length}</Badge>
+              </TabsTrigger>
+            )}
           </TabsList>
 
           <TabsContent value="linked" className="space-y-4">
@@ -1500,6 +1645,60 @@ export default function ParentPortal() {
                       >
                         <Trash2 className="h-4 w-4" />
                       </Button>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            )}
+          </TabsContent>
+
+          {/* v2: Connection Requests tab — parents who requested by email */}
+          <TabsContent value="requests" className="space-y-4">
+            {pendingRequests.length === 0 ? (
+              <Card>
+                <CardContent className="flex flex-col items-center justify-center py-12 text-center">
+                  <CheckCircle className="h-12 w-12 text-muted-foreground opacity-50 mb-3" />
+                  <p className="font-medium">No Pending Requests</p>
+                  <p className="text-muted-foreground text-sm mt-1">No parents are waiting for your approval.</p>
+                </CardContent>
+              </Card>
+            ) : (
+              <div className="space-y-3">
+                {pendingRequests.map((req: any) => (
+                  <Card key={req.id}>
+                    <CardContent className="flex items-center justify-between p-4">
+                      <div className="flex items-center gap-3">
+                        <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center">
+                          <Users className="h-5 w-5 text-primary" />
+                        </div>
+                        <div>
+                          <p className="font-medium text-sm capitalize">{req.relationship || "Parent"} Connection Request</p>
+                          <p className="text-xs text-muted-foreground">
+                            Requested {new Date(req.invitedAt || req.createdAt).toLocaleDateString()}
+                          </p>
+                        </div>
+                      </div>
+                      <div className="flex gap-2">
+                        <Button
+                          size="sm"
+                          onClick={() => approveRequestMutation.mutate(req.id)}
+                          disabled={approveRequestMutation.isPending}
+                          data-testid={`button-approve-request-${req.id}`}
+                        >
+                          <CheckCircle className="mr-1 h-4 w-4" />
+                          Approve
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => rejectRequestMutation.mutate(req.id)}
+                          disabled={rejectRequestMutation.isPending}
+                          data-testid={`button-reject-request-${req.id}`}
+                        >
+                          <XCircle className="mr-1 h-4 w-4" />
+                          Decline
+                        </Button>
+                      </div>
                     </CardContent>
                   </Card>
                 ))}
@@ -1688,6 +1887,284 @@ export default function ParentPortal() {
               <StudentDashboard studentData={studentData} isLoading={studentDataLoading} />
             )}
           </div>
+        </div>
+      )}
+
+      {/* ── v2: PARENT CONNECT BY EMAIL (for homeschool parents or any parent-first flow) ── */}
+      {!isStudent && (
+        <div className="mt-6">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Link2 className="h-5 w-5 text-primary" />
+                Connect by Student Email
+              </CardTitle>
+              <CardDescription>
+                Enter your student's LYS account email to send them a connection request. They must already have an account.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="flex gap-2">
+                <Input
+                  type="email"
+                  placeholder="student@example.com"
+                  value={studentEmailRequest}
+                  onChange={(e) => setStudentEmailRequest(e.target.value)}
+                  className="flex-1"
+                  data-testid="input-student-email-request"
+                />
+                <Button
+                  onClick={() => requestByEmailMutation.mutate({ studentEmail: studentEmailRequest, relationship: "parent" })}
+                  disabled={!studentEmailRequest || requestByEmailMutation.isPending}
+                  data-testid="button-request-by-email"
+                >
+                  {requestByEmailMutation.isPending ? <RefreshCw className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
+                  <span className="ml-2 hidden sm:inline">Request</span>
+                </Button>
+              </div>
+              <p className="text-xs text-muted-foreground mt-2">
+                The student will be notified and can approve or decline your request.
+              </p>
+            </CardContent>
+          </Card>
+        </div>
+      )}
+
+      {/* ── v2: BROADCAST FEED (read-only for parents/students, write for educators/admins) ── */}
+      {broadcastPosts.length > 0 && (
+        <div className="mt-6">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Megaphone className="h-5 w-5 text-primary" />
+                Announcements
+              </CardTitle>
+              <CardDescription>Class-wide announcements from your teachers and campus</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              {broadcastPosts.slice(0, 5).map((post: any) => (
+                <div
+                  key={post.id}
+                  className={`p-4 rounded-lg border ${post.isPinned ? 'border-primary/30 bg-primary/5' : 'border-border'}`}
+                >
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="flex-1">
+                      <div className="flex items-center gap-2 mb-1">
+                        {post.isPinned && <PinIcon className="h-3 w-3 text-primary" />}
+                        <h4 className="font-semibold text-sm">{post.title}</h4>
+                        <Badge variant="secondary" className="text-xs capitalize">{post.audience}</Badge>
+                      </div>
+                      <p className="text-sm text-muted-foreground">{post.content}</p>
+                      <p className="text-xs text-muted-foreground mt-2">
+                        {new Date(post.createdAt).toLocaleDateString()}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </CardContent>
+          </Card>
+        </div>
+      )}
+
+      {/* ── v2: SECURE 1-TO-1 MESSAGES ── */}
+      <div className="mt-6">
+        <Card>
+          <CardHeader>
+            <div className="flex items-center justify-between">
+              <CardTitle className="flex items-center gap-2">
+                <MessageCircle className="h-5 w-5 text-primary" />
+                Messages
+                {unreadCount.count > 0 && (
+                  <Badge className="ml-1">{unreadCount.count}</Badge>
+                )}
+              </CardTitle>
+            </div>
+            <CardDescription>Secure one-to-one conversations between parents, students, and teachers</CardDescription>
+          </CardHeader>
+          <CardContent>
+            {messageThreads.length === 0 ? (
+              <div className="text-center py-8">
+                <MessageCircle className="h-12 w-12 mx-auto text-muted-foreground opacity-50 mb-3" />
+                <p className="text-muted-foreground text-sm">No conversations yet.</p>
+                <p className="text-xs text-muted-foreground mt-1">
+                  Messages you exchange with parents, students, or teachers will appear here.
+                </p>
+              </div>
+            ) : (
+              <div className="grid gap-4 md:grid-cols-3">
+                {/* Thread List */}
+                <div className="space-y-2">
+                  {messageThreads.map((thread: any) => {
+                    const other = thread.otherParticipant;
+                    const last = thread.lastMessage;
+                    return (
+                      <button
+                        key={thread.id}
+                        onClick={() => setSelectedThreadId(thread.id)}
+                        className={`w-full p-3 rounded-md text-left border transition-colors ${selectedThreadId === thread.id ? 'bg-primary/10 border-primary/30' : 'hover:bg-muted/50 border-border'}`}
+                        data-testid={`button-thread-${thread.id}`}
+                      >
+                        <div className="flex items-center gap-2">
+                          <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
+                            <Users className="h-4 w-4 text-primary" />
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <p className="font-medium text-sm truncate">
+                              {other ? `${other.firstName || ''} ${other.lastName || ''}`.trim() || 'Unknown' : 'Unknown'}
+                            </p>
+                            {last && (
+                              <p className="text-xs text-muted-foreground truncate">{last.content}</p>
+                            )}
+                          </div>
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
+
+                {/* Message View */}
+                <div className="md:col-span-2 border rounded-lg flex flex-col min-h-[300px]">
+                  {!selectedThreadId ? (
+                    <div className="flex-1 flex items-center justify-center text-muted-foreground text-sm">
+                      Select a conversation
+                    </div>
+                  ) : (
+                    <>
+                      <ScrollArea className="flex-1 p-4 max-h-[300px]">
+                        {threadMessagesLoading ? (
+                          <div className="space-y-2">
+                            <Skeleton className="h-10 w-3/4" />
+                            <Skeleton className="h-10 w-1/2 ml-auto" />
+                          </div>
+                        ) : threadMessages.length === 0 ? (
+                          <p className="text-center text-muted-foreground text-sm py-8">No messages yet. Say hello!</p>
+                        ) : (
+                          <div className="space-y-3">
+                            {threadMessages.map((msg: any) => {
+                              const isMine = msg.senderUserId === user?.id;
+                              return (
+                                <div key={msg.id} className={`flex ${isMine ? 'justify-end' : 'justify-start'}`}>
+                                  <div className={`max-w-[70%] px-3 py-2 rounded-lg text-sm ${isMine ? 'bg-primary text-primary-foreground' : 'bg-muted'}`}>
+                                    {msg.content}
+                                    <p className={`text-xs mt-1 opacity-60`}>
+                                      {new Date(msg.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                    </p>
+                                  </div>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        )}
+                      </ScrollArea>
+                      <div className="border-t p-3 flex gap-2">
+                        <Input
+                          placeholder="Type a message..."
+                          value={newMessage}
+                          onChange={(e) => setNewMessage(e.target.value)}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter' && !e.shiftKey && newMessage.trim() && selectedThreadId) {
+                              e.preventDefault();
+                              sendMessageMutation.mutate({ threadId: selectedThreadId, content: newMessage.trim() });
+                            }
+                          }}
+                          data-testid="input-new-message"
+                        />
+                        <Button
+                          size="sm"
+                          onClick={() => {
+                            if (newMessage.trim() && selectedThreadId) {
+                              sendMessageMutation.mutate({ threadId: selectedThreadId, content: newMessage.trim() });
+                            }
+                          }}
+                          disabled={!newMessage.trim() || sendMessageMutation.isPending}
+                          data-testid="button-send-message"
+                        >
+                          <Send className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </>
+                  )}
+                </div>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* ── v2: MAGIC LINK INVITE (for teachers/admins to invite parents) ── */}
+      {!isStudent && ['educator', 'campus_admin', 'district_admin', 'homeschool_parent'].includes(userRole || '') && (
+        <div className="mt-6">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Link2 className="h-5 w-5" />
+                Generate Magic Link Invite
+              </CardTitle>
+              <CardDescription>Create a copyable link to share with parents — no email service required</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {magicLinkResult ? (
+                <div className="p-3 bg-muted rounded-lg">
+                  <p className="text-xs text-muted-foreground mb-2 font-medium">Magic Link (share this):</p>
+                  <div className="flex items-center gap-2">
+                    <code className="text-xs flex-1 break-all">{magicLinkResult}</code>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => {
+                        navigator.clipboard.writeText(magicLinkResult);
+                        toast({ title: "Copied!", description: "Link copied to clipboard." });
+                      }}
+                      data-testid="button-copy-magic-link"
+                    >
+                      <Copy className="h-4 w-4" />
+                    </Button>
+                  </div>
+                  <Button variant="ghost" size="sm" className="mt-2" onClick={() => setMagicLinkResult(null)}>
+                    Generate Another
+                  </Button>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <Label className="text-xs">Student's LYS User ID</Label>
+                      <Input
+                        placeholder="Student ID"
+                        value={magicInviteStudentId}
+                        onChange={(e) => setMagicInviteStudentId(e.target.value)}
+                        data-testid="input-magic-invite-student-id"
+                      />
+                    </div>
+                    <div>
+                      <Label className="text-xs">Parent Email</Label>
+                      <Input
+                        type="email"
+                        placeholder="parent@example.com"
+                        value={magicInviteEmail}
+                        onChange={(e) => setMagicInviteEmail(e.target.value)}
+                        data-testid="input-magic-invite-email"
+                      />
+                    </div>
+                  </div>
+                  <Button
+                    onClick={() => magicInviteMutation.mutate({
+                      studentUserId: magicInviteStudentId,
+                      parentEmail: magicInviteEmail,
+                      relationship: "parent",
+                      inviterType: userRole || "educator",
+                    })}
+                    disabled={!magicInviteStudentId || !magicInviteEmail || magicInviteMutation.isPending}
+                    data-testid="button-generate-magic-link"
+                  >
+                    {magicInviteMutation.isPending ? <RefreshCw className="mr-2 h-4 w-4 animate-spin" /> : <Link2 className="mr-2 h-4 w-4" />}
+                    Generate Link
+                  </Button>
+                </div>
+              )}
+            </CardContent>
+          </Card>
         </div>
       )}
     </div>

@@ -39,7 +39,14 @@ import {
   Clock,
   Filter,
   ArrowRightLeft,
-  Send
+  Send,
+  Megaphone,
+  Bell,
+  Link2,
+  PinIcon,
+  MessageCircle,
+  Shield,
+  Moon
 } from "lucide-react";
 import { Link } from "wouter";
 import type { Class, Student, InsertClass, InsertStudent, AccommodationType, Organization, OrgMembership, StudentNote, AttendanceRecord, StudentTransferRequest } from "@shared/schema";
@@ -101,7 +108,17 @@ const ACCOMMODATION_LABELS: Record<AccommodationType, string> = {
 export default function Classroom() {
   const { user, isLoading: authLoading } = useAuth();
   const { toast } = useToast();
-  const [activeTab, setActiveTab] = useState<"classes" | "students" | "lesson-authors">("classes");
+  const [activeTab, setActiveTab] = useState<"classes" | "students" | "lesson-authors" | "communications">("classes");
+  // Communications tab state
+  const [broadcastTitle, setBroadcastTitle] = useState("");
+  const [broadcastContent, setBroadcastContent] = useState("");
+  const [broadcastAudience, setBroadcastAudience] = useState("parents");
+  const [broadcastClassId, setBroadcastClassId] = useState("");
+  const [qhStartTime, setQhStartTime] = useState("21:00");
+  const [qhEndTime, setQhEndTime] = useState("07:00");
+  const [qhDays, setQhDays] = useState<number[]>([0, 6]);
+  const [qhTimezone, setQhTimezone] = useState("America/Chicago");
+  const [isCreateBroadcastOpen, setIsCreateBroadcastOpen] = useState(false);
   const [isCreateClassOpen, setIsCreateClassOpen] = useState(false);
   const [isCreateStudentOpen, setIsCreateStudentOpen] = useState(false);
   const [editingClass, setEditingClass] = useState<Class | null>(null);
@@ -132,6 +149,10 @@ export default function Classroom() {
   // Transfer request state
   const [isTransferDialogOpen, setIsTransferDialogOpen] = useState(false);
   const [transferStudent, setTransferStudent] = useState<Student | null>(null);
+  // Invite parent state
+  const [inviteParentStudent, setInviteParentStudent] = useState<Student | null>(null);
+  const [isInviteParentOpen, setIsInviteParentOpen] = useState(false);
+  const [generatedMagicLink, setGeneratedMagicLink] = useState<string>("");
   const [transferType, setTransferType] = useState<"educator" | "organization">("organization");
   const [targetOrganizationId, setTargetOrganizationId] = useState("");
   const [transferReason, setTransferReason] = useState("");
@@ -586,6 +607,91 @@ export default function Classroom() {
     },
   });
 
+  // Communications queries
+  const { data: portfolioReports = [] } = useQuery<any[]>({
+    queryKey: ["/api/portfolio-reports"],
+    enabled: !!user?.id,
+  });
+
+  const { data: quietHoursList = [] } = useQuery<any[]>({
+    queryKey: ["/api/quiet-hours", user?.id],
+    queryFn: async () => {
+      const res = await fetch(`/api/quiet-hours?teacherUserId=${user?.id}`);
+      if (!res.ok) return [];
+      return res.json();
+    },
+    enabled: !!user?.id,
+  });
+
+  const { data: broadcastPosts = [] } = useQuery<any[]>({
+    queryKey: ["/api/broadcast-posts"],
+    enabled: !!user?.id,
+  });
+
+  const createBroadcastMutation = useMutation({
+    mutationFn: async (data: { title: string; content: string; audience: string; classId?: string }) => {
+      const response = await apiRequest("POST", "/api/broadcast-posts", data);
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/broadcast-posts"] });
+      setBroadcastTitle("");
+      setBroadcastContent("");
+      setIsCreateBroadcastOpen(false);
+      toast({ title: "Announcement posted", description: "Your announcement has been sent to parents and/or students." });
+    },
+    onError: () => {
+      toast({ title: "Error", description: "Failed to post announcement.", variant: "destructive" });
+    },
+  });
+
+  const deleteBroadcastMutation = useMutation({
+    mutationFn: async (postId: string) => {
+      await apiRequest("DELETE", `/api/broadcast-posts/${postId}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/broadcast-posts"] });
+      toast({ title: "Announcement removed" });
+    },
+  });
+
+  const createQuietHoursMutation = useMutation({
+    mutationFn: async (data: { startTime: string; endTime: string; daysOfWeek: number[]; timezone: string }) => {
+      const response = await apiRequest("POST", "/api/quiet-hours", { ...data, teacherUserId: user?.id });
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/quiet-hours", user?.id] });
+      toast({ title: "Quiet Hours Set", description: "Students will not receive messages during the set times." });
+    },
+    onError: () => {
+      toast({ title: "Error", description: "Failed to save quiet hours.", variant: "destructive" });
+    },
+  });
+
+  const deleteQuietHoursMutation = useMutation({
+    mutationFn: async (id: string) => {
+      await apiRequest("DELETE", `/api/quiet-hours/${id}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/quiet-hours", user?.id] });
+      toast({ title: "Quiet Hours Removed" });
+    },
+  });
+
+  const generateMagicLinkMutation = useMutation({
+    mutationFn: async (studentUserId: string) => {
+      const response = await apiRequest("POST", "/api/parent-portal/magic-invite", { studentUserId, inviterType: "educator" });
+      return response.json();
+    },
+    onSuccess: (data: any) => {
+      setGeneratedMagicLink(data.magicLink || "");
+    },
+    onError: () => {
+      toast({ title: "Error", description: "Failed to generate invite link.", variant: "destructive" });
+    },
+  });
+
   // Filtered students based on search and filters
   const filteredStudents = students.filter(student => {
     const matchesSearch = studentSearchQuery === "" || 
@@ -775,6 +881,10 @@ export default function Classroom() {
               Lesson Authors ({campusLessonAuthors.length})
             </TabsTrigger>
           )}
+          <TabsTrigger value="communications" data-testid="tab-communications">
+            <Megaphone className="h-4 w-4 mr-2" />
+            Communications
+          </TabsTrigger>
         </TabsList>
 
         {/* Classes Tab */}
@@ -1312,6 +1422,19 @@ export default function Classroom() {
                           <TrendingUp className="h-4 w-4" />
                         </Button>
                       </Link>
+                      <Button
+                        size="icon"
+                        variant="ghost"
+                        title="Invite Parent"
+                        onClick={() => {
+                          setInviteParentStudent(student);
+                          setGeneratedMagicLink("");
+                          setIsInviteParentOpen(true);
+                        }}
+                        data-testid={`button-invite-parent-${student.id}`}
+                      >
+                        <UserPlus className="h-4 w-4 text-green-600" />
+                      </Button>
                       {isCampusAdmin && (
                         <Button
                           size="icon"
@@ -1521,7 +1644,360 @@ export default function Classroom() {
             )}
           </TabsContent>
         )}
+
+        {/* Communications Tab */}
+        <TabsContent value="communications" className="space-y-6">
+          {/* Quiet Hours */}
+          <Card>
+            <CardHeader>
+              <div className="flex items-center gap-2">
+                <Moon className="h-5 w-5 text-blue-500" />
+                <CardTitle>Quiet Hours</CardTitle>
+              </div>
+              <CardDescription>
+                Set times when students and parents will not receive notifications or messages from your classes.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {quietHoursList.length > 0 && (
+                <div className="space-y-2 mb-4">
+                  {quietHoursList.map((qh: any) => (
+                    <div key={qh.id} className="flex items-center justify-between p-3 rounded-lg border bg-muted/30">
+                      <div className="flex items-center gap-3">
+                        <Clock className="h-4 w-4 text-muted-foreground" />
+                        <span className="text-sm font-medium">{qh.startTime} – {qh.endTime}</span>
+                        <Badge variant="outline" className="text-xs">
+                          {Array.isArray(qh.daysOfWeek) ? qh.daysOfWeek.map((d: number) => ["Sun","Mon","Tue","Wed","Thu","Fri","Sat"][d]).join(", ") : ""}
+                        </Badge>
+                        <span className="text-xs text-muted-foreground">{qh.timezone}</span>
+                      </div>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => deleteQuietHoursMutation.mutate(qh.id)}
+                        disabled={deleteQuietHoursMutation.isPending}
+                        data-testid={`button-delete-quiet-hours-${qh.id}`}
+                      >
+                        <X className="h-4 w-4 text-destructive" />
+                      </Button>
+                    </div>
+                  ))}
+                </div>
+              )}
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label>Start Time (No notifications after)</Label>
+                  <Input
+                    type="time"
+                    value={qhStartTime}
+                    onChange={(e) => setQhStartTime(e.target.value)}
+                    data-testid="input-qh-start"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>End Time (Resume at)</Label>
+                  <Input
+                    type="time"
+                    value={qhEndTime}
+                    onChange={(e) => setQhEndTime(e.target.value)}
+                    data-testid="input-qh-end"
+                  />
+                </div>
+              </div>
+              <div className="space-y-2">
+                <Label>Days of Week</Label>
+                <div className="flex gap-2 flex-wrap">
+                  {["Sun","Mon","Tue","Wed","Thu","Fri","Sat"].map((day, idx) => (
+                    <Button
+                      key={day}
+                      type="button"
+                      variant={qhDays.includes(idx) ? "default" : "outline"}
+                      size="sm"
+                      onClick={() => setQhDays(prev => prev.includes(idx) ? prev.filter(d => d !== idx) : [...prev, idx])}
+                      data-testid={`button-qh-day-${day}`}
+                    >
+                      {day}
+                    </Button>
+                  ))}
+                </div>
+              </div>
+              <div className="space-y-2">
+                <Label>Timezone</Label>
+                <Select value={qhTimezone} onValueChange={setQhTimezone}>
+                  <SelectTrigger data-testid="select-qh-timezone">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="America/Chicago">Central (CT)</SelectItem>
+                    <SelectItem value="America/New_York">Eastern (ET)</SelectItem>
+                    <SelectItem value="America/Denver">Mountain (MT)</SelectItem>
+                    <SelectItem value="America/Los_Angeles">Pacific (PT)</SelectItem>
+                    <SelectItem value="UTC">UTC</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <Button
+                onClick={() => createQuietHoursMutation.mutate({ startTime: qhStartTime, endTime: qhEndTime, daysOfWeek: qhDays, timezone: qhTimezone })}
+                disabled={createQuietHoursMutation.isPending || qhDays.length === 0}
+                data-testid="button-save-quiet-hours"
+              >
+                {createQuietHoursMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Moon className="h-4 w-4 mr-2" />}
+                Save Quiet Hours
+              </Button>
+            </CardContent>
+          </Card>
+
+          {/* Broadcast Announcements */}
+          <Card>
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <Megaphone className="h-5 w-5 text-amber-500" />
+                  <CardTitle>Announcements</CardTitle>
+                </div>
+                <Button
+                  size="sm"
+                  onClick={() => setIsCreateBroadcastOpen(true)}
+                  data-testid="button-open-create-broadcast"
+                >
+                  <Plus className="h-4 w-4 mr-2" />
+                  New Announcement
+                </Button>
+              </div>
+              <CardDescription>
+                Post announcements visible to parents and/or students in your classes.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              {broadcastPosts.length === 0 ? (
+                <div className="text-center py-8 text-muted-foreground">
+                  <Megaphone className="h-10 w-10 mx-auto mb-3 opacity-30" />
+                  <p>No announcements yet. Post your first to keep parents informed.</p>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {broadcastPosts.map((post: any) => (
+                    <div key={post.id} className="p-4 rounded-lg border bg-card space-y-2">
+                      <div className="flex items-start justify-between">
+                        <div className="flex items-center gap-2">
+                          {post.isPinned && <PinIcon className="h-4 w-4 text-amber-500" />}
+                          <h4 className="font-medium">{post.title}</h4>
+                          <Badge variant="outline" className="text-xs">{post.audience}</Badge>
+                        </div>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => deleteBroadcastMutation.mutate(post.id)}
+                          data-testid={`button-delete-broadcast-${post.id}`}
+                        >
+                          <X className="h-4 w-4 text-destructive" />
+                        </Button>
+                      </div>
+                      <p className="text-sm text-muted-foreground">{post.content}</p>
+                      <p className="text-xs text-muted-foreground">{new Date(post.createdAt).toLocaleDateString()}</p>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* Portfolio Reports */}
+          <Card>
+            <CardHeader>
+              <div className="flex items-center gap-2">
+                <Shield className="h-5 w-5 text-red-500" />
+                <CardTitle>Portfolio Oversight</CardTitle>
+                {portfolioReports.length > 0 && (
+                  <Badge variant="destructive" className="ml-auto">{portfolioReports.length} flagged</Badge>
+                )}
+              </div>
+              <CardDescription>
+                Items flagged for review across your students' digital portfolios. Flag items directly from any student's public portfolio page.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              {portfolioReports.length === 0 ? (
+                <div className="text-center py-6 text-muted-foreground text-sm">
+                  <Shield className="h-8 w-8 mx-auto mb-2 opacity-30" />
+                  <p>No flagged portfolio items. You can flag items from any student's portfolio view.</p>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {portfolioReports.map((report: any) => (
+                    <div key={report.id} className="flex items-start justify-between p-3 rounded-lg border bg-red-50 dark:bg-red-950/20">
+                      <div className="space-y-1">
+                        <div className="flex items-center gap-2">
+                          <Shield className="h-4 w-4 text-red-500" />
+                          <span className="text-sm font-medium">Item #{report.portfolioItemId?.slice(0, 8)}</span>
+                          <Badge variant="outline" className="text-xs border-red-300 text-red-700 dark:text-red-400">
+                            {report.reason}
+                          </Badge>
+                          <Badge 
+                            variant="outline" 
+                            className={`text-xs ${report.status === "resolved" ? "border-green-300 text-green-700" : "border-amber-300 text-amber-700"}`}
+                          >
+                            {report.status || "pending"}
+                          </Badge>
+                        </div>
+                        {report.notes && (
+                          <p className="text-xs text-muted-foreground pl-6">{report.notes}</p>
+                        )}
+                        <p className="text-xs text-muted-foreground pl-6">
+                          Reported {new Date(report.createdAt).toLocaleDateString()}
+                        </p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* Create Broadcast Dialog */}
+        <Dialog open={isCreateBroadcastOpen} onOpenChange={setIsCreateBroadcastOpen}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>New Announcement</DialogTitle>
+              <DialogDescription>Post an announcement to parents and/or students.</DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4 py-2">
+              <div className="space-y-2">
+                <Label>Title</Label>
+                <Input
+                  value={broadcastTitle}
+                  onChange={(e) => setBroadcastTitle(e.target.value)}
+                  placeholder="e.g. Field Trip Permission Slip Due"
+                  data-testid="input-broadcast-title"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Message</Label>
+                <Textarea
+                  value={broadcastContent}
+                  onChange={(e) => setBroadcastContent(e.target.value)}
+                  placeholder="Write your announcement..."
+                  rows={4}
+                  data-testid="input-broadcast-content"
+                />
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label>Audience</Label>
+                  <Select value={broadcastAudience} onValueChange={setBroadcastAudience}>
+                    <SelectTrigger data-testid="select-broadcast-audience">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="parents">Parents Only</SelectItem>
+                      <SelectItem value="students">Students Only</SelectItem>
+                      <SelectItem value="all">Parents & Students</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label>Class (Optional)</Label>
+                  <Select value={broadcastClassId} onValueChange={setBroadcastClassId}>
+                    <SelectTrigger data-testid="select-broadcast-class">
+                      <SelectValue placeholder="All my classes" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="">All my classes</SelectItem>
+                      {classes.map((cls: any) => (
+                        <SelectItem key={cls.id} value={cls.id}>{cls.name}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setIsCreateBroadcastOpen(false)}>Cancel</Button>
+              <Button
+                onClick={() => createBroadcastMutation.mutate({
+                  title: broadcastTitle,
+                  content: broadcastContent,
+                  audience: broadcastAudience,
+                  ...(broadcastClassId ? { classId: broadcastClassId } : {}),
+                })}
+                disabled={createBroadcastMutation.isPending || !broadcastTitle.trim() || !broadcastContent.trim()}
+                data-testid="button-submit-broadcast"
+              >
+                {createBroadcastMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Send className="h-4 w-4 mr-2" />}
+                Post Announcement
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       </Tabs>
+
+      {/* Invite Parent Dialog */}
+      <Dialog open={isInviteParentOpen} onOpenChange={(open) => { setIsInviteParentOpen(open); if (!open) { setGeneratedMagicLink(""); setInviteParentStudent(null); } }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Invite Parent / Guardian</DialogTitle>
+            <DialogDescription>
+              Generate a magic link for {inviteParentStudent?.firstName} {inviteParentStudent?.lastName}'s parent or guardian to connect to LYS.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            <p className="text-sm text-muted-foreground">
+              Share this link with the parent. They will be prompted to create or sign into a LYS account and will be automatically linked to their child's profile.
+            </p>
+            {generatedMagicLink ? (
+              <div className="space-y-3">
+                <div className="flex items-center gap-2 p-3 rounded-lg border bg-muted/50">
+                  <Link2 className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+                  <span className="text-xs break-all flex-1">{generatedMagicLink}</span>
+                </div>
+                <Button
+                  className="w-full"
+                  onClick={() => {
+                    navigator.clipboard.writeText(generatedMagicLink);
+                    toast({ title: "Link copied!", description: "Share this link with the parent." });
+                  }}
+                  data-testid="button-copy-magic-link"
+                >
+                  <Link2 className="h-4 w-4 mr-2" />
+                  Copy Link
+                </Button>
+                <Button
+                  variant="outline"
+                  className="w-full"
+                  onClick={() => setGeneratedMagicLink("")}
+                  data-testid="button-regenerate-link"
+                >
+                  Generate New Link
+                </Button>
+              </div>
+            ) : (
+              <Button
+                className="w-full"
+                onClick={() => {
+                  if (inviteParentStudent?.userId) {
+                    generateMagicLinkMutation.mutate(inviteParentStudent.userId);
+                  } else {
+                    toast({ title: "No account linked", description: "This student does not have a LYS user account yet.", variant: "destructive" });
+                  }
+                }}
+                disabled={generateMagicLinkMutation.isPending}
+                data-testid="button-generate-magic-link"
+              >
+                {generateMagicLinkMutation.isPending ? (
+                  <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                ) : (
+                  <Link2 className="h-4 w-4 mr-2" />
+                )}
+                Generate Invite Link
+              </Button>
+            )}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsInviteParentOpen(false)}>Close</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Edit Class Dialog */}
       <Dialog open={!!editingClass} onOpenChange={(open) => !open && setEditingClass(null)}>

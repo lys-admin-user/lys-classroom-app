@@ -2061,6 +2061,9 @@ export const parentInvitations = pgTable("parent_invitations", {
   parentEmail: text("parent_email").notNull(),
   relationship: text("relationship").notNull().default("parent"),
   token: varchar("token").notNull().unique(),
+  magicToken: varchar("magic_token").unique(), // copyable magic link token (no email service needed)
+  inviterUserId: varchar("inviter_user_id"), // who sent the invite (student, parent, teacher, admin)
+  inviterType: text("inviter_type").notNull().default("student"), // student, parent, teacher, campus_admin
   status: text("status").notNull().default("pending"), // pending, accepted, expired, revoked
   expiresAt: timestamp("expires_at").notNull(),
   acceptedAt: timestamp("accepted_at"),
@@ -2087,6 +2090,124 @@ export const parentProgressNotes = pgTable("parent_progress_notes", {
 export const insertParentProgressNoteSchema = createInsertSchema(parentProgressNotes).omit({ id: true, createdAt: true });
 export type InsertParentProgressNote = z.infer<typeof insertParentProgressNoteSchema>;
 export type ParentProgressNote = typeof parentProgressNotes.$inferSelect;
+
+// Quiet Hours Table (teacher/admin-set messaging blackout windows)
+export const quietHours = pgTable("quiet_hours", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  orgId: varchar("org_id"), // campus-level default when set
+  teacherUserId: varchar("teacher_user_id"), // teacher override; null = org-level
+  classId: varchar("class_id"), // optional: scoped to a specific class
+  startTime: varchar("start_time").notNull(), // "HH:MM" 24h format
+  endTime: varchar("end_time").notNull(),   // "HH:MM" 24h format
+  timezone: varchar("timezone").notNull().default("America/Chicago"),
+  daysOfWeek: jsonb("days_of_week").$type<number[]>().default([0, 6]), // 0=Sun..6=Sat
+  isActive: boolean("is_active").notNull().default(true),
+  createdBy: varchar("created_by").notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertQuietHoursSchema = createInsertSchema(quietHours).omit({ id: true, createdAt: true, updatedAt: true });
+export type InsertQuietHours = z.infer<typeof insertQuietHoursSchema>;
+export type QuietHours = typeof quietHours.$inferSelect;
+
+// Parent Broadcast Posts (teacher/admin → all parents/students)
+export const parentBroadcastPosts = pgTable("parent_broadcast_posts", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  authorUserId: varchar("author_user_id").notNull(),
+  authorType: text("author_type").notNull().default("teacher"), // teacher, campus_admin
+  orgId: varchar("org_id"), // scoped to org/campus
+  classId: varchar("class_id"), // optional: class-scoped
+  title: text("title").notNull(),
+  content: text("content").notNull(),
+  audience: text("audience").notNull().default("parents"), // parents, students, all
+  isPinned: boolean("is_pinned").notNull().default(false),
+  isActive: boolean("is_active").notNull().default(true),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertParentBroadcastPostSchema = createInsertSchema(parentBroadcastPosts).omit({ id: true, createdAt: true, updatedAt: true });
+export type InsertParentBroadcastPost = z.infer<typeof insertParentBroadcastPostSchema>;
+export type ParentBroadcastPost = typeof parentBroadcastPosts.$inferSelect;
+
+// Parent Notification Preferences (per parent-student link)
+export const parentNotificationPreferences = pgTable("parent_notification_preferences", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  parentUserId: varchar("parent_user_id").notNull(),
+  linkId: varchar("link_id").notNull(), // references parent_student_links.id
+  preferences: jsonb("preferences").$type<{
+    milestones: boolean;
+    lowEngagement: boolean;
+    newPortfolioItems: boolean;
+    assignmentGrades: boolean;
+    messages: boolean;
+    broadcastPosts: boolean;
+    goalUpdates: boolean;
+    careerActivity: boolean;
+  }>().default({
+    milestones: true,
+    lowEngagement: true,
+    newPortfolioItems: true,
+    assignmentGrades: true,
+    messages: true,
+    broadcastPosts: true,
+    goalUpdates: true,
+    careerActivity: false,
+  }),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertParentNotificationPreferencesSchema = createInsertSchema(parentNotificationPreferences).omit({ id: true, updatedAt: true });
+export type InsertParentNotificationPreferences = z.infer<typeof insertParentNotificationPreferencesSchema>;
+export type ParentNotificationPreferences = typeof parentNotificationPreferences.$inferSelect;
+
+// Portfolio Reports (teacher oversight/flagging)
+export const portfolioReports = pgTable("portfolio_reports", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  portfolioItemId: varchar("portfolio_item_id").notNull(),
+  studentUserId: varchar("student_user_id").notNull(),
+  reportedByUserId: varchar("reported_by_user_id").notNull(),
+  reason: text("reason").notNull(), // inappropriate, copyright, incomplete, other
+  notes: text("notes"),
+  status: text("status").notNull().default("pending"), // pending, reviewed, dismissed, escalated
+  resolvedByUserId: varchar("resolved_by_user_id"),
+  resolvedAt: timestamp("resolved_at"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertPortfolioReportSchema = createInsertSchema(portfolioReports).omit({ id: true, createdAt: true });
+export type InsertPortfolioReport = z.infer<typeof insertPortfolioReportSchema>;
+export type PortfolioReport = typeof portfolioReports.$inferSelect;
+
+// Parent Messages (1-to-1 secure messaging: parent↔student, parent↔teacher, teacher↔student)
+// Uses same collaboration_messages infrastructure but with parentMessageThread as sessionId prefix
+export const parentMessageThreads = pgTable("parent_message_threads", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  participantA: varchar("participant_a").notNull(), // userId
+  participantB: varchar("participant_b").notNull(), // userId
+  linkId: varchar("link_id"), // references parent_student_links.id for context
+  lastMessageAt: timestamp("last_message_at").defaultNow(),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const parentMessages = pgTable("parent_messages", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  threadId: varchar("thread_id").notNull(), // references parent_message_threads.id
+  senderUserId: varchar("sender_user_id").notNull(),
+  content: text("content").notNull(),
+  isRead: boolean("is_read").notNull().default(false),
+  metadata: jsonb("metadata").$type<{ replyToId?: string; attachmentUrl?: string }>(),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertParentMessageThreadSchema = createInsertSchema(parentMessageThreads).omit({ id: true, createdAt: true, lastMessageAt: true });
+export type InsertParentMessageThread = z.infer<typeof insertParentMessageThreadSchema>;
+export type ParentMessageThread = typeof parentMessageThreads.$inferSelect;
+
+export const insertParentMessageSchema = createInsertSchema(parentMessages).omit({ id: true, createdAt: true });
+export type InsertParentMessage = z.infer<typeof insertParentMessageSchema>;
+export type ParentMessage = typeof parentMessages.$inferSelect;
 
 // ================================
 // Platform Configuration System

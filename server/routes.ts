@@ -8648,6 +8648,443 @@ export async function registerRoutes(
     }
   });
 
+  // ====================================================
+  // PARENT PORTAL v2 — Magic Links, Multi-directional invites
+  // ====================================================
+
+  // Generate a magic link invite (teacher/admin/parent initiated)
+  app.post("/api/parent-portal/magic-invite", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user?.claims?.sub;
+      const user = await storage.getUser(userId);
+      if (!user) { res.status(401).json({ error: "Unauthorized" }); return; }
+
+      const { studentUserId, parentEmail, relationship, inviterType } = req.body;
+      if (!studentUserId || !parentEmail) {
+        res.status(400).json({ error: "Student user ID and parent email are required" }); return;
+      }
+
+      // Validate the student exists
+      const student = await storage.getUser(studentUserId);
+      if (!student) { res.status(404).json({ error: "Student not found. They must have a LYS account first." }); return; }
+
+      const token = randomUUID().replace(/-/g, "").substring(0, 32);
+      const magicToken = randomUUID().replace(/-/g, "");
+      const expiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000); // 30 days
+
+      const invitation = await storage.createParentInvitation({
+        studentUserId,
+        parentEmail,
+        relationship: relationship || "parent",
+        token,
+        magicToken,
+        inviterUserId: userId,
+        inviterType: inviterType || user.role || "student",
+        status: "pending",
+        expiresAt,
+      });
+
+      const baseUrl = `${req.protocol}://${req.get('host')}`;
+      res.json({ ...invitation, magicLink: `${baseUrl}/parent-connect?magic=${magicToken}` });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to create magic link invite" });
+    }
+  });
+
+  // Accept a magic link (no auth required — lightweight access)
+  app.get("/api/parent-portal/magic-accept/:token", async (req: any, res) => {
+    try {
+      const { token } = req.params;
+      const invitation = await storage.getParentInvitationByMagicToken(token);
+      if (!invitation) { res.status(404).json({ error: "Invitation not found or expired" }); return; }
+      if (invitation.status !== "pending" || new Date() > invitation.expiresAt) {
+        res.status(410).json({ error: "This invitation has expired" }); return;
+      }
+      // Return invitation info so the frontend can guide the user to sign in / connect
+      res.json({
+        valid: true,
+        studentUserId: invitation.studentUserId,
+        parentEmail: invitation.parentEmail,
+        relationship: invitation.relationship,
+        inviterType: invitation.inviterType,
+        token: invitation.token,
+      });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to validate magic link" });
+    }
+  });
+
+  // Parent-initiated invite: parent enters student's email to request connection
+  app.post("/api/parent-portal/request-by-email", isAuthenticated, async (req: any, res) => {
+    try {
+      const parentId = req.user?.claims?.sub;
+      const parent = await storage.getUser(parentId);
+      if (!parent || (parent.role !== "homeschool_parent" && parent.role !== "student")) {
+        // Allow any authenticated user to request (educator can also find student for parent)
+      }
+
+      const { studentEmail, relationship } = req.body;
+      if (!studentEmail) { res.status(400).json({ error: "Student email is required" }); return; }
+
+      // Find student by email — must have a LYS account
+      const studentUser = await storage.getUserByEmail(studentEmail);
+      if (!studentUser) {
+        res.status(404).json({ error: "No LYS account found with that email. The student must create an account first." }); return;
+      }
+      if (studentUser.role !== "student" && studentUser.role !== "homeschool_parent") {
+        res.status(400).json({ error: "That account is not a student account" }); return;
+      }
+
+      // Check if link already exists
+      const existing = await storage.getParentStudentLinkByUsers(parentId, studentUser.id);
+      if (existing) { res.json({ message: "Connection already exists", link: existing }); return; }
+
+      // Create a pending link (student must approve)
+      const link = await storage.createParentStudentLink({
+        parentUserId: parentId,
+        studentUserId: studentUser.id,
+        relationship: relationship || "parent",
+        status: "pending",
+      });
+
+      res.json(link);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to create connection request" });
+    }
+  });
+
+  // Student approves/rejects a parent connection request
+  app.patch("/api/parent-portal/connection-requests/:linkId", isAuthenticated, async (req: any, res) => {
+    try {
+      const studentId = req.user?.claims?.sub;
+      const { linkId } = req.params;
+      const { action } = req.body; // "approve" or "reject"
+
+      const link = await storage.getParentStudentLink(linkId);
+      if (!link || link.studentUserId !== studentId) {
+        res.status(403).json({ error: "Not authorized" }); return;
+      }
+
+      if (action === "approve") {
+        await storage.updateParentStudentLink(linkId, { status: "active", acceptedAt: new Date() });
+        res.json({ success: true, status: "active" });
+      } else if (action === "reject") {
+        await storage.deleteParentStudentLink(linkId);
+        res.json({ success: true, status: "rejected" });
+      } else {
+        res.status(400).json({ error: "Action must be 'approve' or 'reject'" });
+      }
+    } catch (error) {
+      res.status(500).json({ error: "Failed to update connection request" });
+    }
+  });
+
+  // Get pending connection requests for the logged-in student
+  app.get("/api/parent-portal/connection-requests", isAuthenticated, async (req: any, res) => {
+    try {
+      const studentId = req.user?.claims?.sub;
+      const allLinks = await storage.getParentStudentLinks(studentId, "student");
+      const pending = allLinks.filter(l => l.status === "pending");
+      res.json(pending);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to get connection requests" });
+    }
+  });
+
+  // ====================================================
+  // QUIET HOURS
+  // ====================================================
+
+  app.get("/api/quiet-hours", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user?.claims?.sub;
+      const user = await storage.getUser(userId);
+      if (!user) { res.status(401).json({ error: "Unauthorized" }); return; }
+      const { orgId, teacherUserId } = req.query;
+      const qh = await storage.getQuietHours(orgId as string | undefined, teacherUserId as string | undefined);
+      res.json(qh);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to get quiet hours" });
+    }
+  });
+
+  app.get("/api/quiet-hours/active", isAuthenticated, async (req: any, res) => {
+    try {
+      const { orgId, teacherUserId } = req.query;
+      const active = await storage.isQuietHoursActive(orgId as string | undefined, teacherUserId as string | undefined);
+      res.json({ active });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to check quiet hours" });
+    }
+  });
+
+  app.post("/api/quiet-hours", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user?.claims?.sub;
+      const user = await storage.getUser(userId);
+      if (!user || !["educator", "campus_admin", "district_admin", "site_admin", "system_admin"].includes(user.role || "")) {
+        res.status(403).json({ error: "Only educators and admins can set quiet hours" }); return;
+      }
+      const qh = await storage.createQuietHours({ ...req.body, createdBy: userId });
+      res.json(qh);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to create quiet hours" });
+    }
+  });
+
+  app.patch("/api/quiet-hours/:id", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user?.claims?.sub;
+      const user = await storage.getUser(userId);
+      if (!user || !["educator", "campus_admin", "district_admin", "site_admin", "system_admin"].includes(user.role || "")) {
+        res.status(403).json({ error: "Only educators and admins can update quiet hours" }); return;
+      }
+      const updated = await storage.updateQuietHours(req.params.id, req.body);
+      res.json(updated);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to update quiet hours" });
+    }
+  });
+
+  app.delete("/api/quiet-hours/:id", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user?.claims?.sub;
+      const user = await storage.getUser(userId);
+      if (!user || !["educator", "campus_admin", "district_admin", "site_admin", "system_admin"].includes(user.role || "")) {
+        res.status(403).json({ error: "Only educators and admins can delete quiet hours" }); return;
+      }
+      await storage.deleteQuietHours(req.params.id);
+      res.json({ success: true });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to delete quiet hours" });
+    }
+  });
+
+  // ====================================================
+  // BROADCAST POSTS
+  // ====================================================
+
+  app.get("/api/broadcast-posts", isAuthenticated, async (req: any, res) => {
+    try {
+      const { orgId, classId, audience } = req.query;
+      const posts = await storage.getParentBroadcastPosts({
+        orgId: orgId as string | undefined,
+        classId: classId as string | undefined,
+        audience: audience as string | undefined,
+      });
+      res.json(posts);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to get broadcast posts" });
+    }
+  });
+
+  app.post("/api/broadcast-posts", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user?.claims?.sub;
+      const user = await storage.getUser(userId);
+      if (!user || !["educator", "campus_admin", "district_admin", "site_admin", "system_admin"].includes(user.role || "")) {
+        res.status(403).json({ error: "Only educators and admins can post broadcasts" }); return;
+      }
+      const post = await storage.createParentBroadcastPost({
+        ...req.body,
+        authorUserId: userId,
+        authorType: ["campus_admin", "district_admin"].includes(user.role || "") ? "campus_admin" : "teacher",
+      });
+      res.json(post);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to create broadcast post" });
+    }
+  });
+
+  app.patch("/api/broadcast-posts/:id", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user?.claims?.sub;
+      const post = await storage.getParentBroadcastPost(req.params.id);
+      if (!post || post.authorUserId !== userId) {
+        res.status(403).json({ error: "Not authorized to edit this post" }); return;
+      }
+      const updated = await storage.updateParentBroadcastPost(req.params.id, req.body);
+      res.json(updated);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to update broadcast post" });
+    }
+  });
+
+  app.delete("/api/broadcast-posts/:id", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user?.claims?.sub;
+      const user = await storage.getUser(userId);
+      const post = await storage.getParentBroadcastPost(req.params.id);
+      if (!post) { res.status(404).json({ error: "Post not found" }); return; }
+      if (post.authorUserId !== userId && !["campus_admin", "district_admin", "site_admin", "system_admin"].includes(user?.role || "")) {
+        res.status(403).json({ error: "Not authorized" }); return;
+      }
+      await storage.deleteParentBroadcastPost(req.params.id);
+      res.json({ success: true });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to delete broadcast post" });
+    }
+  });
+
+  // ====================================================
+  // NOTIFICATION PREFERENCES
+  // ====================================================
+
+  app.get("/api/parent-portal/notification-preferences/:linkId", isAuthenticated, async (req: any, res) => {
+    try {
+      const parentId = req.user?.claims?.sub;
+      const prefs = await storage.getParentNotificationPreferences(parentId, req.params.linkId);
+      res.json(prefs || { preferences: { milestones: true, lowEngagement: true, newPortfolioItems: true, assignmentGrades: true, messages: true, broadcastPosts: true, goalUpdates: true, careerActivity: false } });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to get notification preferences" });
+    }
+  });
+
+  app.put("/api/parent-portal/notification-preferences/:linkId", isAuthenticated, async (req: any, res) => {
+    try {
+      const parentId = req.user?.claims?.sub;
+      const prefs = await storage.upsertParentNotificationPreferences({
+        parentUserId: parentId,
+        linkId: req.params.linkId,
+        preferences: req.body.preferences,
+      });
+      res.json(prefs);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to save notification preferences" });
+    }
+  });
+
+  // ====================================================
+  // PORTFOLIO REPORTS (teacher oversight)
+  // ====================================================
+
+  app.get("/api/portfolio-reports", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user?.claims?.sub;
+      const user = await storage.getUser(userId);
+      if (!user || !["educator", "campus_admin", "district_admin", "site_admin", "system_admin"].includes(user.role || "")) {
+        res.status(403).json({ error: "Only educators can view portfolio reports" }); return;
+      }
+      const reports = await storage.getPortfolioReports({
+        studentUserId: req.query.studentUserId as string | undefined,
+        status: req.query.status as string | undefined,
+      });
+      res.json(reports);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to get portfolio reports" });
+    }
+  });
+
+  app.post("/api/portfolio-reports", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user?.claims?.sub;
+      const user = await storage.getUser(userId);
+      if (!user || !["educator", "campus_admin", "district_admin", "site_admin", "system_admin"].includes(user.role || "")) {
+        res.status(403).json({ error: "Only educators can report portfolio items" }); return;
+      }
+      const report = await storage.createPortfolioReport({ ...req.body, reportedByUserId: userId });
+      res.json(report);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to create portfolio report" });
+    }
+  });
+
+  app.patch("/api/portfolio-reports/:id", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user?.claims?.sub;
+      const user = await storage.getUser(userId);
+      if (!user || !["campus_admin", "district_admin", "site_admin", "system_admin"].includes(user.role || "")) {
+        res.status(403).json({ error: "Only admins can resolve portfolio reports" }); return;
+      }
+      const updated = await storage.updatePortfolioReport(req.params.id, { ...req.body, resolvedByUserId: userId, resolvedAt: new Date() });
+      res.json(updated);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to update portfolio report" });
+    }
+  });
+
+  // ====================================================
+  // PARENT MESSAGES (1-to-1 secure messaging)
+  // ====================================================
+
+  app.get("/api/parent-messages/threads", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user?.claims?.sub;
+      const threads = await storage.getMessageThreadsForUser(userId);
+      res.json(threads);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to get message threads" });
+    }
+  });
+
+  app.get("/api/parent-messages/unread-count", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user?.claims?.sub;
+      const count = await storage.getUnreadMessageCount(userId);
+      res.json({ count });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to get unread count" });
+    }
+  });
+
+  app.get("/api/parent-messages/thread/:threadId", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user?.claims?.sub;
+      const messages = await storage.getMessagesForThread(req.params.threadId);
+      await storage.markMessagesAsRead(req.params.threadId, userId);
+      res.json(messages);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to get messages" });
+    }
+  });
+
+  app.post("/api/parent-messages/thread", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user?.claims?.sub;
+      const { recipientUserId, linkId } = req.body;
+      if (!recipientUserId) { res.status(400).json({ error: "Recipient required" }); return; }
+      const thread = await storage.getOrCreateMessageThread(userId, recipientUserId, linkId);
+      res.json(thread);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to get or create thread" });
+    }
+  });
+
+  app.post("/api/parent-messages/send", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user?.claims?.sub;
+      const { threadId, content, metadata } = req.body;
+      if (!threadId || !content) { res.status(400).json({ error: "Thread ID and content required" }); return; }
+      const message = await storage.createParentMessage({ threadId, senderUserId: userId, content, metadata });
+      res.json(message);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to send message" });
+    }
+  });
+
+  // Homeschool parent: get combined parent+educator view data
+  app.get("/api/parent-portal/homeschool-view/:studentUserId", isAuthenticated, async (req: any, res) => {
+    try {
+      const parentId = req.user?.claims?.sub;
+      const parent = await storage.getUser(parentId);
+      if (!parent || parent.role !== "homeschool_parent") {
+        res.status(403).json({ error: "Only homeschool parents can access this view" }); return;
+      }
+      const link = await storage.getParentStudentLinkByUsers(parentId, req.params.studentUserId);
+      if (!link || link.status !== "active") {
+        res.status(403).json({ error: "No active connection to this student" }); return;
+      }
+      const [studentData, classes, assignments] = await Promise.all([
+        storage.getUser(req.params.studentUserId),
+        storage.getClasses(parentId).catch(() => []),
+        storage.getAssignmentsByClass ? storage.getAssignmentsByClass(parentId).catch(() => []) : Promise.resolve([]),
+      ]);
+      res.json({ parentView: { link }, educatorView: { classes, assignments }, student: studentData ? { id: studentData.id, firstName: studentData.firstName, lastName: studentData.lastName } : null });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to load homeschool view" });
+    }
+  });
+
   // Get schools/campuses for parent lookup (public endpoint for dropdown)
   app.get("/api/parent-portal/schools", async (req, res) => {
     try {

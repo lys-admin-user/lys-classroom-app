@@ -106,6 +106,18 @@ import {
   type InsertParentInvitation,
   type ParentProgressNote,
   type InsertParentProgressNote,
+  type QuietHours,
+  type InsertQuietHours,
+  type ParentBroadcastPost,
+  type InsertParentBroadcastPost,
+  type ParentNotificationPreferences,
+  type InsertParentNotificationPreferences,
+  type PortfolioReport,
+  type InsertPortfolioReport,
+  type ParentMessageThread,
+  type InsertParentMessageThread,
+  type ParentMessage,
+  type InsertParentMessage,
   type FeatureFlag,
   type InsertFeatureFlag,
   type EmailTemplate,
@@ -158,6 +170,12 @@ import {
   parentStudentLinks,
   parentInvitations,
   parentProgressNotes,
+  quietHours,
+  parentBroadcastPosts,
+  parentNotificationPreferences,
+  portfolioReports,
+  parentMessageThreads,
+  parentMessages,
   featureFlags,
   emailTemplates,
   studentTransferRequests,
@@ -342,6 +360,7 @@ export interface IStorage {
   
   // User management
   getUser(userId: string): Promise<User | undefined>;
+  getUserByEmail(email: string): Promise<User | undefined>;
   getAllUsers(): Promise<User[]>;
   getUserTier(userId: string): Promise<string>;
   updateUserTier(userId: string, tier: string): Promise<User | undefined>;
@@ -635,7 +654,42 @@ export interface IStorage {
   createParentProgressNote(note: InsertParentProgressNote): Promise<ParentProgressNote>;
   deleteParentProgressNote(id: string, parentUserId: string): Promise<boolean>;
   getPendingParentRequests(educatorId: string): Promise<any[]>;
-  
+
+  // Quiet Hours
+  getQuietHours(orgId?: string, teacherUserId?: string): Promise<QuietHours[]>;
+  getQuietHoursById(id: string): Promise<QuietHours | undefined>;
+  createQuietHours(qh: InsertQuietHours): Promise<QuietHours>;
+  updateQuietHours(id: string, updates: Partial<QuietHours>): Promise<QuietHours | undefined>;
+  deleteQuietHours(id: string): Promise<boolean>;
+  isQuietHoursActive(orgId?: string, teacherUserId?: string): Promise<boolean>;
+
+  // Parent Broadcast Posts
+  getParentBroadcastPosts(filters?: { orgId?: string; classId?: string; audience?: string }): Promise<ParentBroadcastPost[]>;
+  getParentBroadcastPost(id: string): Promise<ParentBroadcastPost | undefined>;
+  createParentBroadcastPost(post: InsertParentBroadcastPost): Promise<ParentBroadcastPost>;
+  updateParentBroadcastPost(id: string, updates: Partial<ParentBroadcastPost>): Promise<ParentBroadcastPost | undefined>;
+  deleteParentBroadcastPost(id: string): Promise<boolean>;
+
+  // Parent Notification Preferences
+  getParentNotificationPreferences(parentUserId: string, linkId: string): Promise<ParentNotificationPreferences | undefined>;
+  upsertParentNotificationPreferences(prefs: InsertParentNotificationPreferences): Promise<ParentNotificationPreferences>;
+
+  // Portfolio Reports
+  getPortfolioReports(filters?: { studentUserId?: string; status?: string; reportedByUserId?: string }): Promise<PortfolioReport[]>;
+  createPortfolioReport(report: InsertPortfolioReport): Promise<PortfolioReport>;
+  updatePortfolioReport(id: string, updates: Partial<PortfolioReport>): Promise<PortfolioReport | undefined>;
+
+  // Parent Messages (1-to-1)
+  getOrCreateMessageThread(participantA: string, participantB: string, linkId?: string): Promise<ParentMessageThread>;
+  getMessageThreadsForUser(userId: string): Promise<(ParentMessageThread & { lastMessage?: ParentMessage; otherParticipant?: any })[]>;
+  getMessagesForThread(threadId: string, limit?: number): Promise<ParentMessage[]>;
+  createParentMessage(message: InsertParentMessage): Promise<ParentMessage>;
+  markMessagesAsRead(threadId: string, userId: string): Promise<void>;
+  getUnreadMessageCount(userId: string): Promise<number>;
+
+  // Magic Link — generate and accept
+  getParentInvitationByMagicToken(magicToken: string): Promise<ParentInvitation | undefined>;
+
   // Feature Flags
   getFeatureFlags(): Promise<FeatureFlag[]>;
   getFeatureFlag(id: string): Promise<FeatureFlag | undefined>;
@@ -3576,6 +3630,11 @@ export class DatabaseStorage implements IStorage {
     return user || undefined;
   }
 
+  async getUserByEmail(email: string): Promise<User | undefined> {
+    const [user] = await db.select().from(users).where(eq(users.email, email));
+    return user || undefined;
+  }
+
   async getAllUsers(): Promise<User[]> {
     return db.select().from(users).orderBy(desc(users.createdAt));
   }
@@ -6053,6 +6112,183 @@ export class DatabaseStorage implements IStorage {
     }));
     
     return enrichedRequests;
+  }
+
+  // Magic Link
+  async getParentInvitationByMagicToken(magicToken: string): Promise<ParentInvitation | undefined> {
+    const [inv] = await db.select().from(parentInvitations).where(eq(parentInvitations.magicToken, magicToken));
+    return inv || undefined;
+  }
+
+  // Quiet Hours
+  async getQuietHours(orgId?: string, teacherUserId?: string): Promise<QuietHours[]> {
+    const conditions = [];
+    if (orgId) conditions.push(eq(quietHours.orgId, orgId));
+    if (teacherUserId) conditions.push(eq(quietHours.teacherUserId, teacherUserId));
+    const query = conditions.length > 0
+      ? db.select().from(quietHours).where(and(...conditions))
+      : db.select().from(quietHours);
+    return await query.orderBy(asc(quietHours.startTime));
+  }
+
+  async getQuietHoursById(id: string): Promise<QuietHours | undefined> {
+    const [qh] = await db.select().from(quietHours).where(eq(quietHours.id, id));
+    return qh || undefined;
+  }
+
+  async createQuietHours(qh: InsertQuietHours): Promise<QuietHours> {
+    const [created] = await db.insert(quietHours).values(qh as any).returning();
+    return created;
+  }
+
+  async updateQuietHours(id: string, updates: Partial<QuietHours>): Promise<QuietHours | undefined> {
+    const [updated] = await db.update(quietHours).set({ ...updates, updatedAt: new Date() } as any).where(eq(quietHours.id, id)).returning();
+    return updated || undefined;
+  }
+
+  async deleteQuietHours(id: string): Promise<boolean> {
+    await db.delete(quietHours).where(eq(quietHours.id, id));
+    return true;
+  }
+
+  async isQuietHoursActive(orgId?: string, teacherUserId?: string): Promise<boolean> {
+    const allQH = await this.getQuietHours(orgId, teacherUserId);
+    if (allQH.length === 0) return false;
+    const now = new Date();
+    const currentDay = now.getDay();
+    const currentTime = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
+    return allQH.some(qh => {
+      if (!qh.isActive) return false;
+      const days = (qh.daysOfWeek as number[]) || [];
+      if (!days.includes(currentDay)) return false;
+      return currentTime >= qh.startTime && currentTime <= qh.endTime;
+    });
+  }
+
+  // Parent Broadcast Posts
+  async getParentBroadcastPosts(filters?: { orgId?: string; classId?: string; audience?: string }): Promise<ParentBroadcastPost[]> {
+    const conditions = [eq(parentBroadcastPosts.isActive, true)];
+    if (filters?.orgId) conditions.push(eq(parentBroadcastPosts.orgId, filters.orgId));
+    if (filters?.classId) conditions.push(eq(parentBroadcastPosts.classId, filters.classId));
+    if (filters?.audience) conditions.push(eq(parentBroadcastPosts.audience, filters.audience));
+    return await db.select().from(parentBroadcastPosts).where(and(...conditions)).orderBy(desc(parentBroadcastPosts.isPinned), desc(parentBroadcastPosts.createdAt));
+  }
+
+  async getParentBroadcastPost(id: string): Promise<ParentBroadcastPost | undefined> {
+    const [post] = await db.select().from(parentBroadcastPosts).where(eq(parentBroadcastPosts.id, id));
+    return post || undefined;
+  }
+
+  async createParentBroadcastPost(post: InsertParentBroadcastPost): Promise<ParentBroadcastPost> {
+    const [created] = await db.insert(parentBroadcastPosts).values(post as any).returning();
+    return created;
+  }
+
+  async updateParentBroadcastPost(id: string, updates: Partial<ParentBroadcastPost>): Promise<ParentBroadcastPost | undefined> {
+    const [updated] = await db.update(parentBroadcastPosts).set({ ...updates, updatedAt: new Date() } as any).where(eq(parentBroadcastPosts.id, id)).returning();
+    return updated || undefined;
+  }
+
+  async deleteParentBroadcastPost(id: string): Promise<boolean> {
+    await db.update(parentBroadcastPosts).set({ isActive: false } as any).where(eq(parentBroadcastPosts.id, id));
+    return true;
+  }
+
+  // Parent Notification Preferences
+  async getParentNotificationPreferences(parentUserId: string, linkId: string): Promise<ParentNotificationPreferences | undefined> {
+    const [prefs] = await db.select().from(parentNotificationPreferences)
+      .where(and(eq(parentNotificationPreferences.parentUserId, parentUserId), eq(parentNotificationPreferences.linkId, linkId)));
+    return prefs || undefined;
+  }
+
+  async upsertParentNotificationPreferences(prefs: InsertParentNotificationPreferences): Promise<ParentNotificationPreferences> {
+    const existing = await this.getParentNotificationPreferences(prefs.parentUserId, prefs.linkId);
+    if (existing) {
+      const [updated] = await db.update(parentNotificationPreferences)
+        .set({ preferences: prefs.preferences, updatedAt: new Date() } as any)
+        .where(eq(parentNotificationPreferences.id, existing.id)).returning();
+      return updated;
+    }
+    const [created] = await db.insert(parentNotificationPreferences).values(prefs as any).returning();
+    return created;
+  }
+
+  // Portfolio Reports
+  async getPortfolioReports(filters?: { studentUserId?: string; status?: string; reportedByUserId?: string }): Promise<PortfolioReport[]> {
+    const conditions = [];
+    if (filters?.studentUserId) conditions.push(eq(portfolioReports.studentUserId, filters.studentUserId));
+    if (filters?.status) conditions.push(eq(portfolioReports.status, filters.status));
+    if (filters?.reportedByUserId) conditions.push(eq(portfolioReports.reportedByUserId, filters.reportedByUserId));
+    const query = conditions.length > 0
+      ? db.select().from(portfolioReports).where(and(...conditions))
+      : db.select().from(portfolioReports);
+    return await query.orderBy(desc(portfolioReports.createdAt));
+  }
+
+  async createPortfolioReport(report: InsertPortfolioReport): Promise<PortfolioReport> {
+    const [created] = await db.insert(portfolioReports).values(report as any).returning();
+    return created;
+  }
+
+  async updatePortfolioReport(id: string, updates: Partial<PortfolioReport>): Promise<PortfolioReport | undefined> {
+    const [updated] = await db.update(portfolioReports).set(updates as any).where(eq(portfolioReports.id, id)).returning();
+    return updated || undefined;
+  }
+
+  // Parent Messages (1-to-1)
+  async getOrCreateMessageThread(participantA: string, participantB: string, linkId?: string): Promise<ParentMessageThread> {
+    const [existing] = await db.select().from(parentMessageThreads).where(
+      sql`(${parentMessageThreads.participantA} = ${participantA} AND ${parentMessageThreads.participantB} = ${participantB})
+       OR (${parentMessageThreads.participantA} = ${participantB} AND ${parentMessageThreads.participantB} = ${participantA})`
+    );
+    if (existing) return existing;
+    const [created] = await db.insert(parentMessageThreads).values({ participantA, participantB, linkId } as any).returning();
+    return created;
+  }
+
+  async getMessageThreadsForUser(userId: string): Promise<(ParentMessageThread & { lastMessage?: ParentMessage; otherParticipant?: any })[]> {
+    const threads = await db.select().from(parentMessageThreads).where(
+      sql`${parentMessageThreads.participantA} = ${userId} OR ${parentMessageThreads.participantB} = ${userId}`
+    ).orderBy(desc(parentMessageThreads.lastMessageAt));
+
+    return await Promise.all(threads.map(async (thread) => {
+      const [lastMessage] = await db.select().from(parentMessages).where(eq(parentMessages.threadId, thread.id)).orderBy(desc(parentMessages.createdAt)).limit(1);
+      const otherId = thread.participantA === userId ? thread.participantB : thread.participantA;
+      const [otherUser] = await db.select().from(users).where(eq(users.id, otherId));
+      return { ...thread, lastMessage: lastMessage || undefined, otherParticipant: otherUser ? { id: otherUser.id, firstName: otherUser.firstName, lastName: otherUser.lastName, profileImageUrl: otherUser.profileImageUrl, role: otherUser.role } : undefined };
+    }));
+  }
+
+  async getMessagesForThread(threadId: string, limit = 50): Promise<ParentMessage[]> {
+    return await db.select().from(parentMessages).where(eq(parentMessages.threadId, threadId)).orderBy(asc(parentMessages.createdAt)).limit(limit);
+  }
+
+  async createParentMessage(message: InsertParentMessage): Promise<ParentMessage> {
+    const [created] = await db.insert(parentMessages).values(message as any).returning();
+    await db.update(parentMessageThreads).set({ lastMessageAt: new Date() } as any).where(eq(parentMessageThreads.id, message.threadId));
+    return created;
+  }
+
+  async markMessagesAsRead(threadId: string, userId: string): Promise<void> {
+    await db.update(parentMessages).set({ isRead: true } as any).where(
+      and(eq(parentMessages.threadId, threadId), sql`${parentMessages.senderUserId} != ${userId}`, eq(parentMessages.isRead, false))
+    );
+  }
+
+  async getUnreadMessageCount(userId: string): Promise<number> {
+    const threads = await db.select().from(parentMessageThreads).where(
+      sql`${parentMessageThreads.participantA} = ${userId} OR ${parentMessageThreads.participantB} = ${userId}`
+    );
+    if (threads.length === 0) return 0;
+    const threadIds = threads.map(t => t.id);
+    const [result] = await db.select({ count: sql<number>`count(*)` }).from(parentMessages).where(
+      and(
+        sql`${parentMessages.threadId} IN (${sql.join(threadIds.map(id => sql`${id}`), sql`, `)})`,
+        sql`${parentMessages.senderUserId} != ${userId}`,
+        eq(parentMessages.isRead, false)
+      )
+    );
+    return Number(result?.count || 0);
   }
 
   // Feature Flags

@@ -1,11 +1,15 @@
 import { useEffect, useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation } from "@tanstack/react-query";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Textarea } from "@/components/ui/textarea";
+import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import {
   Mail,
   ExternalLink,
@@ -23,11 +27,15 @@ import {
   Target,
   Calendar,
   Globe,
-  Eye
+  Eye,
+  Flag,
+  Loader2
 } from "lucide-react";
 import { SiLinkedin } from "react-icons/si";
 import { useToast } from "@/hooks/use-toast";
 import { useRoute } from "wouter";
+import { useAuth } from "@/hooks/use-auth";
+import { apiRequest } from "@/lib/queryClient";
 import type { StudentPortfolio, PortfolioItem } from "@shared/schema";
 
 const itemTypes = [
@@ -70,13 +78,35 @@ const themeStyles = {
 
 export default function PortfolioView() {
   const { toast } = useToast();
+  const { user } = useAuth();
   const [, params] = useRoute("/p/:slug");
   const slug = params?.slug;
   const [copiedLink, setCopiedLink] = useState(false);
+  const [reportingItem, setReportingItem] = useState<PortfolioItem | null>(null);
+  const [reportReason, setReportReason] = useState("inappropriate");
+  const [reportNotes, setReportNotes] = useState("");
+
+  const isTeacherOrAdmin = user && ["educator", "campus_admin", "district_admin", "site_admin", "system_admin"].includes(user.role);
 
   const { data, isLoading, error } = useQuery<{ portfolio: StudentPortfolio; items: PortfolioItem[] }>({
     queryKey: ["/api/portfolio/public", slug],
     enabled: !!slug,
+  });
+
+  const reportItemMutation = useMutation({
+    mutationFn: async ({ itemId, reason, notes }: { itemId: string; reason: string; notes?: string }) => {
+      const response = await apiRequest("POST", "/api/portfolio-reports", { portfolioItemId: itemId, reason, notes });
+      return response.json();
+    },
+    onSuccess: () => {
+      toast({ title: "Item Flagged", description: "This portfolio item has been reported for review." });
+      setReportingItem(null);
+      setReportReason("inappropriate");
+      setReportNotes("");
+    },
+    onError: () => {
+      toast({ title: "Error", description: "Failed to submit report.", variant: "destructive" });
+    },
   });
 
   const portfolio = data?.portfolio;
@@ -247,7 +277,7 @@ export default function PortfolioView() {
             </h2>
             <div className="grid gap-4">
               {highlightedItems.map((item) => (
-                <PortfolioItemCard key={item.id} item={item} featured />
+                <PortfolioItemCard key={item.id} item={item} featured onReport={isTeacherOrAdmin ? () => setReportingItem(item) : undefined} />
               ))}
             </div>
           </section>
@@ -261,7 +291,7 @@ export default function PortfolioView() {
             </h2>
             <div className="grid gap-4">
               {regularItems.map((item) => (
-                <PortfolioItemCard key={item.id} item={item} />
+                <PortfolioItemCard key={item.id} item={item} onReport={isTeacherOrAdmin ? () => setReportingItem(item) : undefined} />
               ))}
             </div>
           </section>
@@ -329,11 +359,69 @@ export default function PortfolioView() {
           </div>
         </footer>
       </div>
+
+      {/* Report Portfolio Item Dialog */}
+      <Dialog open={!!reportingItem} onOpenChange={(open) => { if (!open) { setReportingItem(null); setReportNotes(""); }}}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Flag className="h-5 w-5 text-red-500" />
+              Flag Portfolio Item
+            </DialogTitle>
+            <DialogDescription>
+              Flag "{reportingItem?.customTitle}" for review. This will be visible to campus administration.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            <div className="space-y-2">
+              <Label>Reason for Flagging</Label>
+              <Select value={reportReason} onValueChange={setReportReason}>
+                <SelectTrigger data-testid="select-report-reason">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="inappropriate">Inappropriate Content</SelectItem>
+                  <SelectItem value="inaccurate">Inaccurate Information</SelectItem>
+                  <SelectItem value="plagiarism">Potential Plagiarism</SelectItem>
+                  <SelectItem value="privacy">Privacy Concern</SelectItem>
+                  <SelectItem value="other">Other</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label>Notes (Optional)</Label>
+              <Textarea
+                value={reportNotes}
+                onChange={(e) => setReportNotes(e.target.value)}
+                placeholder="Provide additional context..."
+                rows={3}
+                data-testid="input-report-notes"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setReportingItem(null)}>Cancel</Button>
+            <Button
+              variant="destructive"
+              onClick={() => {
+                if (reportingItem) {
+                  reportItemMutation.mutate({ itemId: reportingItem.id, reason: reportReason, notes: reportNotes });
+                }
+              }}
+              disabled={reportItemMutation.isPending}
+              data-testid="button-submit-report"
+            >
+              {reportItemMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Flag className="h-4 w-4 mr-2" />}
+              Submit Flag
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
 
-function PortfolioItemCard({ item, featured = false }: { item: PortfolioItem; featured?: boolean }) {
+function PortfolioItemCard({ item, featured = false, onReport }: { item: PortfolioItem; featured?: boolean; onReport?: () => void }) {
   const typeInfo = itemTypes.find(t => t.value === item.itemType) || itemTypes[5];
   const TypeIcon = typeInfo.icon;
   const bkd = item.bkdFocus ? bkdLabels[item.bkdFocus as keyof typeof bkdLabels] : null;
@@ -364,12 +452,26 @@ function PortfolioItemCard({ item, featured = false }: { item: PortfolioItem; fe
                   )}
                 </div>
               </div>
-              {bkd && (
-                <Badge className={bkd.color}>
-                  <bkd.icon className="w-3 h-3 mr-1" />
-                  {bkd.label}
-                </Badge>
-              )}
+              <div className="flex items-center gap-2">
+                {bkd && (
+                  <Badge className={bkd.color}>
+                    <bkd.icon className="w-3 h-3 mr-1" />
+                    {bkd.label}
+                  </Badge>
+                )}
+                {onReport && (
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-7 w-7 text-muted-foreground hover:text-red-500"
+                    title="Flag this item for review"
+                    onClick={onReport}
+                    data-testid={`button-flag-item-${item.id}`}
+                  >
+                    <Flag className="h-3.5 w-3.5" />
+                  </Button>
+                )}
+              </div>
             </div>
             {item.customDescription && (
               <p className="text-sm text-muted-foreground mt-2">
