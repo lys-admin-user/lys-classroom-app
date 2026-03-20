@@ -196,24 +196,32 @@ function Router() {
     <Switch>
       <Route path="/embed/:rest*" component={EmbedRouter} />
       
-      <Route path="/" component={AuthDashboard} />
-      <Route path="/lesson-generator" component={AuthLessonGenerator} />
+      {/* Public exploration pages — no sign-in required */}
+      <Route path="/" component={Dashboard} />
+      <Route path="/lesson-generator" component={LessonGenerator} />
       <Route path="/assessments" component={Assessments} />
       <Route path="/careers" component={Careers} />
-      <Route path="/action-plans" component={AuthActionPlans} />
+      <Route path="/action-plans" component={ActionPlans} />
       <Route path="/resources" component={Resources} />
+      <Route path="/self-discovery" component={SelfDiscovery} />
+      <Route path="/strengths-inventory" component={StrengthsInventory} />
+      <Route path="/scholarship-planner" component={ScholarshipPlanner} />
+      <Route path="/mentor-connect" component={MentorConnect} />
+      <Route path="/shared/:shareId" component={SharedLesson} />
+      <Route path="/pricing" component={Pricing} />
+      <Route path="/onboarding" component={Onboarding} />
+      <Route path="/help" component={HelpDesk} />
+      <Route path="/p/:slug" component={PortfolioView} />
+
+      {/* Account-required pages — personal data or admin tools */}
       <Route path="/my-lessons" component={AuthMyLessons} />
       <Route path="/settings" component={AuthSettings} />
       <Route path="/sis-integration" component={AuthSISIntegration} />
       <Route path="/analytics" component={AuthAnalytics} />
       <Route path="/scope-sequence" component={AuthScopeSequence} />
       <Route path="/scope/:id" component={AuthScopeEditor} />
-      <Route path="/self-discovery" component={SelfDiscovery} />
       <Route path="/educator-influence" component={AuthEducatorInfluence} />
-      <Route path="/shared/:shareId" component={SharedLesson} />
       <Route path="/admin/standards" component={AuthStandardsAdmin} />
-      <Route path="/pricing" component={Pricing} />
-      <Route path="/onboarding" component={Onboarding} />
       <Route path="/assignments" component={AuthAssignments} />
       <Route path="/collaboration" component={AuthCollaboration} />
       <Route path="/collaboration/:id" component={AuthCollaboration} />
@@ -229,21 +237,16 @@ function Router() {
       <Route path="/my-journey" component={AuthMyJourney} />
       <Route path="/professional-development" component={AuthProfessionalDevelopment} />
       <Route path="/portfolio" component={AuthPortfolioBuilder} />
-      <Route path="/p/:slug" component={PortfolioView} />
       <Route path="/transfer-approvals" component={AuthTransferApprovals} />
       <Route path="/gradebook" component={AuthGradebook} />
       <Route path="/lesson-authoring" component={AuthLessonAuthoring} />
       <Route path="/admin/know-resources" component={AuthKnowResourcesAdmin} />
       <Route path="/admin/matriculation" component={AuthMatriculationAdmin} />
       <Route path="/alignment-dashboard" component={AuthAlignmentDashboard} />
-      <Route path="/scholarship-planner" component={AuthScholarshipPlanner} />
       <Route path="/essay-builder" component={AuthEssayBuilder} />
       <Route path="/campus-activities" component={AuthCampusActivities} />
-      <Route path="/strengths-inventory" component={AuthStrengthsInventory} />
-      <Route path="/mentor-connect" component={AuthMentorConnect} />
       <Route path="/district-admin" component={AuthDistrictAdmin} />
       <Route path="/district-admin/campuses" component={AuthDistrictAdmin} />
-      <Route path="/help" component={HelpDesk} />
       <Route path="/dev-docs" component={DevDocs} />
       <Route component={NotFound} />
     </Switch>

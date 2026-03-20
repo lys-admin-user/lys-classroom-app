@@ -64,7 +64,6 @@ export default function MentorConnect() {
 
   const { data: mentors, isLoading: mentorsLoading } = useQuery<MentorProfile[]>({
     queryKey: [mentorUrl],
-    enabled: isAuthenticated,
   });
 
   const { data: connections, isLoading: connectionsLoading } = useQuery<MentorConnection[]>({

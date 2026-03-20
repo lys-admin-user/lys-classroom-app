@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
+import { useAuth } from "@/hooks/use-auth";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -70,6 +71,7 @@ const categoryToCareerType: Record<string, string[]> = {
 export default function ActionPlans() {
   const { toast } = useToast();
   const { showAds } = useTier();
+  const { isAuthenticated } = useAuth();
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [newGoal, setNewGoal] = useState({
     title: "",
@@ -208,7 +210,11 @@ export default function ActionPlans() {
           {showAds && <AdBanner position="inline" className="mb-6" />}
           <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
             <DialogTrigger asChild>
-              <Button className="bg-lys-teal hover:bg-lys-teal/90 text-white font-oswald gap-2" data-testid="button-new-goal">
+              <Button
+                className="bg-lys-teal text-white font-oswald gap-2"
+                data-testid="button-new-goal"
+                onClick={(e) => { if (!isAuthenticated) { e.preventDefault(); window.location.href = "/api/login"; } }}
+              >
                 <Plus className="h-5 w-5" />
                 New Goal
               </Button>
@@ -407,12 +413,12 @@ export default function ActionPlans() {
               Dreams become reality through action. Create your first goal and start climbing the ladder to success!
             </p>
             <Button
-              onClick={() => setIsDialogOpen(true)}
-              className="bg-lys-teal hover:bg-lys-teal/90 text-white font-oswald gap-2"
+              onClick={() => isAuthenticated ? setIsDialogOpen(true) : (window.location.href = "/api/login")}
+              className="bg-lys-teal text-white font-oswald gap-2"
               data-testid="button-create-first-goal"
             >
               <Plus className="h-5 w-5" />
-              Create Your First Goal
+              {isAuthenticated ? "Create Your First Goal" : "Sign In to Create Goals"}
             </Button>
           </div>
         ) : (
