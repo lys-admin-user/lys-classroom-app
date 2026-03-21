@@ -37,7 +37,7 @@ Preferred communication style: Simple, everyday language.
 -   **Student Digital Portfolio**: Customizable digital portfolios with privacy controls.
 -   **Student Transfer System**: Campus-level student transfer with triple confirmation.
 -   **Gradebook System**: Manages grades, calculates letter grades, exports CSV, and integrates with SIS.
--   **Parent Portal**: Free tier portal for progress tracking and career readiness insights.
+-   **Parent Portal v2**: Free family connect portal with magic invite links (`/parent-connect` public route, `lys_pending_magic_token` localStorage key for unauthenticated flows), 1-to-1 messaging, class-wide broadcast announcements, quiet hours, and portfolio oversight with teacher flagging. All educator roles (educator through district_admin) see Parent Portal in sidebar.
 -   **Admin Analytics**: Dashboards for system performance, goal completion, user engagement, and granular user metrics.
 -   **Scholarship & Mentorship System**: Tools for scholarship planning, essay building, and mentor connections.
 -   **Help Desk**: Searchable knowledge base and troubleshooting guides for users and administrators.

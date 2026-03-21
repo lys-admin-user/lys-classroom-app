@@ -1238,6 +1238,93 @@ const requireSystemAdmin = requireRole("system_admin");`,
       },
     ],
   },
+  {
+    id: "parent-portal-v2",
+    title: "Parent Portal v2 — Family Connect System",
+    icon: Users,
+    category: "Architecture",
+    content: [
+      {
+        heading: "Overview",
+        body: "Parent Portal v2 adds a full Family Connect layer on top of the read-only BKD progress view. Educators send magic invite links to parents, who accept the connection via /parent-connect. Once linked, teachers can send class-wide announcements (broadcast posts), 1-to-1 messages, enforce quiet hours for notifications, and flag student portfolio items for administrator review.",
+        items: [
+          "Route: /parent-portal — requires authentication; educators and parents both access this page (role-specific rendering)",
+          "Route: /parent-connect — PUBLIC route (no auth wrapper); accepts ?token= query param",
+          "Magic invite tokens stored in: parentInvitationTokens table (schema.ts)",
+          "Parent ↔ student ↔ educator relationship: parentLinks table",
+          "Communications: parentMessages (1-to-1) and classAnnouncements (broadcast) tables",
+          "Quiet hours: quietHours table, per educator/class — enforced at notification-send time",
+          "Portfolio flags: portfolioFlags table — flagged by teachers, reviewed by campus admins",
+        ],
+      },
+      {
+        heading: "Magic Invite Link Flow",
+        body: "Teachers generate a per-student invite link from the Classroom > Communications tab. The token is a UUID stored in parentInvitationTokens with a 30-day TTL and a used flag.",
+        items: [
+          "Teacher triggers: POST /api/parent-portal/invitations/generate — body: { studentId, classId }",
+          "Server creates token (UUID), inserts into parentInvitationTokens with expiresAt = now + 30 days",
+          "Shareable link: https://<domain>/parent-connect?token=<uuid>",
+          "ParentConnect.tsx reads token from URL and calls: POST /api/parent-portal/invitations/accept with { token }",
+          "If unauthenticated: token stored in localStorage key lys_pending_magic_token, user redirected to /api/login?returnTo=/parent-connect",
+          "After login, ParentConnect.tsx reads localStorage token, clears it, and fires the accept call",
+          "Accept endpoint: validates token not expired/used, creates parentLinks row, marks token as used",
+          "Already-linked state: 409 from server, UI shows 'already connected' message",
+          "Expired/invalid token: 400/404 from server, UI prompts parent to request a new link",
+        ],
+      },
+      {
+        heading: "Communications Hub (Teacher Side)",
+        body: "Educators access the Communications tab inside the Classroom page. From here they can compose broadcast announcements, view and reply to 1-to-1 parent messages, configure quiet hours, and see the invite parent button per student.",
+        items: [
+          "Broadcast announcements: POST /api/parent-portal/announcements — visible to all parents connected to that class",
+          "1-to-1 messages: GET/POST /api/parent-portal/messages/:parentUserId — threaded conversation, scoped per educator",
+          "Quiet hours: GET/PUT /api/parent-portal/quiet-hours — startTime/endTime stored in HH:MM format (24h UTC)",
+          "Quiet hours enforcement: notification service checks current UTC time against stored window before dispatching",
+          "Invite Parent button per student: POST /api/parent-portal/invitations/generate — returns { inviteUrl }",
+          "Portfolio oversight: GET /api/parent-portal/flagged-portfolios — lists flagged items for this educator's students",
+        ],
+      },
+      {
+        heading: "Parent-Side View",
+        body: "Once a parent accepts an invite they see the Parent Portal, which is organized into tabs: Overview (BKD journey), Messages (1-to-1), Announcements (broadcast), and Portfolio.",
+        items: [
+          "GET /api/parent-portal/children — returns list of linked students for the authenticated parent",
+          "GET /api/parent-portal/progress/:studentId — BKD journey scores, top career matches, recent milestones",
+          "GET /api/parent-portal/announcements?classId=<id> — broadcast posts from teacher",
+          "GET /api/parent-portal/messages — all 1-to-1 threads for this parent",
+          "GET /api/parent-portal/portfolio/:studentId — student portfolio items viewable by parent",
+          "Homeschool parents (role: homeschool_parent) also see educator features (lesson generator, etc.) — dual view",
+        ],
+      },
+      {
+        heading: "Portfolio Flagging",
+        body: "Teachers can flag portfolio items they deem inappropriate. Flags are stored in portfolioFlags and appear in the campus admin Safety & Security panel.",
+        items: [
+          "POST /api/portfolio/:itemId/flag — body: { reason, notes } — teacher endpoint",
+          "GET /api/admin/portfolio-flags — campus_admin+ endpoint to list pending flags",
+          "PATCH /api/admin/portfolio-flags/:flagId — resolve or dismiss a flag",
+          "Client: PortfolioView.tsx shows a flag icon button for educators/admins on each portfolio item",
+          "Flag reasons: inappropriate_content, privacy_concern, academic_integrity, other",
+          "All flag actions are audit logged with userId, itemId, reason, and resolution",
+        ],
+      },
+      {
+        heading: "Database Tables",
+        body: "Parent Portal v2 adds the following tables to /shared/schema.ts.",
+        table: {
+          headers: ["Table", "Purpose", "Key Columns"],
+          rows: [
+            ["parentInvitationTokens", "Magic invite tokens for parent connections", "id, token (UUID), studentId, educatorId, classId, expiresAt, used"],
+            ["parentLinks", "Accepted parent ↔ student ↔ educator connections", "id, parentUserId, studentId, educatorId, linkedAt"],
+            ["parentMessages", "1-to-1 messages between parents and teachers", "id, senderId, receiverId, content, readAt, createdAt"],
+            ["classAnnouncements", "Broadcast announcements from teacher to class parents", "id, educatorId, classId, title, body, createdAt"],
+            ["quietHours", "Per-educator notification quiet window", "id, educatorId, startTime (HH:MM), endTime (HH:MM), timezone"],
+            ["portfolioFlags", "Teacher-submitted flags on student portfolio items", "id, flaggedBy, portfolioItemId, reason, notes, status, resolvedAt"],
+          ],
+        },
+      },
+    ],
+  },
 ];
 
 const categories = [

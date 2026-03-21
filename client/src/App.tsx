@@ -38,6 +38,7 @@ import ResourceLibrary from "@/pages/ResourceLibrary";
 import SiteAdmin from "@/pages/SiteAdmin";
 import SystemAdmin from "@/pages/SystemAdmin";
 import ParentPortal from "@/pages/ParentPortal";
+import ParentConnect from "@/pages/ParentConnect";
 import Milestones from "@/pages/Milestones";
 import Classroom from "@/pages/Classroom";
 import ProfessionalDevelopment from "@/pages/ProfessionalDevelopment";
@@ -230,6 +231,7 @@ function Router() {
       <Route path="/system-admin/:tab" component={AuthSystemAdmin} />
       <Route path="/system-admin" component={AuthSystemAdmin} />
       <Route path="/parent-portal" component={AuthParentPortal} />
+      <Route path="/parent-connect" component={ParentConnect} />
       <Route path="/milestones" component={AuthMilestones} />
       <Route path="/classroom" component={AuthClassroom} />
       <Route path="/student-journey/:studentId" component={AuthStudentJourney} />

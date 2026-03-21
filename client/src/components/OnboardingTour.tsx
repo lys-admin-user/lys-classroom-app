@@ -294,7 +294,7 @@ const EDUCATOR_STEPS: TourStep[] = [
   {
     id: "parent-portal",
     title: "Parent Portal",
-    description: "Connect with parents to share student progress, career readiness insights, and Be-Know-Do journey updates.",
+    description: "Invite parents via a magic link, send class-wide announcements, set quiet hours so families aren't pinged at midnight, message parents 1-to-1, and oversee student portfolio activity — all from one Communications Hub.",
     icon: Users,
     targetSelector: '[data-testid="nav-parent-portal"]',
     navPath: "/parent-portal",

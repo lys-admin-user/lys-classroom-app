@@ -1034,6 +1034,82 @@ const helpArticles: HelpArticle[] = [
     ],
     relatedArticles: ["sysadmin-rss-feeds"],
   },
+  {
+    id: "parent-connect-magic-link",
+    title: "Connecting as a Parent via Magic Invite Link",
+    category: "parent-portal",
+    tags: ["parent", "invite", "magic link", "connect", "token", "family", "portal"],
+    severity: "info",
+    symptom: "You received a parent invitation link from a teacher and want to connect your account.",
+    explanation: "Teachers send parents a unique magic invite link via the Classroom > Communications tab. Clicking the link opens the Parent Connect page. If you aren't signed in yet, you'll be redirected to log in first — your invitation is saved automatically so you don't have to click the link again. Once you're logged in, you simply confirm the connection and you'll have access to your child's progress in the Parent Portal.",
+    steps: [
+      "Click the invite link your teacher shared with you",
+      "If you're not signed in, you'll be redirected to the login page — sign in with your account",
+      "After logging in, you'll be taken back to the invite page automatically",
+      "Click 'Accept Invitation' to confirm the connection",
+      "You'll now see your child listed in the Parent Portal",
+      "If the link says 'already connected', the connection is already active — go to /parent-portal",
+      "If the link says 'expired or invalid', ask your teacher to re-send the invitation from their Classroom page",
+    ],
+    relatedArticles: ["parent-portal-communications", "parent-portal-overview"],
+  },
+  {
+    id: "parent-portal-overview",
+    title: "What Can I See in the Parent Portal?",
+    category: "parent-portal",
+    tags: ["parent", "portal", "progress", "BKD", "career", "overview", "child", "student"],
+    severity: "info",
+    symptom: "You want to understand what information is available to you as a parent in the Parent Portal.",
+    explanation: "The Parent Portal gives parents a read-only view of their child's Be-Know-Do journey. This includes their current progress scores across Being, Knowing, and Doing, top career matches, recent milestone achievements, and direct messages from their teacher. The portal is completely free for all families and requires a connection invitation from the teacher.",
+    steps: [
+      "Navigate to /parent-portal after accepting your teacher's invitation",
+      "The Overview tab shows BKD journey scores, top career match, and recent milestones",
+      "The Messages tab shows 1-to-1 conversations with each of your child's teachers",
+      "The Announcements tab shows class-wide posts from teachers (field trips, reminders, etc.)",
+      "The Portfolio tab lets you see your child's digital portfolio with teacher-approved content",
+      "You cannot edit student data from the parent portal — it's a read-only view",
+      "If you don't see your child, make sure you've accepted the invite link from their teacher",
+    ],
+    relatedArticles: ["parent-connect-magic-link", "parent-portal-communications"],
+  },
+  {
+    id: "parent-portal-communications",
+    title: "Teacher Announcements, Messaging & Quiet Hours",
+    category: "parent-portal",
+    tags: ["parent", "teacher", "message", "announcement", "quiet hours", "notification", "communication"],
+    severity: "info",
+    symptom: "You want to understand how messaging and notifications work between parents and teachers.",
+    explanation: "Teachers can communicate with parents in two ways: class-wide announcements (visible to all connected parents and students in the class) and 1-to-1 direct messages (visible only to a specific parent). Teachers also set Quiet Hours — a time window during which the platform won't send you any push or email notifications. This prevents late-night pings and respects family schedules.",
+    steps: [
+      "Announcements appear in the Announcements tab of the Parent Portal — they come from your child's teacher to the whole class",
+      "1-to-1 messages appear in the Messages tab — only you and the teacher see these",
+      "To reply to a teacher message, click on the conversation thread and type your response",
+      "Quiet Hours are set by the teacher — if they've set 9pm–7am, you won't receive notifications during that window",
+      "You can still send a message during quiet hours — the teacher will see it when they're back online",
+      "If you're not receiving notifications, check that your browser or app notifications are enabled",
+      "If you have concerns about a message, use the 'Report' option in the message thread",
+    ],
+    relatedArticles: ["parent-portal-overview", "parent-connect-magic-link"],
+  },
+  {
+    id: "parent-portal-portfolio-flagging",
+    title: "Portfolio Content Flagged or Reported",
+    category: "parent-portal",
+    tags: ["portfolio", "flag", "report", "inappropriate", "teacher", "oversight", "student"],
+    severity: "warning",
+    symptom: "A student's portfolio item has been flagged, or you want to understand the flagging process.",
+    explanation: "Teachers can flag portfolio items they believe are inappropriate or need review. When a flag is submitted, a reason is recorded and the item is queued for administrator review. Parents can see their child's portfolio in the Parent Portal. If an item is flagged, it may be hidden pending review. Students may also receive a notification if their portfolio item needs attention.",
+    steps: [
+      "Teachers: go to the student's Portfolio page and click the flag icon on any item that needs review",
+      "Select a reason for flagging (inappropriate content, privacy concern, etc.) and optionally add a note",
+      "Flagged items are visible to campus admins in the Safety & Security panel",
+      "Admins can approve or remove the flagged item after review",
+      "Parents: if you notice content in your child's portfolio you're concerned about, contact their teacher directly via the Messages tab",
+      "Students whose items are flagged may receive a notification to revise or remove the content",
+      "All flag actions are logged in the audit trail",
+    ],
+    relatedArticles: ["parent-portal-overview", "portfolio-share-broken"],
+  },
 ];
 
 const categories = [
@@ -1052,6 +1128,7 @@ const categories = [
   { id: "trial", label: "Free Trial", icon: Clock },
   { id: "system-admin", label: "System Admin Docs", icon: Code },
   { id: "campus-district-admin", label: "Admin Troubleshooting", icon: Building },
+  { id: "parent-portal", label: "Parent Portal", icon: Users },
 ];
 
 const quickLinks = [
@@ -1066,6 +1143,8 @@ const quickLinks = [
   { label: "Charter networks?", articleId: "admin-charter-network-management", icon: Network },
   { label: "Earn rewards?", articleId: "affiliate-getting-started", icon: Activity },
   { label: "Start free trial?", articleId: "trial-getting-started", icon: Clock },
+  { label: "Parent magic link?", articleId: "parent-connect-magic-link", icon: Users },
+  { label: "Parent portal guide?", articleId: "parent-portal-overview", icon: Users },
 ];
 
 export default function HelpDesk() {

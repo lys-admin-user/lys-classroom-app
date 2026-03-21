@@ -351,18 +351,20 @@ const slides: DemoSlide[] = [
     ),
   },
   {
-    title: "Parent Portal",
-    subtitle: "Free for Every Family",
-    description: "Parents track student progress, view BKD journey, and see career readiness insights.",
+    title: "Parent Portal v2",
+    subtitle: "Free for Every Family · Now with Family Connect",
+    description: "Parents connect via magic invite links, read teacher announcements, track their child's Be-Know-Do journey, and message teachers securely — all in one place.",
     icon: <Users className="h-10 w-10" />,
     color: "text-lys-yellow",
     bgGradient: "from-lys-yellow/20 via-lys-yellow/5 to-transparent",
     features: [
       { icon: <Heart className="h-4 w-4" />, text: "BKD Journey View" },
       { icon: <Briefcase className="h-4 w-4" />, text: "Career Readiness" },
+      { icon: <MessageSquare className="h-4 w-4" />, text: "1-to-1 Secure Messaging" },
+      { icon: <Layers className="h-4 w-4" />, text: "Magic Invite Links" },
     ],
     visual: (
-      <div className="w-full max-w-xs mx-auto">
+      <div className="w-full max-w-xs mx-auto space-y-2">
         <div className="bg-card rounded-lg border p-3 space-y-2">
           <p className="text-xs text-muted-foreground font-roboto">Your Child's Progress</p>
           <div className="grid grid-cols-3 gap-2 text-center">
@@ -377,10 +379,53 @@ const slides: DemoSlide[] = [
               </div>
             ))}
           </div>
-          <div className="flex items-center gap-2 text-xs text-muted-foreground">
-            <Briefcase className="h-3 w-3" />
-            <span>Top match: Software Developer (94%)</span>
+        </div>
+        <div className="bg-card rounded-lg border p-2 flex items-center gap-2">
+          <MessageSquare className="h-4 w-4 text-lys-teal flex-shrink-0" />
+          <div className="flex-1 min-w-0">
+            <p className="text-xs font-medium truncate">Ms. Johnson</p>
+            <p className="text-[10px] text-muted-foreground truncate">Field trip forms due Friday!</p>
           </div>
+          <span className="text-[10px] bg-lys-yellow/20 text-lys-yellow px-1.5 py-0.5 rounded-full">New</span>
+        </div>
+        <div className="bg-card rounded-lg border p-2 flex items-center gap-2">
+          <Briefcase className="h-4 w-4 text-lys-red flex-shrink-0" />
+          <p className="text-[10px] text-muted-foreground">Top match: Software Developer (94%)</p>
+        </div>
+      </div>
+    ),
+  },
+  {
+    title: "Teacher Communications Hub",
+    subtitle: "Quiet Hours · Announcements · Portfolio Oversight",
+    description: "Teachers set quiet hours so families aren't notified at midnight, post class-wide announcements to parents and students, and flag inappropriate portfolio items for review.",
+    icon: <Layers className="h-10 w-10" />,
+    color: "text-lys-teal",
+    bgGradient: "from-lys-teal/20 via-lys-teal/5 to-transparent",
+    features: [
+      { icon: <Shield className="h-4 w-4" />, text: "Portfolio Oversight" },
+      { icon: <FileText className="h-4 w-4" />, text: "Class Announcements" },
+      { icon: <Brain className="h-4 w-4" />, text: "Quiet Hours Scheduling" },
+    ],
+    visual: (
+      <div className="w-full max-w-xs mx-auto space-y-2">
+        <div className="bg-card rounded-lg border p-2 flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <div className="w-2 h-2 rounded-full bg-amber-400" />
+            <p className="text-xs font-medium">Field Trip Reminder</p>
+          </div>
+          <span className="text-[10px] text-muted-foreground">Parents</span>
+        </div>
+        <div className="bg-card rounded-lg border p-2 flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <div className="w-2 h-2 rounded-full bg-blue-400" />
+            <p className="text-xs font-medium">Quiet Hours: 9pm–7am</p>
+          </div>
+          <span className="text-[10px] text-green-600">Active</span>
+        </div>
+        <div className="bg-card rounded-lg border p-2 flex items-center gap-2">
+          <Shield className="h-3.5 w-3.5 text-red-400" />
+          <p className="text-xs text-muted-foreground">0 flagged portfolio items</p>
         </div>
       </div>
     ),

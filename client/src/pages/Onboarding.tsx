@@ -123,6 +123,7 @@ const PRIMARY_GOALS_BASE = [
   { id: "career", label: "Explore career pathways", icon: Target },
   { id: "lessons", label: "Create engaging lesson plans", icon: BookOpen },
   { id: "curriculum", label: "Build scope & sequence", icon: BookMarked },
+  { id: "connect_family", label: "Connect with & track my child's education", icon: Home },
 ];
 
 const PRIMARY_GOALS_ADMIN = [
@@ -154,6 +155,7 @@ const getAutoInterests = (role: string, primaryGoal: string): string[] => {
   if (primaryGoal === "lessons") interests.push("ai-lessons", "resources");
   if (primaryGoal === "curriculum") interests.push("scope-sequence", "analytics");
   if (primaryGoal === "oversight") interests.push("analytics", "safety-monitoring", "district-management");
+  if (primaryGoal === "connect_family") interests.push("parent-portal", "analytics", "career-exploration");
   
   return Array.from(new Set(interests));
 };
@@ -285,6 +287,7 @@ export default function Onboarding() {
       if (role === "district_admin") return "/district-admin";
       return "/admin";
     }
+    if (primaryGoal === "connect_family") return "/parent-portal";
     return "/";
   };
 

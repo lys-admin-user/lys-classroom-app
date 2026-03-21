@@ -152,7 +152,7 @@ const navigationGroups: NavGroup[] = [
   },
   {
     label: "Student Management",
-    minRole: "homeschool_parent",
+    minRole: "educator",
     items: [
       { title: "Parent Portal", url: "/parent-portal", icon: Users, requiresAuth: true },
     ],
