@@ -39,6 +39,9 @@ import {
   ShieldCheck,
   Network,
   Wrench,
+  ShoppingBag,
+  Bookmark,
+  ClipboardList,
 } from "lucide-react";
 
 interface HelpArticle {
@@ -1110,6 +1113,99 @@ const helpArticles: HelpArticle[] = [
     ],
     relatedArticles: ["parent-portal-overview", "portfolio-share-broken"],
   },
+  {
+    id: "marketplace-browse",
+    title: "Browsing the LYS Marketplace",
+    category: "resources",
+    tags: ["marketplace", "ebook", "course", "guide", "resource", "free", "know resources"],
+    severity: "info",
+    symptom: "You want to find eBooks, mini courses, guides, or resource packs in the LYS Marketplace.",
+    explanation: "The LYS Marketplace lives inside the KNOW Resources page. Switch to the 'LYS Marketplace' tab to browse all published items. Free items can be claimed instantly with a single click. Paid items direct you to the LYS content team. Once you claim an item it shows an 'Owned' badge everywhere.",
+    steps: [
+      "Go to KNOW Resources in the left sidebar",
+      "Click the 'LYS Marketplace' tab at the top of the page",
+      "Browse all available items — you can search by title or topic",
+      "Click 'View Details' on any card to see the full description, author info, and BKD targets",
+      "Free items show a green 'Free' badge — click 'Get for Free' to claim them instantly",
+      "Paid items will direct you to contact the LYS content team for purchase",
+      "Items you've already claimed show an 'Owned' badge",
+    ],
+    relatedArticles: ["marketplace-claim-free", "scholarship-save-planner"],
+  },
+  {
+    id: "marketplace-claim-free",
+    title: "Claiming Free Marketplace Items",
+    category: "resources",
+    tags: ["marketplace", "free", "claim", "ebook", "mini course", "download"],
+    severity: "info",
+    symptom: "You want to claim a free item from the LYS Marketplace.",
+    explanation: "Free marketplace items (price = $0) can be claimed instantly without any payment. Once claimed, the item is permanently associated with your account and you can access its content any time from the marketplace.",
+    steps: [
+      "Open any free item in the LYS Marketplace (look for the green 'Free' badge)",
+      "Click 'Get for Free' on the card or 'Get for Free' inside the detail dialog",
+      "The item is immediately added to your library — no payment needed",
+      "Once claimed, the card shows an 'Owned' badge and an 'Access Content' button",
+      "If the item has a content URL, clicking 'Access Content' opens the material directly",
+      "Educators can also find educator-specific courses under Professional Development > LYS Courses",
+    ],
+    relatedArticles: ["marketplace-browse"],
+  },
+  {
+    id: "scholarship-save-planner",
+    title: "Saving Scholarships to Your Planner",
+    category: "resources",
+    tags: ["scholarship", "bookmark", "planner", "save", "know resources", "financial aid"],
+    severity: "info",
+    symptom: "You want to bookmark a scholarship so you can track it in your Scholarship Planner.",
+    explanation: "Any scholarship in the KNOW Resources library can be bookmarked with a single click. Saved scholarships appear in your Scholarship Planner where you can track deadlines, amounts, and application progress. The bookmark icon toggles between saved (teal) and unsaved.",
+    steps: [
+      "Open KNOW Resources from the left sidebar",
+      "Find a scholarship in the 'Scholarships' section",
+      "Click the bookmark icon (ribbon icon) on the card to save it to your Scholarship Planner",
+      "A filled teal bookmark icon means the scholarship is already saved",
+      "Click the bookmark icon again to remove it from your planner",
+      "You can also open a scholarship's details and click 'Save to Planner' in the dialog",
+      "All saved scholarships are available in your Scholarship Planner page",
+    ],
+    relatedArticles: ["marketplace-browse"],
+  },
+  {
+    id: "student-assignments-view",
+    title: "Student View: Finding and Completing Assignments",
+    category: "resources",
+    tags: ["student", "assignments", "classroom", "homework", "work", "educator"],
+    severity: "info",
+    symptom: "You are a student and want to find your assignments in LYS.",
+    explanation: "Students see a simplified Classroom page that shows only their assigned work — the AI generation and lesson creation tools are only visible to educators. The page defaults to the 'My Assignments' tab when students log in. If you see no assignments, your teacher hasn't sent any yet.",
+    steps: [
+      "Navigate to 'Classroom' in the left sidebar",
+      "The page opens directly on 'My Assignments' for student accounts",
+      "All assignments sent to you by your educator appear listed here",
+      "Click any assignment card to view its full details, instructions, and due date",
+      "The 'AI Generate' and 'Create New' tabs are educator-only and will not appear for students",
+      "If you don't see any assignments, your educator hasn't sent any yet — contact them directly",
+    ],
+    relatedArticles: ["auth-role-denied"],
+  },
+  {
+    id: "pd-lys-courses",
+    title: "Accessing LYS Courses in Professional Development",
+    category: "resources",
+    tags: ["professional development", "PD", "educator", "course", "ebook", "lys marketplace"],
+    severity: "info",
+    symptom: "You are an educator looking for LYS-curated courses, eBooks, or guides for your professional development.",
+    explanation: "The Professional Development page has a dedicated 'LYS Courses' tab that surfaces all marketplace items targeted at educators. You can claim free items instantly or reach out to purchase paid ones. Claimed items track ownership so you can access content any time.",
+    steps: [
+      "Go to 'Professional Development' in the left sidebar",
+      "Click the 'LYS Courses' tab in the navigation row at the top",
+      "Browse educator-targeted eBooks, mini courses, guides, and resource packs",
+      "Use the search bar to filter by topic or title",
+      "Free items can be claimed instantly with 'Get for Free'",
+      "Paid items open a purchase email to the LYS content team",
+      "Claimed items show an 'Owned' badge and an 'Access Content' button",
+    ],
+    relatedArticles: ["marketplace-browse", "marketplace-claim-free"],
+  },
 ];
 
 const categories = [
@@ -1129,6 +1225,7 @@ const categories = [
   { id: "system-admin", label: "System Admin Docs", icon: Code },
   { id: "campus-district-admin", label: "Admin Troubleshooting", icon: Building },
   { id: "parent-portal", label: "Parent Portal", icon: Users },
+  { id: "resources", label: "Marketplace & Resources", icon: ShoppingBag },
 ];
 
 const quickLinks = [
@@ -1145,6 +1242,9 @@ const quickLinks = [
   { label: "Start free trial?", articleId: "trial-getting-started", icon: Clock },
   { label: "Parent magic link?", articleId: "parent-connect-magic-link", icon: Users },
   { label: "Parent portal guide?", articleId: "parent-portal-overview", icon: Users },
+  { label: "Browse marketplace?", articleId: "marketplace-browse", icon: ShoppingBag },
+  { label: "Save a scholarship?", articleId: "scholarship-save-planner", icon: Bookmark },
+  { label: "Student assignments?", articleId: "student-assignments-view", icon: ClipboardList },
 ];
 
 export default function HelpDesk() {

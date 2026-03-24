@@ -29,6 +29,7 @@ import {
   Copy,
   Check,
   ArrowLeft,
+  ShoppingBag,
 } from "lucide-react";
 import { Link } from "wouter";
 
@@ -1322,6 +1323,135 @@ const requireSystemAdmin = requireRole("system_admin");`,
             ["portfolioFlags", "Teacher-submitted flags on student portfolio items", "id, flaggedBy, portfolioItemId, reason, notes, status, resolvedAt"],
           ],
         },
+      },
+    ],
+  },
+  {
+    id: "marketplace",
+    title: "LYS Marketplace & Saved Scholarships",
+    icon: ShoppingBag,
+    category: "Core",
+    content: [
+      {
+        heading: "Overview",
+        body: "The LYS Marketplace is a curated storefront of educational products published by LYS system admins. It surfaces inside the KNOW Resources page (under the 'LYS Marketplace' tab) and inside Professional Development (under the 'LYS Courses' tab filtered by audience). The Saved Scholarships system lets any authenticated user bookmark scholarship resources to their Scholarship Planner with a single click.",
+        items: [
+          "Products: eBooks, mini courses, guides, templates, workshops, resource packs",
+          "Pricing: cents integer (0 = free). Free items are claimed via POST /api/marketplace/:id/claim",
+          "Audience enum: students | educators | parents | all — controls which surfaces render the item",
+          "BKD Targets enum: student_be | student_know | student_do | educator_be | educator_know | educator_do",
+          "Publisher restriction: only system_admin and site_admin roles can create/update/delete marketplace items",
+          "Ownership tracking: marketplacePurchases table links userId ↔ itemId with amountPaid and status",
+          "Saved Scholarships: resourceId is a namespaced string — 'know-<uuid>' for knowResources rows, bare UUID for resources rows",
+        ],
+      },
+      {
+        heading: "Database Tables",
+        body: "Three new tables in shared/schema.ts support the marketplace and saved scholarships systems.",
+        table: {
+          headers: ["Table", "Purpose", "Key Columns"],
+          rows: [
+            ["marketplaceItems", "Marketplace product catalog", "id (UUID), title, description, itemType, audience, bkdTargets (text[]), price (int, cents), coverImageUrl, contentUrl, externalUrl, author, authorBio, tags (text[]), careerFields (text[]), pageCount, durationMinutes, featured (bool), isActive (bool), stripeProductId, stripePriceId, publishedBy (userId), createdAt, updatedAt"],
+            ["marketplacePurchases", "User ownership/claim records", "id (UUID), userId, itemId (FK marketplaceItems), amountPaid (int), stripePaymentIntentId, paypalOrderId, status (pending|completed|refunded), createdAt"],
+            ["savedScholarships", "Scholarship bookmarks per user", "id (UUID), userId, resourceId (namespaced string), resourceTitle, resourceAmount, resourceDeadline, resourceUrl, notes, createdAt"],
+          ],
+        },
+      },
+      {
+        heading: "API Endpoints — Public Browsing",
+        body: "All marketplace endpoints require authentication (isAuthenticated middleware). The browse endpoint automatically enriches each item with an 'owned' boolean for the requesting user.",
+        table: {
+          headers: ["Method", "Path", "Auth", "Description"],
+          rows: [
+            ["GET", "/api/marketplace", "any authenticated", "List active items. Query params: audience, itemType. Returns items with owned:boolean field"],
+            ["GET", "/api/marketplace/:id", "any authenticated", "Single item detail with owned flag"],
+            ["POST", "/api/marketplace/:id/claim", "any authenticated", "Claim a free item (price must be 0). Creates marketplacePurchases record. Idempotent."],
+          ],
+        },
+      },
+      {
+        heading: "API Endpoints — Admin CRUD",
+        body: "Admin marketplace management is restricted to system_admin and site_admin roles.",
+        table: {
+          headers: ["Method", "Path", "Auth", "Description"],
+          rows: [
+            ["GET", "/api/admin/marketplace", "system_admin, site_admin", "List ALL items including inactive"],
+            ["POST", "/api/admin/marketplace", "system_admin, site_admin", "Create a new marketplace item. publishedBy is auto-set from req.user.id"],
+            ["PATCH", "/api/admin/marketplace/:id", "system_admin, site_admin", "Update any field. updatedAt is auto-set by storage layer"],
+            ["DELETE", "/api/admin/marketplace/:id", "system_admin, site_admin", "Permanently delete an item"],
+          ],
+        },
+      },
+      {
+        heading: "API Endpoints — Saved Scholarships",
+        body: "Scholarship bookmarks are user-scoped and do not require any special role.",
+        table: {
+          headers: ["Method", "Path", "Auth", "Description"],
+          rows: [
+            ["GET", "/api/saved-scholarships", "any authenticated", "List all bookmarked scholarships for the current user"],
+            ["POST", "/api/saved-scholarships", "any authenticated", "Save a scholarship. Body: { resourceId, resourceTitle, resourceAmount?, resourceDeadline?, resourceUrl?, notes? }. Deduplicates by resourceId."],
+            ["DELETE", "/api/saved-scholarships/:resourceId", "any authenticated", "Remove a scholarship bookmark. resourceId must be URL-encoded."],
+          ],
+        },
+      },
+      {
+        heading: "Storage Interface Methods",
+        body: "All marketplace and saved-scholarship operations are wired through the IStorage interface in server/storage.ts, ensuring the MemoryStorage and DatabaseStorage implementations stay in sync.",
+        code: `// Marketplace Items
+getMarketplaceItems(filters?: { audience?: string; itemType?: string; isActive?: boolean }): Promise<MarketplaceItem[]>
+getMarketplaceItem(id: string): Promise<MarketplaceItem | undefined>
+createMarketplaceItem(item: InsertMarketplaceItem): Promise<MarketplaceItem>
+updateMarketplaceItem(id: string, updates: Partial<MarketplaceItem>): Promise<MarketplaceItem | undefined>
+deleteMarketplaceItem(id: string): Promise<boolean>
+
+// Marketplace Purchases
+getUserPurchases(userId: string): Promise<MarketplacePurchase[]>
+hasPurchased(userId: string, itemId: string): Promise<boolean>
+createPurchase(purchase: InsertMarketplacePurchase): Promise<MarketplacePurchase>
+
+// Saved Scholarships
+getSavedScholarships(userId: string): Promise<SavedScholarship[]>
+saveScholarship(data: InsertSavedScholarship): Promise<SavedScholarship>
+unsaveScholarship(userId: string, resourceId: string): Promise<boolean>
+isSavedScholarship(userId: string, resourceId: string): Promise<boolean>`,
+        language: "typescript",
+      },
+      {
+        heading: "Frontend Architecture",
+        body: "The marketplace surfaces in two locations. Resources.tsx renders the 'LYS Marketplace' tab alongside the Resource Library. ProfessionalDevelopment.tsx renders a 'LYS Courses' tab that fetches marketplace items filtered to audience='educators'.",
+        items: [
+          "Resources.tsx: Top-level Tabs ('Resource Library' | 'LYS Marketplace'). Marketplace tab has search, featured section, and all-items grid. MarketplaceCard is a co-located sub-component.",
+          "ProfessionalDevelopment.tsx: 'LYS Courses' tab renders PDCoursesTab (a co-located sub-component) which fetches /api/marketplace?audience=educators",
+          "Scholarship bookmark: Each scholarship card in Resources.tsx has an inline bookmark Button (Bookmark / BookmarkCheck icon). Toggling calls POST or DELETE /api/saved-scholarships. savedIds Set is derived from the /api/saved-scholarships query.",
+          "Claim mutation: Uses apiRequest('POST', '/api/marketplace/:id/claim', {}). On success, invalidates ['/api/marketplace'] query to refresh owned status.",
+          "Item detail dialog: Shows full metadata — authorBio, bkdTargets, durationMinutes, pageCount, tags, and access/claim/purchase CTA buttons.",
+        ],
+      },
+      {
+        heading: "Role-Aware Assignments (Student Classroom View)",
+        body: "The Classroom / Assignments page (client/src/pages/Assignments.tsx) renders differently based on the authenticated user's role. No separate route is used — role-aware rendering gates UI elements.",
+        items: [
+          "isStudent = user?.role === 'student'",
+          "isParent = user?.role === 'parent'",
+          "Students: defaultValue of the Tabs is 'saved' (My Assignments tab). AI Generate and Create New tabs are completely hidden.",
+          "Parents: Same as students — Tabs default to 'saved', generator tabs hidden.",
+          "Page heading changes: 'My Assignments' for students/parents, 'Assignment Generator' for educators.",
+          "Description line is role-specific: students see 'View and complete your assigned work', parents see 'View your student's assignments'.",
+          "isPaidUser gating: Pro upgrade banner only shown to non-paid, non-student, non-parent users.",
+        ],
+        warning: "Do not add separate routes for student vs educator classroom views. All role differentiation is handled by conditional rendering inside the single Assignments.tsx component.",
+      },
+      {
+        heading: "Publishing Marketplace Content",
+        body: "Only system_admin and site_admin can publish marketplace items. There is no educator self-publishing workflow at this time — the LYS Author educator framework is planned for a future release.",
+        items: [
+          "Publish via POST /api/admin/marketplace with isActive: true",
+          "Set featured: true to surface the item in the 'Featured' section of the marketplace grid",
+          "audience field controls which page surface renders the item: 'educators' → PD LYS Courses tab; 'students' or 'all' → main Marketplace tab",
+          "price: 0 = free (claim flow). price > 0 = paid (routes to purchase email). Stripe/PayPal integration is available via stripeProductId and stripePriceId fields for future webhook-based fulfillment.",
+          "contentUrl: Direct link to downloadable content (PDF, ZIP, external LMS). Shown via 'Access Content' button after claim.",
+          "externalUrl: Optional fallback link for items without direct content hosting.",
+        ],
       },
     ],
   },
