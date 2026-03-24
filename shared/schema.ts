@@ -2015,6 +2015,94 @@ export const insertKnowResourceSchema = createInsertSchema(knowResources).omit({
 export type InsertKnowResource = z.infer<typeof insertKnowResourceSchema>;
 export type KnowResource = typeof knowResources.$inferSelect;
 
+// LYS Marketplace Items — eBooks, mini courses, guides sold/offered via the platform
+export const MARKETPLACE_ITEM_TYPES = ["ebook", "mini_course", "guide", "template", "workshop", "resource_pack"] as const;
+export type MarketplaceItemType = typeof MARKETPLACE_ITEM_TYPES[number];
+
+export const MARKETPLACE_AUDIENCE = ["students", "educators", "parents", "all"] as const;
+export type MarketplaceAudience = typeof MARKETPLACE_AUDIENCE[number];
+
+export const MARKETPLACE_BKD_TARGET = ["student_be", "student_know", "student_do", "educator_be", "educator_know", "educator_do"] as const;
+export type MarketplaceBkdTarget = typeof MARKETPLACE_BKD_TARGET[number];
+
+export const marketplaceItems = pgTable("marketplace_items", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  title: text("title").notNull(),
+  description: text("description").notNull(),
+  itemType: text("item_type").notNull().$type<MarketplaceItemType>(),
+  audience: text("audience").notNull().$type<MarketplaceAudience>().default("all"),
+  bkdTargets: jsonb("bkd_targets").$type<MarketplaceBkdTarget[]>().default([]),
+
+  // Pricing
+  price: integer("price").default(0), // in cents; 0 = free
+  stripeProductId: text("stripe_product_id"),
+  stripePriceId: text("stripe_price_id"),
+
+  // Content
+  coverImageUrl: text("cover_image_url"),
+  previewUrl: text("preview_url"),
+  contentUrl: text("content_url"), // download link after purchase
+  externalUrl: text("external_url"), // for 3rd party hosted content
+
+  // Metadata
+  author: text("author"),
+  authorBio: text("author_bio"),
+  tags: jsonb("tags").$type<string[]>().default([]),
+  careerFields: jsonb("career_fields").$type<string[]>().default([]),
+  pageCount: integer("page_count"),
+  durationMinutes: integer("duration_minutes"),
+  featured: boolean("featured").default(false),
+  isActive: boolean("is_active").default(true),
+
+  // Publishing
+  publishedBy: varchar("published_by").notNull(), // userId of system_admin publisher
+  isThirdParty: boolean("is_third_party").default(false),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertMarketplaceItemSchema = createInsertSchema(marketplaceItems).omit({
+  id: true, createdAt: true, updatedAt: true,
+});
+export type InsertMarketplaceItem = z.infer<typeof insertMarketplaceItemSchema>;
+export type MarketplaceItem = typeof marketplaceItems.$inferSelect;
+
+// Marketplace Purchases — tracks user acquisitions (free claim or paid)
+export const marketplacePurchases = pgTable("marketplace_purchases", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull(),
+  itemId: varchar("item_id").notNull(),
+  amountPaid: integer("amount_paid").default(0), // in cents
+  stripePaymentIntentId: text("stripe_payment_intent_id"),
+  status: text("status").notNull().default("completed"), // completed, pending, refunded
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertMarketplacePurchaseSchema = createInsertSchema(marketplacePurchases).omit({
+  id: true, createdAt: true,
+});
+export type InsertMarketplacePurchase = z.infer<typeof insertMarketplacePurchaseSchema>;
+export type MarketplacePurchase = typeof marketplacePurchases.$inferSelect;
+
+// Saved Scholarships — users bookmark scholarship resources for the Scholarship Planner
+export const savedScholarships = pgTable("saved_scholarships", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull(),
+  resourceId: text("resource_id").notNull(), // prefixed: "know-<uuid>" or "<resource-id>"
+  resourceTitle: text("resource_title").notNull(),
+  resourceAmount: text("resource_amount"),
+  resourceDeadline: text("resource_deadline"),
+  resourceUrl: text("resource_url"),
+  notes: text("notes"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertSavedScholarshipSchema = createInsertSchema(savedScholarships).omit({
+  id: true, createdAt: true,
+});
+export type InsertSavedScholarship = z.infer<typeof insertSavedScholarshipSchema>;
+export type SavedScholarship = typeof savedScholarships.$inferSelect;
+
 // Session Edit History (for tracking collaborative changes)
 export const sessionEditHistory = pgTable("session_edit_history", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),

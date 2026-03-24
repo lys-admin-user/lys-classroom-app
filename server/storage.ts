@@ -162,6 +162,15 @@ import {
   sharedResources,
   resourceLikes,
   knowResources,
+  marketplaceItems,
+  marketplacePurchases,
+  savedScholarships,
+  type MarketplaceItem,
+  type InsertMarketplaceItem,
+  type MarketplacePurchase,
+  type InsertMarketplacePurchase,
+  type SavedScholarship,
+  type InsertSavedScholarship,
   sessionEditHistory,
   organizations,
   organizationMemberships,
@@ -934,6 +943,24 @@ export interface IStorage {
   updateKnowResource(id: string, updates: Partial<KnowResource>, userId: string): Promise<KnowResource | undefined>;
   deleteKnowResource(id: string): Promise<boolean>;
   
+  // Marketplace Items
+  getMarketplaceItems(filters?: { audience?: string; itemType?: string; isActive?: boolean }): Promise<MarketplaceItem[]>;
+  getMarketplaceItem(id: string): Promise<MarketplaceItem | undefined>;
+  createMarketplaceItem(item: InsertMarketplaceItem): Promise<MarketplaceItem>;
+  updateMarketplaceItem(id: string, updates: Partial<MarketplaceItem>): Promise<MarketplaceItem | undefined>;
+  deleteMarketplaceItem(id: string): Promise<boolean>;
+
+  // Marketplace Purchases
+  getUserPurchases(userId: string): Promise<MarketplacePurchase[]>;
+  hasPurchased(userId: string, itemId: string): Promise<boolean>;
+  createPurchase(purchase: InsertMarketplacePurchase): Promise<MarketplacePurchase>;
+
+  // Saved Scholarships
+  getSavedScholarships(userId: string): Promise<SavedScholarship[]>;
+  saveScholarship(data: InsertSavedScholarship): Promise<SavedScholarship>;
+  unsaveScholarship(userId: string, resourceId: string): Promise<boolean>;
+  isSavedScholarship(userId: string, resourceId: string): Promise<boolean>;
+
   // Student Matriculation History (System-Level Tracking)
   getStudentMatriculationHistory(studentId: string): Promise<StudentMatriculationHistory[]>;
   getStudentMatriculationEvent(id: string): Promise<StudentMatriculationHistory | undefined>;
@@ -5343,6 +5370,73 @@ export class DatabaseStorage implements IStorage {
   async deleteKnowResource(id: string): Promise<boolean> {
     const result = await db.delete(knowResources).where(eq(knowResources.id, id));
     return true;
+  }
+
+  // Marketplace Items
+  async getMarketplaceItems(filters?: { audience?: string; itemType?: string; isActive?: boolean }): Promise<MarketplaceItem[]> {
+    const conditions: any[] = [];
+    if (filters?.isActive !== undefined) conditions.push(eq(marketplaceItems.isActive, filters.isActive));
+    if (filters?.audience) conditions.push(eq(marketplaceItems.audience as any, filters.audience));
+    if (filters?.itemType) conditions.push(eq(marketplaceItems.itemType as any, filters.itemType));
+    const q = conditions.length > 0
+      ? db.select().from(marketplaceItems).where(and(...conditions))
+      : db.select().from(marketplaceItems);
+    return await q.orderBy(desc(marketplaceItems.featured), desc(marketplaceItems.createdAt));
+  }
+
+  async getMarketplaceItem(id: string): Promise<MarketplaceItem | undefined> {
+    const [item] = await db.select().from(marketplaceItems).where(eq(marketplaceItems.id, id));
+    return item;
+  }
+
+  async createMarketplaceItem(item: InsertMarketplaceItem): Promise<MarketplaceItem> {
+    const [created] = await db.insert(marketplaceItems).values(item).returning();
+    return created;
+  }
+
+  async updateMarketplaceItem(id: string, updates: Partial<MarketplaceItem>): Promise<MarketplaceItem | undefined> {
+    const [updated] = await db.update(marketplaceItems).set({ ...updates, updatedAt: new Date() }).where(eq(marketplaceItems.id, id)).returning();
+    return updated;
+  }
+
+  async deleteMarketplaceItem(id: string): Promise<boolean> {
+    await db.delete(marketplaceItems).where(eq(marketplaceItems.id, id));
+    return true;
+  }
+
+  // Marketplace Purchases
+  async getUserPurchases(userId: string): Promise<MarketplacePurchase[]> {
+    return await db.select().from(marketplacePurchases).where(eq(marketplacePurchases.userId, userId)).orderBy(desc(marketplacePurchases.createdAt));
+  }
+
+  async hasPurchased(userId: string, itemId: string): Promise<boolean> {
+    const [row] = await db.select().from(marketplacePurchases).where(and(eq(marketplacePurchases.userId, userId), eq(marketplacePurchases.itemId, itemId)));
+    return !!row;
+  }
+
+  async createPurchase(purchase: InsertMarketplacePurchase): Promise<MarketplacePurchase> {
+    const [created] = await db.insert(marketplacePurchases).values(purchase).returning();
+    return created;
+  }
+
+  // Saved Scholarships
+  async getSavedScholarships(userId: string): Promise<SavedScholarship[]> {
+    return await db.select().from(savedScholarships).where(eq(savedScholarships.userId, userId)).orderBy(desc(savedScholarships.createdAt));
+  }
+
+  async saveScholarship(data: InsertSavedScholarship): Promise<SavedScholarship> {
+    const [created] = await db.insert(savedScholarships).values(data).returning();
+    return created;
+  }
+
+  async unsaveScholarship(userId: string, resourceId: string): Promise<boolean> {
+    await db.delete(savedScholarships).where(and(eq(savedScholarships.userId, userId), eq(savedScholarships.resourceId, resourceId)));
+    return true;
+  }
+
+  async isSavedScholarship(userId: string, resourceId: string): Promise<boolean> {
+    const [row] = await db.select().from(savedScholarships).where(and(eq(savedScholarships.userId, userId), eq(savedScholarships.resourceId, resourceId)));
+    return !!row;
   }
 
   // Student Matriculation History (System-Level Tracking)

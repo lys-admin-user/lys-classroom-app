@@ -30,7 +30,11 @@ import {
   Zap,
   CheckCircle2,
   PlayCircle,
-  Trash2
+  Trash2,
+  ShoppingBag,
+  Search,
+  Download,
+  ExternalLink
 } from "lucide-react";
 import type { EducatorCareerGoal, EducatorSkill, PDRecommendation, EducatorPDProgress } from "@shared/schema";
 
@@ -188,12 +192,16 @@ export default function ProfessionalDevelopment() {
         </div>
 
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-          <TabsList className="bg-muted/50" data-testid="tabs-pd-navigation">
+          <TabsList className="bg-muted/50 flex-wrap h-auto gap-1" data-testid="tabs-pd-navigation">
             <TabsTrigger value="overview" data-testid="tab-overview">Overview</TabsTrigger>
             <TabsTrigger value="goals" data-testid="tab-goals">Career Goals</TabsTrigger>
             <TabsTrigger value="skills" data-testid="tab-skills">Skills</TabsTrigger>
             <TabsTrigger value="recommendations" data-testid="tab-recommendations">Recommendations</TabsTrigger>
             <TabsTrigger value="progress" data-testid="tab-progress">My Progress</TabsTrigger>
+            <TabsTrigger value="courses" data-testid="tab-courses">
+              <ShoppingBag className="h-4 w-4 mr-1.5" />
+              LYS Courses
+            </TabsTrigger>
           </TabsList>
 
           <TabsContent value="overview" className="space-y-6">
@@ -968,8 +976,131 @@ export default function ProfessionalDevelopment() {
               </div>
             )}
           </TabsContent>
+
+          <TabsContent value="courses" className="space-y-6">
+            <PDCoursesTab />
+          </TabsContent>
         </Tabs>
       </div>
+    </div>
+  );
+}
+
+function PDCoursesTab() {
+  const { toast } = useToast();
+  const [search, setSearch] = useState("");
+
+  const { data: items = [], isLoading } = useQuery<Array<{
+    id: string;
+    title: string;
+    description: string;
+    itemType: string;
+    audience: string;
+    bkdTargets: string[];
+    price: number;
+    coverImageUrl: string | null;
+    author: string | null;
+    authorBio: string | null;
+    tags: string[];
+    pageCount: number | null;
+    durationMinutes: number | null;
+    featured: boolean;
+    owned: boolean;
+    contentUrl: string | null;
+    externalUrl: string | null;
+  }>>({
+    queryKey: ["/api/marketplace", { audience: "educators" }],
+    queryFn: async () => {
+      const res = await fetch("/api/marketplace?audience=educators");
+      if (!res.ok) throw new Error("Failed to fetch");
+      return res.json();
+    },
+  });
+
+  const claimMutation = useMutation({
+    mutationFn: (id: string) => apiRequest("POST", `/api/marketplace/${id}/claim`, {}),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/marketplace"] });
+      toast({ title: "Claimed!", description: "This course has been added to your library." });
+    },
+  });
+
+  const formatPrice = (cents: number) => {
+    if (cents === 0) return "Free";
+    return new Intl.NumberFormat(undefined, { style: "currency", currency: "USD" }).format(cents / 100);
+  };
+
+  const filtered = items.filter((item) => {
+    if (!search) return true;
+    const q = search.toLowerCase();
+    return item.title.toLowerCase().includes(q) || item.description.toLowerCase().includes(q);
+  });
+
+  return (
+    <div className="space-y-6">
+      <div className="flex items-center justify-between gap-4 flex-wrap">
+        <div>
+          <h2 className="font-oswald text-xl">LYS Courses & Resources</h2>
+          <p className="text-sm text-muted-foreground">eBooks, mini courses, guides, and resource packs for educators</p>
+        </div>
+        <div className="relative w-full max-w-sm">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <Input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search courses..." className="pl-9" data-testid="input-search-pd-courses" />
+        </div>
+      </div>
+
+      {isLoading ? (
+        <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {[1,2,3].map(i => <Card key={i}><CardContent className="pt-6"><Skeleton className="h-5 w-3/4 mb-2" /><Skeleton className="h-4 w-full mb-2" /><Skeleton className="h-8 w-24 mt-4" /></CardContent></Card>)}
+        </div>
+      ) : filtered.length === 0 ? (
+        <Card className="border-dashed">
+          <CardContent className="pt-6 text-center py-16">
+            <GraduationCap className="h-12 w-12 mx-auto text-muted-foreground/40 mb-4" />
+            <p className="font-oswald text-lg text-muted-foreground mb-1">Educator Courses Coming Soon</p>
+            <p className="text-sm text-muted-foreground font-roboto max-w-sm mx-auto">
+              LYS eBooks and courses for educators will appear here once published. Check back soon!
+            </p>
+          </CardContent>
+        </Card>
+      ) : (
+        <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {filtered.map((item) => (
+            <Card key={item.id} className="hover-elevate flex flex-col" data-testid={`card-pd-course-${item.id}`}>
+              {item.coverImageUrl && <img src={item.coverImageUrl} alt={item.title} className="w-full h-36 object-cover rounded-t-lg" />}
+              <CardHeader className="pb-2">
+                <div className="flex items-center justify-between">
+                  <Badge variant="outline" className="text-xs capitalize">{item.itemType.replace("_", " ")}</Badge>
+                  <span className="text-sm font-oswald">
+                    {item.price === 0 ? <span className="text-green-600">Free</span> : <span className="text-lys-yellow">{formatPrice(item.price)}</span>}
+                  </span>
+                </div>
+                <CardTitle className="font-oswald text-base mt-2 leading-snug">{item.title}</CardTitle>
+                {item.author && <p className="text-xs text-muted-foreground">by {item.author}</p>}
+                <CardDescription className="text-xs line-clamp-2 mt-1">{item.description}</CardDescription>
+              </CardHeader>
+              <CardContent className="mt-auto">
+                <div className="flex flex-wrap gap-1 mb-3">
+                  {item.durationMinutes && <Badge variant="secondary" className="text-xs"><Clock className="h-3 w-3 mr-1" />{item.durationMinutes} min</Badge>}
+                </div>
+                {item.owned ? (
+                  <Button className="w-full font-oswald gap-2" onClick={() => item.contentUrl ? window.open(item.contentUrl, "_blank") : null} data-testid={`button-access-course-${item.id}`}>
+                    <Download className="h-4 w-4" />Access Content
+                  </Button>
+                ) : item.price === 0 ? (
+                  <Button className="w-full font-oswald gap-2 bg-lys-teal hover:bg-lys-teal/90" onClick={() => claimMutation.mutate(item.id)} disabled={claimMutation.isPending} data-testid={`button-claim-course-${item.id}`}>
+                    <Download className="h-4 w-4" />{claimMutation.isPending ? "Claiming..." : "Get for Free"}
+                  </Button>
+                ) : (
+                  <Button className="w-full font-oswald gap-2" onClick={() => window.open("mailto:purchase@ladderingyoursuccess.com?subject=Purchase: " + encodeURIComponent(item.title), "_blank")} data-testid={`button-buy-course-${item.id}`}>
+                    <ExternalLink className="h-4 w-4" />Purchase — {formatPrice(item.price)}
+                  </Button>
+                )}
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      )}
     </div>
   );
 }

@@ -3591,6 +3591,136 @@ export async function registerRoutes(
   });
 
   // ================================
+  // LYS Marketplace
+  // ================================
+
+  app.get("/api/marketplace", isAuthenticated, async (req: any, res) => {
+    try {
+      const { audience, itemType } = req.query;
+      const items = await storage.getMarketplaceItems({ isActive: true, audience: audience as string | undefined, itemType: itemType as string | undefined });
+      const userId = req.user?.id || req.user?.claims?.sub;
+      const purchases = userId ? await storage.getUserPurchases(userId) : [];
+      const purchasedIds = new Set(purchases.map((p: any) => p.itemId));
+      const result = items.map((item: any) => ({ ...item, owned: purchasedIds.has(item.id) }));
+      res.json(result);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch marketplace items" });
+    }
+  });
+
+  app.get("/api/marketplace/:id", isAuthenticated, async (req: any, res) => {
+    try {
+      const item = await storage.getMarketplaceItem(req.params.id);
+      if (!item) return res.status(404).json({ error: "Item not found" });
+      const userId = req.user?.id || req.user?.claims?.sub;
+      const owned = userId ? await storage.hasPurchased(userId, item.id) : false;
+      res.json({ ...item, owned });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch marketplace item" });
+    }
+  });
+
+  app.post("/api/marketplace/:id/claim", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user?.id || req.user?.claims?.sub;
+      const item = await storage.getMarketplaceItem(req.params.id);
+      if (!item) return res.status(404).json({ error: "Item not found" });
+      if (item.price !== 0) return res.status(400).json({ error: "This item requires payment" });
+      const alreadyOwned = await storage.hasPurchased(userId, item.id);
+      if (alreadyOwned) return res.json({ success: true, message: "Already claimed" });
+      await storage.createPurchase({ userId, itemId: item.id, amountPaid: 0, status: "completed" });
+      res.json({ success: true });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to claim item" });
+    }
+  });
+
+  // Admin marketplace management (system_admin only)
+  app.get("/api/admin/marketplace", isAuthenticated, async (req: any, res) => {
+    try {
+      const role = req.user?.role || req.user?.claims?.role;
+      if (!["system_admin", "site_admin"].includes(role)) return res.status(403).json({ error: "Forbidden" });
+      const items = await storage.getMarketplaceItems();
+      res.json(items);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch marketplace items" });
+    }
+  });
+
+  app.post("/api/admin/marketplace", isAuthenticated, async (req: any, res) => {
+    try {
+      const role = req.user?.role || req.user?.claims?.role;
+      if (!["system_admin", "site_admin"].includes(role)) return res.status(403).json({ error: "Forbidden" });
+      const userId = req.user?.id || req.user?.claims?.sub;
+      const item = await storage.createMarketplaceItem({ ...req.body, publishedBy: userId });
+      res.status(201).json(item);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to create marketplace item" });
+    }
+  });
+
+  app.patch("/api/admin/marketplace/:id", isAuthenticated, async (req: any, res) => {
+    try {
+      const role = req.user?.role || req.user?.claims?.role;
+      if (!["system_admin", "site_admin"].includes(role)) return res.status(403).json({ error: "Forbidden" });
+      const item = await storage.updateMarketplaceItem(req.params.id, req.body);
+      if (!item) return res.status(404).json({ error: "Item not found" });
+      res.json(item);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to update marketplace item" });
+    }
+  });
+
+  app.delete("/api/admin/marketplace/:id", isAuthenticated, async (req: any, res) => {
+    try {
+      const role = req.user?.role || req.user?.claims?.role;
+      if (!["system_admin", "site_admin"].includes(role)) return res.status(403).json({ error: "Forbidden" });
+      await storage.deleteMarketplaceItem(req.params.id);
+      res.json({ success: true });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to delete marketplace item" });
+    }
+  });
+
+  // ================================
+  // Saved Scholarships
+  // ================================
+
+  app.get("/api/saved-scholarships", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user?.id || req.user?.claims?.sub;
+      const items = await storage.getSavedScholarships(userId);
+      res.json(items);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch saved scholarships" });
+    }
+  });
+
+  app.post("/api/saved-scholarships", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user?.id || req.user?.claims?.sub;
+      const { resourceId, resourceTitle, resourceAmount, resourceDeadline, resourceUrl, notes } = req.body;
+      if (!resourceId || !resourceTitle) return res.status(400).json({ error: "resourceId and resourceTitle required" });
+      const already = await storage.isSavedScholarship(userId, resourceId);
+      if (already) return res.json({ alreadySaved: true });
+      const saved = await storage.saveScholarship({ userId, resourceId, resourceTitle, resourceAmount, resourceDeadline, resourceUrl, notes });
+      res.status(201).json(saved);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to save scholarship" });
+    }
+  });
+
+  app.delete("/api/saved-scholarships/:resourceId", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user?.id || req.user?.claims?.sub;
+      await storage.unsaveScholarship(userId, req.params.resourceId);
+      res.json({ success: true });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to unsave scholarship" });
+    }
+  });
+
+  // ================================
   // Student Matriculation & Achievement Tracking (System-Level)
   // ================================
 

@@ -59,6 +59,9 @@ Preferred communication style: Simple, everyday language.
 -   **studentJourneyProgress**: Aggregated progress scores.
 -   **studentJourneyMilestones**: Specific milestone achievements.
 -   **studentJourneyActivities**: Detailed activity log.
+-   **marketplaceItems**: LYS Marketplace products (eBooks, mini courses, guides, templates, workshops, resource packs). Priced in cents (0 = free). Audience enum: students/educators/parents/all. Published by system_admin only.
+-   **marketplacePurchases**: Records of users claiming/purchasing marketplace items.
+-   **savedScholarships**: Scholarship bookmarks saved by users, linked to ScholarshipPlanner.
 
 ## External Dependencies
 
