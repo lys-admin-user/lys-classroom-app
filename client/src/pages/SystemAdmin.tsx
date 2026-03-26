@@ -273,6 +273,14 @@ export default function SystemAdminPage({ params }: { params?: { tab?: string } 
   const { data: lessonsData, isLoading: lessonsLoading } = useQuery<{ lessons: (Lesson & { author?: string; authorEmail?: string })[]; total: number }>({
     queryKey: ["/api/admin/lessons", lessonSearch],
     enabled: adminCheck?.isSiteAdmin && activeTab === "content",
+    queryFn: async () => {
+      const params = new URLSearchParams();
+      if (lessonSearch) params.set("search", lessonSearch);
+      const url = `/api/admin/lessons${params.toString() ? `?${params.toString()}` : ""}`;
+      const res = await fetch(url, { credentials: "include" });
+      if (!res.ok) throw new Error(`${res.status}: Failed to fetch lessons`);
+      return res.json();
+    },
   });
 
   const { data: billingData } = useQuery<BillingData>({

@@ -22,6 +22,12 @@ export function ContextualSponsorship({ placement, className = "" }: ContextualS
   const { data: sponsorship } = useQuery<Sponsorship | null>({
     queryKey: ["/api/ads/sponsorship", placement],
     enabled: adSettings.showAds && !hasFocusMode,
+    queryFn: async () => {
+      const res = await fetch(`/api/ads/sponsorship?placement=${encodeURIComponent(placement)}`, { credentials: "include" });
+      if (res.status === 400 || res.status === 404) return null;
+      if (!res.ok) throw new Error(`${res.status}: Failed to fetch sponsorship`);
+      return res.json();
+    },
   });
 
   if (tierLoading || hasFocusMode || !adSettings.showAds) {

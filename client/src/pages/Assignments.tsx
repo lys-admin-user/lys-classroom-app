@@ -288,6 +288,11 @@ export default function Assignments() {
   const { data: suggestions } = useQuery<AccommodationSuggestion[]>({
     queryKey: ["/api/accommodations/suggestions", selectedAccommodations],
     enabled: selectedAccommodations.length > 0,
+    queryFn: async () => {
+      const res = await fetch("/api/accommodations/suggestions", { credentials: "include" });
+      if (!res.ok) throw new Error(`${res.status}: Failed to fetch suggestions`);
+      return res.json();
+    },
   });
 
   const generateMutation = useMutation({

@@ -70,6 +70,15 @@ export default function ResourceLibrary() {
 
   const { data: publicResources, isLoading: publicLoading } = useQuery<SharedResource[]>({
     queryKey: ["/api/shared-resources", categoryFilter, subjectFilter],
+    queryFn: async () => {
+      const params = new URLSearchParams();
+      if (categoryFilter) params.set("category", categoryFilter);
+      if (subjectFilter) params.set("subject", subjectFilter);
+      const url = `/api/shared-resources${params.toString() ? `?${params.toString()}` : ""}`;
+      const res = await fetch(url, { credentials: "include" });
+      if (!res.ok) throw new Error(`${res.status}: Failed to fetch resources`);
+      return res.json();
+    },
   });
 
   const { data: myResources, isLoading: myLoading } = useQuery<SharedResource[]>({
