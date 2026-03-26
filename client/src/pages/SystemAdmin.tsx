@@ -253,6 +253,16 @@ export default function SystemAdminPage({ params }: { params?: { tab?: string } 
   const { data: usersData, isLoading: usersLoading } = useQuery<{ users: UserType[]; total: number }>({
     queryKey: ["/api/admin/users", userSearch, userRoleFilter, userTierFilter],
     enabled: adminCheck?.isSiteAdmin && activeTab === "users",
+    queryFn: async () => {
+      const params = new URLSearchParams();
+      if (userSearch) params.set("search", userSearch);
+      if (userRoleFilter && userRoleFilter !== "all") params.set("role", userRoleFilter);
+      if (userTierFilter && userTierFilter !== "all") params.set("tier", userTierFilter);
+      const url = `/api/admin/users${params.toString() ? `?${params.toString()}` : ""}`;
+      const res = await fetch(url, { credentials: "include" });
+      if (!res.ok) throw new Error(`${res.status}: Failed to fetch users`);
+      return res.json();
+    },
   });
 
   const { data: affiliates = [], isLoading: affiliatesLoading } = useQuery<EnrichedAffiliate[]>({
