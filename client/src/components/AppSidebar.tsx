@@ -50,6 +50,7 @@ import {
   DollarSign,
   UserPlus,
   HelpCircle,
+  Wand2,
 } from "lucide-react";
 
 function hasMinRole(userRole: string, minRole: UserRole): boolean {
@@ -130,6 +131,7 @@ const navigationGroups: NavGroup[] = [
     minRole: "educator",
     items: [
       { title: "AI Lesson Generator", url: "/lesson-generator", icon: Sparkles, requiresAuth: true },
+      { title: "AI Assignment Generator", url: "/assignments", icon: Wand2, requiresAuth: true },
       { title: "My Lessons", url: "/my-lessons", icon: BookOpen, requiresAuth: true },
       { title: "Assessments", url: "/assessments", icon: FileText, requiresAuth: true },
       { title: "Scope & Sequence", url: "/scope-sequence", icon: Map, requiresAuth: true },
