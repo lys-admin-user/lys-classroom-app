@@ -267,7 +267,12 @@ export default function Assignments() {
 
   const { data: assignments, isLoading: assignmentsLoading } = useQuery<Assignment[]>({
     queryKey: ["/api/assignments"],
-    enabled: isAuthenticated,
+    enabled: isAuthenticated && !isStudent && !isParent,
+  });
+
+  const { data: myAssignedWork, isLoading: myAssignedLoading } = useQuery<{ assignment: Assignment; recipient: any }[]>({
+    queryKey: ["/api/my-assignments"],
+    enabled: isAuthenticated && (isStudent || isParent),
   });
 
   const { data: classes } = useQuery<Class[]>({
@@ -1825,152 +1830,286 @@ export default function Assignments() {
           </TabsContent>
 
           <TabsContent value="saved">
-            {assignmentsLoading ? (
-              <div className="text-center py-12 text-muted-foreground">Loading assignments...</div>
-            ) : assignments && assignments.length > 0 ? (
-              <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
-                {assignments.map((assignment) => (
-                  <Card key={assignment.id} data-testid={`card-assignment-${assignment.id}`}>
-                    <CardHeader className="pb-2">
-                      <div className="flex items-start justify-between gap-2">
-                        <CardTitle className="font-oswald text-lg">{assignment.title}</CardTitle>
-                        {assignment.accommodationModified && (assignment as any).accommodationTypes && (assignment as any).accommodationTypes.length > 0 && (
-                          <Badge variant="outline">{(assignment as any).accommodationTypes.length} accommodation{(assignment as any).accommodationTypes.length > 1 ? "s" : ""}</Badge>
-                        )}
-                      </div>
-                      <CardDescription className="line-clamp-2">{assignment.description}</CardDescription>
-                    </CardHeader>
-                    <CardContent className="pb-2">
-                      <div className="flex items-center gap-4 text-sm text-muted-foreground">
-                        <span className="flex items-center gap-1">
-                          <FileText className="h-4 w-4" />
-                          {(assignment.questions as any[])?.length || 0} questions
-                        </span>
-                        <span className="flex items-center gap-1">
-                          <Clock className="h-4 w-4" />
-                          {assignment.totalPoints} pts
-                        </span>
-                      </div>
-                    </CardContent>
-                    <CardFooter className="gap-2">
-                      <Dialog open={assignDialogOpen} onOpenChange={setAssignDialogOpen}>
-                        <DialogTrigger asChild>
-                          <Button variant="outline" data-testid={`button-assign-${assignment.id}`}>
-                            <Users className="h-4 w-4 mr-1" />
-                            Assign
-                          </Button>
-                        </DialogTrigger>
-                        <DialogContent>
-                          <DialogHeader>
-                            <DialogTitle>Assign to Students</DialogTitle>
-                          </DialogHeader>
-                          <div className="space-y-4 py-4">
-                            <RadioGroup value={recipientType} onValueChange={(v) => setRecipientType(v as any)}>
-                              <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2 sm:gap-4">
-                                <div className="flex items-center gap-2">
-                                  <RadioGroupItem value="student" id="student" />
-                                  <Label htmlFor="student">Individual Students</Label>
-                                </div>
-                                <div className="flex items-center gap-2">
-                                  <RadioGroupItem value="group" id="group" />
-                                  <Label htmlFor="group">Student Group</Label>
-                                </div>
-                                <div className="flex items-center gap-2">
-                                  <RadioGroupItem value="class" id="class" />
-                                  <Label htmlFor="class">Entire Class</Label>
-                                </div>
-                              </div>
-                            </RadioGroup>
-
-                            <ScrollArea className="h-[200px] border rounded-md p-2">
-                              {recipientType === "student" && students?.map((s) => (
-                                <div key={s.id} className="flex items-center gap-2 py-1">
-                                  <Checkbox
-                                    checked={selectedRecipients.includes(s.id)}
-                                    onCheckedChange={(checked) => {
-                                      if (checked) {
-                                        setSelectedRecipients([...selectedRecipients, s.id]);
-                                      } else {
-                                        setSelectedRecipients(selectedRecipients.filter(id => id !== s.id));
-                                      }
-                                    }}
-                                  />
-                                  <span>{s.firstName} {s.lastName}</span>
-                                  {s.accommodations && s.accommodations.length > 0 && (
-                                    <Badge variant="outline">
-                                      {(s.accommodations as any[])[0].type}
+            {(isStudent || isParent) ? (
+              /* ── Student / Parent view: show assignments received from educators ── */
+              myAssignedLoading ? (
+                <div className="text-center py-12 text-muted-foreground">Loading your assignments...</div>
+              ) : myAssignedWork && myAssignedWork.length > 0 ? (
+                <div className="space-y-4">
+                  {/* Pending / In-Progress first */}
+                  {myAssignedWork.filter(({ recipient }) => recipient.status === "assigned" || recipient.status === "in_progress").length > 0 && (
+                    <div>
+                      <h3 className="font-oswald text-lg mb-3 flex items-center gap-2">
+                        <Clock className="h-5 w-5 text-amber-500" />
+                        Due Soon
+                      </h3>
+                      <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
+                        {myAssignedWork
+                          .filter(({ recipient }) => recipient.status === "assigned" || recipient.status === "in_progress")
+                          .map(({ assignment, recipient }) => {
+                            const isOverdue = assignment.dueDate && new Date(assignment.dueDate) < new Date();
+                            return (
+                              <Card key={recipient.id} data-testid={`card-assigned-${assignment.id}`} className="border-l-4 border-l-amber-400">
+                                <CardHeader className="pb-2">
+                                  <div className="flex items-start justify-between gap-2">
+                                    <CardTitle className="font-oswald text-lg">{assignment.title}</CardTitle>
+                                    <Badge variant={isOverdue ? "destructive" : "secondary"}>
+                                      {isOverdue ? "Overdue" : recipient.status === "in_progress" ? "In Progress" : "New"}
                                     </Badge>
+                                  </div>
+                                  <CardDescription className="line-clamp-2">{assignment.description}</CardDescription>
+                                </CardHeader>
+                                <CardContent className="pb-2">
+                                  <div className="flex flex-wrap items-center gap-3 text-sm text-muted-foreground">
+                                    <span className="flex items-center gap-1">
+                                      <FileText className="h-4 w-4" />
+                                      {(assignment.questions as any[])?.length || 0} questions
+                                    </span>
+                                    <span className="flex items-center gap-1">
+                                      <Star className="h-4 w-4" />
+                                      {assignment.totalPoints} pts
+                                    </span>
+                                    {assignment.dueDate && (
+                                      <span className={`flex items-center gap-1 ${isOverdue ? "text-destructive font-medium" : ""}`}>
+                                        <Clock className="h-4 w-4" />
+                                        Due {new Date(assignment.dueDate).toLocaleDateString()}
+                                      </span>
+                                    )}
+                                  </div>
+                                  {assignment.assignmentType && (
+                                    <Badge variant="outline" className="mt-2 capitalize">{assignment.assignmentType}</Badge>
                                   )}
-                                </div>
-                              ))}
-                              {recipientType === "group" && studentGroups?.map((g) => (
-                                <div key={g.id} className="flex items-center gap-2 py-1">
-                                  <Checkbox
-                                    checked={selectedRecipients.includes(g.id)}
-                                    onCheckedChange={(checked) => {
-                                      if (checked) {
-                                        setSelectedRecipients([...selectedRecipients, g.id]);
-                                      } else {
-                                        setSelectedRecipients(selectedRecipients.filter(id => id !== g.id));
-                                      }
-                                    }}
-                                  />
-                                  <span>{g.name}</span>
-                                  <Badge variant="outline">
-                                    {(g.studentIds as string[]).length} students
+                                </CardContent>
+                                <CardFooter>
+                                  <Button size="sm" className="w-full" data-testid={`button-start-${assignment.id}`}>
+                                    <Play className="h-4 w-4 mr-1" />
+                                    {recipient.status === "in_progress" ? "Continue" : "Start Assignment"}
+                                  </Button>
+                                </CardFooter>
+                              </Card>
+                            );
+                          })}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Submitted / Graded */}
+                  {myAssignedWork.filter(({ recipient }) => recipient.status === "submitted" || recipient.status === "graded").length > 0 && (
+                    <div>
+                      <h3 className="font-oswald text-lg mb-3 flex items-center gap-2">
+                        <CheckCircle className="h-5 w-5 text-green-500" />
+                        Completed
+                      </h3>
+                      <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
+                        {myAssignedWork
+                          .filter(({ recipient }) => recipient.status === "submitted" || recipient.status === "graded")
+                          .map(({ assignment, recipient }) => (
+                            <Card key={recipient.id} data-testid={`card-completed-${assignment.id}`} className="border-l-4 border-l-green-400 opacity-90">
+                              <CardHeader className="pb-2">
+                                <div className="flex items-start justify-between gap-2">
+                                  <CardTitle className="font-oswald text-lg">{assignment.title}</CardTitle>
+                                  <Badge variant="outline" className="text-green-600 border-green-400">
+                                    {recipient.status === "graded" ? "Graded" : "Submitted"}
                                   </Badge>
                                 </div>
-                              ))}
-                              {recipientType === "class" && classes?.map((c) => (
-                                <div key={c.id} className="flex items-center gap-2 py-1">
-                                  <Checkbox
-                                    checked={selectedRecipients.includes(c.id)}
-                                    onCheckedChange={(checked) => {
-                                      if (checked) {
-                                        setSelectedRecipients([...selectedRecipients, c.id]);
-                                      } else {
-                                        setSelectedRecipients(selectedRecipients.filter(id => id !== c.id));
-                                      }
-                                    }}
-                                  />
-                                  <span>{c.name}</span>
-                                  {c.period && <Badge variant="outline">Period {c.period}</Badge>}
+                                <CardDescription className="line-clamp-2">{assignment.description}</CardDescription>
+                              </CardHeader>
+                              <CardContent className="pb-2">
+                                <div className="flex flex-wrap items-center gap-3 text-sm text-muted-foreground">
+                                  {recipient.score !== null && recipient.score !== undefined ? (
+                                    <span className="flex items-center gap-1 font-medium text-foreground">
+                                      <Star className="h-4 w-4 text-amber-500" />
+                                      {recipient.score} / {assignment.totalPoints} pts
+                                    </span>
+                                  ) : (
+                                    <span className="flex items-center gap-1">
+                                      <Star className="h-4 w-4" />
+                                      {assignment.totalPoints} pts
+                                    </span>
+                                  )}
+                                  {recipient.submittedAt && (
+                                    <span className="flex items-center gap-1">
+                                      <CheckCircle className="h-4 w-4 text-green-500" />
+                                      Submitted {new Date(recipient.submittedAt).toLocaleDateString()}
+                                    </span>
+                                  )}
                                 </div>
-                              ))}
-                              {((recipientType === "student" && (!students || students.length === 0)) ||
-                                (recipientType === "group" && (!studentGroups || studentGroups.length === 0)) ||
-                                (recipientType === "class" && (!classes || classes.length === 0))) && (
-                                <div className="text-center py-8 text-muted-foreground">
-                                  <UserPlus className="h-8 w-8 mx-auto mb-2" />
-                                  <p>No {recipientType}s found</p>
-                                  <p className="text-sm">Add {recipientType}s first to assign work</p>
-                                </div>
-                              )}
-                            </ScrollArea>
-                          </div>
-                          <DialogFooter>
-                            <Button variant="outline" onClick={() => setAssignDialogOpen(false)}>Cancel</Button>
-                            <Button 
-                              onClick={() => handleAssign(assignment.id)}
-                              disabled={assignMutation.isPending || selectedRecipients.length === 0}
-                            >
-                              {assignMutation.isPending ? "Assigning..." : "Assign"}
-                            </Button>
-                          </DialogFooter>
-                        </DialogContent>
-                      </Dialog>
-                    </CardFooter>
-                  </Card>
-                ))}
-              </div>
+                                {recipient.feedback && (
+                                  <p className="mt-2 text-sm border-l-2 border-muted pl-2 text-muted-foreground italic line-clamp-2">
+                                    {recipient.feedback}
+                                  </p>
+                                )}
+                              </CardContent>
+                              <CardFooter>
+                                <Button size="sm" variant="outline" className="w-full" data-testid={`button-review-${assignment.id}`}>
+                                  <Eye className="h-4 w-4 mr-1" />
+                                  Review
+                                </Button>
+                              </CardFooter>
+                            </Card>
+                          ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <Card className="text-center py-12">
+                  <CardContent>
+                    <CheckCircle className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
+                    <h3 className="font-oswald text-lg mb-2">No Assignments Yet</h3>
+                    <p className="text-muted-foreground">Your teacher hasn't assigned anything yet. Check back soon!</p>
+                  </CardContent>
+                </Card>
+              )
             ) : (
-              <Card className="text-center py-12">
-                <CardContent>
-                  <FileText className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
-                  <h3 className="font-oswald text-lg mb-2">No Assignments Yet</h3>
-                  <p className="text-muted-foreground mb-4">Generate your first assignment from a lesson plan</p>
-                </CardContent>
-              </Card>
+              /* ── Educator view: show their created/saved assignments ── */
+              assignmentsLoading ? (
+                <div className="text-center py-12 text-muted-foreground">Loading assignments...</div>
+              ) : assignments && assignments.length > 0 ? (
+                <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {assignments.map((assignment) => (
+                    <Card key={assignment.id} data-testid={`card-assignment-${assignment.id}`}>
+                      <CardHeader className="pb-2">
+                        <div className="flex items-start justify-between gap-2">
+                          <CardTitle className="font-oswald text-lg">{assignment.title}</CardTitle>
+                          {assignment.accommodationModified && (assignment as any).accommodationTypes && (assignment as any).accommodationTypes.length > 0 && (
+                            <Badge variant="outline">{(assignment as any).accommodationTypes.length} accommodation{(assignment as any).accommodationTypes.length > 1 ? "s" : ""}</Badge>
+                          )}
+                        </div>
+                        <CardDescription className="line-clamp-2">{assignment.description}</CardDescription>
+                      </CardHeader>
+                      <CardContent className="pb-2">
+                        <div className="flex items-center gap-4 text-sm text-muted-foreground">
+                          <span className="flex items-center gap-1">
+                            <FileText className="h-4 w-4" />
+                            {(assignment.questions as any[])?.length || 0} questions
+                          </span>
+                          <span className="flex items-center gap-1">
+                            <Clock className="h-4 w-4" />
+                            {assignment.totalPoints} pts
+                          </span>
+                        </div>
+                      </CardContent>
+                      <CardFooter className="gap-2">
+                        <Dialog open={assignDialogOpen} onOpenChange={setAssignDialogOpen}>
+                          <DialogTrigger asChild>
+                            <Button variant="outline" data-testid={`button-assign-${assignment.id}`}>
+                              <Users className="h-4 w-4 mr-1" />
+                              Assign
+                            </Button>
+                          </DialogTrigger>
+                          <DialogContent>
+                            <DialogHeader>
+                              <DialogTitle>Assign to Students</DialogTitle>
+                            </DialogHeader>
+                            <div className="space-y-4 py-4">
+                              <RadioGroup value={recipientType} onValueChange={(v) => setRecipientType(v as any)}>
+                                <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2 sm:gap-4">
+                                  <div className="flex items-center gap-2">
+                                    <RadioGroupItem value="student" id="student" />
+                                    <Label htmlFor="student">Individual Students</Label>
+                                  </div>
+                                  <div className="flex items-center gap-2">
+                                    <RadioGroupItem value="group" id="group" />
+                                    <Label htmlFor="group">Student Group</Label>
+                                  </div>
+                                  <div className="flex items-center gap-2">
+                                    <RadioGroupItem value="class" id="class" />
+                                    <Label htmlFor="class">Entire Class</Label>
+                                  </div>
+                                </div>
+                              </RadioGroup>
+
+                              <ScrollArea className="h-[200px] border rounded-md p-2">
+                                {recipientType === "student" && students?.map((s) => (
+                                  <div key={s.id} className="flex items-center gap-2 py-1">
+                                    <Checkbox
+                                      checked={selectedRecipients.includes(s.id)}
+                                      onCheckedChange={(checked) => {
+                                        if (checked) {
+                                          setSelectedRecipients([...selectedRecipients, s.id]);
+                                        } else {
+                                          setSelectedRecipients(selectedRecipients.filter(id => id !== s.id));
+                                        }
+                                      }}
+                                    />
+                                    <span>{s.firstName} {s.lastName}</span>
+                                    {s.accommodations && s.accommodations.length > 0 && (
+                                      <Badge variant="outline">
+                                        {(s.accommodations as any[])[0].type}
+                                      </Badge>
+                                    )}
+                                  </div>
+                                ))}
+                                {recipientType === "group" && studentGroups?.map((g) => (
+                                  <div key={g.id} className="flex items-center gap-2 py-1">
+                                    <Checkbox
+                                      checked={selectedRecipients.includes(g.id)}
+                                      onCheckedChange={(checked) => {
+                                        if (checked) {
+                                          setSelectedRecipients([...selectedRecipients, g.id]);
+                                        } else {
+                                          setSelectedRecipients(selectedRecipients.filter(id => id !== g.id));
+                                        }
+                                      }}
+                                    />
+                                    <span>{g.name}</span>
+                                    <Badge variant="outline">
+                                      {(g.studentIds as string[]).length} students
+                                    </Badge>
+                                  </div>
+                                ))}
+                                {recipientType === "class" && classes?.map((c) => (
+                                  <div key={c.id} className="flex items-center gap-2 py-1">
+                                    <Checkbox
+                                      checked={selectedRecipients.includes(c.id)}
+                                      onCheckedChange={(checked) => {
+                                        if (checked) {
+                                          setSelectedRecipients([...selectedRecipients, c.id]);
+                                        } else {
+                                          setSelectedRecipients(selectedRecipients.filter(id => id !== c.id));
+                                        }
+                                      }}
+                                    />
+                                    <span>{c.name}</span>
+                                    {c.period && <Badge variant="outline">Period {c.period}</Badge>}
+                                  </div>
+                                ))}
+                                {((recipientType === "student" && (!students || students.length === 0)) ||
+                                  (recipientType === "group" && (!studentGroups || studentGroups.length === 0)) ||
+                                  (recipientType === "class" && (!classes || classes.length === 0))) && (
+                                  <div className="text-center py-8 text-muted-foreground">
+                                    <UserPlus className="h-8 w-8 mx-auto mb-2" />
+                                    <p>No {recipientType}s found</p>
+                                    <p className="text-sm">Add {recipientType}s first to assign work</p>
+                                  </div>
+                                )}
+                              </ScrollArea>
+                            </div>
+                            <DialogFooter>
+                              <Button variant="outline" onClick={() => setAssignDialogOpen(false)}>Cancel</Button>
+                              <Button 
+                                onClick={() => handleAssign(assignment.id)}
+                                disabled={assignMutation.isPending || selectedRecipients.length === 0}
+                              >
+                                {assignMutation.isPending ? "Assigning..." : "Assign"}
+                              </Button>
+                            </DialogFooter>
+                          </DialogContent>
+                        </Dialog>
+                      </CardFooter>
+                    </Card>
+                  ))}
+                </div>
+              ) : (
+                <Card className="text-center py-12">
+                  <CardContent>
+                    <FileText className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
+                    <h3 className="font-oswald text-lg mb-2">No Assignments Yet</h3>
+                    <p className="text-muted-foreground mb-4">Generate your first assignment from a lesson plan</p>
+                  </CardContent>
+                </Card>
+              )
             )}
           </TabsContent>
         </Tabs>

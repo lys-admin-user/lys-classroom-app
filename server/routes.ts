@@ -2202,6 +2202,18 @@ export async function registerRoutes(
     }
   });
 
+  // Get assignments assigned TO the current logged-in student
+  app.get("/api/my-assignments", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user?.claims?.sub;
+      const assigned = await storage.getAssignmentsForStudent(userId);
+      res.json(assigned);
+    } catch (error) {
+      console.error("Failed to fetch student assigned assignments:", error);
+      res.status(500).json({ error: "Failed to fetch your assignments" });
+    }
+  });
+
   // Get single assignment
   app.get("/api/assignments/:id", isAuthenticated, async (req: any, res) => {
     try {
