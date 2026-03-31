@@ -14,7 +14,8 @@ import { useAuth } from "@/hooks/use-auth";
 import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { LogIn } from "lucide-react";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
+import { LogIn, Sparkles, X } from "lucide-react";
 import Dashboard from "@/pages/Dashboard";
 import LessonGenerator from "@/pages/LessonGenerator";
 import Assessments from "@/pages/Assessments";
@@ -67,46 +68,109 @@ import { EmbedRouter } from "@/pages/EmbedRouter";
 
 const EXEMPT_PATHS = ["/onboarding", "/pricing", "/shared", "/p/", "/embed/"];
 const MAX_ONBOARDING_SKIPS = 3;
-const SESSION_TRACKED_KEY = "lys_onboarding_session_tracked";
+const SESSION_PROMPT_KEY = "lys_onboarding_prompted";
 
 function OnboardingGuard({ children }: { children: React.ReactNode }) {
   const { user, isAuthenticated, isLoading } = useAuth();
   const [location, setLocation] = useLocation();
+  const [showPrompt, setShowPrompt] = useState(false);
+  const [skipping, setSkipping] = useState(false);
 
   useEffect(() => {
     if (isLoading) return;
-    
+    if (!isAuthenticated || !user || user.onboardingCompleted) return;
+
     const isExemptPath = EXEMPT_PATHS.some(path => location.startsWith(path));
-    
-    if (isAuthenticated && user && !user.onboardingCompleted && !isExemptPath) {
-      const skipCount = user.onboardingSkipCount || 0;
-      
-      // Only force redirect if user has exceeded skip limit
-      if (skipCount >= MAX_ONBOARDING_SKIPS) {
-        setLocation("/onboarding");
-        return;
-      }
-      
-      // Auto-track session visit (once per browser session using sessionStorage)
-      const sessionTracked = sessionStorage.getItem(SESSION_TRACKED_KEY);
-      if (!sessionTracked && skipCount < MAX_ONBOARDING_SKIPS) {
-        sessionStorage.setItem(SESSION_TRACKED_KEY, "true");
-        // Silently increment skip count for this session
-        fetch("/api/onboarding/skip", { method: "POST", credentials: "include" })
-          .then(res => res.json())
-          .catch(() => {});
-      }
+    if (isExemptPath) return;
+
+    const skipCount = user.onboardingSkipCount || 0;
+
+    // Hard redirect once all skips are used
+    if (skipCount >= MAX_ONBOARDING_SKIPS) {
+      setLocation("/onboarding");
+      return;
+    }
+
+    // Show the explicit prompt once per browser session
+    const alreadyPrompted = sessionStorage.getItem(SESSION_PROMPT_KEY);
+    if (!alreadyPrompted) {
+      sessionStorage.setItem(SESSION_PROMPT_KEY, "true");
+      setShowPrompt(true);
     }
   }, [isAuthenticated, user, isLoading, location, setLocation]);
 
-  // Clear session tracking when onboarding is completed
   useEffect(() => {
     if (user?.onboardingCompleted) {
-      sessionStorage.removeItem(SESSION_TRACKED_KEY);
+      sessionStorage.removeItem(SESSION_PROMPT_KEY);
+      setShowPrompt(false);
     }
   }, [user?.onboardingCompleted]);
 
-  return <>{children}</>;
+  const handleGoToOnboarding = () => {
+    setShowPrompt(false);
+    setLocation("/onboarding");
+  };
+
+  const handleSkip = async () => {
+    setSkipping(true);
+    try {
+      await fetch("/api/onboarding/skip", { method: "POST", credentials: "include" });
+      queryClient.invalidateQueries({ queryKey: ["/api/auth/user"] });
+    } catch (_) {}
+    setSkipping(false);
+    setShowPrompt(false);
+  };
+
+  const skipCount = user?.onboardingSkipCount || 0;
+  const skipsRemaining = MAX_ONBOARDING_SKIPS - skipCount - 1; // -1 for this dismissal
+
+  return (
+    <>
+      {children}
+      <Dialog open={showPrompt} onOpenChange={(open) => { if (!open) handleSkip(); }}>
+        <DialogContent className="sm:max-w-md" data-testid="dialog-onboarding-prompt">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 font-oswald text-xl">
+              <Sparkles className="h-5 w-5 text-lys-yellow" />
+              Complete Your Profile
+            </DialogTitle>
+            <DialogDescription className="text-base">
+              Set up your profile to unlock personalized lesson recommendations, career matching, and your full LYS experience.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="py-2">
+            {skipsRemaining > 0 ? (
+              <p className="text-sm text-muted-foreground">
+                You can skip for now — you have <strong>{skipsRemaining} reminder{skipsRemaining !== 1 ? "s" : ""}</strong> remaining before setup is required.
+              </p>
+            ) : (
+              <p className="text-sm text-amber-600 font-medium">
+                This is your last chance to skip. After this, setup will be required.
+              </p>
+            )}
+          </div>
+          <DialogFooter className="flex-col sm:flex-row gap-2">
+            <Button
+              variant="outline"
+              onClick={handleSkip}
+              disabled={skipping}
+              data-testid="button-onboarding-skip"
+            >
+              {skipping ? "Saving..." : skipsRemaining > 0 ? "Remind Me Later" : "Skip (Last Time)"}
+            </Button>
+            <Button
+              onClick={handleGoToOnboarding}
+              className="gap-2"
+              data-testid="button-onboarding-start"
+            >
+              <Sparkles className="h-4 w-4" />
+              Set Up My Profile
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </>
+  );
 }
 
 function AuthRequired({ children }: { children: React.ReactNode }) {

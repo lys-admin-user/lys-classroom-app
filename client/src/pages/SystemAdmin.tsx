@@ -4379,6 +4379,113 @@ function DataGovernanceTab() {
   );
 }
 
+function TrialAdminActions() {
+  const { toast } = useToast();
+  const [grantUserId, setGrantUserId] = useState("");
+  const [grantDays, setGrantDays] = useState("10");
+  const [revokeUserId, setRevokeUserId] = useState("");
+
+  const grantMutation = useMutation({
+    mutationFn: (data: { userId: string; durationDays: number }) =>
+      apiRequest("POST", "/api/admin/trial/grant", data),
+    onSuccess: () => {
+      toast({ title: "Trial Granted", description: `A fresh ${grantDays}-day trial has been issued.` });
+      setGrantUserId("");
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/trial-stats"] });
+    },
+    onError: (err: any) => {
+      toast({ title: "Error", description: err.message || "Failed to grant trial", variant: "destructive" });
+    },
+  });
+
+  const revokeMutation = useMutation({
+    mutationFn: (data: { userId: string }) =>
+      apiRequest("POST", "/api/admin/trial/revoke", data),
+    onSuccess: () => {
+      toast({ title: "Trial Revoked", description: "The user's active trial has been deactivated." });
+      setRevokeUserId("");
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/trial-stats"] });
+    },
+    onError: (err: any) => {
+      toast({ title: "Error", description: err.message || "Failed to revoke trial", variant: "destructive" });
+    },
+  });
+
+  return (
+    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+      <Card className="border-green-200 dark:border-green-800">
+        <CardHeader>
+          <CardTitle className="text-base font-oswald flex items-center gap-2 text-green-700 dark:text-green-400">
+            <Zap className="h-4 w-4" />
+            Grant Trial
+          </CardTitle>
+          <CardDescription className="font-roboto">Issue or refresh a 10-day trial for any user</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          <div className="space-y-1">
+            <Label className="font-roboto text-sm">User ID</Label>
+            <Input
+              value={grantUserId}
+              onChange={(e) => setGrantUserId(e.target.value)}
+              placeholder="Enter user ID..."
+              data-testid="input-grant-user-id"
+            />
+          </div>
+          <div className="space-y-1">
+            <Label className="font-roboto text-sm">Duration (days)</Label>
+            <Input
+              type="number"
+              min="1"
+              max="365"
+              value={grantDays}
+              onChange={(e) => setGrantDays(e.target.value)}
+              data-testid="input-grant-days"
+            />
+          </div>
+          <Button
+            onClick={() => grantMutation.mutate({ userId: grantUserId.trim(), durationDays: Number(grantDays) })}
+            disabled={!grantUserId.trim() || grantMutation.isPending}
+            className="w-full"
+            data-testid="button-grant-trial"
+          >
+            {grantMutation.isPending ? "Granting..." : "Grant Trial"}
+          </Button>
+        </CardContent>
+      </Card>
+
+      <Card className="border-red-200 dark:border-red-800">
+        <CardHeader>
+          <CardTitle className="text-base font-oswald flex items-center gap-2 text-red-700 dark:text-red-400">
+            <Lock className="h-4 w-4" />
+            Revoke Trial
+          </CardTitle>
+          <CardDescription className="font-roboto">Immediately deactivate a user's active trial</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          <div className="space-y-1">
+            <Label className="font-roboto text-sm">User ID</Label>
+            <Input
+              value={revokeUserId}
+              onChange={(e) => setRevokeUserId(e.target.value)}
+              placeholder="Enter user ID..."
+              data-testid="input-revoke-user-id"
+            />
+          </div>
+          <Button
+            variant="destructive"
+            onClick={() => revokeMutation.mutate({ userId: revokeUserId.trim() })}
+            disabled={!revokeUserId.trim() || revokeMutation.isPending}
+            className="w-full"
+            data-testid="button-revoke-trial"
+          >
+            {revokeMutation.isPending ? "Revoking..." : "Revoke Trial"}
+          </Button>
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
+
 function TrialMonitoringTab() {
   const { data: trialStats, isLoading } = useQuery<{
     totalTrials: number;
@@ -4511,7 +4618,7 @@ function TrialMonitoringTab() {
             <Separator />
             <div className="flex justify-between items-center">
               <span className="text-sm font-roboto text-muted-foreground">Trials per IP</span>
-              <Badge variant="secondary">5 per 6 months</Badge>
+              <Badge variant="secondary">1 per user (system_admin unlimited)</Badge>
             </div>
             <Separator />
             <div className="flex justify-between items-center">
@@ -4582,6 +4689,14 @@ function TrialMonitoringTab() {
           )}
         </CardContent>
       </Card>
+
+      <div>
+        <h3 className="text-base font-semibold font-oswald mb-3 flex items-center gap-2">
+          <Zap className="h-4 w-4 text-amber-500" />
+          Trial Management (System Admin Only)
+        </h3>
+        <TrialAdminActions />
+      </div>
     </>
   );
 }

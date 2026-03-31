@@ -293,7 +293,7 @@ export async function registerRoutes(
   // Free Trial System
   const TRIAL_DURATION_DAYS = 10;
   const TRIAL_RESET_MONTHS = 6;
-  const MAX_TRIALS_PER_IP = 5;
+  const MAX_TRIALS_PER_IP = 1; // 1 trial per IP for regular users; system_admin bypasses this
 
   function getTrialSinceDate(): number {
     const d = new Date();
@@ -377,46 +377,53 @@ export async function registerRoutes(
       const { fingerprint, metadata } = req.body;
       const sinceDate = getTrialSinceDate();
 
-      if (userId) {
-        const existingUserTrial = await storage.getActiveTrialByUserId(userId);
-        if (existingUserTrial) {
-          res.status(400).json({ error: "You already have an active trial" });
+      // system_admin users bypass all trial limits (unlimited for demos/testing)
+      const isSystemAdmin = userId
+        ? (await storage.getUser(userId))?.role === "system_admin"
+        : false;
+
+      if (!isSystemAdmin) {
+        if (userId) {
+          const existingUserTrial = await storage.getActiveTrialByUserId(userId);
+          if (existingUserTrial) {
+            res.status(400).json({ error: "You already have an active trial" });
+            return;
+          }
+        }
+
+        const existingIPTrial = await storage.getActiveTrialByIP(ipAddress);
+        if (existingIPTrial) {
+          if (userId && !existingIPTrial.userId) {
+            await storage.bindTrialToUser(existingIPTrial.id, userId);
+          }
+          res.status(400).json({ error: "An active trial already exists for this network" });
           return;
         }
-      }
 
-      const existingIPTrial = await storage.getActiveTrialByIP(ipAddress);
-      if (existingIPTrial) {
-        if (userId && !existingIPTrial.userId) {
-          await storage.bindTrialToUser(existingIPTrial.id, userId);
+        if (fingerprint) {
+          const existingFPTrial = await storage.getActiveTrialByFingerprint(fingerprint);
+          if (existingFPTrial) {
+            await storage.flagTrialAbuse(existingFPTrial.id);
+            res.status(400).json({ error: "An active trial already exists" });
+            return;
+          }
         }
-        res.status(400).json({ error: "An active trial already exists for this network" });
-        return;
-      }
 
-      if (fingerprint) {
-        const existingFPTrial = await storage.getActiveTrialByFingerprint(fingerprint);
-        if (existingFPTrial) {
-          await storage.flagTrialAbuse(existingFPTrial.id);
-          res.status(400).json({ error: "An active trial already exists" });
+        const trialCount = await storage.getActiveTrialCount(ipAddress, sinceDate);
+        if (trialCount >= MAX_TRIALS_PER_IP) {
+          res.status(403).json({ 
+            error: "Trial limit reached. Each network is allowed one 10-day trial.",
+            nextEligibleDate: null,
+          });
           return;
         }
-      }
 
-      const trialCount = await storage.getActiveTrialCount(ipAddress, sinceDate);
-      if (trialCount >= MAX_TRIALS_PER_IP) {
-        res.status(403).json({ 
-          error: "Trial limit reached for this network. Trials reset every 6 months.",
-          nextEligibleDate: null,
-        });
-        return;
-      }
-
-      if (fingerprint) {
-        const fpTrials = await storage.getTrialsByFingerprint(fingerprint, sinceDate);
-        if (fpTrials.length >= MAX_TRIALS_PER_IP) {
-          res.status(403).json({ error: "Trial limit reached. Trials reset every 6 months." });
-          return;
+        if (fingerprint) {
+          const fpTrials = await storage.getTrialsByFingerprint(fingerprint, sinceDate);
+          if (fpTrials.length >= MAX_TRIALS_PER_IP) {
+            res.status(403).json({ error: "Trial limit reached. Each device is allowed one 10-day trial." });
+            return;
+          }
         }
       }
 
@@ -8212,6 +8219,105 @@ export async function registerRoutes(
     }
   });
 
+  // System admin: grant a fresh trial to any user (reset/extend)
+  app.post("/api/admin/trial/grant", isAuthenticated, requireSystemAdmin, async (req: any, res) => {
+    try {
+      const adminId = req.user?.claims?.sub;
+      const { userId, durationDays = TRIAL_DURATION_DAYS } = req.body;
+
+      if (!userId) {
+        res.status(400).json({ error: "userId is required" });
+        return;
+      }
+
+      const targetUser = await storage.getUser(userId);
+      if (!targetUser) {
+        res.status(404).json({ error: "User not found" });
+        return;
+      }
+
+      // Deactivate any existing trial for this user
+      const existingTrial = await storage.getActiveTrialByUserId(userId);
+      if (existingTrial) {
+        await db.update(freeTrials).set({ isActive: false }).where(eq(freeTrials.id, existingTrial.id));
+      }
+
+      const now = new Date();
+      const trialEndDate = new Date(now);
+      trialEndDate.setDate(trialEndDate.getDate() + Number(durationDays));
+
+      const trial = await storage.createFreeTrial({
+        ipAddress: "admin-granted",
+        fingerprint: null,
+        userId,
+        trialStartDate: now,
+        trialEndDate,
+        isActive: true,
+        abuseFlags: 0,
+        metadata: { grantedBy: adminId, reason: "admin_grant" } as any,
+      });
+
+      await logAuditEvent({
+        userId: adminId,
+        action: "trial_granted",
+        resourceType: "free_trial",
+        resourceId: trial.id,
+        category: "admin_action",
+        severity: "info",
+        details: { targetUserId: userId, durationDays },
+        ipAddress: req.ip || "",
+      });
+
+      res.json({
+        success: true,
+        trialId: trial.id,
+        trialStartDate: trial.trialStartDate,
+        trialEndDate: trial.trialEndDate,
+        daysGranted: Number(durationDays),
+      });
+    } catch (error) {
+      console.error("Admin trial grant error:", error);
+      res.status(500).json({ error: "Failed to grant trial" });
+    }
+  });
+
+  // System admin: revoke a user's active trial
+  app.post("/api/admin/trial/revoke", isAuthenticated, requireSystemAdmin, async (req: any, res) => {
+    try {
+      const adminId = req.user?.claims?.sub;
+      const { userId } = req.body;
+
+      if (!userId) {
+        res.status(400).json({ error: "userId is required" });
+        return;
+      }
+
+      const existingTrial = await storage.getActiveTrialByUserId(userId);
+      if (!existingTrial) {
+        res.status(404).json({ error: "No active trial found for this user" });
+        return;
+      }
+
+      await db.update(freeTrials).set({ isActive: false }).where(eq(freeTrials.id, existingTrial.id));
+
+      await logAuditEvent({
+        userId: adminId,
+        action: "trial_revoked",
+        resourceType: "free_trial",
+        resourceId: existingTrial.id,
+        category: "admin_action",
+        severity: "info",
+        details: { targetUserId: userId },
+        ipAddress: req.ip || "",
+      });
+
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Admin trial revoke error:", error);
+      res.status(500).json({ error: "Failed to revoke trial" });
+    }
+  });
+
   // Get all referral events (site admin only)
   app.get("/api/admin/referral-events", isAuthenticated, isSiteAdmin, async (req: any, res) => {
     try {
@@ -13917,7 +14023,7 @@ export async function registerRoutes(
 
   // ============ RSS Content Ingestion Routes ============
 
-  const requireSystemAdmin = async (req: any, res: any, next: any) => {
+  const requireRssAdmin = async (req: any, res: any, next: any) => {
     const userId = req.user?.claims?.sub;
     if (!userId) return res.status(401).json({ error: "Unauthorized" });
     const isAdmin = await storage.isSiteAdmin(userId);
@@ -13925,7 +14031,7 @@ export async function registerRoutes(
     next();
   };
 
-  app.get("/api/admin/rss-feeds", isAuthenticated, requireSystemAdmin, async (req: any, res) => {
+  app.get("/api/admin/rss-feeds", isAuthenticated, requireRssAdmin, async (req: any, res) => {
     try {
       const feeds = await storage.getRssFeeds();
       res.json(feeds);
@@ -13934,7 +14040,7 @@ export async function registerRoutes(
     }
   });
 
-  app.post("/api/admin/rss-feeds", isAuthenticated, requireSystemAdmin, async (req: any, res) => {
+  app.post("/api/admin/rss-feeds", isAuthenticated, requireRssAdmin, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
       const parsed = insertRssFeedSchema.parse({ ...req.body, createdBy: userId });
@@ -13945,7 +14051,7 @@ export async function registerRoutes(
     }
   });
 
-  app.patch("/api/admin/rss-feeds/:id", isAuthenticated, requireSystemAdmin, async (req: any, res) => {
+  app.patch("/api/admin/rss-feeds/:id", isAuthenticated, requireRssAdmin, async (req: any, res) => {
     try {
       const { name, url, feedType, description, isActive, fetchIntervalMinutes } = req.body;
       const allowedUpdates: any = {};
@@ -13966,7 +14072,7 @@ export async function registerRoutes(
     }
   });
 
-  app.delete("/api/admin/rss-feeds/:id", isAuthenticated, requireSystemAdmin, async (req: any, res) => {
+  app.delete("/api/admin/rss-feeds/:id", isAuthenticated, requireRssAdmin, async (req: any, res) => {
     try {
       const deleted = await storage.deleteRssFeed(req.params.id);
       if (!deleted) return res.status(404).json({ error: "Feed not found" });
@@ -13976,7 +14082,7 @@ export async function registerRoutes(
     }
   });
 
-  app.post("/api/admin/rss-feeds/:id/fetch", isAuthenticated, requireSystemAdmin, async (req: any, res) => {
+  app.post("/api/admin/rss-feeds/:id/fetch", isAuthenticated, requireRssAdmin, async (req: any, res) => {
     try {
       const feed = await storage.getRssFeed(req.params.id);
       if (!feed) return res.status(404).json({ error: "Feed not found" });
@@ -13987,7 +14093,7 @@ export async function registerRoutes(
     }
   });
 
-  app.get("/api/admin/rss-content", isAuthenticated, requireSystemAdmin, async (req: any, res) => {
+  app.get("/api/admin/rss-content", isAuthenticated, requireRssAdmin, async (req: any, res) => {
     try {
       const filters: any = {};
       if (req.query.feedId) filters.feedId = req.query.feedId;
@@ -14000,7 +14106,7 @@ export async function registerRoutes(
     }
   });
 
-  app.get("/api/admin/rss-content/pending-count", isAuthenticated, requireSystemAdmin, async (req: any, res) => {
+  app.get("/api/admin/rss-content/pending-count", isAuthenticated, requireRssAdmin, async (req: any, res) => {
     try {
       const count = await storage.getPendingRssContentCount();
       res.json({ count });
@@ -14009,7 +14115,7 @@ export async function registerRoutes(
     }
   });
 
-  app.patch("/api/admin/rss-content/:id", isAuthenticated, requireSystemAdmin, async (req: any, res) => {
+  app.patch("/api/admin/rss-content/:id", isAuthenticated, requireRssAdmin, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
       const { status, approvedPlacements, bkdPillar, aiUsageType, reviewNotes, careerFields, tags } = req.body;
