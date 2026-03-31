@@ -547,7 +547,17 @@ export default function Assignments() {
               <Card>
                 <CardHeader>
                   <CardTitle className="font-oswald">1. Select a Lesson</CardTitle>
-                  <CardDescription>Choose a lesson plan to base your assignment on</CardDescription>
+                  <CardDescription>
+                    AI will generate aligned questions from one of your saved lessons.{" "}
+                    <button
+                      className="underline underline-offset-2 text-foreground hover:text-lys-teal transition-colors"
+                      onClick={() => setLocation("/lesson-generator")}
+                      data-testid="link-go-to-lesson-generator"
+                    >
+                      Build a lesson first
+                    </button>{" "}
+                    if you don't have one yet.
+                  </CardDescription>
                 </CardHeader>
                 <CardContent>
                   {lessonsLoading ? (

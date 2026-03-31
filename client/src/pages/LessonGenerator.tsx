@@ -59,6 +59,13 @@ export default function LessonGenerator() {
   const [profileApplied, setProfileApplied] = useState(false);
   const [scopeSkipped, setScopeSkipped] = useState(false);
   
+  // Inline lesson editing state
+  const [isEditingLesson, setIsEditingLesson] = useState(false);
+  const [editTitle, setEditTitle] = useState("");
+  const [editObjectives, setEditObjectives] = useState("");
+  const [editEssentialQuestions, setEditEssentialQuestions] = useState("");
+  const [editReflection, setEditReflection] = useState("");
+
   // Assignment generation state
   const [showAssignmentOption, setShowAssignmentOption] = useState(false);
   const [assignmentType, setAssignmentType] = useState<"quiz" | "worksheet" | "project" | "discussion" | "reflection">("quiz");
@@ -941,6 +948,58 @@ ${addedResources.length > 0 ? addedResources.map(r => `- ${r.title}: ${r.url}`).
                         <ChevronDown className="h-3 w-3" />
                       </Button>
                     )}
+                    {!isEditingLesson ? (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="gap-1 font-roboto"
+                        data-testid="button-edit-lesson"
+                        onClick={() => {
+                          if (!generatedLesson) return;
+                          setEditTitle(generatedLesson.title);
+                          setEditObjectives(generatedLesson.objectives.join("\n"));
+                          setEditEssentialQuestions((generatedLesson.essentialQuestions || []).join("\n"));
+                          setEditReflection((generatedLesson as any).reflection || "");
+                          setIsEditingLesson(true);
+                        }}
+                      >
+                        <PenLine className="h-4 w-4" />
+                        Edit
+                      </Button>
+                    ) : (
+                      <div className="flex items-center gap-1">
+                        <Button
+                          size="sm"
+                          className="gap-1 font-roboto bg-lys-teal hover:bg-lys-teal/90 text-white"
+                          data-testid="button-save-lesson-edits"
+                          onClick={() => {
+                            if (!generatedLesson) return;
+                            setGeneratedLesson({
+                              ...generatedLesson,
+                              title: editTitle.trim() || generatedLesson.title,
+                              objectives: editObjectives.split("\n").map(l => l.trim()).filter(Boolean),
+                              essentialQuestions: editEssentialQuestions.split("\n").map(l => l.trim()).filter(Boolean),
+                              reflection: editReflection,
+                            } as any);
+                            setIsSaved(false);
+                            setIsEditingLesson(false);
+                            toast({ title: "Changes applied", description: "Don't forget to save your lesson." });
+                          }}
+                        >
+                          <Check className="h-4 w-4" />
+                          Done
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          className="gap-1 font-roboto"
+                          data-testid="button-cancel-lesson-edits"
+                          onClick={() => setIsEditingLesson(false)}
+                        >
+                          <X className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    )}
                     <Button variant="outline" size="sm" onClick={copyToClipboard} className="gap-1 font-roboto" data-testid="button-copy-lesson">
                       <Copy className="h-4 w-4" />
                       Copy
@@ -968,9 +1027,27 @@ ${addedResources.length > 0 ? addedResources.map(r => `- ${r.title}: ${r.url}`).
                   </div>
                 ) : generatedLesson ? (
                   <ScrollArea className="h-[700px]">
+                    {isEditingLesson && (
+                      <div className="mx-6 mt-4 px-3 py-2 rounded-md bg-lys-teal/10 border border-lys-teal/30 flex items-center gap-2 text-sm font-roboto text-lys-teal">
+                        <PenLine className="h-4 w-4 shrink-0" />
+                        Edit mode — change the title, objectives, and questions below, then click <strong className="ml-1">Done</strong>.
+                      </div>
+                    )}
                     <div className="p-6 space-y-6">
                       <div className="border-b pb-4">
-                        <h2 className="font-marker text-2xl text-foreground mb-3">{generatedLesson.title}</h2>
+                        {isEditingLesson ? (
+                          <div className="space-y-1 mb-3">
+                            <Label className="text-xs text-muted-foreground font-roboto">Lesson Title</Label>
+                            <Input
+                              value={editTitle}
+                              onChange={(e) => setEditTitle(e.target.value)}
+                              className="font-marker text-lg"
+                              data-testid="input-edit-lesson-title"
+                            />
+                          </div>
+                        ) : (
+                          <h2 className="font-marker text-2xl text-foreground mb-3">{generatedLesson.title}</h2>
+                        )}
                         <div className="grid grid-cols-2 md:grid-cols-4 gap-2 text-sm font-roboto">
                           {generatedLesson.course && (
                             <div><span className="text-muted-foreground">Course:</span> {generatedLesson.course}</div>
@@ -1000,21 +1077,34 @@ ${addedResources.length > 0 ? addedResources.map(r => `- ${r.title}: ${r.url}`).
                         )}
                       </div>
 
-                      {generatedLesson.essentialQuestions && generatedLesson.essentialQuestions.length > 0 && (
+                      {(generatedLesson.essentialQuestions && generatedLesson.essentialQuestions.length > 0) || isEditingLesson ? (
                         <div>
                           <h3 className="font-oswald text-lg font-semibold mb-3 flex items-center gap-2">
                             <Lightbulb className="h-5 w-5 text-lys-yellow" />
                             Essential Questions
                           </h3>
-                          <ul className="space-y-2">
-                            {generatedLesson.essentialQuestions.map((q, i) => (
-                              <li key={i} className="font-roboto text-sm italic text-muted-foreground pl-4 border-l-2 border-lys-yellow">
-                                {q}
-                              </li>
-                            ))}
-                          </ul>
+                          {isEditingLesson ? (
+                            <div className="space-y-1">
+                              <Label className="text-xs text-muted-foreground font-roboto">One question per line</Label>
+                              <Textarea
+                                value={editEssentialQuestions}
+                                onChange={(e) => setEditEssentialQuestions(e.target.value)}
+                                rows={4}
+                                className="font-roboto text-sm"
+                                data-testid="textarea-edit-essential-questions"
+                              />
+                            </div>
+                          ) : (
+                            <ul className="space-y-2">
+                              {generatedLesson.essentialQuestions.map((q, i) => (
+                                <li key={i} className="font-roboto text-sm italic text-muted-foreground pl-4 border-l-2 border-lys-yellow">
+                                  {q}
+                                </li>
+                              ))}
+                            </ul>
+                          )}
                         </div>
-                      )}
+                      ) : null}
 
                       {generatedLesson.lysMethodology && (
                         <div className="p-4 rounded-md bg-muted/30">
@@ -1058,16 +1148,29 @@ ${addedResources.length > 0 ? addedResources.map(r => `- ${r.title}: ${r.url}`).
                           <Target className="h-5 w-5 text-lys-red" />
                           Learning Objectives
                         </h3>
-                        <ul className="space-y-2">
-                          {generatedLesson.objectives.map((obj, i) => (
-                            <li key={i} className="flex items-start gap-2 font-roboto text-sm">
-                              <span className="w-5 h-5 rounded-full bg-lys-red/10 text-lys-red text-xs flex items-center justify-center flex-shrink-0 mt-0.5">
-                                {i + 1}
-                              </span>
-                              {obj}
-                            </li>
-                          ))}
-                        </ul>
+                        {isEditingLesson ? (
+                          <div className="space-y-1">
+                            <Label className="text-xs text-muted-foreground font-roboto">One objective per line</Label>
+                            <Textarea
+                              value={editObjectives}
+                              onChange={(e) => setEditObjectives(e.target.value)}
+                              rows={5}
+                              className="font-roboto text-sm"
+                              data-testid="textarea-edit-objectives"
+                            />
+                          </div>
+                        ) : (
+                          <ul className="space-y-2">
+                            {generatedLesson.objectives.map((obj, i) => (
+                              <li key={i} className="flex items-start gap-2 font-roboto text-sm">
+                                <span className="w-5 h-5 rounded-full bg-lys-red/10 text-lys-red text-xs flex items-center justify-center flex-shrink-0 mt-0.5">
+                                  {i + 1}
+                                </span>
+                                {obj}
+                              </li>
+                            ))}
+                          </ul>
+                        )}
                       </div>
 
                       <Separator />
