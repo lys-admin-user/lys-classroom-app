@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { useSearch } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -71,7 +72,15 @@ const resourceTypeIcons: Record<string, typeof BookOpen> = {
 
 export default function ProfessionalDevelopment() {
   const { toast } = useToast();
-  const [activeTab, setActiveTab] = useState("overview");
+  const search = useSearch();
+  const initialTab = new URLSearchParams(search).get("tab") || "overview";
+  const [activeTab, setActiveTab] = useState(initialTab);
+
+  useEffect(() => {
+    const tab = new URLSearchParams(search).get("tab");
+    if (tab) setActiveTab(tab);
+  }, [search]);
+
   const [isGoalDialogOpen, setIsGoalDialogOpen] = useState(false);
   const [isSkillDialogOpen, setIsSkillDialogOpen] = useState(false);
   const [newGoal, setNewGoal] = useState({ title: "", goalType: "", targetRole: "", description: "", timeframe: "", priority: 1 });

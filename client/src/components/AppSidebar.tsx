@@ -150,6 +150,7 @@ const navigationGroups: NavGroup[] = [
       { title: "Analytics", url: "/analytics", icon: BarChart3, requiresAuth: true },
       { title: "Educator Influence", url: "/educator-influence", icon: Award, requiresAuth: true },
       { title: "Professional Dev", url: "/professional-development", icon: TrendingUp, requiresAuth: true },
+      { title: "Self Assessment", url: "/professional-development?tab=bkd-assessment", icon: Heart, requiresAuth: true, minRole: "educator" as UserRole },
     ],
   },
   {
@@ -198,8 +199,9 @@ export function AppSidebar() {
   const pendingCount = pendingCountData?.count ?? 0;
 
   const isActiveRoute = (url: string) => {
-    if (url === "/") return location === "/";
-    return location.startsWith(url);
+    const path = url.split("?")[0];
+    if (path === "/") return location === "/";
+    return location.startsWith(path);
   };
 
   const shouldShowGroup = (group: NavGroup) => {
