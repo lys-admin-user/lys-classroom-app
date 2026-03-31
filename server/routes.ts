@@ -2209,6 +2209,171 @@ export async function registerRoutes(
     }
   });
 
+  // Class BKD Insights for educators — aggregate + per-student breakdown
+  app.get("/api/class/bkd-insights", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user?.claims?.sub;
+      const userRole = req.user?.claims?.role || "";
+      const educatorRoles = ["educator", "campus_admin", "district_admin", "site_admin", "system_admin"];
+      if (!educatorRoles.includes(userRole)) {
+        return res.status(403).json({ error: "Only educators can view class BKD insights" });
+      }
+
+      // Collect all students linked to this educator's classes
+      const educatorClasses = await storage.getClasses(userId);
+      if (educatorClasses.length === 0) return res.json({ classes: [], aggregate: null });
+
+      const { classStudents, students, selfDiscoveryResults } = await import("../shared/schema.js");
+      const { eq, inArray } = await import("drizzle-orm");
+      const { db } = await import("./db.js");
+
+      const classIds = educatorClasses.map(c => c.id);
+
+      // Get all enrolled student records
+      const enrollments = await db.select().from(classStudents)
+        .where(inArray(classStudents.classId, classIds));
+      const studentIds = [...new Set(enrollments.map(e => e.studentId))];
+
+      if (studentIds.length === 0) return res.json({ classes: educatorClasses, students: [], aggregate: null });
+
+      // Get student profiles
+      const studentProfiles = studentIds.length > 0
+        ? await db.select().from(students).where(inArray(students.id, studentIds))
+        : [];
+
+      // Get self-discovery results for students (use userId on students table)
+      const studentUserIds = studentProfiles.map(s => s.userId);
+      const assessments = studentUserIds.length > 0
+        ? await db.select().from(selfDiscoveryResults)
+            .where(inArray(selfDiscoveryResults.userId, studentUserIds))
+        : [];
+
+      // Build per-student data — latest assessment only per student
+      const latestByUser: Record<string, any> = {};
+      for (const a of assessments) {
+        if (!latestByUser[a.userId] || new Date(a.createdAt!) > new Date(latestByUser[a.userId].createdAt)) {
+          latestByUser[a.userId] = a;
+        }
+      }
+
+      const studentData = studentProfiles.map(s => {
+        const assessment = latestByUser[s.userId] || null;
+        return {
+          id: s.id,
+          firstName: s.firstName,
+          lastName: s.lastName,
+          gradeLevel: s.gradeLevel,
+          classIds: enrollments.filter(e => e.studentId === s.id).map(e => e.classId),
+          hasAssessment: !!assessment,
+          beScore: assessment?.beScore ?? null,
+          knowScore: assessment?.knowScore ?? null,
+          doScore: assessment?.doScore ?? null,
+          totalScore: assessment?.totalScore ?? null,
+          strengths: assessment?.strengths ?? [],
+          growthAreas: assessment?.growthAreas ?? [],
+          assessedAt: assessment?.createdAt ?? null,
+        };
+      });
+
+      // Build class-level aggregate
+      const assessed = studentData.filter(s => s.hasAssessment);
+      const aggregate = assessed.length > 0 ? {
+        totalStudents: studentData.length,
+        studentsAssessed: assessed.length,
+        avgBe: Math.round(assessed.reduce((sum, s) => sum + (s.beScore ?? 0), 0) / assessed.length),
+        avgKnow: Math.round(assessed.reduce((sum, s) => sum + (s.knowScore ?? 0), 0) / assessed.length),
+        avgDo: Math.round(assessed.reduce((sum, s) => sum + (s.doScore ?? 0), 0) / assessed.length),
+        lowBe: assessed.filter(s => (s.beScore ?? 0) < 50).length,
+        lowKnow: assessed.filter(s => (s.knowScore ?? 0) < 50).length,
+        lowDo: assessed.filter(s => (s.doScore ?? 0) < 50).length,
+      } : null;
+
+      // Per-class breakdown
+      const classSummaries = educatorClasses.map(cls => {
+        const classStudentIds = enrollments.filter(e => e.classId === cls.id).map(e => e.studentId);
+        const classStudentData = studentData.filter(s => classStudentIds.includes(s.id));
+        const classAssessed = classStudentData.filter(s => s.hasAssessment);
+        return {
+          classId: cls.id,
+          className: cls.name,
+          period: cls.period,
+          totalStudents: classStudentData.length,
+          studentsAssessed: classAssessed.length,
+          avgBe: classAssessed.length ? Math.round(classAssessed.reduce((sum, s) => sum + (s.beScore ?? 0), 0) / classAssessed.length) : null,
+          avgKnow: classAssessed.length ? Math.round(classAssessed.reduce((sum, s) => sum + (s.knowScore ?? 0), 0) / classAssessed.length) : null,
+          avgDo: classAssessed.length ? Math.round(classAssessed.reduce((sum, s) => sum + (s.doScore ?? 0), 0) / classAssessed.length) : null,
+        };
+      });
+
+      res.json({ classes: classSummaries, students: studentData, aggregate });
+    } catch (error) {
+      console.error("Class BKD insights error:", error);
+      res.status(500).json({ error: "Failed to fetch class BKD insights" });
+    }
+  });
+
+  // Educator BKD self-assessment — save results + auto-create PD goal suggestions
+  app.post("/api/educator/bkd-assessment", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user?.claims?.sub;
+      const userRole = req.user?.claims?.role || "";
+      const educatorRoles = ["educator", "campus_admin", "district_admin", "site_admin", "system_admin"];
+      if (!educatorRoles.includes(userRole)) {
+        return res.status(403).json({ error: "Only educators can submit this assessment" });
+      }
+
+      const { beScore, knowScore, doScore, totalScore, strengths, growthAreas, answers } = req.body;
+
+      // Save as a self-discovery result tagged to this educator
+      const result = await storage.saveSelfDiscoveryResult({
+        userId,
+        beScore,
+        knowScore,
+        doScore,
+        totalScore,
+        strengths,
+        growthAreas,
+        answers,
+      });
+
+      // Auto-create PD goals from low-scoring pillars
+      const suggestedGoals: string[] = [];
+      if (beScore < 60) suggestedGoals.push("Reflect on and strengthen your teaching identity and core values");
+      if (knowScore < 60) suggestedGoals.push("Deepen subject-matter expertise and pedagogical knowledge");
+      if (doScore < 60) suggestedGoals.push("Develop consistent classroom practices and measurable student impact strategies");
+
+      const createdGoals = [];
+      for (const title of suggestedGoals) {
+        try {
+          const goal = await storage.createEducatorCareerGoal({
+            userId,
+            title,
+            goalType: "skill_development",
+            description: `Auto-suggested from your Be-Know-Do self-assessment. Review and customize to fit your context.`,
+            priority: 2,
+          });
+          createdGoals.push(goal);
+        } catch (_) { /* skip if PD goal creation fails */ }
+      }
+
+      res.json({ result, suggestedGoals: createdGoals });
+    } catch (error) {
+      console.error("Educator BKD assessment error:", error);
+      res.status(500).json({ error: "Failed to save educator BKD assessment" });
+    }
+  });
+
+  // Get educator's own BKD assessment history
+  app.get("/api/educator/bkd-assessment", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user?.claims?.sub;
+      const results = await storage.getSelfDiscoveryResults(userId);
+      res.json(results);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch educator BKD results" });
+    }
+  });
+
   // Get assignments assigned TO the current logged-in student
   app.get("/api/my-assignments", isAuthenticated, async (req: any, res) => {
     try {

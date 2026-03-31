@@ -34,7 +34,13 @@ import {
   ShoppingBag,
   Search,
   Download,
-  ExternalLink
+  ExternalLink,
+  Heart,
+  Compass,
+  RotateCcw,
+  Trophy,
+  Brain,
+  Lightbulb
 } from "lucide-react";
 import type { EducatorCareerGoal, EducatorSkill, PDRecommendation, EducatorPDProgress } from "@shared/schema";
 
@@ -198,6 +204,10 @@ export default function ProfessionalDevelopment() {
             <TabsTrigger value="skills" data-testid="tab-skills">Skills</TabsTrigger>
             <TabsTrigger value="recommendations" data-testid="tab-recommendations">Recommendations</TabsTrigger>
             <TabsTrigger value="progress" data-testid="tab-progress">My Progress</TabsTrigger>
+            <TabsTrigger value="bkd-assessment" data-testid="tab-bkd-assessment">
+              <Heart className="h-4 w-4 mr-1.5" />
+              BKD Self-Assessment
+            </TabsTrigger>
             <TabsTrigger value="courses" data-testid="tab-courses">
               <ShoppingBag className="h-4 w-4 mr-1.5" />
               LYS Courses
@@ -977,6 +987,10 @@ export default function ProfessionalDevelopment() {
             )}
           </TabsContent>
 
+          <TabsContent value="bkd-assessment" className="space-y-6">
+            <EducatorBKDAssessment />
+          </TabsContent>
+
           <TabsContent value="courses" className="space-y-6">
             <PDCoursesTab />
           </TabsContent>
@@ -1101,6 +1115,412 @@ function PDCoursesTab() {
           ))}
         </div>
       )}
+    </div>
+  );
+}
+
+// Educator-specific BKD questions — framed around professional teaching identity
+const educatorBKDQuestions = [
+  // BE — Teaching Identity & Values
+  {
+    id: "be-1",
+    text: "How clearly can you articulate your personal teaching philosophy and core values as an educator?",
+    category: "be" as const,
+    options: [
+      { value: "a", label: "I have a well-defined philosophy I actively share with students and colleagues", score: 3 },
+      { value: "b", label: "I have a general sense of my values but haven't formalized them", score: 2 },
+      { value: "c", label: "I haven't yet spent much time developing a personal teaching identity", score: 1 },
+    ],
+  },
+  {
+    id: "be-2",
+    text: "How well does your teaching practice reflect who you are as a person — your authentic self?",
+    category: "be" as const,
+    options: [
+      { value: "a", label: "I bring my genuine personality into every lesson and relationship with students", score: 3 },
+      { value: "b", label: "Sometimes I feel I'm playing a role rather than being fully myself", score: 2 },
+      { value: "c", label: "I often feel disconnected between who I am and how I teach", score: 1 },
+    ],
+  },
+  {
+    id: "be-3",
+    text: "How connected do you feel to your long-term purpose as an educator?",
+    category: "be" as const,
+    options: [
+      { value: "a", label: "I am deeply grounded in my 'why' — my students and community drive everything I do", score: 3 },
+      { value: "b", label: "I feel connected on good days but sometimes lose sight of the bigger picture", score: 2 },
+      { value: "c", label: "I'm still figuring out what my deeper purpose is in education", score: 1 },
+    ],
+  },
+  // KNOW — Subject & Pedagogical Mastery
+  {
+    id: "know-1",
+    text: "How confident are you in your mastery of the subject matter you teach?",
+    category: "know" as const,
+    options: [
+      { value: "a", label: "Highly confident — I stay current, go deep, and can answer most questions", score: 3 },
+      { value: "b", label: "Fairly confident but there are gaps I know I need to address", score: 2 },
+      { value: "c", label: "I often feel I need to strengthen my subject-matter knowledge", score: 1 },
+    ],
+  },
+  {
+    id: "know-2",
+    text: "How well do you understand different instructional strategies and when to use each one?",
+    category: "know" as const,
+    options: [
+      { value: "a", label: "I draw from a wide repertoire of strategies and match them to student needs", score: 3 },
+      { value: "b", label: "I have a few go-to methods but could expand my toolkit", score: 2 },
+      { value: "c", label: "I tend to rely on one or two approaches regardless of the student or context", score: 1 },
+    ],
+  },
+  {
+    id: "know-3",
+    text: "How well do you understand your students' learning needs, backgrounds, and circumstances?",
+    category: "know" as const,
+    options: [
+      { value: "a", label: "I actively learn about each student and use that knowledge to differentiate instruction", score: 3 },
+      { value: "b", label: "I know my students generally but could invest more in truly understanding them", score: 2 },
+      { value: "c", label: "I find it hard to find time to learn much beyond academic performance data", score: 1 },
+    ],
+  },
+  // DO — Classroom Impact & Professional Action
+  {
+    id: "do-1",
+    text: "How consistently do you set measurable goals for your students and track their progress?",
+    category: "do" as const,
+    options: [
+      { value: "a", label: "I use data regularly to set goals, monitor progress, and adjust my teaching", score: 3 },
+      { value: "b", label: "I track progress informally but don't always have clear measurable targets", score: 2 },
+      { value: "c", label: "I haven't built a consistent system for goal-setting and progress monitoring", score: 1 },
+    ],
+  },
+  {
+    id: "do-2",
+    text: "How actively do you pursue your own professional development and continuous growth?",
+    category: "do" as const,
+    options: [
+      { value: "a", label: "I regularly seek PD opportunities, reflect on my practice, and implement what I learn", score: 3 },
+      { value: "b", label: "I engage in PD when it's provided but rarely seek it out on my own", score: 2 },
+      { value: "c", label: "Professional development doesn't feel like a high priority right now", score: 1 },
+    ],
+  },
+  {
+    id: "do-3",
+    text: "How effectively do you collaborate with colleagues, families, and the broader community to support your students?",
+    category: "do" as const,
+    options: [
+      { value: "a", label: "I build strong relationships with families and colleagues and actively co-create student success", score: 3 },
+      { value: "b", label: "I collaborate when required but could be more proactive about reaching out", score: 2 },
+      { value: "c", label: "Collaboration outside my classroom is limited right now", score: 1 },
+    ],
+  },
+];
+
+function EducatorBKDAssessment() {
+  const { toast } = useToast();
+  const [currentQuestion, setCurrentQuestion] = useState(0);
+  const [answers, setAnswers] = useState<Record<string, { value: string; score: number }>>({});
+  const [showResults, setShowResults] = useState(false);
+  const [resultsSaved, setResultsSaved] = useState(false);
+
+  const { data: previousResults = [] } = useQuery<any[]>({
+    queryKey: ["/api/educator/bkd-assessment"],
+  });
+
+  const saveResultsMutation = useMutation({
+    mutationFn: async (results: any) => {
+      const res = await apiRequest("POST", "/api/educator/bkd-assessment", results);
+      return res.json();
+    },
+    onSuccess: (data) => {
+      setResultsSaved(true);
+      queryClient.invalidateQueries({ queryKey: ["/api/pd/career-goals"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/pd/recommendations"] });
+      const goalsCreated = data?.suggestedGoals?.length || 0;
+      toast({
+        title: "BKD Assessment Saved",
+        description: goalsCreated > 0
+          ? `Results saved! ${goalsCreated} PD goal${goalsCreated > 1 ? "s" : ""} were automatically added to your Career Goals based on areas for growth.`
+          : "Your assessment results have been saved to your profile.",
+      });
+    },
+    onError: () => {
+      toast({ title: "Error", description: "Failed to save results.", variant: "destructive" });
+    },
+  });
+
+  const question = educatorBKDQuestions[currentQuestion];
+  const progress = ((currentQuestion + 1) / educatorBKDQuestions.length) * 100;
+
+  const handleAnswer = (value: string, score: number) => {
+    setAnswers(prev => ({ ...prev, [question.id]: { value, score } }));
+  };
+
+  const calculateResults = () => {
+    const scores = { be: 0, know: 0, do: 0 };
+    const maxScores = { be: 0, know: 0, do: 0 };
+    educatorBKDQuestions.forEach(q => {
+      maxScores[q.category] += 3;
+      const answer = answers[q.id];
+      if (answer) scores[q.category] += answer.score;
+    });
+    const bePercent = Math.round((scores.be / maxScores.be) * 100);
+    const knowPercent = Math.round((scores.know / maxScores.know) * 100);
+    const doPercent = Math.round((scores.do / maxScores.do) * 100);
+    const total = Math.round(((scores.be + scores.know + scores.do) / (maxScores.be + maxScores.know + maxScores.do)) * 100);
+
+    const strengths: string[] = [];
+    const growthAreas: string[] = [];
+
+    if (bePercent >= 70) strengths.push("Strong teaching identity and clear personal values");
+    else if (bePercent < 50) growthAreas.push("Develop a clearer sense of teaching identity and purpose");
+    if (knowPercent >= 70) strengths.push("Deep subject expertise and pedagogical range");
+    else if (knowPercent < 50) growthAreas.push("Strengthen subject-matter knowledge and instructional strategies");
+    if (doPercent >= 70) strengths.push("Consistent classroom impact and professional action");
+    else if (doPercent < 50) growthAreas.push("Build habits for goal-setting, data use, and professional collaboration");
+
+    return { be: bePercent, know: knowPercent, do: doPercent, total, strengths, growthAreas };
+  };
+
+  const pillars = [
+    { key: "be" as const, icon: Heart, color: "text-lys-yellow", bg: "bg-lys-yellow/10", bar: "bg-lys-yellow", label: "BE", subtitle: "Teaching Identity & Values" },
+    { key: "know" as const, icon: Brain, color: "text-lys-red", bg: "bg-lys-red/10", bar: "bg-lys-red", label: "KNOW", subtitle: "Subject & Pedagogical Mastery" },
+    { key: "do" as const, icon: Zap, color: "text-lys-teal", bg: "bg-lys-teal/10", bar: "bg-lys-teal", label: "DO", subtitle: "Classroom Impact & Action" },
+  ];
+
+  const categoryPillar = pillars.find(p => p.key === question?.category) || pillars[0];
+
+  if (showResults) {
+    const results = calculateResults();
+    return (
+      <div className="space-y-6">
+        {/* Header */}
+        <div className="text-center">
+          <div className="w-14 h-14 rounded-full bg-lys-yellow/10 flex items-center justify-center mx-auto mb-3">
+            <Trophy className="h-7 w-7 text-lys-yellow" />
+          </div>
+          <h2 className="font-marker text-2xl sm:text-3xl text-foreground mb-1">Your Educator BKD Profile</h2>
+          <p className="font-roboto text-muted-foreground text-sm">
+            This reflects your professional identity, knowledge, and classroom impact.
+          </p>
+          <div className="flex items-center justify-center gap-2 mt-2 flex-wrap">
+            <Badge variant="secondary" className="font-oswald gap-1">
+              <Heart className="h-3 w-3" /> Educator Assessment
+            </Badge>
+            <Badge variant="outline" className="font-roboto text-xs gap-1">
+              <Lightbulb className="h-3 w-3" /> Results connect to your PD goals
+            </Badge>
+          </div>
+        </div>
+
+        {/* Pillar Scores */}
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          {pillars.map(pillar => {
+            const Icon = pillar.icon;
+            const score = results[pillar.key];
+            return (
+              <Card key={pillar.key} className={`${pillar.bg} border-none`}>
+                <CardContent className="p-5 text-center">
+                  <Icon className={`h-7 w-7 ${pillar.color} mx-auto mb-2`} />
+                  <p className="font-oswald text-xl font-bold">{pillar.label}</p>
+                  <p className="text-xs text-muted-foreground mb-3">{pillar.subtitle}</p>
+                  <div className="relative h-2 bg-muted rounded-full overflow-hidden mb-2">
+                    <div className={`absolute left-0 top-0 h-full ${pillar.bar}`} style={{ width: `${score}%` }} />
+                  </div>
+                  <p className="font-oswald text-2xl">{score}%</p>
+                  {score < 60 && (
+                    <Badge variant="outline" className="text-xs mt-1 font-roboto">Growth area → PD goal added</Badge>
+                  )}
+                </CardContent>
+              </Card>
+            );
+          })}
+        </div>
+
+        {/* Strengths + Growth */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="font-oswald text-lg flex items-center gap-2">
+              <Sparkles className="h-5 w-5 text-lys-red" />
+              Overall Score: {results.total}%
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {results.strengths.length > 0 && (
+              <div>
+                <p className="font-oswald text-sm mb-2 text-green-700 dark:text-green-400">Your Strengths</p>
+                <div className="flex flex-wrap gap-2">
+                  {results.strengths.map((s, i) => (
+                    <Badge key={i} variant="secondary" className="font-roboto">{s}</Badge>
+                  ))}
+                </div>
+              </div>
+            )}
+            {results.growthAreas.length > 0 && (
+              <div>
+                <p className="font-oswald text-sm mb-2 text-amber-700 dark:text-amber-400">Areas for Growth</p>
+                <div className="flex flex-wrap gap-2">
+                  {results.growthAreas.map((g, i) => (
+                    <Badge key={i} variant="outline" className="font-roboto">{g}</Badge>
+                  ))}
+                </div>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        <div className="flex flex-col sm:flex-row gap-3 justify-center">
+          <Button variant="outline" onClick={() => { setCurrentQuestion(0); setAnswers({}); setShowResults(false); setResultsSaved(false); }} className="gap-2" data-testid="button-retake-educator-bkd">
+            <RotateCcw className="h-4 w-4" /> Retake Assessment
+          </Button>
+          {!resultsSaved && (
+            <Button
+              onClick={() => saveResultsMutation.mutate({ beScore: results.be, knowScore: results.know, doScore: results.do, totalScore: results.total, strengths: results.strengths, growthAreas: results.growthAreas, answers })}
+              disabled={saveResultsMutation.isPending}
+              className="gap-2 bg-lys-teal hover:bg-lys-teal/90 text-white"
+              data-testid="button-save-educator-bkd"
+            >
+              <Sparkles className="h-4 w-4" />
+              {saveResultsMutation.isPending ? "Saving & Creating Goals..." : "Save Results & Create PD Goals"}
+            </Button>
+          )}
+          {resultsSaved && (
+            <Badge variant="secondary" className="font-roboto py-2 px-4">
+              <CheckCircle2 className="h-4 w-4 mr-1" /> Saved — Check Career Goals tab
+            </Badge>
+          )}
+        </div>
+
+        {/* Previous Results */}
+        {previousResults.length > 0 && (
+          <Card>
+            <CardHeader>
+              <CardTitle className="font-oswald text-base">Assessment History</CardTitle>
+              <CardDescription className="font-roboto">Your past educator BKD assessments</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-3">
+                {previousResults.slice(0, 5).map((r: any, i: number) => (
+                  <div key={i} className="flex items-center gap-4 p-3 border rounded-md">
+                    <div className="text-xs text-muted-foreground font-roboto w-24">
+                      {r.createdAt ? new Date(r.createdAt).toLocaleDateString() : "—"}
+                    </div>
+                    <div className="flex gap-3 flex-1">
+                      {[{ label: "BE", val: r.beScore, color: "text-lys-yellow" }, { label: "KNOW", val: r.knowScore, color: "text-lys-red" }, { label: "DO", val: r.doScore, color: "text-lys-teal" }].map(p => (
+                        <div key={p.label} className="text-center">
+                          <p className={`font-oswald text-sm font-bold ${p.color}`}>{p.label}</p>
+                          <p className="font-roboto text-sm">{p.val ?? "—"}%</p>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+        )}
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-6">
+      {/* Context Banner */}
+      <Card className="border-lys-yellow/30 bg-lys-yellow/5">
+        <CardContent className="py-4 flex gap-4 items-start">
+          <Heart className="h-6 w-6 text-lys-yellow shrink-0 mt-0.5" />
+          <div>
+            <p className="font-oswald text-base font-semibold">Educator Be-Know-Do Self-Assessment</p>
+            <p className="font-roboto text-sm text-muted-foreground mt-1">
+              This assessment is <strong>only for you</strong> — it measures your professional identity (<span className="text-lys-yellow font-semibold">BE</span>), pedagogical knowledge (<span className="text-lys-red font-semibold">KNOW</span>), and classroom impact (<span className="text-lys-teal font-semibold">DO</span>). Results automatically suggest Professional Development goals where you have room to grow.
+            </p>
+            <div className="flex gap-2 mt-2 flex-wrap">
+              <Badge variant="outline" className="font-roboto text-xs">For Educators Only</Badge>
+              <Badge variant="outline" className="font-roboto text-xs">Not visible to students</Badge>
+              <Badge variant="outline" className="font-roboto text-xs">Connects to your PD goals</Badge>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Pillar Legend */}
+      <div className="grid grid-cols-3 gap-3">
+        {pillars.map(pillar => {
+          const Icon = pillar.icon;
+          return (
+            <div key={pillar.key} className={`${pillar.bg} rounded-lg p-3 text-center`}>
+              <Icon className={`h-5 w-5 ${pillar.color} mx-auto mb-1`} />
+              <p className={`font-oswald text-sm font-bold ${pillar.color}`}>{pillar.label}</p>
+              <p className="font-roboto text-xs text-muted-foreground">{pillar.subtitle}</p>
+            </div>
+          );
+        })}
+      </div>
+
+      {/* Progress */}
+      <div>
+        <div className="flex justify-between text-xs text-muted-foreground font-roboto mb-1">
+          <span>Question {currentQuestion + 1} of {educatorBKDQuestions.length}</span>
+          <span>{Math.round(progress)}% complete</span>
+        </div>
+        <div className="relative h-2 bg-muted rounded-full overflow-hidden">
+          <div className="absolute left-0 top-0 h-full bg-lys-teal transition-all" style={{ width: `${progress}%` }} />
+        </div>
+      </div>
+
+      {/* Question Card */}
+      <Card>
+        <CardHeader className={`${categoryPillar.bg} border-b`}>
+          <div className="flex items-center gap-2">
+            {(() => { const Icon = categoryPillar.icon; return <Icon className={`h-5 w-5 ${categoryPillar.color}`} />; })()}
+            <Badge variant="secondary" className="font-oswald">
+              {categoryPillar.label}: {categoryPillar.subtitle}
+            </Badge>
+          </div>
+        </CardHeader>
+        <CardContent className="p-6">
+          <p className="font-roboto text-lg mb-6">{question.text}</p>
+          <div className="space-y-3">
+            {question.options.map(option => (
+              <button
+                key={option.value}
+                type="button"
+                onClick={() => handleAnswer(option.value, option.score)}
+                data-testid={`radio-edu-${question.id}-${option.value}`}
+                className={`w-full text-left flex items-start gap-3 p-4 rounded-md border transition-all ${
+                  answers[question.id]?.value === option.value
+                    ? "border-lys-teal bg-lys-teal/5"
+                    : "border-border hover:border-lys-teal/50"
+                }`}
+              >
+                <div className={`mt-0.5 w-4 h-4 rounded-full border-2 shrink-0 flex items-center justify-center ${answers[question.id]?.value === option.value ? "border-lys-teal" : "border-muted-foreground"}`}>
+                  {answers[question.id]?.value === option.value && <div className="w-2 h-2 rounded-full bg-lys-teal" />}
+                </div>
+                <span className="font-roboto text-sm">{option.label}</span>
+              </button>
+            ))}
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Navigation */}
+      <div className="flex justify-between">
+        <Button variant="outline" onClick={() => setCurrentQuestion(p => p - 1)} disabled={currentQuestion === 0} className="gap-2" data-testid="button-edu-bkd-prev">
+          Previous
+        </Button>
+        <Button
+          onClick={() => {
+            if (currentQuestion < educatorBKDQuestions.length - 1) setCurrentQuestion(p => p + 1);
+            else setShowResults(true);
+          }}
+          disabled={!answers[question.id]}
+          className="gap-2 bg-lys-teal hover:bg-lys-teal/90 text-white"
+          data-testid="button-edu-bkd-next"
+        >
+          {currentQuestion === educatorBKDQuestions.length - 1 ? "See My Results" : "Next"}
+          <ChevronRight className="h-4 w-4" />
+        </Button>
+      </div>
     </div>
   );
 }

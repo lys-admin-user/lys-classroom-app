@@ -15,6 +15,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, Dialog
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
+import { Skeleton } from "@/components/ui/skeleton";
 import { Sparkles, FileText, Users, UserPlus, AlertTriangle, Check, Clock, BookOpen, Target, Compass, Lightbulb, Lock, GraduationCap, Copy, Printer, Pencil, Trash2, Plus, CheckCircle, Play, Search, RefreshCw, Star, ArrowRight, HelpCircle, ScrollText, Heart, ChevronDown, ChevronRight, Eye, EyeOff, BarChart3 } from "lucide-react";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -516,6 +517,12 @@ export default function Assignments() {
               </>
             )}
             <TabsTrigger value="saved" data-testid="tab-saved">My Assignments</TabsTrigger>
+            {!isStudent && !isParent && (
+              <TabsTrigger value="class-bkd" data-testid="tab-class-bkd">
+                <BarChart3 className="h-4 w-4 mr-1" />
+                Class BKD Insights
+              </TabsTrigger>
+            )}
           </TabsList>
 
           <TabsContent value="generate" className="space-y-6">
@@ -2112,6 +2119,13 @@ export default function Assignments() {
               )
             )}
           </TabsContent>
+
+          {/* ── Class BKD Insights Tab (educators only) ── */}
+          {!isStudent && !isParent && (
+            <TabsContent value="class-bkd" className="space-y-6">
+              <ClassBKDInsights />
+            </TabsContent>
+          )}
         </Tabs>
 
         <Dialog open={suggestionsDialogOpen} onOpenChange={setSuggestionsDialogOpen}>
@@ -2143,6 +2157,309 @@ export default function Assignments() {
           </DialogContent>
         </Dialog>
       </div>
+    </div>
+  );
+}
+
+interface StudentBKDRow {
+  id: string;
+  firstName: string;
+  lastName: string;
+  gradeLevel: string | null;
+  classIds: string[];
+  hasAssessment: boolean;
+  beScore: number | null;
+  knowScore: number | null;
+  doScore: number | null;
+  totalScore: number | null;
+  strengths: string[];
+  growthAreas: string[];
+  assessedAt: string | null;
+}
+
+interface BKDInsightsData {
+  classes: { classId: string; className: string; period?: string | null; totalStudents: number; studentsAssessed: number; avgBe: number | null; avgKnow: number | null; avgDo: number | null }[];
+  students: StudentBKDRow[];
+  aggregate: {
+    totalStudents: number;
+    studentsAssessed: number;
+    avgBe: number;
+    avgKnow: number;
+    avgDo: number;
+    lowBe: number;
+    lowKnow: number;
+    lowDo: number;
+  } | null;
+}
+
+function BKDBar({ score, color }: { score: number | null; color: string }) {
+  if (score === null) return <span className="text-xs text-muted-foreground font-roboto">No data</span>;
+  return (
+    <div className="flex items-center gap-2">
+      <div className="flex-1 h-2 bg-muted rounded-full overflow-hidden">
+        <div className={`h-full ${color}`} style={{ width: `${score}%` }} />
+      </div>
+      <span className="text-xs font-roboto w-8 text-right">{score}%</span>
+    </div>
+  );
+}
+
+function ClassBKDInsights() {
+  const [selectedClass, setSelectedClass] = useState<string>("all");
+  const [showNames, setShowNames] = useState(false);
+  const { toast } = useToast();
+
+  const { data, isLoading } = useQuery<BKDInsightsData>({
+    queryKey: ["/api/class/bkd-insights"],
+  });
+
+  const handlePrint = () => {
+    window.print();
+  };
+
+  const handleDownload = () => {
+    if (!data?.students) return;
+    const rows = data.students.filter(s => s.hasAssessment);
+    const csv = [
+      ["First Name", "Last Name", "Grade", "BE Score", "KNOW Score", "DO Score", "Total", "Strengths", "Growth Areas", "Assessed At"].join(","),
+      ...rows.map(s => [
+        s.firstName, s.lastName, s.gradeLevel || "", s.beScore, s.knowScore, s.doScore, s.totalScore,
+        `"${(s.strengths || []).join("; ")}"`, `"${(s.growthAreas || []).join("; ")}"`,
+        s.assessedAt ? new Date(s.assessedAt).toLocaleDateString() : ""
+      ].join(","))
+    ].join("\n");
+    const blob = new Blob([csv], { type: "text/csv" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a"); a.href = url; a.download = "class-bkd-results.csv"; a.click();
+    URL.revokeObjectURL(url);
+    toast({ title: "Downloaded", description: "Class BKD data exported as CSV" });
+  };
+
+  const filteredStudents = data?.students?.filter(s =>
+    selectedClass === "all" || s.classIds.includes(selectedClass)
+  ) || [];
+
+  if (isLoading) {
+    return (
+      <div className="space-y-4">
+        <Skeleton className="h-32 w-full" />
+        <Skeleton className="h-64 w-full" />
+      </div>
+    );
+  }
+
+  if (!data || data.classes.length === 0) {
+    return (
+      <Card className="text-center py-12">
+        <CardContent>
+          <Users className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
+          <h3 className="font-oswald text-lg mb-2">No Classes Found</h3>
+          <p className="text-muted-foreground font-roboto text-sm">Add classes and enroll students to view their BKD assessment results here.</p>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  return (
+    <div className="space-y-6">
+      {/* Context Header */}
+      <Card className="border-lys-teal/30 bg-lys-teal/5">
+        <CardContent className="py-4 flex gap-4 items-start">
+          <BarChart3 className="h-6 w-6 text-lys-teal shrink-0 mt-0.5" />
+          <div className="flex-1">
+            <p className="font-oswald text-base font-semibold">Class Be-Know-Do Insights</p>
+            <p className="font-roboto text-sm text-muted-foreground mt-1">
+              View how your students score across the three BKD pillars so you can tailor your teaching, coaching, and lesson plans to meet them where they are.
+            </p>
+            <div className="flex gap-2 mt-2 flex-wrap">
+              <Badge variant="outline" className="font-roboto text-xs">Student data only</Badge>
+              <Badge variant="outline" className="font-roboto text-xs">COPPA-compliant view</Badge>
+              <Badge variant="outline" className="font-roboto text-xs">District & campus admins can see this</Badge>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Controls */}
+      <div className="flex flex-wrap items-center gap-3">
+        <Select value={selectedClass} onValueChange={setSelectedClass}>
+          <SelectTrigger className="w-48" data-testid="select-class-filter">
+            <SelectValue placeholder="All Classes" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All Classes</SelectItem>
+            {data.classes.map(c => (
+              <SelectItem key={c.classId} value={c.classId}>{c.className}{c.period ? ` (Period ${c.period})` : ""}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => setShowNames(!showNames)}
+            className={`flex items-center gap-2 px-3 py-1.5 rounded-md border text-sm font-roboto transition-colors ${showNames ? "border-lys-teal bg-lys-teal/10 text-lys-teal" : "border-border text-muted-foreground"}`}
+            data-testid="button-toggle-names"
+          >
+            {showNames ? <Eye className="h-4 w-4" /> : <EyeOff className="h-4 w-4" />}
+            {showNames ? "Showing Names" : "Names Hidden"}
+          </button>
+        </div>
+
+        <div className="ml-auto flex gap-2">
+          <Button variant="outline" size="sm" onClick={handlePrint} className="gap-1" data-testid="button-print-bkd">
+            <Printer className="h-4 w-4" /> Print
+          </Button>
+          <Button variant="outline" size="sm" onClick={handleDownload} className="gap-1" data-testid="button-download-bkd">
+            <Copy className="h-4 w-4" /> Export CSV
+          </Button>
+        </div>
+      </div>
+
+      {/* Aggregate Summary Cards */}
+      {data.aggregate && (
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+          <Card className="bg-muted/30">
+            <CardContent className="pt-4 text-center">
+              <p className="text-2xl font-bold font-oswald">{data.aggregate.studentsAssessed}</p>
+              <p className="text-xs text-muted-foreground font-roboto">of {data.aggregate.totalStudents} students assessed</p>
+            </CardContent>
+          </Card>
+          <Card className="bg-lys-yellow/10 border-lys-yellow/20">
+            <CardContent className="pt-4 text-center">
+              <p className="text-2xl font-bold font-oswald text-lys-yellow">{data.aggregate.avgBe}%</p>
+              <p className="text-xs text-muted-foreground font-roboto">Class avg BE</p>
+              {data.aggregate.lowBe > 0 && <Badge variant="outline" className="text-xs mt-1">{data.aggregate.lowBe} need support</Badge>}
+            </CardContent>
+          </Card>
+          <Card className="bg-lys-red/10 border-lys-red/20">
+            <CardContent className="pt-4 text-center">
+              <p className="text-2xl font-bold font-oswald text-lys-red">{data.aggregate.avgKnow}%</p>
+              <p className="text-xs text-muted-foreground font-roboto">Class avg KNOW</p>
+              {data.aggregate.lowKnow > 0 && <Badge variant="outline" className="text-xs mt-1">{data.aggregate.lowKnow} need support</Badge>}
+            </CardContent>
+          </Card>
+          <Card className="bg-lys-teal/10 border-lys-teal/20">
+            <CardContent className="pt-4 text-center">
+              <p className="text-2xl font-bold font-oswald text-lys-teal">{data.aggregate.avgDo}%</p>
+              <p className="text-xs text-muted-foreground font-roboto">Class avg DO</p>
+              {data.aggregate.lowDo > 0 && <Badge variant="outline" className="text-xs mt-1">{data.aggregate.lowDo} need support</Badge>}
+            </CardContent>
+          </Card>
+        </div>
+      )}
+
+      {/* Per-Student Breakdown */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="font-oswald text-base flex items-center gap-2">
+            <Users className="h-4 w-4" />
+            Student Breakdown
+            {!showNames && (
+              <Badge variant="outline" className="font-roboto text-xs font-normal">Names hidden — toggle above to reveal</Badge>
+            )}
+          </CardTitle>
+          <CardDescription className="font-roboto text-xs">
+            Results reflect each student's most recent Be-Know-Do assessment. Scores below 50% indicate areas where coaching and targeted lesson design can make a real difference.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          {filteredStudents.length === 0 ? (
+            <p className="text-center text-sm text-muted-foreground py-6 font-roboto">No students found in this class.</p>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm" data-testid="table-class-bkd">
+                <thead>
+                  <tr className="border-b">
+                    <th className="text-left py-2 pr-4 font-oswald text-xs text-muted-foreground">Student</th>
+                    <th className="text-left py-2 pr-4 font-oswald text-xs text-muted-foreground w-32">
+                      <span className="text-lys-yellow">BE</span> — Identity
+                    </th>
+                    <th className="text-left py-2 pr-4 font-oswald text-xs text-muted-foreground w-32">
+                      <span className="text-lys-red">KNOW</span> — Knowledge
+                    </th>
+                    <th className="text-left py-2 pr-4 font-oswald text-xs text-muted-foreground w-32">
+                      <span className="text-lys-teal">DO</span> — Action
+                    </th>
+                    <th className="text-left py-2 font-oswald text-xs text-muted-foreground">Focus Areas</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {filteredStudents.map((student, idx) => (
+                    <tr key={student.id} className="border-b last:border-0" data-testid={`row-student-bkd-${student.id}`}>
+                      <td className="py-3 pr-4">
+                        {showNames ? (
+                          <span className="font-roboto text-sm">{student.firstName} {student.lastName}</span>
+                        ) : (
+                          <span className="font-roboto text-sm text-muted-foreground">Student {idx + 1}</span>
+                        )}
+                        {student.gradeLevel && (
+                          <span className="block text-xs text-muted-foreground">Grade {student.gradeLevel}</span>
+                        )}
+                        {!student.hasAssessment && (
+                          <Badge variant="outline" className="text-xs mt-1">Not assessed yet</Badge>
+                        )}
+                      </td>
+                      <td className="py-3 pr-4 w-32">
+                        <BKDBar score={student.beScore} color="bg-lys-yellow" />
+                      </td>
+                      <td className="py-3 pr-4 w-32">
+                        <BKDBar score={student.knowScore} color="bg-lys-red" />
+                      </td>
+                      <td className="py-3 pr-4 w-32">
+                        <BKDBar score={student.doScore} color="bg-lys-teal" />
+                      </td>
+                      <td className="py-3">
+                        <div className="flex flex-wrap gap-1">
+                          {(student.growthAreas || []).map((area, i) => (
+                            <Badge key={i} variant="outline" className="text-xs font-roboto">{area}</Badge>
+                          ))}
+                          {student.hasAssessment && (student.growthAreas || []).length === 0 && (
+                            <Badge variant="secondary" className="text-xs font-roboto text-green-600">Strong across all pillars</Badge>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Per-Class Summary */}
+      {data.classes.length > 1 && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="font-oswald text-base">Class-by-Class Summary</CardTitle>
+            <CardDescription className="font-roboto text-xs">Aggregate BKD averages per period or class section</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-4">
+              {data.classes.map(cls => (
+                <div key={cls.classId} className="border rounded-md p-4">
+                  <div className="flex justify-between items-center mb-3">
+                    <div>
+                      <p className="font-oswald text-sm font-semibold">{cls.className}</p>
+                      {cls.period && <p className="text-xs text-muted-foreground">Period {cls.period}</p>}
+                    </div>
+                    <Badge variant="outline" className="font-roboto text-xs">{cls.studentsAssessed}/{cls.totalStudents} assessed</Badge>
+                  </div>
+                  <div className="grid grid-cols-3 gap-3">
+                    {[{ label: "BE", val: cls.avgBe, color: "bg-lys-yellow", text: "text-lys-yellow" }, { label: "KNOW", val: cls.avgKnow, color: "bg-lys-red", text: "text-lys-red" }, { label: "DO", val: cls.avgDo, color: "bg-lys-teal", text: "text-lys-teal" }].map(p => (
+                      <div key={p.label}>
+                        <p className={`font-oswald text-xs font-bold ${p.text} mb-1`}>{p.label}</p>
+                        <BKDBar score={p.val} color={p.color} />
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
     </div>
   );
 }
