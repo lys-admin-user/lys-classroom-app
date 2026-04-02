@@ -191,21 +191,25 @@ export default function Resources() {
     setDetailsOpen(true);
   };
 
-  const { data: resources = [], isLoading: loadingResources } = useQuery<Resource[]>({
+  const { data: rawResources, isLoading: loadingResources } = useQuery<Resource[]>({
     queryKey: ["/api/resources"],
   });
+  const resources = rawResources ?? [];
 
-  const { data: knowResources = [], isLoading: loadingKnow } = useQuery<KnowResourceData[]>({
+  const { data: rawKnowResources, isLoading: loadingKnow } = useQuery<KnowResourceData[]>({
     queryKey: ["/api/know-resources"],
   });
+  const knowResources = rawKnowResources ?? [];
 
-  const { data: marketplaceItems = [], isLoading: loadingMarket } = useQuery<MarketplaceItemData[]>({
+  const { data: rawMarketplaceItems, isLoading: loadingMarket } = useQuery<MarketplaceItemData[]>({
     queryKey: ["/api/marketplace"],
   });
+  const marketplaceItems = rawMarketplaceItems ?? [];
 
-  const { data: savedScholarships = [] } = useQuery<SavedScholarship[]>({
+  const { data: rawSavedScholarships } = useQuery<SavedScholarship[]>({
     queryKey: ["/api/saved-scholarships"],
   });
+  const savedScholarships = rawSavedScholarships ?? [];
 
   const savedIds = new Set(savedScholarships.map((s) => s.resourceId));
 
