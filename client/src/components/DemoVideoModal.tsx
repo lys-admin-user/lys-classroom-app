@@ -35,6 +35,11 @@ import {
   Star,
   FileText,
   Building2,
+  ShoppingBag,
+  Bookmark,
+  BookmarkCheck,
+  Rss,
+  Calendar,
 } from "lucide-react";
 
 interface DemoSlide {
@@ -460,31 +465,83 @@ const slides: DemoSlide[] = [
     ),
   },
   {
+    title: "LYS Marketplace",
+    subtitle: "eBooks, Courses & Educator Tools",
+    description: "Browse and save educator resources — lesson plan packs, mini-courses, guides, and more — with category filters, wishlisting, and one-click access.",
+    icon: <ShoppingBag className="h-10 w-10" />,
+    color: "text-lys-teal",
+    bgGradient: "from-lys-teal/20 via-lys-yellow/5 to-transparent",
+    features: [
+      { icon: <Bookmark className="h-4 w-4" />, text: "Personal Wishlist" },
+      { icon: <Star className="h-4 w-4" />, text: "Category Filters" },
+      { icon: <ShoppingBag className="h-4 w-4" />, text: "Free & Paid Items" },
+    ],
+    visual: (
+      <div className="w-full max-w-xs mx-auto space-y-2">
+        <div className="flex flex-wrap gap-1 mb-1">
+          {["All", "Lesson Plans", "SEL", "STEM"].map((cat, i) => (
+            <span key={cat} className={`text-[10px] font-oswald px-2 py-0.5 rounded-full border ${i === 0 ? "bg-lys-teal text-white border-lys-teal" : "text-muted-foreground border-border"}`}>{cat}</span>
+          ))}
+        </div>
+        {[
+          { title: "Growth Mindset Toolkit", type: "Resource Pack", price: "Free", wishlisted: true },
+          { title: "Career Readiness eBook", type: "eBook", price: "$12.99", wishlisted: false },
+          { title: "SEL Lesson Bundle", type: "Mini Course", price: "$29.99", wishlisted: false },
+        ].map((item) => (
+          <div key={item.title} className="bg-card rounded-lg border p-2 flex items-center justify-between">
+            <div className="flex-1 min-w-0">
+              <p className="text-xs font-oswald truncate">{item.title}</p>
+              <Badge variant="secondary" className="text-[10px]">{item.type}</Badge>
+            </div>
+            <div className="flex items-center gap-1.5 shrink-0 ml-2">
+              <span className={`text-xs font-oswald ${item.price === "Free" ? "text-green-600" : "text-lys-yellow"}`}>{item.price}</span>
+              {item.wishlisted
+                ? <BookmarkCheck className="h-3.5 w-3.5 text-lys-yellow" />
+                : <Bookmark className="h-3.5 w-3.5 text-muted-foreground" />}
+            </div>
+          </div>
+        ))}
+      </div>
+    ),
+  },
+  {
     title: "Professional Development",
-    subtitle: "Grow as an Educator",
-    description: "AI-recommended PD courses, certification tracking, and progress dashboards.",
+    subtitle: "Courses + Curated Live Articles",
+    description: "AI-recommended courses, certification tracking, and a live feed of curated educator articles pulled from the Content Hub RSS engine.",
     icon: <Star className="h-10 w-10" />,
     color: "text-lys-teal",
     bgGradient: "from-lys-teal/20 via-lys-teal/5 to-transparent",
     features: [
       { icon: <Brain className="h-4 w-4" />, text: "AI Recommendations" },
+      { icon: <Rss className="h-4 w-4" />, text: "Live RSS Articles" },
       { icon: <Award className="h-4 w-4" />, text: "Cert Tracking" },
     ],
     visual: (
       <div className="w-full max-w-xs mx-auto space-y-2">
-        {[
-          { course: "AI in the Classroom", hours: "6 hrs", status: "Complete" },
-          { course: "Differentiated Learning", hours: "4 hrs", status: "In Progress" },
-          { course: "SEL Strategies", hours: "3 hrs", status: "Recommended" },
-        ].map((c) => (
-          <div key={c.course} className="bg-card rounded-lg border p-2 flex items-center justify-between">
-            <div>
-              <p className="text-sm font-oswald">{c.course}</p>
-              <p className="text-xs text-muted-foreground">{c.hours}</p>
+        <div className="bg-card rounded-lg border p-2">
+          <p className="text-[10px] text-muted-foreground mb-1.5 font-oswald">LYS Courses</p>
+          {[
+            { course: "AI in the Classroom", hours: "6 hrs", status: "Complete" },
+            { course: "SEL Strategies", hours: "3 hrs", status: "In Progress" },
+          ].map((c) => (
+            <div key={c.course} className="flex items-center justify-between text-xs py-0.5">
+              <span className="font-roboto">{c.course}</span>
+              <Badge variant="secondary" className="text-[10px]">{c.status}</Badge>
             </div>
-            <Badge variant="secondary" className="text-xs">{c.status}</Badge>
+          ))}
+        </div>
+        <div className="bg-card rounded-lg border p-2">
+          <div className="flex items-center gap-1 mb-1.5">
+            <Rss className="h-3 w-3 text-lys-yellow" />
+            <p className="text-[10px] font-oswald text-muted-foreground">Curated Articles</p>
           </div>
-        ))}
+          {["Edu-Steps: Vision to Reality", "Dealing with Pressure in Teaching"].map((a) => (
+            <div key={a} className="flex items-center gap-1.5 text-xs py-0.5">
+              <div className="w-1 h-1 rounded-full bg-lys-yellow shrink-0" />
+              <span className="text-muted-foreground truncate">{a}</span>
+            </div>
+          ))}
+        </div>
       </div>
     ),
   },
@@ -587,22 +644,28 @@ const slides: DemoSlide[] = [
   },
   {
     title: "SIS Integration",
-    subtitle: "Connect Your Systems",
-    description: "Sync with Clever, PowerSchool, Canvas, Infinite Campus, Skyward, and OneRoster.",
+    subtitle: "Clever Live · 5 More Coming Soon",
+    description: "Sync students and classes with Clever today. PowerSchool, Canvas LMS, Infinite Campus, Skyward, and OneRoster integrations are in development.",
     icon: <Globe className="h-10 w-10" />,
     color: "text-lys-red",
     bgGradient: "from-lys-red/20 via-lys-teal/5 to-transparent",
     features: [
-      { icon: <CheckCircle2 className="h-4 w-4" />, text: "Auto Student Sync" },
-      { icon: <Layers className="h-4 w-4" />, text: "6 Providers" },
+      { icon: <CheckCircle2 className="h-4 w-4" />, text: "Clever — Live Now" },
+      { icon: <Layers className="h-4 w-4" />, text: "5 More Coming Soon" },
     ],
     visual: (
       <div className="w-full max-w-xs mx-auto">
-        <div className="bg-card rounded-lg border p-3">
-          <div className="grid grid-cols-3 gap-2">
-            {["Clever", "PowerSchool", "Canvas", "Infinite Campus", "Skyward", "OneRoster"].map((p) => (
-              <div key={p} className="bg-muted/50 rounded p-1.5 text-center">
-                <p className="text-[10px] font-oswald">{p}</p>
+        <div className="bg-card rounded-lg border p-3 space-y-2">
+          <div className="flex items-center gap-2">
+            <div className="bg-muted/50 rounded p-1.5 flex-1 text-center border border-green-500/30">
+              <p className="text-[10px] font-oswald text-green-600">✓ Clever</p>
+            </div>
+          </div>
+          <div className="grid grid-cols-3 gap-1.5">
+            {["PowerSchool", "Canvas", "Infinite Campus", "Skyward", "OneRoster"].map((p) => (
+              <div key={p} className="bg-muted/30 rounded p-1 text-center border border-amber-500/20">
+                <p className="text-[9px] font-oswald text-muted-foreground">{p}</p>
+                <p className="text-[8px] text-amber-500">Soon</p>
               </div>
             ))}
           </div>

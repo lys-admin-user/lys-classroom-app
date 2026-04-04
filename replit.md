@@ -44,6 +44,13 @@ Preferred communication style: Simple, everyday language.
 -   **Developer Documentation**: Internal documentation for site_admin and system_admin roles covering architecture, APIs, security, and integration details.
 -   **Org Admin Self-Service**: Tools for campus and district admins to manage their organizations and members.
 -   **RSS Content Ingestion System**: System admin Content Hub for managing and ingesting RSS feeds, categorizing content for various platform features, with an approval workflow.
+-   **Upcoming Deadlines Widget**: Dashboard widget on both educator and student dashboards showing this week's deadlines from goals (targetDate) and assignments (dueDate).
+-   **Student → Teacher Messaging Widget**: Student dashboard card showing messaging threads with teachers via the parent-messages thread API.
+-   **New Educator Checklist**: First-time educator onboarding checklist on the educator dashboard.
+-   **Marketplace Wishlist & Category Filters**: Users can save marketplace items to a personal wishlist (bookmark toggle on each card); category filter pills (Lesson Plans, SEL, STEM, etc.) above the marketplace grid; backed by marketplace_wishlists table.
+-   **PD RSS Feed Integration**: Professional Development Courses tab now shows curated articles from approved RSS content (prefers `professional_development`/`educator_tools` tagged items, falls back to all approved content). Two-section layout: LYS Courses above, Curated Articles below.
+-   **SIS Coming Soon Labels**: SIS Integration page has an info banner and disabled/badged SelectItems for non-Clever providers (PowerSchool, Canvas LMS, Infinite Campus, Skyward, OneRoster). Only Clever is live.
+-   **Demo Walkthrough Updated**: DemoVideoModal now has 22 slides including a new LYS Marketplace slide with wishlist demo, updated PD slide with RSS article section, and updated SIS slide reflecting Clever-only live status.
 
 ### Global Architecture
 -   **Educational Hierarchy**: Structured organization from country to school level, supporting various governance systems.

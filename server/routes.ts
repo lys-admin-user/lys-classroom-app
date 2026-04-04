@@ -3963,14 +3963,16 @@ export async function registerRoutes(
   app.get("/api/pd-content", isAuthenticated, async (req: any, res) => {
     try {
       const { search } = req.query as { search?: string };
-      const items = await storage.getRssContentItems({ status: "approved" });
-      const pdItems = items.filter((item: any) => {
+      const allApproved = await storage.getRssContentItems({ status: "approved" });
+      // Prefer items explicitly tagged for PD/educator, fall back to all approved content
+      const pdTagged = allApproved.filter((item: any) => {
         const placements: string[] = item.approvedPlacements || [];
         return placements.includes("professional_development") || placements.includes("educator_tools");
       });
+      const pool = pdTagged.length > 0 ? pdTagged : allApproved;
       const filtered = search
-        ? pdItems.filter((i: any) => i.title?.toLowerCase().includes(search.toLowerCase()) || i.description?.toLowerCase().includes(search.toLowerCase()))
-        : pdItems;
+        ? pool.filter((i: any) => i.title?.toLowerCase().includes(search.toLowerCase()) || i.description?.toLowerCase().includes(search.toLowerCase()))
+        : pool;
       res.json(filtered.slice(0, 60));
     } catch (error) {
       res.status(500).json({ error: "Failed to fetch PD content" });
