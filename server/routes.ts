@@ -3867,6 +3867,117 @@ export async function registerRoutes(
   });
 
   // ================================
+  // Marketplace Wishlist
+  // ================================
+
+  app.get("/api/marketplace/wishlist", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user?.id || req.user?.claims?.sub;
+      const wishlist = await storage.getWishlist(userId);
+      const itemIds = wishlist.map((w: any) => w.itemId);
+      const items: any[] = [];
+      for (const id of itemIds) {
+        const item = await storage.getMarketplaceItem(id);
+        if (item) items.push({ ...item, wishlisted: true });
+      }
+      res.json(items);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch wishlist" });
+    }
+  });
+
+  app.post("/api/marketplace/:id/wishlist", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user?.id || req.user?.claims?.sub;
+      await storage.addToWishlist(userId, req.params.id);
+      res.json({ success: true });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to add to wishlist" });
+    }
+  });
+
+  app.delete("/api/marketplace/:id/wishlist", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user?.id || req.user?.claims?.sub;
+      await storage.removeFromWishlist(userId, req.params.id);
+      res.json({ success: true });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to remove from wishlist" });
+    }
+  });
+
+  // ================================
+  // Marketplace Ratings
+  // ================================
+
+  app.get("/api/marketplace/:id/ratings", isAuthenticated, async (req: any, res) => {
+    try {
+      const [ratings, avgData] = await Promise.all([
+        storage.getRatingsForItem(req.params.id),
+        storage.getItemAverageRating(req.params.id),
+      ]);
+      const userId = req.user?.id || req.user?.claims?.sub;
+      const userRating = userId ? await storage.getUserRating(userId, req.params.id) : undefined;
+      res.json({ ratings, avg: avgData.avg, count: avgData.count, userRating: userRating || null });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch ratings" });
+    }
+  });
+
+  app.post("/api/marketplace/:id/rate", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user?.id || req.user?.claims?.sub;
+      const { rating, review } = req.body;
+      if (!rating || rating < 1 || rating > 5) return res.status(400).json({ error: "Rating must be between 1 and 5" });
+      const owned = await storage.hasPurchased(userId, req.params.id);
+      const result = await storage.upsertRating(userId, req.params.id, rating, review, owned);
+      res.json(result);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to submit rating" });
+    }
+  });
+
+  // ================================
+  // Public Community Stats
+  // ================================
+
+  app.get("/api/stats/community", async (req: any, res) => {
+    try {
+      const { db } = await import("./db");
+      const { users } = await import("@shared/schema");
+      const { sql: sqlFn } = await import("drizzle-orm");
+      const [result] = await db.select({
+        educators: sqlFn<number>`count(*) filter (where role in ('educator','campus_admin','district_admin','site_admin'))`,
+        students: sqlFn<number>`count(*) filter (where role = 'student')`,
+      }).from(users);
+      res.json({ educators: Number(result?.educators || 0), students: Number(result?.students || 0) });
+    } catch (error) {
+      res.json({ educators: 0, students: 0 });
+    }
+  });
+
+  // ================================
+  // PD RSS Content (approved articles as micro-courses)
+  // ================================
+
+  app.get("/api/pd-content", isAuthenticated, async (req: any, res) => {
+    try {
+      const { search } = req.query as { search?: string };
+      const items = await storage.getRssContentItems({ status: "approved" });
+      const pdItems = items.filter((item: any) => {
+        const placements: string[] = item.approvedPlacements || [];
+        return placements.includes("professional_development") || placements.includes("educator_tools");
+      });
+      const filtered = search
+        ? pdItems.filter((i: any) => i.title?.toLowerCase().includes(search.toLowerCase()) || i.description?.toLowerCase().includes(search.toLowerCase()))
+        : pdItems;
+      res.json(filtered.slice(0, 60));
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch PD content" });
+    }
+  });
+
+  // ================================
   // Saved Scholarships
   // ================================
 

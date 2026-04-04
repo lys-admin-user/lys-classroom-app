@@ -43,6 +43,8 @@ const providerIcons: Record<string, React.ReactNode> = {
   oneroster: <Link2 className="h-5 w-5" />,
 };
 
+const COMING_SOON_PROVIDERS = ["powerschool", "canvas", "infinite_campus", "skyward", "oneroster"];
+
 const statusColors: Record<string, string> = {
   connected: "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200",
   pending: "bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200",
@@ -177,7 +179,7 @@ export default function SISIntegration() {
 
   return (
     <div className="container mx-auto py-6 px-4 max-w-6xl">
-      <div className="flex items-center justify-between mb-6">
+      <div className="flex items-center justify-between mb-4">
         <div>
           <h1 className="text-2xl font-bold" data-testid="text-sis-title">SIS Integration</h1>
           <p className="text-muted-foreground">
@@ -213,14 +215,22 @@ export default function SISIntegration() {
                           </SelectTrigger>
                         </FormControl>
                         <SelectContent>
-                          {providers && Object.entries(providers as Record<string, any>).map(([key, info]: [string, any]) => (
-                            <SelectItem key={key} value={key} data-testid={`option-provider-${key}`}>
-                              <div className="flex items-center gap-2">
-                                {providerIcons[key]}
-                                <span>{info.name}</span>
-                              </div>
-                            </SelectItem>
-                          ))}
+                          {providers && Object.entries(providers as Record<string, any>).map(([key, info]: [string, any]) => {
+                            const isComingSoon = COMING_SOON_PROVIDERS.includes(key);
+                            return (
+                              <SelectItem key={key} value={key} disabled={isComingSoon} data-testid={`option-provider-${key}`}>
+                                <div className="flex items-center gap-2">
+                                  {providerIcons[key]}
+                                  <span>{info.name}</span>
+                                  {isComingSoon && (
+                                    <span className="ml-1 text-xs font-medium text-amber-600 bg-amber-100 dark:bg-amber-900/30 dark:text-amber-400 px-1.5 py-0.5 rounded">
+                                      Coming Soon
+                                    </span>
+                                  )}
+                                </div>
+                              </SelectItem>
+                            );
+                          })}
                         </SelectContent>
                       </Select>
                       <FormDescription>
@@ -326,6 +336,16 @@ export default function SISIntegration() {
             </Form>
           </DialogContent>
         </Dialog>
+      </div>
+
+      <div className="mb-6 p-4 rounded-lg border border-amber-200 bg-amber-50 dark:border-amber-900/50 dark:bg-amber-950/20 flex items-start gap-3" data-testid="banner-sis-coming-soon">
+        <AlertCircle className="h-5 w-5 text-amber-600 dark:text-amber-400 flex-shrink-0 mt-0.5" />
+        <div>
+          <p className="font-semibold text-amber-800 dark:text-amber-300 text-sm">Clever is fully supported</p>
+          <p className="text-amber-700 dark:text-amber-400 text-sm">
+            PowerSchool, Canvas LMS, Infinite Campus, Skyward, and OneRoster integrations are <strong>coming soon</strong>. They appear in the provider list for planning purposes but will not successfully sync. Only Clever connections are live today.
+          </p>
+        </div>
       </div>
 
       {connectionsLoading ? (

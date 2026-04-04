@@ -164,11 +164,17 @@ import {
   knowResources,
   marketplaceItems,
   marketplacePurchases,
+  marketplaceWishlists,
+  marketplaceRatings,
   savedScholarships,
   type MarketplaceItem,
   type InsertMarketplaceItem,
   type MarketplacePurchase,
   type InsertMarketplacePurchase,
+  type MarketplaceWishlist,
+  type InsertMarketplaceWishlist,
+  type MarketplaceRating,
+  type InsertMarketplaceRating,
   type SavedScholarship,
   type InsertSavedScholarship,
   sessionEditHistory,
@@ -5417,6 +5423,53 @@ export class DatabaseStorage implements IStorage {
   async createPurchase(purchase: InsertMarketplacePurchase): Promise<MarketplacePurchase> {
     const [created] = await db.insert(marketplacePurchases).values(purchase).returning();
     return created;
+  }
+
+  // Marketplace Wishlists
+  async getWishlist(userId: string): Promise<MarketplaceWishlist[]> {
+    return await db.select().from(marketplaceWishlists).where(eq(marketplaceWishlists.userId, userId)).orderBy(desc(marketplaceWishlists.createdAt));
+  }
+
+  async addToWishlist(userId: string, itemId: string): Promise<MarketplaceWishlist> {
+    const existing = await db.select().from(marketplaceWishlists).where(and(eq(marketplaceWishlists.userId, userId), eq(marketplaceWishlists.itemId, itemId)));
+    if (existing[0]) return existing[0];
+    const [created] = await db.insert(marketplaceWishlists).values({ userId, itemId }).returning();
+    return created;
+  }
+
+  async removeFromWishlist(userId: string, itemId: string): Promise<boolean> {
+    await db.delete(marketplaceWishlists).where(and(eq(marketplaceWishlists.userId, userId), eq(marketplaceWishlists.itemId, itemId)));
+    return true;
+  }
+
+  async isInWishlist(userId: string, itemId: string): Promise<boolean> {
+    const [row] = await db.select().from(marketplaceWishlists).where(and(eq(marketplaceWishlists.userId, userId), eq(marketplaceWishlists.itemId, itemId)));
+    return !!row;
+  }
+
+  // Marketplace Ratings
+  async getRatingsForItem(itemId: string): Promise<MarketplaceRating[]> {
+    return await db.select().from(marketplaceRatings).where(eq(marketplaceRatings.itemId, itemId)).orderBy(desc(marketplaceRatings.createdAt));
+  }
+
+  async getUserRating(userId: string, itemId: string): Promise<MarketplaceRating | undefined> {
+    const [row] = await db.select().from(marketplaceRatings).where(and(eq(marketplaceRatings.userId, userId), eq(marketplaceRatings.itemId, itemId)));
+    return row;
+  }
+
+  async upsertRating(userId: string, itemId: string, rating: number, review: string | undefined, verified: boolean): Promise<MarketplaceRating> {
+    const existing = await this.getUserRating(userId, itemId);
+    if (existing) {
+      const [updated] = await db.update(marketplaceRatings).set({ rating, review, updatedAt: new Date() }).where(eq(marketplaceRatings.id, existing.id)).returning();
+      return updated;
+    }
+    const [created] = await db.insert(marketplaceRatings).values({ userId, itemId, rating, review, verified }).returning();
+    return created;
+  }
+
+  async getItemAverageRating(itemId: string): Promise<{ avg: number; count: number }> {
+    const [result] = await db.select({ avg: sql<number>`avg(rating)`, count: sql<number>`count(*)` }).from(marketplaceRatings).where(eq(marketplaceRatings.itemId, itemId));
+    return { avg: parseFloat((result?.avg || 0).toFixed(1)), count: Number(result?.count || 0) };
   }
 
   // Saved Scholarships

@@ -174,9 +174,24 @@ function normalizeKnowResource(kr: KnowResourceData): DisplayResource {
   };
 }
 
+const MARKET_CATEGORIES = [
+  { value: "all", label: "All" },
+  { value: "lesson_plans", label: "Lesson Plans" },
+  { value: "classroom_tools", label: "Classroom Tools" },
+  { value: "career_readiness", label: "Career Readiness" },
+  { value: "college_prep", label: "College Prep" },
+  { value: "sel", label: "SEL" },
+  { value: "professional_development", label: "PD" },
+  { value: "financial_literacy", label: "Financial Literacy" },
+  { value: "stem", label: "STEM" },
+  { value: "special_education", label: "Special Ed" },
+  { value: "other", label: "Other" },
+];
+
 export default function Resources() {
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedCategory, setSelectedCategory] = useState<string>("all");
+  const [marketCategory, setMarketCategory] = useState<string>("all");
   const [selectedResource, setSelectedResource] = useState<DisplayResource | null>(null);
   const [selectedMarketItem, setSelectedMarketItem] = useState<MarketplaceItemData | null>(null);
   const [detailsOpen, setDetailsOpen] = useState(false);
@@ -242,6 +257,27 @@ export default function Resources() {
     },
   });
 
+  const { data: rawWishlist } = useQuery<MarketplaceItemData[]>({
+    queryKey: ["/api/marketplace/wishlist"],
+  });
+  const wishlistIds = new Set((rawWishlist ?? []).map((item) => item.id));
+
+  const addWishlistMutation = useMutation({
+    mutationFn: (itemId: string) => apiRequest("POST", `/api/marketplace/${itemId}/wishlist`, {}),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/marketplace/wishlist"] });
+      toast({ title: "Saved to wishlist" });
+    },
+  });
+
+  const removeWishlistMutation = useMutation({
+    mutationFn: (itemId: string) => apiRequest("DELETE", `/api/marketplace/${itemId}/wishlist`),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/marketplace/wishlist"] });
+      toast({ title: "Removed from wishlist" });
+    },
+  });
+
   const isLoading = loadingResources || loadingKnow;
 
   const allResources: DisplayResource[] = [
@@ -281,6 +317,7 @@ export default function Resources() {
   const otherResources = filteredResources.filter(r => r.type !== "scholarship");
 
   const filteredMarket = marketplaceItems.filter((item) => {
+    if (marketCategory !== "all" && (item as any).category !== marketCategory) return false;
     if (!searchQuery) return true;
     const q = searchQuery.toLowerCase();
     return item.title.toLowerCase().includes(q) || item.description.toLowerCase().includes(q) ||
@@ -643,7 +680,7 @@ export default function Resources() {
                   <p className="text-sm text-muted-foreground font-roboto">eBooks, mini courses, guides, and tools from LYS and trusted partners</p>
                 </div>
               </div>
-              <div className="relative max-w-md mt-3">
+              <div className="relative max-w-md mt-3 mb-4">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                 <Input
                   placeholder="Search marketplace..."
@@ -652,6 +689,22 @@ export default function Resources() {
                   className="pl-9 font-roboto"
                   data-testid="input-search-marketplace"
                 />
+              </div>
+              <div className="flex flex-wrap gap-2" data-testid="marketplace-category-filters">
+                {MARKET_CATEGORIES.map((cat) => (
+                  <button
+                    key={cat.value}
+                    onClick={() => setMarketCategory(cat.value)}
+                    className={`text-xs font-oswald px-3 py-1.5 rounded-full border transition-colors ${
+                      marketCategory === cat.value
+                        ? "bg-lys-teal text-white border-lys-teal"
+                        : "bg-background text-muted-foreground border-border hover:border-lys-teal/50"
+                    }`}
+                    data-testid={`filter-market-cat-${cat.value}`}
+                  >
+                    {cat.label}
+                  </button>
+                ))}
               </div>
             </div>
 
@@ -685,7 +738,7 @@ export default function Resources() {
                     </h3>
                     <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
                       {filteredMarket.filter(i => i.featured).map((item) => (
-                        <MarketplaceCard key={item.id} item={item} formatPrice={formatPrice} onView={() => { setSelectedMarketItem(item); setMarketDetailOpen(true); }} onClaim={() => claimItemMutation.mutate(item.id)} isClaiming={claimItemMutation.isPending} />
+                        <MarketplaceCard key={item.id} item={item} formatPrice={formatPrice} onView={() => { setSelectedMarketItem(item); setMarketDetailOpen(true); }} onClaim={() => claimItemMutation.mutate(item.id)} isClaiming={claimItemMutation.isPending} wishlisted={wishlistIds.has(item.id)} onWishlist={() => wishlistIds.has(item.id) ? removeWishlistMutation.mutate(item.id) : addWishlistMutation.mutate(item.id)} />
                       ))}
                     </div>
                   </section>
@@ -694,7 +747,7 @@ export default function Resources() {
                   <h3 className="font-oswald text-lg mb-3">All Items</h3>
                   <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
                     {filteredMarket.map((item) => (
-                      <MarketplaceCard key={item.id} item={item} formatPrice={formatPrice} onView={() => { setSelectedMarketItem(item); setMarketDetailOpen(true); }} onClaim={() => claimItemMutation.mutate(item.id)} isClaiming={claimItemMutation.isPending} />
+                      <MarketplaceCard key={item.id} item={item} formatPrice={formatPrice} onView={() => { setSelectedMarketItem(item); setMarketDetailOpen(true); }} onClaim={() => claimItemMutation.mutate(item.id)} isClaiming={claimItemMutation.isPending} wishlisted={wishlistIds.has(item.id)} onWishlist={() => wishlistIds.has(item.id) ? removeWishlistMutation.mutate(item.id) : addWishlistMutation.mutate(item.id)} />
                     ))}
                   </div>
                 </section>
@@ -981,12 +1034,16 @@ function MarketplaceCard({
   onView,
   onClaim,
   isClaiming,
+  wishlisted,
+  onWishlist,
 }: {
   item: MarketplaceItemData;
   formatPrice: (cents: number) => string;
   onView: () => void;
   onClaim: () => void;
   isClaiming: boolean;
+  wishlisted: boolean;
+  onWishlist: () => void;
 }) {
   const typeConf = marketplaceTypeConfig[item.itemType] || { label: item.itemType, icon: BookOpen, color: "bg-muted text-muted-foreground" };
   const TypeIcon = typeConf.icon;
@@ -1002,9 +1059,19 @@ function MarketplaceCard({
             <TypeIcon className="h-3 w-3 mr-1" />
             {typeConf.label}
           </Badge>
-          <span className="text-sm font-oswald font-semibold">
-            {item.price === 0 ? <span className="text-green-600">Free</span> : <span className="text-lys-yellow">{formatPrice(item.price)}</span>}
-          </span>
+          <div className="flex items-center gap-2">
+            <span className="text-sm font-oswald font-semibold">
+              {item.price === 0 ? <span className="text-green-600">Free</span> : <span className="text-lys-yellow">{formatPrice(item.price)}</span>}
+            </span>
+            <button
+              onClick={(e) => { e.stopPropagation(); onWishlist(); }}
+              className="text-muted-foreground hover:text-lys-yellow transition-colors"
+              title={wishlisted ? "Remove from wishlist" : "Save to wishlist"}
+              data-testid={`button-wishlist-${item.id}`}
+            >
+              {wishlisted ? <BookmarkCheck className="h-4 w-4 text-lys-yellow" /> : <Bookmark className="h-4 w-4" />}
+            </button>
+          </div>
         </div>
         <CardTitle className="font-oswald text-base mt-2 leading-snug">{item.title}</CardTitle>
         {item.author && <p className="text-xs text-muted-foreground">by {item.author}</p>}

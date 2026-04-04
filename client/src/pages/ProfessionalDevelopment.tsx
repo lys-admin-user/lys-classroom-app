@@ -41,7 +41,8 @@ import {
   RotateCcw,
   Trophy,
   Brain,
-  Lightbulb
+  Lightbulb,
+  Rss
 } from "lucide-react";
 import type { EducatorCareerGoal, EducatorSkill, PDRecommendation, EducatorPDProgress } from "@shared/schema";
 
@@ -1040,6 +1041,24 @@ function PDCoursesTab() {
     },
   });
 
+  const { data: rssArticles = [], isLoading: loadingRss } = useQuery<Array<{
+    id: string;
+    title: string;
+    description: string | null;
+    url: string;
+    sourceName: string | null;
+    imageUrl: string | null;
+    publishedAt: string | null;
+    category: string | null;
+  }>>({
+    queryKey: ["/api/pd-content"],
+    queryFn: async () => {
+      const res = await fetch("/api/pd-content");
+      if (!res.ok) return [];
+      return res.json();
+    },
+  });
+
   const claimMutation = useMutation({
     mutationFn: (id: string) => apiRequest("POST", `/api/marketplace/${id}/claim`, {}),
     onSuccess: () => {
@@ -1059,24 +1078,32 @@ function PDCoursesTab() {
     return item.title.toLowerCase().includes(q) || item.description.toLowerCase().includes(q);
   });
 
+  const filteredRss = rssArticles.filter((a) => {
+    if (!search) return true;
+    const q = search.toLowerCase();
+    return a.title.toLowerCase().includes(q) || (a.description ?? "").toLowerCase().includes(q);
+  });
+
+  const hasContent = filtered.length > 0 || filteredRss.length > 0;
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between gap-4 flex-wrap">
         <div>
           <h2 className="font-oswald text-xl">LYS Courses & Resources</h2>
-          <p className="text-sm text-muted-foreground">eBooks, mini courses, guides, and resource packs for educators</p>
+          <p className="text-sm text-muted-foreground">eBooks, mini courses, guides, and curated professional development articles</p>
         </div>
         <div className="relative w-full max-w-sm">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-          <Input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search courses..." className="pl-9" data-testid="input-search-pd-courses" />
+          <Input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search courses and articles..." className="pl-9" data-testid="input-search-pd-courses" />
         </div>
       </div>
 
-      {isLoading ? (
+      {(isLoading || loadingRss) ? (
         <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
           {[1,2,3].map(i => <Card key={i}><CardContent className="pt-6"><Skeleton className="h-5 w-3/4 mb-2" /><Skeleton className="h-4 w-full mb-2" /><Skeleton className="h-8 w-24 mt-4" /></CardContent></Card>)}
         </div>
-      ) : filtered.length === 0 ? (
+      ) : !hasContent ? (
         <Card className="border-dashed">
           <CardContent className="pt-6 text-center py-16">
             <GraduationCap className="h-12 w-12 mx-auto text-muted-foreground/40 mb-4" />
@@ -1087,41 +1114,85 @@ function PDCoursesTab() {
           </CardContent>
         </Card>
       ) : (
-        <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {filtered.map((item) => (
-            <Card key={item.id} className="hover-elevate flex flex-col" data-testid={`card-pd-course-${item.id}`}>
-              {item.coverImageUrl && <img src={item.coverImageUrl} alt={item.title} className="w-full h-36 object-cover rounded-t-lg" />}
-              <CardHeader className="pb-2">
-                <div className="flex items-center justify-between">
-                  <Badge variant="outline" className="text-xs capitalize">{item.itemType.replace("_", " ")}</Badge>
-                  <span className="text-sm font-oswald">
-                    {item.price === 0 ? <span className="text-green-600">Free</span> : <span className="text-lys-yellow">{formatPrice(item.price)}</span>}
-                  </span>
-                </div>
-                <CardTitle className="font-oswald text-base mt-2 leading-snug">{item.title}</CardTitle>
-                {item.author && <p className="text-xs text-muted-foreground">by {item.author}</p>}
-                <CardDescription className="text-xs line-clamp-2 mt-1">{item.description}</CardDescription>
-              </CardHeader>
-              <CardContent className="mt-auto">
-                <div className="flex flex-wrap gap-1 mb-3">
-                  {item.durationMinutes && <Badge variant="secondary" className="text-xs"><Clock className="h-3 w-3 mr-1" />{item.durationMinutes} min</Badge>}
-                </div>
-                {item.owned ? (
-                  <Button className="w-full font-oswald gap-2" onClick={() => item.contentUrl ? window.open(item.contentUrl, "_blank") : null} data-testid={`button-access-course-${item.id}`}>
-                    <Download className="h-4 w-4" />Access Content
-                  </Button>
-                ) : item.price === 0 ? (
-                  <Button className="w-full font-oswald gap-2 bg-lys-teal hover:bg-lys-teal/90" onClick={() => claimMutation.mutate(item.id)} disabled={claimMutation.isPending} data-testid={`button-claim-course-${item.id}`}>
-                    <Download className="h-4 w-4" />{claimMutation.isPending ? "Claiming..." : "Get for Free"}
-                  </Button>
-                ) : (
-                  <Button className="w-full font-oswald gap-2" onClick={() => window.open("mailto:purchase@ladderingyoursuccess.com?subject=Purchase: " + encodeURIComponent(item.title), "_blank")} data-testid={`button-buy-course-${item.id}`}>
-                    <ExternalLink className="h-4 w-4" />Purchase — {formatPrice(item.price)}
-                  </Button>
-                )}
-              </CardContent>
-            </Card>
-          ))}
+        <div className="space-y-8">
+          {filtered.length > 0 && (
+            <section>
+              <h3 className="font-oswald text-lg mb-3 flex items-center gap-2">
+                <GraduationCap className="h-5 w-5 text-lys-teal" />
+                LYS Courses & eBooks
+              </h3>
+              <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {filtered.map((item) => (
+                  <Card key={item.id} className="hover-elevate flex flex-col" data-testid={`card-pd-course-${item.id}`}>
+                    {item.coverImageUrl && <img src={item.coverImageUrl} alt={item.title} className="w-full h-36 object-cover rounded-t-lg" />}
+                    <CardHeader className="pb-2">
+                      <div className="flex items-center justify-between">
+                        <Badge variant="outline" className="text-xs capitalize">{item.itemType.replace("_", " ")}</Badge>
+                        <span className="text-sm font-oswald">
+                          {item.price === 0 ? <span className="text-green-600">Free</span> : <span className="text-lys-yellow">{formatPrice(item.price)}</span>}
+                        </span>
+                      </div>
+                      <CardTitle className="font-oswald text-base mt-2 leading-snug">{item.title}</CardTitle>
+                      {item.author && <p className="text-xs text-muted-foreground">by {item.author}</p>}
+                      <CardDescription className="text-xs line-clamp-2 mt-1">{item.description}</CardDescription>
+                    </CardHeader>
+                    <CardContent className="mt-auto">
+                      <div className="flex flex-wrap gap-1 mb-3">
+                        {item.durationMinutes && <Badge variant="secondary" className="text-xs"><Clock className="h-3 w-3 mr-1" />{item.durationMinutes} min</Badge>}
+                      </div>
+                      {item.owned ? (
+                        <Button className="w-full font-oswald gap-2" onClick={() => item.contentUrl ? window.open(item.contentUrl, "_blank") : null} data-testid={`button-access-course-${item.id}`}>
+                          <Download className="h-4 w-4" />Access Content
+                        </Button>
+                      ) : item.price === 0 ? (
+                        <Button className="w-full font-oswald gap-2 bg-lys-teal hover:bg-lys-teal/90" onClick={() => claimMutation.mutate(item.id)} disabled={claimMutation.isPending} data-testid={`button-claim-course-${item.id}`}>
+                          <Download className="h-4 w-4" />{claimMutation.isPending ? "Claiming..." : "Get for Free"}
+                        </Button>
+                      ) : (
+                        <Button className="w-full font-oswald gap-2" onClick={() => window.open("mailto:purchase@ladderingyoursuccess.com?subject=Purchase: " + encodeURIComponent(item.title), "_blank")} data-testid={`button-buy-course-${item.id}`}>
+                          <ExternalLink className="h-4 w-4" />Purchase — {formatPrice(item.price)}
+                        </Button>
+                      )}
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            </section>
+          )}
+
+          {filteredRss.length > 0 && (
+            <section>
+              <h3 className="font-oswald text-lg mb-3 flex items-center gap-2">
+                <Rss className="h-5 w-5 text-lys-yellow" />
+                Curated Professional Development Articles
+              </h3>
+              <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {filteredRss.map((article) => (
+                  <Card key={article.id} className="hover-elevate flex flex-col" data-testid={`card-pd-article-${article.id}`}>
+                    {article.imageUrl && (
+                      <img src={article.imageUrl} alt={article.title} className="w-full h-36 object-cover rounded-t-lg" />
+                    )}
+                    <CardHeader className="pb-2">
+                      <div className="flex items-center gap-2">
+                        <Badge variant="outline" className="text-xs text-lys-yellow border-lys-yellow/30">Article</Badge>
+                        {article.sourceName && <span className="text-xs text-muted-foreground truncate">{article.sourceName}</span>}
+                      </div>
+                      <CardTitle className="font-oswald text-base mt-2 leading-snug line-clamp-2">{article.title}</CardTitle>
+                      {article.publishedAt && (
+                        <p className="text-xs text-muted-foreground">{new Date(article.publishedAt).toLocaleDateString()}</p>
+                      )}
+                      <CardDescription className="text-xs line-clamp-3 mt-1">{article.description ?? "Professional development resource for educators."}</CardDescription>
+                    </CardHeader>
+                    <CardContent className="mt-auto">
+                      <Button variant="outline" className="w-full font-oswald gap-2" onClick={() => window.open(article.url, "_blank")} data-testid={`button-read-article-${article.id}`}>
+                        <ExternalLink className="h-4 w-4" />Read Article
+                      </Button>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            </section>
+          )}
         </div>
       )}
     </div>

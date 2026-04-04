@@ -4,6 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
+import { Textarea } from "@/components/ui/textarea";
 import { 
   Sparkles, 
   Heart, 
@@ -21,12 +22,21 @@ import {
   Flame,
   Award,
   FolderOpen,
-  Play
+  Play,
+  Calendar,
+  AlertCircle,
+  CheckCircle2,
+  MessageCircle,
+  Send,
+  CheckSquare,
+  Circle
 } from "lucide-react";
 import { Link } from "wouter";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/use-auth";
 import { DemoVideoModal } from "@/components/DemoVideoModal";
+import { apiRequest, queryClient } from "@/lib/queryClient";
+import { useToast } from "@/hooks/use-toast";
 import type { StudentJourneyProgress, StudentJourneyMilestone, StudentJourneyActivity, Career } from "@shared/schema";
 
 interface JourneyData {
@@ -130,6 +140,306 @@ function JourneyProgressCard() {
     </Card>
   );
 }
+
+// ─── Upcoming Deadlines Widget (shared) ───────────────────────────────────────
+
+function UpcomingDeadlines({ role }: { role: "educator" | "student" }) {
+  const { isAuthenticated } = useAuth();
+
+  const { data: assignments = [] } = useQuery<any[]>({
+    queryKey: ["/api/my-assignments"],
+    enabled: isAuthenticated,
+  });
+
+  const { data: goals = [] } = useQuery<any[]>({
+    queryKey: ["/api/goals"],
+    enabled: isAuthenticated && role === "educator",
+  });
+
+  const now = new Date();
+  const nextWeek = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
+
+  const upcomingAssignments = (assignments as any[])
+    .filter((a: any) => a.dueDate && !a.completed && new Date(a.dueDate) >= now)
+    .sort((a: any, b: any) => new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime())
+    .slice(0, 4);
+
+  const upcomingGoals = (goals as any[])
+    .filter((g: any) => g.targetDate && g.status !== "completed" && new Date(g.targetDate) >= now && new Date(g.targetDate) <= nextWeek)
+    .sort((a: any, b: any) => new Date(a.targetDate).getTime() - new Date(b.targetDate).getTime())
+    .slice(0, 3);
+
+  const items = [
+    ...upcomingAssignments.map((a: any) => ({
+      id: a.id, title: a.title, date: a.dueDate, type: "assignment" as const,
+      overdue: new Date(a.dueDate) < now,
+    })),
+    ...upcomingGoals.map((g: any) => ({
+      id: g.id, title: g.title || g.goal, date: g.targetDate, type: "goal" as const,
+      overdue: false,
+    })),
+  ].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()).slice(0, 5);
+
+  const formatDate = (dateStr: string) => {
+    const d = new Date(dateStr);
+    const diff = Math.ceil((d.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+    if (diff === 0) return "Today";
+    if (diff === 1) return "Tomorrow";
+    if (diff <= 7) return `In ${diff} days`;
+    return d.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+  };
+
+  return (
+    <Card data-testid="card-upcoming-deadlines">
+      <CardHeader className="pb-2">
+        <CardTitle className="font-oswald flex items-center gap-2 text-base">
+          <Calendar className="h-4 w-4 text-lys-yellow" />
+          Upcoming Deadlines
+        </CardTitle>
+      </CardHeader>
+      <CardContent>
+        {items.length === 0 ? (
+          <div className="text-center py-4">
+            <CheckCircle2 className="w-8 h-8 mx-auto text-green-500 mb-2" />
+            <p className="text-sm text-muted-foreground font-roboto">You're all caught up! No upcoming deadlines.</p>
+          </div>
+        ) : (
+          <div className="space-y-2">
+            {items.map((item) => (
+              <div key={item.id} className={`flex items-center gap-3 p-2 rounded-md text-sm ${item.overdue ? "bg-red-50 dark:bg-red-950/20 border border-red-200 dark:border-red-800" : "bg-muted/30"}`}>
+                <div className={`flex-shrink-0 ${item.type === "assignment" ? "text-lys-teal" : "text-lys-yellow"}`}>
+                  {item.type === "assignment" ? <BookOpen className="h-4 w-4" /> : <Target className="h-4 w-4" />}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="font-medium truncate font-oswald">{item.title}</p>
+                  <p className={`text-xs font-roboto ${item.overdue ? "text-red-500" : "text-muted-foreground"}`}>
+                    {item.overdue ? "Overdue" : formatDate(item.date)}
+                  </p>
+                </div>
+                <Badge variant="outline" className={`text-xs flex-shrink-0 ${item.type === "assignment" ? "border-lys-teal/40 text-lys-teal" : "border-lys-yellow/40 text-lys-yellow"}`}>
+                  {item.type === "assignment" ? "Assignment" : "Goal"}
+                </Badge>
+              </div>
+            ))}
+          </div>
+        )}
+        <div className="mt-3 pt-3 border-t flex gap-2">
+          <Button asChild variant="ghost" size="sm" className="flex-1 font-roboto text-xs">
+            <Link href="/assignments"><BookOpen className="h-3 w-3 mr-1" />Assignments</Link>
+          </Button>
+          {role === "educator" && (
+            <Button asChild variant="ghost" size="sm" className="flex-1 font-roboto text-xs">
+              <Link href="/action-plans"><Target className="h-3 w-3 mr-1" />Goals</Link>
+            </Button>
+          )}
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+// ─── Student Messaging Widget ──────────────────────────────────────────────────
+
+function StudentMessagingWidget() {
+  const { isAuthenticated } = useAuth();
+  const { toast } = useToast();
+  const [replyContent, setReplyContent] = useState("");
+  const [activeThreadId, setActiveThreadId] = useState<string | null>(null);
+
+  const { data: unreadCount = 0 } = useQuery<number>({
+    queryKey: ["/api/parent-messages/unread-count"],
+    enabled: isAuthenticated,
+    queryFn: async () => {
+      const res = await fetch("/api/parent-messages/unread-count");
+      if (!res.ok) return 0;
+      const d = await res.json();
+      return typeof d === "number" ? d : (d?.count ?? 0);
+    },
+  });
+
+  const { data: threads = [] } = useQuery<any[]>({
+    queryKey: ["/api/parent-messages/threads"],
+    enabled: isAuthenticated,
+    queryFn: async () => {
+      const res = await fetch("/api/parent-messages/threads");
+      if (!res.ok) return [];
+      return res.json();
+    },
+  });
+
+  const { data: activeMessages = [] } = useQuery<any[]>({
+    queryKey: ["/api/parent-messages/thread", activeThreadId],
+    enabled: !!activeThreadId,
+    queryFn: async () => {
+      const res = await fetch(`/api/parent-messages/thread/${activeThreadId}`);
+      if (!res.ok) return [];
+      return res.json();
+    },
+  });
+
+  const sendMutation = useMutation({
+    mutationFn: async () => apiRequest("POST", "/api/parent-messages/send", { threadId: activeThreadId, content: replyContent }),
+    onSuccess: () => {
+      setReplyContent("");
+      queryClient.invalidateQueries({ queryKey: ["/api/parent-messages/thread", activeThreadId] });
+      queryClient.invalidateQueries({ queryKey: ["/api/parent-messages/threads"] });
+    },
+    onError: () => toast({ title: "Failed to send message", variant: "destructive" }),
+  });
+
+  return (
+    <Card data-testid="card-student-messaging">
+      <CardHeader className="pb-2">
+        <CardTitle className="font-oswald flex items-center gap-2 text-base">
+          <MessageCircle className="h-4 w-4 text-lys-teal" />
+          Messages
+          {unreadCount > 0 && (
+            <Badge className="bg-lys-red text-white text-xs ml-1">{unreadCount}</Badge>
+          )}
+        </CardTitle>
+      </CardHeader>
+      <CardContent>
+        {!activeThreadId ? (
+          <>
+            {(threads as any[]).length === 0 ? (
+              <div className="text-center py-4">
+                <MessageCircle className="w-8 h-8 mx-auto text-muted-foreground/40 mb-2" />
+                <p className="text-sm text-muted-foreground font-roboto">No messages yet.</p>
+                <p className="text-xs text-muted-foreground font-roboto mt-1">Your teacher can message you here.</p>
+              </div>
+            ) : (
+              <div className="space-y-2">
+                {(threads as any[]).slice(0, 3).map((thread: any) => (
+                  <button
+                    key={thread.id}
+                    onClick={() => setActiveThreadId(thread.id)}
+                    className="w-full flex items-center gap-3 p-2 rounded-md hover:bg-muted/50 text-left transition-colors"
+                    data-testid={`button-thread-${thread.id}`}
+                  >
+                    <div className="w-8 h-8 rounded-full bg-lys-teal/10 flex items-center justify-center flex-shrink-0">
+                      <Users className="h-4 w-4 text-lys-teal" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium font-oswald truncate">Teacher</p>
+                      <p className="text-xs text-muted-foreground font-roboto truncate">
+                        {thread.lastMessageAt ? new Date(thread.lastMessageAt).toLocaleDateString() : ""}
+                      </p>
+                    </div>
+                  </button>
+                ))}
+              </div>
+            )}
+          </>
+        ) : (
+          <div className="space-y-3">
+            <Button variant="ghost" size="sm" onClick={() => setActiveThreadId(null)} className="font-roboto text-xs -ml-2">
+              ← Back
+            </Button>
+            <div className="space-y-2 max-h-40 overflow-y-auto">
+              {(activeMessages as any[]).map((msg: any) => (
+                <div key={msg.id} className="text-sm p-2 rounded-md bg-muted/30">
+                  <p className="font-roboto">{msg.content}</p>
+                  <p className="text-xs text-muted-foreground mt-1">{new Date(msg.createdAt).toLocaleTimeString()}</p>
+                </div>
+              ))}
+            </div>
+            <div className="flex gap-2">
+              <Textarea
+                value={replyContent}
+                onChange={(e) => setReplyContent(e.target.value)}
+                placeholder="Type a message..."
+                className="text-sm min-h-[60px] resize-none"
+                data-testid="input-message-reply"
+              />
+              <Button
+                size="sm"
+                className="self-end"
+                disabled={!replyContent.trim() || sendMutation.isPending}
+                onClick={() => sendMutation.mutate()}
+                data-testid="button-send-message"
+              >
+                <Send className="h-4 w-4" />
+              </Button>
+            </div>
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
+// ─── New Educator Checklist ────────────────────────────────────────────────────
+
+function NewEducatorChecklist({ lessonsCount, goalsCount }: { lessonsCount: number; goalsCount: number }) {
+  const { data: classesData } = useQuery<any[]>({ queryKey: ["/api/classes"] });
+  const classes = classesData ?? [];
+
+  const steps = [
+    {
+      id: "lesson",
+      label: "Create your first AI lesson",
+      done: lessonsCount > 0,
+      href: "/lesson-generator",
+      cta: "Build Lesson",
+    },
+    {
+      id: "class",
+      label: "Set up a class",
+      done: classes.length > 0,
+      href: "/classroom",
+      cta: "Create Class",
+    },
+    {
+      id: "goal",
+      label: "Set a teaching goal",
+      done: goalsCount > 0,
+      href: "/action-plans",
+      cta: "Add Goal",
+    },
+    {
+      id: "assessment",
+      label: "Run a student assessment",
+      done: false,
+      href: "/assessments",
+      cta: "Start Assessment",
+    },
+  ];
+
+  const completedCount = steps.filter((s) => s.done).length;
+  if (completedCount === steps.length) return null;
+
+  return (
+    <Card className="border-lys-yellow/30 bg-gradient-to-br from-lys-yellow/5 to-background" data-testid="card-new-educator-checklist">
+      <CardHeader className="pb-2">
+        <div className="flex items-center justify-between">
+          <CardTitle className="font-oswald flex items-center gap-2 text-base">
+            <CheckSquare className="h-4 w-4 text-lys-yellow" />
+            Getting Started
+          </CardTitle>
+          <Badge variant="secondary" className="text-xs">{completedCount}/{steps.length} done</Badge>
+        </div>
+        <Progress value={(completedCount / steps.length) * 100} className="h-1.5 mt-2" />
+      </CardHeader>
+      <CardContent className="space-y-2">
+        {steps.map((step) => (
+          <div key={step.id} className={`flex items-center gap-3 p-2 rounded-md transition-colors ${step.done ? "opacity-50" : "bg-muted/20 hover:bg-muted/40"}`}>
+            <div className="flex-shrink-0">
+              {step.done ? <CheckCircle2 className="h-4 w-4 text-green-500" /> : <Circle className="h-4 w-4 text-muted-foreground" />}
+            </div>
+            <p className={`flex-1 text-sm font-roboto ${step.done ? "line-through text-muted-foreground" : ""}`}>{step.label}</p>
+            {!step.done && (
+              <Button asChild size="sm" variant="outline" className="text-xs h-7 font-roboto" data-testid={`button-checklist-${step.id}`}>
+                <Link href={step.href}>{step.cta}</Link>
+              </Button>
+            )}
+          </div>
+        ))}
+      </CardContent>
+    </Card>
+  );
+}
+
+// ─── Student Dashboard ─────────────────────────────────────────────────────────
 
 function StudentDashboard() {
   const { user, isAuthenticated } = useAuth();
@@ -449,6 +759,15 @@ function StudentDashboard() {
         </div>
       </section>
 
+      <section className="py-6 lg:py-8">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6">
+          <div className="grid sm:grid-cols-2 gap-4">
+            <UpcomingDeadlines role="student" />
+            <StudentMessagingWidget />
+          </div>
+        </div>
+      </section>
+
       <section className="py-8 lg:py-12">
         <div className="max-w-7xl mx-auto px-4 sm:px-6">
           <div className="text-center mb-8">
@@ -500,6 +819,16 @@ function EducatorDashboard() {
   const { data: goalsData } = useQuery<any[]>({
     queryKey: ["/api/goals"],
     enabled: isAuthenticated,
+  });
+
+  const { data: communityStats } = useQuery<{ educators: number; students: number }>({
+    queryKey: ["/api/stats/community"],
+    staleTime: 1000 * 60 * 10,
+    queryFn: async () => {
+      const res = await fetch("/api/stats/community");
+      if (!res.ok) return { educators: 0, students: 0 };
+      return res.json();
+    },
   });
 
   const lessons = lessonsData || [];
@@ -562,7 +891,11 @@ function EducatorDashboard() {
                     </div>
                   ))}
                 </div>
-                <span className="font-roboto">Join <strong>10,000+</strong> educators transforming student futures</span>
+                <span className="font-roboto">
+                  {communityStats && communityStats.educators > 0
+                    ? <>Join <strong>{communityStats.educators.toLocaleString()}+</strong> educators on LYS</>
+                    : <>Join educators transforming student futures</>}
+                </span>
               </div>
             </div>
             <div className="relative">
@@ -716,6 +1049,17 @@ function EducatorDashboard() {
           </div>
         </div>
       </section>
+
+      {isAuthenticated && (
+        <section className="py-6 lg:py-8">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6">
+            <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
+              <UpcomingDeadlines role="educator" />
+              <NewEducatorChecklist lessonsCount={totalLessons} goalsCount={totalGoals} />
+            </div>
+          </div>
+        </section>
+      )}
 
       <section className="py-12 lg:py-16">
         <div className="max-w-7xl mx-auto px-4 sm:px-6">

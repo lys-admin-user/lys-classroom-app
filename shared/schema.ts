@@ -808,6 +808,7 @@ export const AFFILIATE_POINT_CONFIG = {
   copy_link: 2,
   lesson_save: 25,
   signup: 50,
+  marketplace_sale: 200, // points earned when a marketplace item you authored sells
 } as const;
 
 export const AFFILIATE_CONVERSION_RATE = {
@@ -2016,7 +2017,7 @@ export type InsertKnowResource = z.infer<typeof insertKnowResourceSchema>;
 export type KnowResource = typeof knowResources.$inferSelect;
 
 // LYS Marketplace Items — eBooks, mini courses, guides sold/offered via the platform
-export const MARKETPLACE_ITEM_TYPES = ["ebook", "mini_course", "guide", "template", "workshop", "resource_pack"] as const;
+export const MARKETPLACE_ITEM_TYPES = ["ebook", "mini_course", "guide", "template", "workshop", "resource_pack", "lesson_plan", "pd_course"] as const;
 export type MarketplaceItemType = typeof MARKETPLACE_ITEM_TYPES[number];
 
 export const MARKETPLACE_AUDIENCE = ["students", "educators", "parents", "all"] as const;
@@ -2025,11 +2026,15 @@ export type MarketplaceAudience = typeof MARKETPLACE_AUDIENCE[number];
 export const MARKETPLACE_BKD_TARGET = ["student_be", "student_know", "student_do", "educator_be", "educator_know", "educator_do"] as const;
 export type MarketplaceBkdTarget = typeof MARKETPLACE_BKD_TARGET[number];
 
+export const MARKETPLACE_CATEGORIES = ["lessons", "professional_development", "know_resources", "tools", "assessments", "other"] as const;
+export type MarketplaceCategory = typeof MARKETPLACE_CATEGORIES[number];
+
 export const marketplaceItems = pgTable("marketplace_items", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   title: text("title").notNull(),
   description: text("description").notNull(),
   itemType: text("item_type").notNull().$type<MarketplaceItemType>(),
+  category: text("category").$type<MarketplaceCategory>().default("other"),
   audience: text("audience").notNull().$type<MarketplaceAudience>().default("all"),
   bkdTargets: jsonb("bkd_targets").$type<MarketplaceBkdTarget[]>().default([]),
 
@@ -2047,12 +2052,14 @@ export const marketplaceItems = pgTable("marketplace_items", {
   // Metadata
   author: text("author"),
   authorBio: text("author_bio"),
+  authorUserId: varchar("author_user_id"), // platform user who authored (for payouts)
   tags: jsonb("tags").$type<string[]>().default([]),
   careerFields: jsonb("career_fields").$type<string[]>().default([]),
   pageCount: integer("page_count"),
   durationMinutes: integer("duration_minutes"),
   featured: boolean("featured").default(false),
   isActive: boolean("is_active").default(true),
+  salesCount: integer("sales_count").default(0),
 
   // Publishing
   publishedBy: varchar("published_by").notNull(), // userId of system_admin publisher
@@ -2066,6 +2073,32 @@ export const insertMarketplaceItemSchema = createInsertSchema(marketplaceItems).
 });
 export type InsertMarketplaceItem = z.infer<typeof insertMarketplaceItemSchema>;
 export type MarketplaceItem = typeof marketplaceItems.$inferSelect;
+
+// Marketplace Wishlists — saved items for later
+export const marketplaceWishlists = pgTable("marketplace_wishlists", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull(),
+  itemId: varchar("item_id").notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+export const insertMarketplaceWishlistSchema = createInsertSchema(marketplaceWishlists).omit({ id: true, createdAt: true });
+export type InsertMarketplaceWishlist = z.infer<typeof insertMarketplaceWishlistSchema>;
+export type MarketplaceWishlist = typeof marketplaceWishlists.$inferSelect;
+
+// Marketplace Ratings — verified reviews from purchasers
+export const marketplaceRatings = pgTable("marketplace_ratings", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull(),
+  itemId: varchar("item_id").notNull(),
+  rating: integer("rating").notNull(), // 1-5
+  review: text("review"),
+  verified: boolean("verified").default(false), // true if user has purchased
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+export const insertMarketplaceRatingSchema = createInsertSchema(marketplaceRatings).omit({ id: true, createdAt: true, updatedAt: true });
+export type InsertMarketplaceRating = z.infer<typeof insertMarketplaceRatingSchema>;
+export type MarketplaceRating = typeof marketplaceRatings.$inferSelect;
 
 // Marketplace Purchases — tracks user acquisitions (free claim or paid)
 export const marketplacePurchases = pgTable("marketplace_purchases", {
