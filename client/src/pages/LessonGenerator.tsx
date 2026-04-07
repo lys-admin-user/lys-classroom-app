@@ -21,7 +21,7 @@ import type { LessonPlan, EducatorProfile, Lesson } from "@shared/schema";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import type { StandardCode } from "@shared/standards";
 import { educationalResourceProviders, getSearchUrl, type EducationalResourceProvider, type EducationalResource } from "@shared/educationalResources";
-import { Link, useLocation } from "wouter";
+import { Link, useLocation, useSearch } from "wouter";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
@@ -81,6 +81,32 @@ export default function LessonGenerator() {
   const [customResourceTitle, setCustomResourceTitle] = useState("");
   const [selectedResourceCategory, setSelectedResourceCategory] = useState<"all" | "oer" | "government" | "video" | "interactive" | "textbooks">("all");
   const [myLessonsOpen, setMyLessonsOpen] = useState(false);
+
+  const search = useSearch();
+  const viewLessonId = new URLSearchParams(search).get("view");
+
+  const { data: viewLessonData, isLoading: viewLessonLoading } = useQuery<Lesson>({
+    queryKey: ["/api/lessons", viewLessonId],
+    queryFn: async () => {
+      const res = await fetch(`/api/lessons/${viewLessonId}`, { credentials: "include" });
+      if (!res.ok) throw new Error("Lesson not found");
+      return res.json();
+    },
+    enabled: !!viewLessonId && isAuthenticated,
+  });
+
+  useEffect(() => {
+    if (viewLessonData && !generatedLesson) {
+      const lesson = viewLessonData;
+      setGeneratedLesson(lesson as unknown as LessonPlan);
+      setIsSaved(true);
+      setSavedLessonId(lesson.id);
+      setTopic(lesson.topic);
+      setGradeLevel(lesson.gradeLevel);
+      setBkdFocus(lesson.bkdFocus as "be" | "know" | "do");
+      setDuration(lesson.duration ?? "45 minutes");
+    }
+  }, [viewLessonData]);
 
   const { data: profileData } = useQuery<{ profile: EducatorProfile | null; tier: string }>({
     queryKey: ["/api/educator-profile"],
@@ -493,6 +519,17 @@ ${addedResources.length > 0 ? addedResources.map(r => `- ${r.title}: ${r.url}`).
     { value: "know", label: "KNOW", description: "Strategy & Resources", icon: Compass, color: "bg-lys-red" },
     { value: "do", label: "DO", description: "Action & Impact", icon: Target, color: "bg-lys-teal" },
   ];
+
+  if (viewLessonId && viewLessonLoading) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <div className="flex flex-col items-center gap-4">
+          <Loader2 className="h-8 w-8 animate-spin text-lys-red" />
+          <p className="font-roboto text-muted-foreground">Loading your lesson...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-background">

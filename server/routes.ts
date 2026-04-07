@@ -588,6 +588,20 @@ export async function registerRoutes(
     }
   });
 
+  // Get a single lesson by ID
+  app.get("/api/lessons/:id", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user?.claims?.sub;
+      const lesson = await storage.getLesson(req.params.id);
+      if (!lesson || lesson.userId !== userId) {
+        return res.status(404).json({ error: "Lesson not found" });
+      }
+      res.json(lesson);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch lesson" });
+    }
+  });
+
   app.post("/api/lessons/save", isAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user?.claims?.sub;
