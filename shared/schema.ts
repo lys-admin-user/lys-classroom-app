@@ -1870,6 +1870,9 @@ export const collaborationSessions = pgTable("collaboration_sessions", {
     allowComments: boolean;
     requireApproval: boolean;
   }>(),
+  zoomUrl: text("zoom_url"),
+  whatsappLink: text("whatsapp_link"),
+  youtubeUrl: text("youtube_url"),
   createdAt: timestamp("created_at").defaultNow(),
   endedAt: timestamp("ended_at"),
 });

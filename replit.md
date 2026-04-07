@@ -51,6 +51,7 @@ Preferred communication style: Simple, everyday language.
 -   **PD RSS Feed Integration**: Professional Development Courses tab now shows curated articles from approved RSS content (prefers `professional_development`/`educator_tools` tagged items, falls back to all approved content). Two-section layout: LYS Courses above, Curated Articles below.
 -   **SIS Coming Soon Labels**: SIS Integration page has an info banner and disabled/badged SelectItems for non-Clever providers (PowerSchool, Canvas LMS, Infinite Campus, Skyward, OneRoster). Only Clever is live.
 -   **Demo Walkthrough Updated**: DemoVideoModal now has 22 slides including a new LYS Marketplace slide with wishlist demo, updated PD slide with RSS article section, and updated SIS slide reflecting Clever-only live status.
+-   **Collaboration Video Conferencing**: Collaboration sessions now include a "Meet" tab in the sidebar with: embedded Jitsi Meet (in-app video, no account needed), "Open Zoom" and "Open WhatsApp" external launch buttons (open new tab), and a host-only configuration panel to paste Zoom URLs, WhatsApp group links, and YouTube recording URLs. Schema: `zoomUrl`, `whatsappLink`, `youtubeUrl` columns on `collaboration_sessions`. Route: `PATCH /api/collaboration/sessions/:id/meeting`.
 
 ### Global Architecture
 -   **Educational Hierarchy**: Structured organization from country to school level, supporting various governance systems.

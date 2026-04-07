@@ -9,11 +9,12 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { Users, Plus, Link2, Copy, Send, MessageSquare, History, FileText, CheckCircle, XCircle, Wifi, WifiOff, Crown } from "lucide-react";
+import { Users, Plus, Link2, Copy, Send, MessageSquare, History, FileText, CheckCircle, XCircle, Wifi, WifiOff, Crown, Video, Youtube, ExternalLink, Settings, PlayCircle, X } from "lucide-react";
+import { SiZoom, SiWhatsapp } from "react-icons/si";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/use-auth";
@@ -398,6 +399,33 @@ function CollaborationRoom({ session, user, onEnd, onLeave }: CollaborationRoomP
   const [lessonContent, setLessonContent] = useState<Record<string, any>>({});
   const [editingField, setEditingField] = useState<string | null>(null);
 
+  // Meeting state
+  const [jitsiOpen, setJitsiOpen] = useState(false);
+  const [editingMeeting, setEditingMeeting] = useState(false);
+  const [meetZoomUrl, setMeetZoomUrl] = useState(session.zoomUrl || "");
+  const [meetWhatsappLink, setMeetWhatsappLink] = useState(session.whatsappLink || "");
+  const [meetYoutubeUrl, setMeetYoutubeUrl] = useState(session.youtubeUrl || "");
+  const jitsiRoomName = `lys-collab-${session.inviteCode}`;
+
+  const updateMeetingMutation = useMutation({
+    mutationFn: async () => {
+      const res = await apiRequest("PATCH", `/api/collaboration/sessions/${session.id}/meeting`, {
+        zoomUrl: meetZoomUrl || null,
+        whatsappLink: meetWhatsappLink || null,
+        youtubeUrl: meetYoutubeUrl || null,
+      });
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/collaboration/sessions", session.id] });
+      toast({ title: "Meeting links saved" });
+      setEditingMeeting(false);
+    },
+    onError: () => {
+      toast({ title: "Error", description: "Failed to save meeting links", variant: "destructive" });
+    },
+  });
+
   const { data: linkedLesson, isLoading: lessonLoading } = useQuery<Lesson>({
     queryKey: ["/api/lessons", session.lessonId],
     enabled: !!session.lessonId,
@@ -630,6 +658,33 @@ function CollaborationRoom({ session, user, onEnd, onLeave }: CollaborationRoomP
             </Card>
           </div>
 
+          {/* Jitsi Meet Dialog */}
+          <Dialog open={jitsiOpen} onOpenChange={setJitsiOpen}>
+            <DialogContent className="max-w-4xl w-full p-0 overflow-hidden">
+              <DialogHeader className="p-4 border-b flex-row items-center justify-between">
+                <div>
+                  <DialogTitle className="font-oswald flex items-center gap-2">
+                    <Video className="h-5 w-5 text-lys-teal" />
+                    Live Meeting — {session.title}
+                  </DialogTitle>
+                  <DialogDescription className="text-sm text-muted-foreground mt-1">
+                    Room: <span className="font-mono">{jitsiRoomName}</span> · Powered by Jitsi Meet
+                  </DialogDescription>
+                </div>
+                <Button variant="ghost" size="icon" onClick={() => setJitsiOpen(false)}>
+                  <X className="h-4 w-4" />
+                </Button>
+              </DialogHeader>
+              <iframe
+                src={`https://meet.jit.si/${jitsiRoomName}`}
+                allow="camera; microphone; fullscreen; display-capture; autoplay"
+                className="w-full"
+                style={{ height: "560px", border: "none" }}
+                title="Jitsi Meet"
+              />
+            </DialogContent>
+          </Dialog>
+
           <div className="w-80 border-l flex flex-col">
             <Tabs defaultValue="chat" className="flex-1 flex flex-col">
               <TabsList className="w-full justify-start rounded-none border-b px-4">
@@ -640,6 +695,10 @@ function CollaborationRoom({ session, user, onEnd, onLeave }: CollaborationRoomP
                 <TabsTrigger value="participants">
                   <Users className="h-4 w-4 mr-1" />
                   People
+                </TabsTrigger>
+                <TabsTrigger value="meet">
+                  <Video className="h-4 w-4 mr-1" />
+                  Meet
                 </TabsTrigger>
               </TabsList>
 
@@ -698,6 +757,156 @@ function CollaborationRoom({ session, user, onEnd, onLeave }: CollaborationRoomP
                       </div>
                     </div>
                   ))}
+                </div>
+              </TabsContent>
+
+              <TabsContent value="meet" className="flex-1 m-0 p-4 overflow-auto">
+                <div className="space-y-4">
+                  {/* Primary: Jitsi embedded */}
+                  <div className="rounded-lg border bg-lys-teal/5 border-lys-teal/20 p-4">
+                    <div className="flex items-center gap-2 mb-1">
+                      <Video className="h-4 w-4 text-lys-teal" />
+                      <span className="font-oswald text-sm font-medium">In-App Video</span>
+                      <Badge variant="outline" className="text-xs ml-auto">Free</Badge>
+                    </div>
+                    <p className="text-xs text-muted-foreground mb-3">No download needed. Camera &amp; screen share included.</p>
+                    <Button
+                      className="w-full bg-lys-teal hover:bg-lys-teal/90 text-white"
+                      onClick={() => setJitsiOpen(true)}
+                      data-testid="button-join-jitsi"
+                    >
+                      <Video className="h-4 w-4 mr-2" />
+                      Join Jitsi Meeting
+                    </Button>
+                  </div>
+
+                  <Separator />
+
+                  {/* External apps */}
+                  <div className="space-y-2">
+                    <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">External Apps</p>
+                    <Button
+                      variant="outline"
+                      className="w-full justify-start gap-3"
+                      disabled={!session.zoomUrl}
+                      onClick={() => session.zoomUrl && window.open(session.zoomUrl, "_blank")}
+                      data-testid="button-open-zoom"
+                    >
+                      <SiZoom className="h-4 w-4 text-blue-500" />
+                      Open Zoom
+                      {session.zoomUrl ? (
+                        <ExternalLink className="h-3 w-3 ml-auto text-muted-foreground" />
+                      ) : (
+                        <span className="ml-auto text-xs text-muted-foreground">Not set</span>
+                      )}
+                    </Button>
+                    <Button
+                      variant="outline"
+                      className="w-full justify-start gap-3"
+                      disabled={!session.whatsappLink}
+                      onClick={() => session.whatsappLink && window.open(session.whatsappLink, "_blank")}
+                      data-testid="button-open-whatsapp"
+                    >
+                      <SiWhatsapp className="h-4 w-4 text-green-500" />
+                      Open WhatsApp
+                      {session.whatsappLink ? (
+                        <ExternalLink className="h-3 w-3 ml-auto text-muted-foreground" />
+                      ) : (
+                        <span className="ml-auto text-xs text-muted-foreground">Not set</span>
+                      )}
+                    </Button>
+                  </div>
+
+                  {/* YouTube recording */}
+                  {session.youtubeUrl && (
+                    <>
+                      <Separator />
+                      <div className="space-y-2">
+                        <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Session Recording</p>
+                        <Button
+                          variant="outline"
+                          className="w-full justify-start gap-3"
+                          onClick={() => window.open(session.youtubeUrl!, "_blank")}
+                          data-testid="button-watch-recording"
+                        >
+                          <Youtube className="h-4 w-4 text-red-500" />
+                          Watch Recording
+                          <ExternalLink className="h-3 w-3 ml-auto text-muted-foreground" />
+                        </Button>
+                      </div>
+                    </>
+                  )}
+
+                  {/* Host-only config */}
+                  {isHost && (
+                    <>
+                      <Separator />
+                      <div>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="w-full justify-start gap-2 text-muted-foreground"
+                          onClick={() => setEditingMeeting(!editingMeeting)}
+                          data-testid="button-configure-meeting"
+                        >
+                          <Settings className="h-4 w-4" />
+                          {editingMeeting ? "Cancel" : "Configure Meeting Links"}
+                        </Button>
+                        {editingMeeting && (
+                          <div className="mt-3 space-y-3">
+                            <div>
+                              <Label className="text-xs flex items-center gap-1.5">
+                                <SiZoom className="h-3 w-3 text-blue-500" />
+                                Zoom Meeting URL
+                              </Label>
+                              <Input
+                                placeholder="https://zoom.us/j/..."
+                                value={meetZoomUrl}
+                                onChange={(e) => setMeetZoomUrl(e.target.value)}
+                                className="mt-1 text-xs"
+                                data-testid="input-zoom-url"
+                              />
+                            </div>
+                            <div>
+                              <Label className="text-xs flex items-center gap-1.5">
+                                <SiWhatsapp className="h-3 w-3 text-green-500" />
+                                WhatsApp Group Link
+                              </Label>
+                              <Input
+                                placeholder="https://chat.whatsapp.com/..."
+                                value={meetWhatsappLink}
+                                onChange={(e) => setMeetWhatsappLink(e.target.value)}
+                                className="mt-1 text-xs"
+                                data-testid="input-whatsapp-link"
+                              />
+                            </div>
+                            <div>
+                              <Label className="text-xs flex items-center gap-1.5">
+                                <Youtube className="h-3 w-3 text-red-500" />
+                                YouTube Recording URL
+                              </Label>
+                              <Input
+                                placeholder="https://youtube.com/watch?v=..."
+                                value={meetYoutubeUrl}
+                                onChange={(e) => setMeetYoutubeUrl(e.target.value)}
+                                className="mt-1 text-xs"
+                                data-testid="input-youtube-url"
+                              />
+                            </div>
+                            <Button
+                              size="sm"
+                              className="w-full"
+                              onClick={() => updateMeetingMutation.mutate()}
+                              disabled={updateMeetingMutation.isPending}
+                              data-testid="button-save-meeting-links"
+                            >
+                              {updateMeetingMutation.isPending ? "Saving..." : "Save Links"}
+                            </Button>
+                          </div>
+                        )}
+                      </div>
+                    </>
+                  )}
                 </div>
               </TabsContent>
             </Tabs>

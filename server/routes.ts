@@ -3435,6 +3435,22 @@ export async function registerRoutes(
     }
   });
 
+  // Update meeting links for a session (host only)
+  app.patch("/api/collaboration/sessions/:id/meeting", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user?.claims?.sub;
+      const { id } = req.params;
+      const { zoomUrl, whatsappLink, youtubeUrl } = req.body;
+      const session = await storage.updateCollaborationSession(id, { zoomUrl, whatsappLink, youtubeUrl }, userId);
+      if (!session) {
+        return res.status(404).json({ error: "Session not found or not authorized" });
+      }
+      res.json(session);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to update meeting links" });
+    }
+  });
+
   // Join session by invite code
   app.post("/api/collaboration/join", isAuthenticated, async (req: any, res) => {
     try {
