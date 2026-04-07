@@ -86,7 +86,7 @@ export default function PortfolioView() {
   const [reportReason, setReportReason] = useState("inappropriate");
   const [reportNotes, setReportNotes] = useState("");
 
-  const isTeacherOrAdmin = user && ["educator", "campus_admin", "district_admin", "site_admin", "system_admin"].includes(user.role);
+  const isTeacherOrAdmin = user && ["educator", "campus_admin", "district_admin", "site_admin", "system_admin"].includes(user.role ?? "");
 
   const { data, isLoading, error } = useQuery<{ portfolio: StudentPortfolio; items: PortfolioItem[] }>({
     queryKey: ["/api/portfolio/public", slug],

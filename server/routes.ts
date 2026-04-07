@@ -2246,7 +2246,7 @@ export async function registerRoutes(
       // Get all enrolled student records
       const enrollments = await db.select().from(classStudents)
         .where(inArray(classStudents.classId, classIds));
-      const studentIds = [...new Set(enrollments.map(e => e.studentId))];
+      const studentIds = Array.from(new Set(enrollments.map(e => e.studentId)));
 
       if (studentIds.length === 0) return res.json({ classes: educatorClasses, students: [], aggregate: null });
 
@@ -2363,6 +2363,7 @@ export async function registerRoutes(
             userId,
             title,
             goalType: "skill_development",
+            timeframe: "1_year",
             description: `Auto-suggested from your Be-Know-Do self-assessment. Review and customize to fit your context.`,
             priority: 2,
           });

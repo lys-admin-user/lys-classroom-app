@@ -5396,7 +5396,7 @@ export class DatabaseStorage implements IStorage {
   }
 
   async createMarketplaceItem(item: InsertMarketplaceItem): Promise<MarketplaceItem> {
-    const [created] = await db.insert(marketplaceItems).values(item).returning();
+    const [created] = await db.insert(marketplaceItems).values(item as any).returning();
     return created;
   }
 
@@ -8447,7 +8447,7 @@ export class DatabaseStorage implements IStorage {
   }
 
   async createRssFeed(feed: InsertRssFeed): Promise<RssFeed> {
-    const [created] = await db.insert(rssFeeds).values(feed).returning();
+    const [created] = await db.insert(rssFeeds).values(feed as any).returning();
     return created;
   }
 
@@ -8486,7 +8486,7 @@ export class DatabaseStorage implements IStorage {
   }
 
   async createRssContentItem(item: InsertRssContentItem): Promise<RssContentItem> {
-    const [created] = await db.insert(rssContentItems).values(item).returning();
+    const [created] = await db.insert(rssContentItems).values(item as any).returning();
     return created;
   }
 
@@ -8514,7 +8514,7 @@ export class DatabaseStorage implements IStorage {
       eq(rssContentItems.status, "approved"),
       sql`${rssContentItems.approvedPlacements}::jsonb @> ${JSON.stringify([placement])}::jsonb`,
     ];
-    if (filters?.bkdPillar) conditions.push(eq(rssContentItems.bkdPillar, filters.bkdPillar));
+    if (filters?.bkdPillar) conditions.push(eq(rssContentItems.bkdPillar, filters.bkdPillar as any));
     return db.select().from(rssContentItems)
       .where(and(...conditions))
       .orderBy(desc(rssContentItems.publishedAt));
