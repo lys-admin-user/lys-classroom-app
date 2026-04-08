@@ -214,6 +214,10 @@ export default function SystemAdminPage({ params }: { params?: { tab?: string } 
   const [analyticsTierFilter, setAnalyticsTierFilter] = useState<string>("all");
   const [analyticsRoleFilter, setAnalyticsRoleFilter] = useState<string>("all");
   const [analyticsSortBy, setAnalyticsSortBy] = useState<string>("lastActivity");
+  const [showWalkthrough, setShowWalkthrough] = useState(false);
+  const [walkthroughPage, setWalkthroughPage] = useState(0);
+  const [tierConfirmOpen, setTierConfirmOpen] = useState(false);
+  const [tierConfirmData, setTierConfirmData] = useState<{ userId: string; updates: Partial<UserType>; suggestedTier: string } | null>(null);
   const [expandedUserId, setExpandedUserId] = useState<string | null>(null);
   const [analyticsPage, setAnalyticsPage] = useState(1);
   const [contentTypeFilter, setContentTypeFilter] = useState<string>("all");
@@ -238,6 +242,15 @@ export default function SystemAdminPage({ params }: { params?: { tab?: string } 
     queryKey: ["/api/admin/check"],
     enabled: !!user,
   });
+
+  useEffect(() => {
+    if (adminCheck?.isSiteAdmin) {
+      const seen = localStorage.getItem("lys_admin_walkthrough_seen");
+      if (!seen) {
+        setShowWalkthrough(true);
+      }
+    }
+  }, [adminCheck?.isSiteAdmin]);
 
   const { data: analytics, isLoading: analyticsLoading } = useQuery<Analytics>({
     queryKey: ["/api/admin/analytics"],
@@ -370,12 +383,39 @@ export default function SystemAdminPage({ params }: { params?: { tab?: string } 
       queryClient.invalidateQueries({ queryKey: ["/api/admin/analytics"] });
       setEditUserOpen(false);
       setSelectedUser(null);
+      setTierConfirmOpen(false);
+      setTierConfirmData(null);
       toast({ title: "User updated successfully" });
     },
     onError: () => {
       toast({ title: "Failed to update user", variant: "destructive" });
     },
   });
+
+  const SUBSCRIPTION_TO_TIER: Record<string, string> = {
+    active: "pro",
+    trialing: "pro",
+    past_due: "pro",
+    canceled: "free",
+    incomplete: "free",
+  };
+
+  const handleSaveUser = () => {
+    if (!selectedUser) return;
+    const newSubStatus = editUserData.subscriptionStatus;
+    const currentTier = selectedUser.tier;
+    const suggestedTier = newSubStatus ? SUBSCRIPTION_TO_TIER[newSubStatus] : null;
+    const paymentChanged =
+      editUserData.stripeCustomerId !== selectedUser.stripeCustomerId ||
+      editUserData.stripeSubscriptionId !== (selectedUser as any).stripeSubscriptionId ||
+      newSubStatus !== selectedUser.subscriptionStatus;
+    if (paymentChanged && suggestedTier && suggestedTier !== currentTier && !editUserData.tier) {
+      setTierConfirmData({ userId: selectedUser.id, updates: editUserData, suggestedTier });
+      setTierConfirmOpen(true);
+    } else {
+      updateUserMutation.mutate({ id: selectedUser.id, updates: editUserData });
+    }
+  };
 
   const deleteUserMutation = useMutation({
     mutationFn: async (id: string) => {
@@ -808,7 +848,7 @@ export default function SystemAdminPage({ params }: { params?: { tab?: string } 
         <div className="w-14 h-14 rounded-lg bg-gradient-to-br from-lys-red to-lys-red/80 flex items-center justify-center shadow-lg">
           <Shield className="h-7 w-7 text-white" />
         </div>
-        <div>
+        <div className="flex-1">
           <h1 className="font-marker text-3xl sm:text-4xl text-foreground">
             System Administration
           </h1>
@@ -816,6 +856,16 @@ export default function SystemAdminPage({ params }: { params?: { tab?: string } 
             Manage all users, organizations, billing, content, educational standards, and platform-wide settings
           </p>
         </div>
+        <Button
+          variant="outline"
+          size="sm"
+          className="gap-2 hidden sm:flex"
+          onClick={() => { setWalkthroughPage(0); setShowWalkthrough(true); }}
+          data-testid="button-open-walkthrough"
+        >
+          <BookOpen className="h-4 w-4" />
+          Admin Guide
+        </Button>
       </div>
 
       <Tabs value={activeTab} onValueChange={handleTabChange} className="space-y-6">
@@ -1287,7 +1337,21 @@ export default function SystemAdminPage({ params }: { params?: { tab?: string } 
               </div>
               <div className="grid gap-4">
                 <div className="grid gap-2">
-                  <Label>Stripe Customer ID</Label>
+                  <div className="flex items-center justify-between">
+                    <Label>Stripe Customer ID</Label>
+                    {editUserData.stripeCustomerId && (
+                      <a
+                        href={`https://dashboard.stripe.com/customers/${editUserData.stripeCustomerId}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-xs text-blue-500 hover:text-blue-700 flex items-center gap-1"
+                        data-testid="link-stripe-customer-dashboard"
+                      >
+                        <ExternalLink className="h-3 w-3" />
+                        View in Stripe
+                      </a>
+                    )}
+                  </div>
                   <Input
                     value={editUserData.stripeCustomerId || ""}
                     onChange={(e) => setEditUserData({ ...editUserData, stripeCustomerId: e.target.value })}
@@ -1324,12 +1388,47 @@ export default function SystemAdminPage({ params }: { params?: { tab?: string } 
               <DialogFooter>
                 <Button variant="outline" onClick={() => setEditUserOpen(false)}>Cancel</Button>
                 <Button 
-                  onClick={() => selectedUser && updateUserMutation.mutate({ id: selectedUser.id, updates: editUserData })}
+                  onClick={handleSaveUser}
                   disabled={updateUserMutation.isPending}
                   data-testid="button-save-user"
                 >
                   {updateUserMutation.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
                   Save Changes
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
+
+          {/* Tier update confirmation dialog */}
+          <Dialog open={tierConfirmOpen} onOpenChange={setTierConfirmOpen}>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle className="flex items-center gap-2">
+                  <CreditCard className="h-5 w-5 text-amber-500" />
+                  Update User Tier?
+                </DialogTitle>
+                <DialogDescription>
+                  You've set the subscription status to <strong>{tierConfirmData?.updates.subscriptionStatus}</strong>. Based on this, the recommended tier is <strong className="capitalize">{tierConfirmData?.suggestedTier}</strong>. Would you like to update this user's tier as well?
+                </DialogDescription>
+              </DialogHeader>
+              <div className="py-2 text-sm text-muted-foreground">
+                <p>Current tier: <span className="font-semibold capitalize">{selectedUser?.tier || "free"}</span></p>
+                <p>Suggested tier: <span className="font-semibold capitalize">{tierConfirmData?.suggestedTier}</span></p>
+              </div>
+              <DialogFooter className="flex-col sm:flex-row gap-2">
+                <Button variant="outline" onClick={() => {
+                  if (tierConfirmData) {
+                    updateUserMutation.mutate({ id: tierConfirmData.userId, updates: tierConfirmData.updates });
+                  }
+                }} data-testid="button-tier-confirm-skip">
+                  Save Without Changing Tier
+                </Button>
+                <Button onClick={() => {
+                  if (tierConfirmData) {
+                    updateUserMutation.mutate({ id: tierConfirmData.userId, updates: { ...tierConfirmData.updates, tier: tierConfirmData.suggestedTier as any } });
+                  }
+                }} data-testid="button-tier-confirm-apply">
+                  Update Tier to {tierConfirmData?.suggestedTier}
                 </Button>
               </DialogFooter>
             </DialogContent>
@@ -3213,6 +3312,182 @@ export default function SystemAdminPage({ params }: { params?: { tab?: string } 
           <TrialMonitoringTab />
         </TabsContent>
       </Tabs>
+
+      {/* Admin Walkthrough / Guide Dialog */}
+      {(() => {
+        const pages = [
+          {
+            icon: <Shield className="h-10 w-10 text-lys-red" />,
+            title: "Welcome, System Administrator",
+            subtitle: "Your role & responsibilities",
+            content: (
+              <div className="space-y-3 text-sm text-muted-foreground">
+                <p>As a <strong>System Admin</strong>, you have the highest level of access on the LYS platform — second only to the platform owner. This guide covers everything you can do and how to do it safely.</p>
+                <p>You can return to this guide at any time using the <strong>Admin Guide</strong> button in the top-right corner of this page.</p>
+                <div className="rounded-lg border bg-amber-50 dark:bg-amber-950/20 border-amber-200 dark:border-amber-800 p-3">
+                  <p className="text-amber-800 dark:text-amber-300 font-medium text-xs">Important: Actions taken here affect all users and the entire platform. Always double-check before deleting data or changing user roles.</p>
+                </div>
+              </div>
+            ),
+          },
+          {
+            icon: <Users className="h-10 w-10 text-blue-500" />,
+            title: "Users Tab",
+            subtitle: "Search, edit, create, and delete users",
+            content: (
+              <div className="space-y-3 text-sm text-muted-foreground">
+                <p>The <strong>Users</strong> tab lets you manage every account on the platform.</p>
+                <ul className="space-y-2 list-none">
+                  <li className="flex gap-2"><CheckCircle className="h-4 w-4 text-green-500 mt-0.5 shrink-0" /><span><strong>Search & Filter</strong> — find users by name, email, role, or tier</span></li>
+                  <li className="flex gap-2"><CheckCircle className="h-4 w-4 text-green-500 mt-0.5 shrink-0" /><span><strong>Edit User</strong> — update name, email, role, tier, and Stripe payment information</span></li>
+                  <li className="flex gap-2"><CheckCircle className="h-4 w-4 text-green-500 mt-0.5 shrink-0" /><span><strong>Create User</strong> — manually add users with any role and tier</span></li>
+                  <li className="flex gap-2"><XCircle className="h-4 w-4 text-red-500 mt-0.5 shrink-0" /><span><strong>Delete User</strong> — permanently removes the account, all their lessons, and goals. This cannot be undone.</span></li>
+                </ul>
+                <div className="rounded-lg border bg-blue-50 dark:bg-blue-950/20 border-blue-200 dark:border-blue-800 p-3">
+                  <p className="text-blue-800 dark:text-blue-300 text-xs">Tip: When editing a user's Stripe Customer ID, a "View in Stripe" link appears so you can open their Stripe dashboard record directly.</p>
+                </div>
+              </div>
+            ),
+          },
+          {
+            icon: <CreditCard className="h-10 w-10 text-green-500" />,
+            title: "Payment Management",
+            subtitle: "Managing Stripe data for users",
+            content: (
+              <div className="space-y-3 text-sm text-muted-foreground">
+                <p>Inside each user's <strong>Edit</strong> dialog, you'll find a <strong>Payment Information</strong> section with three fields:</p>
+                <ul className="space-y-2 list-none">
+                  <li className="flex gap-2"><CheckCircle className="h-4 w-4 text-green-500 mt-0.5 shrink-0" /><span><strong>Stripe Customer ID</strong> (cus_...) — links this user to a Stripe customer record. Click "View in Stripe" to open it directly in your Stripe dashboard.</span></li>
+                  <li className="flex gap-2"><CheckCircle className="h-4 w-4 text-green-500 mt-0.5 shrink-0" /><span><strong>Stripe Subscription ID</strong> (sub_...) — the specific subscription record in Stripe for this user.</span></li>
+                  <li className="flex gap-2"><CheckCircle className="h-4 w-4 text-green-500 mt-0.5 shrink-0" /><span><strong>Subscription Status</strong> — active, trialing, past_due, canceled, or incomplete.</span></li>
+                </ul>
+                <p>When you change a user's subscription status, the system will ask whether you'd also like to update their <strong>access tier</strong> to match (e.g., active → Pro, canceled → Free). You choose.</p>
+              </div>
+            ),
+          },
+          {
+            icon: <Building2 className="h-10 w-10 text-purple-500" />,
+            title: "Organizations",
+            subtitle: "Schools, districts, and campuses",
+            content: (
+              <div className="space-y-3 text-sm text-muted-foreground">
+                <p>The <strong>Organizations</strong> tab shows all schools, districts, and universities on the platform.</p>
+                <ul className="space-y-2 list-none">
+                  <li className="flex gap-2"><CheckCircle className="h-4 w-4 text-green-500 mt-0.5 shrink-0" /><span>View all organizations and their type (school, district, university)</span></li>
+                  <li className="flex gap-2"><CheckCircle className="h-4 w-4 text-green-500 mt-0.5 shrink-0" /><span>See member counts and active status</span></li>
+                  <li className="flex gap-2"><CheckCircle className="h-4 w-4 text-green-500 mt-0.5 shrink-0" /><span>Delete organizations when needed (removes org but not the individual users)</span></li>
+                </ul>
+              </div>
+            ),
+          },
+          {
+            icon: <BarChart3 className="h-10 w-10 text-orange-500" />,
+            title: "Analytics & Billing",
+            subtitle: "Platform metrics and pricing tiers",
+            content: (
+              <div className="space-y-3 text-sm text-muted-foreground">
+                <p>The <strong>Overview</strong> tab shows a live snapshot of platform health: total users, active users, content created, and organizations.</p>
+                <p>The <strong>Billing</strong> tab lets you view and edit the platform's pricing tiers — name, price, billing period, description, and whether they're active/visible to users.</p>
+                <p>The <strong>User Analytics</strong> tab gives a detailed breakdown of every user's engagement: login frequency, lessons created, AI usage, goals, and their engagement rate.</p>
+                <div className="rounded-lg border bg-muted/50 p-3">
+                  <p className="text-xs">Analytics refresh automatically every 30 seconds while you're on this page.</p>
+                </div>
+              </div>
+            ),
+          },
+          {
+            icon: <Globe className="h-10 w-10 text-teal-500" />,
+            title: "Standards, Authorities & Content",
+            subtitle: "Educational infrastructure",
+            content: (
+              <div className="space-y-3 text-sm text-muted-foreground">
+                <p>These tabs let you manage the educational framework that powers lesson alignment:</p>
+                <ul className="space-y-2 list-none">
+                  <li className="flex gap-2"><CheckCircle className="h-4 w-4 text-green-500 mt-0.5 shrink-0" /><span><strong>Standards</strong> — manage state/national standards by jurisdiction</span></li>
+                  <li className="flex gap-2"><CheckCircle className="h-4 w-4 text-green-500 mt-0.5 shrink-0" /><span><strong>Global Authorities</strong> — configure educational governing bodies (national, regional, local)</span></li>
+                  <li className="flex gap-2"><CheckCircle className="h-4 w-4 text-green-500 mt-0.5 shrink-0" /><span><strong>Lesson Repository</strong> — manage the master lesson library available to all educators</span></li>
+                  <li className="flex gap-2"><CheckCircle className="h-4 w-4 text-green-500 mt-0.5 shrink-0" /><span><strong>Content Library</strong> — curated resources (PDFs, videos, links) available platform-wide</span></li>
+                  <li className="flex gap-2"><CheckCircle className="h-4 w-4 text-green-500 mt-0.5 shrink-0" /><span><strong>Content Hub</strong> — approve or reject RSS-sourced content for display to users</span></li>
+                </ul>
+              </div>
+            ),
+          },
+          {
+            icon: <Lock className="h-10 w-10 text-red-500" />,
+            title: "Safety, Governance & Data",
+            subtitle: "Platform safety and data management",
+            content: (
+              <div className="space-y-3 text-sm text-muted-foreground">
+                <p>The final set of tabs covers platform safety and infrastructure:</p>
+                <ul className="space-y-2 list-none">
+                  <li className="flex gap-2"><CheckCircle className="h-4 w-4 text-green-500 mt-0.5 shrink-0" /><span><strong>Safety Suite</strong> — review flagged content and take moderation actions</span></li>
+                  <li className="flex gap-2"><CheckCircle className="h-4 w-4 text-green-500 mt-0.5 shrink-0" /><span><strong>Data Sync</strong> — monitor BLS data sync status and manual refresh</span></li>
+                  <li className="flex gap-2"><CheckCircle className="h-4 w-4 text-green-500 mt-0.5 shrink-0" /><span><strong>Technical Specs</strong> — view the platform's technical architecture and stack information</span></li>
+                  <li className="flex gap-2"><CheckCircle className="h-4 w-4 text-green-500 mt-0.5 shrink-0" /><span><strong>Trials</strong> — manage and monitor free trial access across the platform</span></li>
+                  <li className="flex gap-2"><CheckCircle className="h-4 w-4 text-green-500 mt-0.5 shrink-0" /><span><strong>Affiliates</strong> — track referral activity and affiliate performance</span></li>
+                </ul>
+                <div className="rounded-lg border bg-green-50 dark:bg-green-950/20 border-green-200 dark:border-green-800 p-3">
+                  <p className="text-green-800 dark:text-green-300 text-xs font-medium">You can reopen this guide anytime via the "Admin Guide" button at the top of this page.</p>
+                </div>
+              </div>
+            ),
+          },
+        ];
+        const currentPage = pages[walkthroughPage];
+        const isLast = walkthroughPage === pages.length - 1;
+        return (
+          <Dialog open={showWalkthrough} onOpenChange={(open) => {
+            if (!open) {
+              localStorage.setItem("lys_admin_walkthrough_seen", "true");
+            }
+            setShowWalkthrough(open);
+          }}>
+            <DialogContent className="max-w-lg">
+              <DialogHeader>
+                <div className="flex flex-col items-center text-center gap-3 pb-2">
+                  {currentPage.icon}
+                  <div>
+                    <DialogTitle className="text-xl font-marker">{currentPage.title}</DialogTitle>
+                    <DialogDescription className="text-sm mt-1">{currentPage.subtitle}</DialogDescription>
+                  </div>
+                </div>
+              </DialogHeader>
+              <div className="py-2">{currentPage.content}</div>
+              <div className="flex items-center justify-between pt-2">
+                <div className="flex gap-1">
+                  {pages.map((_, i) => (
+                    <button
+                      key={i}
+                      onClick={() => setWalkthroughPage(i)}
+                      className={`h-2 rounded-full transition-all ${i === walkthroughPage ? "w-6 bg-lys-red" : "w-2 bg-muted-foreground/30"}`}
+                      data-testid={`walkthrough-dot-${i}`}
+                    />
+                  ))}
+                </div>
+                <div className="flex gap-2">
+                  {walkthroughPage > 0 && (
+                    <Button variant="outline" size="sm" onClick={() => setWalkthroughPage(w => w - 1)} data-testid="button-walkthrough-prev">
+                      Back
+                    </Button>
+                  )}
+                  {isLast ? (
+                    <Button size="sm" onClick={() => {
+                      localStorage.setItem("lys_admin_walkthrough_seen", "true");
+                      setShowWalkthrough(false);
+                    }} data-testid="button-walkthrough-done">
+                      Done
+                    </Button>
+                  ) : (
+                    <Button size="sm" onClick={() => setWalkthroughPage(w => w + 1)} data-testid="button-walkthrough-next">
+                      Next
+                    </Button>
+                  )}
+                </div>
+              </div>
+            </DialogContent>
+          </Dialog>
+        );
+      })()}
     </div>
   );
 }
