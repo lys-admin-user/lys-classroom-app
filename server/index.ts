@@ -5,6 +5,8 @@ import { createServer } from "http";
 import { setupCollaborationWebSocket } from "./collaboration";
 import helmet from "helmet";
 import rateLimit from "express-rate-limit";
+import { WebhookHandlers } from "./webhookHandlers";
+import { getStripeSync } from "./stripeClient";
 
 const app = express();
 const httpServer = createServer(app);
@@ -51,6 +53,29 @@ const aiLimiter = rateLimit({
 });
 app.use("/api/lessons/generate", aiLimiter);
 app.use("/api/assignments/generate", aiLimiter);
+
+// Stripe webhook route MUST be registered BEFORE express.json() middleware
+// Webhooks require raw Buffer body, not parsed JSON
+app.post(
+  '/api/stripe/webhook',
+  express.raw({ type: 'application/json' }),
+  async (req, res) => {
+    const signature = req.headers['stripe-signature'];
+
+    if (!signature) {
+      return res.status(400).json({ error: 'Missing stripe-signature' });
+    }
+
+    try {
+      const sig = Array.isArray(signature) ? signature[0] : signature;
+      await WebhookHandlers.processWebhook(req.body as Buffer, sig);
+      res.status(200).json({ received: true });
+    } catch (error: any) {
+      console.error('Webhook error:', error.message);
+      res.status(400).json({ error: 'Webhook processing error' });
+    }
+  }
+);
 
 app.use(
   express.json({
@@ -100,7 +125,32 @@ app.use((req, res, next) => {
   next();
 });
 
+async function initStripe() {
+  const databaseUrl = process.env.DATABASE_URL;
+  if (!databaseUrl) {
+    console.warn('DATABASE_URL not set - skipping Stripe initialization');
+    return;
+  }
+
+  try {
+    console.log('Initializing Stripe...');
+
+    const stripeSync = await getStripeSync();
+
+    const webhookBaseUrl = `https://${process.env.REPLIT_DOMAINS?.split(',')[0]}`;
+    await stripeSync.findOrCreateManagedWebhook(`${webhookBaseUrl}/api/stripe/webhook`);
+    console.log('Stripe webhook configured');
+
+    stripeSync.syncBackfill()
+      .then(() => console.log('Stripe data synced'))
+      .catch((err: any) => console.error('Stripe sync error:', err));
+  } catch (error) {
+    console.error('Failed to initialize Stripe:', error);
+  }
+}
+
 (async () => {
+  await initStripe();
   await registerRoutes(httpServer, app);
 
   app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
