@@ -6081,7 +6081,9 @@ export class DatabaseStorage implements IStorage {
 
   async isSiteAdmin(userId: string): Promise<boolean> {
     const admin = await this.getSiteAdmin(userId);
-    return !!admin;
+    if (admin) return true;
+    const [user] = await db.select({ role: users.role }).from(users).where(eq(users.id, userId));
+    return user?.role === "system_admin" || user?.role === "site_admin";
   }
 
   async createSiteAdmin(admin: InsertSiteAdmin): Promise<SiteAdmin> {

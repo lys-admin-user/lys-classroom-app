@@ -1176,7 +1176,7 @@ export default function SystemAdminPage({ params }: { params?: { tab?: string } 
                             variant="ghost"
                             onClick={() => {
                               setSelectedUser(u);
-                              setEditUserData({ tier: u.tier, role: u.role, email: u.email, firstName: u.firstName, lastName: u.lastName });
+                              setEditUserData({ tier: u.tier, role: u.role, email: u.email, firstName: u.firstName, lastName: u.lastName, stripeCustomerId: u.stripeCustomerId, stripeSubscriptionId: u.stripeSubscriptionId, subscriptionStatus: u.subscriptionStatus });
                               setEditUserOpen(true);
                             }}
                             data-testid={`button-edit-user-${u.id}`}
@@ -1279,6 +1279,46 @@ export default function SystemAdminPage({ params }: { params?: { tab?: string } 
                       </SelectContent>
                     </Select>
                   </div>
+                </div>
+              </div>
+              <Separator />
+              <div className="space-y-1">
+                <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Payment Information</Label>
+              </div>
+              <div className="grid gap-4">
+                <div className="grid gap-2">
+                  <Label>Stripe Customer ID</Label>
+                  <Input
+                    value={editUserData.stripeCustomerId || ""}
+                    onChange={(e) => setEditUserData({ ...editUserData, stripeCustomerId: e.target.value })}
+                    placeholder="cus_..."
+                    data-testid="input-edit-stripe-customer-id"
+                  />
+                </div>
+                <div className="grid gap-2">
+                  <Label>Stripe Subscription ID</Label>
+                  <Input
+                    value={editUserData.stripeSubscriptionId || ""}
+                    onChange={(e) => setEditUserData({ ...editUserData, stripeSubscriptionId: e.target.value })}
+                    placeholder="sub_..."
+                    data-testid="input-edit-stripe-subscription-id"
+                  />
+                </div>
+                <div className="grid gap-2">
+                  <Label>Subscription Status</Label>
+                  <Select value={editUserData.subscriptionStatus || "none"} onValueChange={(v) => setEditUserData({ ...editUserData, subscriptionStatus: v === "none" ? null : v })}>
+                    <SelectTrigger data-testid="select-edit-subscription-status">
+                      <SelectValue placeholder="No subscription" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="none">No subscription</SelectItem>
+                      <SelectItem value="active">Active</SelectItem>
+                      <SelectItem value="trialing">Trialing</SelectItem>
+                      <SelectItem value="past_due">Past Due</SelectItem>
+                      <SelectItem value="canceled">Canceled</SelectItem>
+                      <SelectItem value="incomplete">Incomplete</SelectItem>
+                    </SelectContent>
+                  </Select>
                 </div>
               </div>
               <DialogFooter>

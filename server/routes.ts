@@ -8301,7 +8301,7 @@ export async function registerRoutes(
   app.patch("/api/admin/users/:id", isAuthenticated, isSiteAdmin, async (req: any, res) => {
     try {
       const { id } = req.params;
-      const { tier, role, email, firstName, lastName } = req.body;
+      const { tier, role, email, firstName, lastName, stripeCustomerId, stripeSubscriptionId, subscriptionStatus } = req.body;
       
       const updates: Partial<User> = {};
       if (tier) updates.tier = tier;
@@ -8309,6 +8309,9 @@ export async function registerRoutes(
       if (email) updates.email = email;
       if (firstName) updates.firstName = firstName;
       if (lastName) updates.lastName = lastName;
+      if (stripeCustomerId !== undefined) updates.stripeCustomerId = stripeCustomerId || null;
+      if (stripeSubscriptionId !== undefined) updates.stripeSubscriptionId = stripeSubscriptionId || null;
+      if (subscriptionStatus !== undefined) updates.subscriptionStatus = subscriptionStatus || null;
       updates.updatedAt = new Date();
       
       const [updated] = await db.update(users).set(updates).where(eq(users.id, id)).returning();
