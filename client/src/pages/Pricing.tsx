@@ -1,5 +1,5 @@
 import { useState, useMemo, useEffect } from "react";
-import { Link, useLocation } from "wouter";
+import { Link } from "wouter";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -183,7 +183,6 @@ const paymentMethodIcons: Record<string, any> = {
 export default function Pricing() {
   const { isAuthenticated, user } = useAuth();
   const { toast } = useToast();
-  const [, navigate] = useLocation();
   const [selectedCountry, setSelectedCountry] = useState<string>("US");
   const [checkoutOpen, setCheckoutOpen] = useState(false);
   const [checkoutTier, setCheckoutTier] = useState<string>("");
@@ -220,7 +219,6 @@ export default function Pricing() {
             const tierData = baseTiers.find(t => t.id === (tier || data.tier));
             const displayName = tierData?.subtitle || tierData?.name || tier || data.tier;
             toast({ title: "Welcome to " + displayName + "! 🎉", description: "Your payment was successful. Enjoy your new features!" });
-            setTimeout(() => navigate("/"), 1500);
           } else {
             toast({ title: "Verification Pending", description: "Your payment is being processed. Your plan will update shortly." });
           }
