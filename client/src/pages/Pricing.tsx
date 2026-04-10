@@ -219,14 +219,16 @@ export default function Pricing() {
   }, [countries, selectedCountry]);
 
   const upgradeMutation = useMutation({
-    mutationFn: (tier: string) => apiRequest("POST", "/api/subscription/demo-upgrade", { tier }),
-    onSuccess: (data: any) => {
+    mutationFn: (tier: string) => apiRequest("POST", "/api/subscription/demo-upgrade", { tier }).then(r => r.json()),
+    onSuccess: (_data: any, tier: string) => {
       queryClient.invalidateQueries({ queryKey: ["/api/subscription/status"] });
       queryClient.invalidateQueries({ queryKey: ["/api/auth/user"] });
       setCheckoutOpen(false);
+      const tierData = baseTiers.find(t => t.id === tier);
+      const displayName = tierData?.subtitle || tierData?.name || tier;
       toast({
         title: "Upgrade Successful",
-        description: data.message || `You've been upgraded to ${data.tier}!`,
+        description: `You've been upgraded to ${displayName}!`,
       });
     },
     onError: () => {
@@ -239,7 +241,7 @@ export default function Pricing() {
   });
 
   const poMutation = useMutation({
-    mutationFn: (data: any) => apiRequest("POST", "/api/purchase-order/submit", data),
+    mutationFn: (data: any) => apiRequest("POST", "/api/purchase-order/submit", data).then(r => r.json()),
     onSuccess: (data: any) => {
       queryClient.invalidateQueries({ queryKey: ["/api/subscription/status"] });
       queryClient.invalidateQueries({ queryKey: ["/api/auth/user"] });
@@ -259,7 +261,7 @@ export default function Pricing() {
   });
 
   const bankTransferMutation = useMutation({
-    mutationFn: (data: any) => apiRequest("POST", "/api/bank-transfer/request", data),
+    mutationFn: (data: any) => apiRequest("POST", "/api/bank-transfer/request", data).then(r => r.json()),
     onSuccess: (data: any) => {
       setBankTransferDetails(data.bankDetails);
       queryClient.invalidateQueries({ queryKey: ["/api/subscription/status"] });
