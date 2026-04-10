@@ -21,6 +21,7 @@ interface SubscriptionStatus {
   subscriptionStatus: string | null;
   stripeSubscriptionId: string | null;
   currentPeriodEnd: string | null;
+  downgradeTargetTier: string | null;
   isDemo: boolean;
 }
 
@@ -427,6 +428,14 @@ export default function Pricing() {
     : null;
   const hasRealSubscription = !!subscriptionStatus?.stripeSubscriptionId && subscriptionStatus?.subscriptionStatus === "active";
 
+  const scheduledDowngrade = subscriptionStatus?.subscriptionStatus === "canceling" && subscriptionStatus?.downgradeTargetTier
+    ? {
+        targetTier: subscriptionStatus.downgradeTargetTier,
+        targetName: baseTiers.find(t => t.id === subscriptionStatus.downgradeTargetTier)?.name ?? subscriptionStatus.downgradeTargetTier,
+        date: periodEndFormatted,
+      }
+    : null;
+
   const lostFeatures = currentTierData?.features.filter(f =>
     f.included && !downgradeToData?.features.find(df => df.name === f.name && df.included)
   ) || [];
@@ -620,16 +629,27 @@ export default function Pricing() {
                     ))}
                   </ul>
                 </CardContent>
-                <CardFooter>
+                <CardFooter className="flex flex-col gap-3">
+                  {isCurrentPlan && scheduledDowngrade && (
+                    <div className="w-full rounded-md border border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-950/30 px-3 py-2.5 flex items-start gap-2" data-testid="banner-scheduled-downgrade">
+                      <AlertCircle className="h-4 w-4 text-amber-500 shrink-0 mt-0.5" />
+                      <p className="text-xs text-amber-800 dark:text-amber-300 leading-snug">
+                        Switching to <strong>{scheduledDowngrade.targetName}</strong>
+                        {scheduledDowngrade.date ? <> on <strong>{scheduledDowngrade.date}</strong></> : " at end of billing period"}.
+                        {" "}You keep full access until then.
+                      </p>
+                    </div>
+                  )}
                   {isAuthenticated ? (
                     <Button 
                       className="w-full" 
                       variant={isCurrentPlan ? "secondary" : tier.popular ? "default" : "outline"}
-                      disabled={isCurrentPlan || isPending}
+                      disabled={(isCurrentPlan && !scheduledDowngrade) || isPending}
                       onClick={() => handleTierClick(tier.id)}
                       data-testid={`button-select-${tier.name.toLowerCase()}`}
                     >
-                      {isCurrentPlan ? "Current Plan" :
+                      {isCurrentPlan && !scheduledDowngrade ? "Current Plan" :
+                       isCurrentPlan && scheduledDowngrade ? "Change Plan" :
                        action === "downgrade" ? `Switch to ${tier.name}` :
                        tier.cta}
                     </Button>

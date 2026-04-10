@@ -66,6 +66,7 @@ export const users = pgTable("users", {
   stripeCustomerId: varchar("stripe_customer_id"),
   stripeSubscriptionId: varchar("stripe_subscription_id"),
   subscriptionStatus: varchar("subscription_status"),
+  downgradeTargetTier: varchar("downgrade_target_tier"),
   lastLoginAt: timestamp("last_login_at"),
   loginCount: integer("login_count").default(0),
   createdAt: timestamp("created_at").defaultNow(),

@@ -10188,6 +10188,7 @@ export async function registerRoutes(
         stripeCustomerId: user.stripeCustomerId || null,
         stripeSubscriptionId: user.stripeSubscriptionId || null,
         currentPeriodEnd,
+        downgradeTargetTier: user.downgradeTargetTier || null,
         isDemo: !process.env.STRIPE_SECRET_KEY,
       });
     } catch (error) {
@@ -10366,7 +10367,7 @@ export async function registerRoutes(
           : new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(); // fallback: 30 days
 
         await db.update(users)
-          .set({ subscriptionStatus: "canceling", updatedAt: new Date() })
+          .set({ subscriptionStatus: "canceling", downgradeTargetTier: targetTier, updatedAt: new Date() })
           .where(eq(users.id, userId));
 
         res.json({
@@ -10379,7 +10380,7 @@ export async function registerRoutes(
       } else {
         // Demo/no subscription — immediate downgrade
         await db.update(users)
-          .set({ tier: targetTier, subscriptionStatus: null, stripeSubscriptionId: null, updatedAt: new Date() })
+          .set({ tier: targetTier, subscriptionStatus: null, stripeSubscriptionId: null, downgradeTargetTier: null, updatedAt: new Date() })
           .where(eq(users.id, userId));
 
         res.json({ success: true, immediate: true, targetTier, message: `Switched to ${targetTier} plan.` });
