@@ -55,6 +55,7 @@ import { syncJurisdictionsFromCSP, syncStandardSetFromCSP, getSyncStatus, fetchC
 import { extractStandardsFromText, processPdfImport, checkSourceForChanges } from "./services/llmExtractionService";
 import { syncBlsData, getLastSyncStatus, getSyncHistory, startBlsScheduler, getSchedulerStatus } from "./services/blsService";
 import { createPaypalOrder, capturePaypalOrder, loadPaypalDefault, isPayPalConfigured } from "./paypal";
+import { getUncachableStripeClient } from "./stripeClient";
 import * as hubspotService from "./services/hubspotService";
 import * as wordpressService from "./services/wordpressService";
 import { fetchAndProcessFeed, fetchAllActiveFeeds, startRssFeedScheduler } from "./services/rssFeedService";
@@ -10173,6 +10174,108 @@ export async function registerRoutes(
     }
   });
 
+  // Create Stripe Checkout Session for real card payments
+  app.post("/api/subscription/create-checkout-session", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user?.claims?.sub;
+      const { tier } = req.body;
+
+      if (!["pro", "campus"].includes(tier)) {
+        res.status(400).json({ error: "Invalid tier. Choose 'pro' or 'campus'" });
+        return;
+      }
+
+      const stripe = await getUncachableStripeClient();
+      const userRecord = await db.select().from(users).where(eq(users.id, userId)).limit(1);
+      const user = userRecord[0];
+
+      const tierPrices: Record<string, { amount: number; name: string; period: string }> = {
+        pro: { amount: 1900, name: "LYS Pro (Focus Mode)", period: "month" },
+        campus: { amount: 9900, name: "LYS Campus", period: "month" },
+      };
+      const tierInfo = tierPrices[tier];
+
+      // Find or create Stripe customer
+      let customerId = user?.stripeCustomerId || undefined;
+      if (!customerId) {
+        const customer = await stripe.customers.create({
+          email: user?.email || undefined,
+          name: [user?.firstName, user?.lastName].filter(Boolean).join(" ") || undefined,
+          metadata: { userId },
+        });
+        customerId = customer.id;
+        await db.update(users).set({ stripeCustomerId: customerId }).where(eq(users.id, userId));
+      }
+
+      const origin = req.headers.origin || req.headers.referer?.replace(/\/$/, "") || "https://localhost:5000";
+
+      const session = await stripe.checkout.sessions.create({
+        customer: customerId,
+        payment_method_types: ["card"],
+        mode: "subscription",
+        line_items: [
+          {
+            price_data: {
+              currency: "usd",
+              product_data: { name: tierInfo.name },
+              unit_amount: tierInfo.amount,
+              recurring: { interval: tierInfo.period as "month" | "year" },
+            },
+            quantity: 1,
+          },
+        ],
+        success_url: `${origin}/billing?checkout_success=true&session_id={CHECKOUT_SESSION_ID}&tier=${tier}`,
+        cancel_url: `${origin}/billing?checkout_cancelled=true`,
+        metadata: { userId, tier },
+      });
+
+      res.json({ url: session.url, sessionId: session.id });
+    } catch (error: any) {
+      console.error("Stripe checkout session error:", error);
+      res.status(500).json({ error: "Failed to create checkout session", details: error.message });
+    }
+  });
+
+  // Verify checkout session after Stripe redirects back
+  app.post("/api/subscription/verify-checkout", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user?.claims?.sub;
+      const { sessionId } = req.body;
+
+      if (!sessionId) {
+        res.status(400).json({ error: "Missing sessionId" });
+        return;
+      }
+
+      const stripe = await getUncachableStripeClient();
+      const session = await stripe.checkout.sessions.retrieve(sessionId, {
+        expand: ["subscription"],
+      });
+
+      if (session.payment_status !== "paid" && session.status !== "complete") {
+        res.status(400).json({ error: "Payment not completed" });
+        return;
+      }
+
+      const tier = (session.metadata?.tier || "pro") as string;
+      const subscription = session.subscription as any;
+
+      await db.update(users)
+        .set({
+          tier,
+          subscriptionStatus: "active",
+          stripeSubscriptionId: subscription?.id || null,
+          updatedAt: new Date(),
+        })
+        .where(eq(users.id, userId));
+
+      res.json({ success: true, tier, message: `Successfully upgraded to ${tier}` });
+    } catch (error: any) {
+      console.error("Checkout verification error:", error);
+      res.status(500).json({ error: "Failed to verify checkout session" });
+    }
+  });
+
   // Demo tier upgrade (for development/testing only)
   app.post("/api/subscription/demo-upgrade", isAuthenticated, async (req: any, res) => {
     try {
@@ -10241,16 +10344,16 @@ export async function registerRoutes(
           name: "Credit / Debit Card",
           description: "Pay securely with Visa, Mastercard, Amex, or Discover",
           icon: "credit-card",
-          configured: !!process.env.STRIPE_SECRET_KEY,
+          configured: true,
           available: true,
         },
         {
           id: "paypal",
           name: "PayPal",
-          description: "Pay with your PayPal account or PayPal Credit",
+          description: "Pay with your PayPal account or PayPal Credit — Coming soon",
           icon: "paypal",
-          configured: isPayPalConfigured(),
-          available: true,
+          configured: false,
+          available: false,
         },
         {
           id: "purchase_order",

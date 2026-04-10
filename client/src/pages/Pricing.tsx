@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { Link } from "wouter";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from "@/components/ui/card";
@@ -186,6 +186,40 @@ export default function Pricing() {
   const [poFormData, setPoFormData] = useState({ poNumber: "", organizationName: "", contactName: "", contactEmail: user?.email || "", notes: "" });
   const [bankFormData, setBankFormData] = useState({ organizationName: "", contactEmail: user?.email || "" });
   const [bankTransferDetails, setBankTransferDetails] = useState<any>(null);
+  const [stripeLoading, setStripeLoading] = useState(false);
+
+  // Handle return from Stripe Checkout
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const success = params.get("checkout_success");
+    const sessionId = params.get("session_id");
+    const tier = params.get("tier");
+    const cancelled = params.get("checkout_cancelled");
+
+    if (cancelled) {
+      window.history.replaceState({}, "", window.location.pathname);
+      toast({ title: "Checkout Cancelled", description: "No charges were made. You can try again anytime.", variant: "destructive" });
+      return;
+    }
+
+    if (success && sessionId && isAuthenticated) {
+      window.history.replaceState({}, "", window.location.pathname);
+      apiRequest("POST", "/api/subscription/verify-checkout", { sessionId })
+        .then(r => r.json())
+        .then((data) => {
+          if (data.success) {
+            queryClient.invalidateQueries({ queryKey: ["/api/subscription/status"] });
+            queryClient.invalidateQueries({ queryKey: ["/api/auth/user"] });
+            const tierData = baseTiers.find(t => t.id === (tier || data.tier));
+            const displayName = tierData?.subtitle || tierData?.name || tier || data.tier;
+            toast({ title: "Payment Successful!", description: `You've been upgraded to ${displayName}. Welcome to the next level!` });
+          }
+        })
+        .catch(() => {
+          toast({ title: "Verification Pending", description: "Your payment is being processed. Your plan will update shortly.", variant: "default" });
+        });
+    }
+  }, [isAuthenticated]);
 
   const { data: countries } = useQuery<CAICountry[]>({
     queryKey: ["/api/cai/countries"],
@@ -319,11 +353,26 @@ export default function Pricing() {
     }
   };
 
-  const handlePaymentSubmit = () => {
+  const handlePaymentSubmit = async () => {
     if (selectedPaymentMethod === "stripe") {
-      upgradeMutation.mutate(checkoutTier);
+      setStripeLoading(true);
+      try {
+        const res = await apiRequest("POST", "/api/subscription/create-checkout-session", { tier: checkoutTier });
+        const data = await res.json();
+        if (data.url) {
+          window.location.href = data.url;
+        } else {
+          toast({ title: "Error", description: data.error || "Could not start checkout. Please try again.", variant: "destructive" });
+          setStripeLoading(false);
+        }
+      } catch {
+        toast({ title: "Error", description: "Could not connect to payment service. Please try again.", variant: "destructive" });
+        setStripeLoading(false);
+      }
+      return;
     } else if (selectedPaymentMethod === "paypal") {
-      upgradeMutation.mutate(checkoutTier);
+      toast({ title: "PayPal Coming Soon", description: "PayPal checkout will be available soon. Please use a card or another payment method.", variant: "default" });
+      return;
     } else if (selectedPaymentMethod === "purchase_order") {
       poMutation.mutate({
         tier: checkoutTier,
@@ -356,7 +405,7 @@ export default function Pricing() {
   const selectedTierData = baseTiers.find(t => t.id === checkoutTier);
   const checkoutPrice = getAdjustedPrice(checkoutTier);
   const displayCheckoutPrice = checkoutPrice ? formatPrice(checkoutPrice.price) : selectedTierData ? `$${selectedTierData.basePrice}` : "$0";
-  const isPending = upgradeMutation.isPending || downgradeMutation.isPending || poMutation.isPending || bankTransferMutation.isPending;
+  const isPending = upgradeMutation.isPending || downgradeMutation.isPending || poMutation.isPending || bankTransferMutation.isPending || stripeLoading;
 
   return (
     <div className="min-h-screen bg-background">
@@ -673,17 +722,22 @@ export default function Pricing() {
               <div className="grid gap-2">
                 {paymentMethods?.map((method) => {
                   const IconComp = paymentMethodIcons[method.icon] || CreditCard;
-                  const needsSetup = (method.id === "stripe" || method.id === "paypal") && !method.configured;
+                  const isUnavailable = method.available === false;
                   return (
                     <button
                       key={method.id}
                       type="button"
+                      disabled={isUnavailable}
                       onClick={() => {
-                        setSelectedPaymentMethod(method.id);
-                        setBankTransferDetails(null);
+                        if (!isUnavailable) {
+                          setSelectedPaymentMethod(method.id);
+                          setBankTransferDetails(null);
+                        }
                       }}
                       className={`flex items-center gap-3 p-3 rounded-md border text-left transition-colors ${
-                        selectedPaymentMethod === method.id
+                        isUnavailable
+                          ? "opacity-50 cursor-not-allowed border-border"
+                          : selectedPaymentMethod === method.id
                           ? "border-lys-teal bg-lys-teal/5 ring-1 ring-lys-teal"
                           : "hover-elevate"
                       }`}
@@ -695,13 +749,13 @@ export default function Pricing() {
                       <div className="min-w-0 flex-1">
                         <div className="flex items-center gap-2 flex-wrap">
                           <p className="text-sm font-medium text-foreground">{method.name}</p>
-                          {needsSetup && (
-                            <Badge variant="secondary" className="text-xs">Demo Mode</Badge>
+                          {isUnavailable && (
+                            <Badge variant="outline" className="text-xs text-muted-foreground">Coming Soon</Badge>
                           )}
                         </div>
                         <p className="text-xs text-muted-foreground">{method.description}</p>
                       </div>
-                      {selectedPaymentMethod === method.id && (
+                      {selectedPaymentMethod === method.id && !isUnavailable && (
                         <Check className="h-4 w-4 text-lys-teal shrink-0" />
                       )}
                     </button>
@@ -712,35 +766,23 @@ export default function Pricing() {
 
             {selectedPaymentMethod === "stripe" && (
               <div className="p-4 rounded-md bg-muted/50 border space-y-2">
-                <p className="text-sm text-foreground font-medium">Credit / Debit Card</p>
-                {paymentMethods?.find(m => m.id === "stripe")?.configured ? (
-                  <p className="text-xs text-muted-foreground">
-                    You'll be redirected to our secure payment page to enter your card details.
-                    We accept Visa, Mastercard, American Express, and Discover.
-                  </p>
-                ) : (
-                  <p className="text-xs text-muted-foreground">
-                    Card payments are in demo mode. Clicking below will simulate a successful upgrade
-                    so you can explore all features. Live card processing via Stripe will be available soon.
-                  </p>
-                )}
+                <p className="text-sm text-foreground font-medium">Secure Card Payment via Stripe</p>
+                <p className="text-xs text-muted-foreground">
+                  You'll be redirected to Stripe's secure checkout page to enter your card details.
+                  We accept Visa, Mastercard, American Express, and Discover.
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  Your payment is protected by Stripe — no card data is stored on our servers.
+                </p>
               </div>
             )}
 
             {selectedPaymentMethod === "paypal" && (
               <div className="p-4 rounded-md bg-muted/50 border space-y-2">
-                <p className="text-sm text-foreground font-medium">PayPal Checkout</p>
-                {paymentMethods?.find(m => m.id === "paypal")?.configured ? (
-                  <p className="text-xs text-muted-foreground">
-                    You'll be redirected to PayPal to complete your payment securely.
-                    You can pay with your PayPal balance, linked bank account, or PayPal Credit.
-                  </p>
-                ) : (
-                  <p className="text-xs text-muted-foreground">
-                    PayPal is in demo mode. Clicking below will simulate a successful upgrade
-                    so you can explore all features. Live PayPal checkout will be available soon.
-                  </p>
-                )}
+                <p className="text-sm text-foreground font-medium">PayPal — Coming Soon</p>
+                <p className="text-xs text-muted-foreground">
+                  PayPal checkout is not yet available. Please use Credit / Debit Card, Purchase Order, or Bank Transfer instead.
+                </p>
               </div>
             )}
 
@@ -885,8 +927,8 @@ export default function Pricing() {
                 {isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
                 {selectedPaymentMethod === "purchase_order" ? "Submit Purchase Order" :
                  selectedPaymentMethod === "bank_transfer" ? "Get Transfer Instructions" :
-                 selectedPaymentMethod === "paypal" ? "Continue to PayPal" :
-                 selectedPaymentMethod === "stripe" ? "Continue to Card Payment" :
+                 selectedPaymentMethod === "paypal" ? "PayPal — Coming Soon" :
+                 selectedPaymentMethod === "stripe" ? (stripeLoading ? "Redirecting to Stripe..." : "Pay with Card") :
                  "Select Payment Method"}
               </Button>
             )}
