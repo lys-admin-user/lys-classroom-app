@@ -19,8 +19,12 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip
 interface SubscriptionStatus {
   tier: string;
   subscriptionStatus: string | null;
+  stripeSubscriptionId: string | null;
+  currentPeriodEnd: string | null;
   isDemo: boolean;
 }
+
+const TIER_ORDER: Record<string, number> = { free: 0, pro: 1, campus: 2, enterprise: 3 };
 
 interface CAICountry {
   code: string;
@@ -188,6 +192,8 @@ export default function Pricing() {
   const [bankFormData, setBankFormData] = useState({ organizationName: "", contactEmail: user?.email || "" });
   const [bankTransferDetails, setBankTransferDetails] = useState<any>(null);
   const [stripeLoading, setStripeLoading] = useState(false);
+  const [downgradeDialogOpen, setDowngradeDialogOpen] = useState(false);
+  const [downgradeTo, setDowngradeTo] = useState<string>("");
 
   // Handle return from Stripe Checkout
   useEffect(() => {
@@ -318,21 +324,23 @@ export default function Pricing() {
   });
 
   const downgradeMutation = useMutation({
-    mutationFn: () => apiRequest("POST", "/api/subscription/demo-downgrade", {}),
-    onSuccess: () => {
+    mutationFn: (targetTier: string) =>
+      apiRequest("POST", "/api/subscription/downgrade", { targetTier }).then(r => r.json()),
+    onSuccess: (data: any) => {
       queryClient.invalidateQueries({ queryKey: ["/api/subscription/status"] });
       queryClient.invalidateQueries({ queryKey: ["/api/auth/user"] });
-      toast({
-        title: "Plan Changed",
-        description: "You're now on the Free plan.",
-      });
+      setDowngradeDialogOpen(false);
+      if (data.immediate) {
+        toast({ title: "Plan Changed", description: data.message });
+      } else {
+        toast({
+          title: "Downgrade Scheduled",
+          description: data.message,
+        });
+      }
     },
     onError: () => {
-      toast({
-        title: "Error",
-        description: "Failed to change plan.",
-        variant: "destructive",
-      });
+      toast({ title: "Error", description: "Failed to change plan. Please try again.", variant: "destructive" });
     },
   });
 
@@ -341,7 +349,9 @@ export default function Pricing() {
   const getButtonAction = (tierId: string) => {
     if (!isAuthenticated) return "login";
     if (tierId === currentTier) return "current";
-    if (tierId === "free") return "downgrade";
+    const currentOrder = TIER_ORDER[currentTier] ?? 0;
+    const targetOrder = TIER_ORDER[tierId] ?? 0;
+    if (targetOrder < currentOrder) return "downgrade";
     return "upgrade";
   };
 
@@ -353,7 +363,8 @@ export default function Pricing() {
       setBankTransferDetails(null);
       setCheckoutOpen(true);
     } else if (action === "downgrade") {
-      downgradeMutation.mutate();
+      setDowngradeTo(tierId);
+      setDowngradeDialogOpen(true);
     }
   };
 
@@ -410,6 +421,17 @@ export default function Pricing() {
   const checkoutPrice = getAdjustedPrice(checkoutTier);
   const displayCheckoutPrice = checkoutPrice ? formatPrice(checkoutPrice.price) : selectedTierData ? `$${selectedTierData.basePrice}` : "$0";
   const isPending = upgradeMutation.isPending || downgradeMutation.isPending || poMutation.isPending || bankTransferMutation.isPending || stripeLoading;
+
+  const downgradeToData = baseTiers.find(t => t.id === downgradeTo);
+  const currentTierData = baseTiers.find(t => t.id === currentTier);
+  const periodEndFormatted = subscriptionStatus?.currentPeriodEnd
+    ? new Date(subscriptionStatus.currentPeriodEnd).toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" })
+    : null;
+  const hasRealSubscription = !!subscriptionStatus?.stripeSubscriptionId && subscriptionStatus?.subscriptionStatus === "active";
+
+  const lostFeatures = currentTierData?.features.filter(f =>
+    f.included && !downgradeToData?.features.find(df => df.name === f.name && df.included)
+  ) || [];
 
   return (
     <div className="min-h-screen bg-background">
@@ -609,7 +631,9 @@ export default function Pricing() {
                       onClick={() => handleTierClick(tier.id)}
                       data-testid={`button-select-${tier.name.toLowerCase()}`}
                     >
-                      {isPending ? "Processing..." : isCurrentPlan ? "Current Plan" : action === "downgrade" ? "Switch to Free" : tier.cta}
+                      {isCurrentPlan ? "Current Plan" :
+                       action === "downgrade" ? `Switch to ${tier.name}` :
+                       tier.cta}
                     </Button>
                   ) : (
                     <Link href="/api/login" className="w-full">
@@ -713,6 +737,83 @@ export default function Pricing() {
           </Button>
         </div>
       </div>
+
+      {/* Downgrade Confirmation Dialog */}
+      <Dialog open={downgradeDialogOpen} onOpenChange={setDowngradeDialogOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="font-oswald text-xl flex items-center gap-2">
+              <AlertCircle className="h-5 w-5 text-amber-500" />
+              Confirm Plan Change
+            </DialogTitle>
+            <DialogDescription>
+              You're switching from <strong>{currentTierData?.name}</strong> to <strong>{downgradeToData?.name}</strong>.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4 py-1">
+            {/* Access timeline */}
+            {hasRealSubscription && periodEndFormatted ? (
+              <div className="rounded-lg border border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-950/20 p-4 space-y-1">
+                <p className="text-sm font-medium text-amber-800 dark:text-amber-300">
+                  You keep full access until {periodEndFormatted}
+                </p>
+                <p className="text-xs text-amber-700 dark:text-amber-400">
+                  Since you've already paid for this billing period, your {currentTierData?.name} plan stays active until then. After that, your account switches to {downgradeToData?.name}.
+                </p>
+              </div>
+            ) : (
+              <div className="rounded-lg border border-muted bg-muted/40 p-4 space-y-1">
+                <p className="text-sm font-medium text-foreground">Your plan changes immediately</p>
+                <p className="text-xs text-muted-foreground">
+                  You'll be switched to the {downgradeToData?.name} plan right away.
+                </p>
+              </div>
+            )}
+
+            {/* Features being lost */}
+            {lostFeatures.length > 0 && (
+              <div className="space-y-2">
+                <p className="text-sm font-medium text-foreground">Features you'll lose:</p>
+                <ul className="space-y-1">
+                  {lostFeatures.slice(0, 6).map(f => (
+                    <li key={f.name} className="flex items-center gap-2 text-sm text-muted-foreground">
+                      <X className="h-3.5 w-3.5 text-red-400 shrink-0" />
+                      {f.name}
+                    </li>
+                  ))}
+                  {lostFeatures.length > 6 && (
+                    <li className="text-xs text-muted-foreground pl-5">and {lostFeatures.length - 6} more…</li>
+                  )}
+                </ul>
+              </div>
+            )}
+          </div>
+
+          <DialogFooter className="flex-col sm:flex-row gap-2 pt-2">
+            <Button
+              variant="outline"
+              className="w-full sm:w-auto"
+              onClick={() => setDowngradeDialogOpen(false)}
+              data-testid="button-cancel-downgrade"
+            >
+              Keep {currentTierData?.name}
+            </Button>
+            <Button
+              variant="destructive"
+              className="w-full sm:w-auto"
+              disabled={downgradeMutation.isPending}
+              onClick={() => downgradeMutation.mutate(downgradeTo)}
+              data-testid="button-confirm-downgrade"
+            >
+              {downgradeMutation.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+              {hasRealSubscription && periodEndFormatted
+                ? `Downgrade on ${periodEndFormatted}`
+                : `Switch to ${downgradeToData?.name}`}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <Dialog open={checkoutOpen} onOpenChange={setCheckoutOpen}>
         <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">

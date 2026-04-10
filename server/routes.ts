@@ -10161,12 +10161,24 @@ export async function registerRoutes(
         res.status(404).json({ error: "User not found" });
         return;
       }
+
+      let currentPeriodEnd: string | null = null;
+      if (user.stripeSubscriptionId) {
+        try {
+          const stripe = await getUncachableStripeClient();
+          const subscription = await stripe.subscriptions.retrieve(user.stripeSubscriptionId);
+          currentPeriodEnd = new Date((subscription as any).current_period_end * 1000).toISOString();
+        } catch {
+          // Non-fatal: period end simply won't be shown
+        }
+      }
       
       res.json({
         tier: user.tier || "free",
         subscriptionStatus: user.subscriptionStatus || null,
         stripeCustomerId: user.stripeCustomerId || null,
         stripeSubscriptionId: user.stripeSubscriptionId || null,
+        currentPeriodEnd,
         isDemo: !process.env.STRIPE_SECRET_KEY,
       });
     } catch (error) {
@@ -10309,24 +10321,66 @@ export async function registerRoutes(
     }
   });
 
-  // Demo tier downgrade
+  // Tier downgrade — cancels at period end for real subscriptions, immediate for demo
+  app.post("/api/subscription/downgrade", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user?.claims?.sub;
+      const { targetTier } = req.body;
+
+      const validTiers = ["free", "pro", "campus"];
+      if (!validTiers.includes(targetTier)) {
+        res.status(400).json({ error: "Invalid target tier" });
+        return;
+      }
+
+      const userRecord = await db.select().from(users).where(eq(users.id, userId)).limit(1);
+      const user = userRecord[0];
+      if (!user) {
+        res.status(404).json({ error: "User not found" });
+        return;
+      }
+
+      // Real Stripe subscription — cancel at period end
+      if (user.stripeSubscriptionId && user.subscriptionStatus === "active") {
+        const stripe = await getUncachableStripeClient();
+        const sub = await stripe.subscriptions.update(user.stripeSubscriptionId, {
+          cancel_at_period_end: true,
+        });
+        const periodEnd = new Date((sub as any).current_period_end * 1000).toISOString();
+
+        await db.update(users)
+          .set({ subscriptionStatus: "canceling", updatedAt: new Date() })
+          .where(eq(users.id, userId));
+
+        res.json({
+          success: true,
+          immediate: false,
+          currentPeriodEnd: periodEnd,
+          targetTier,
+          message: `Your plan will change to ${targetTier} on ${new Date(periodEnd).toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" })}.`,
+        });
+      } else {
+        // Demo/no subscription — immediate downgrade
+        await db.update(users)
+          .set({ tier: targetTier, subscriptionStatus: null, stripeSubscriptionId: null, updatedAt: new Date() })
+          .where(eq(users.id, userId));
+
+        res.json({ success: true, immediate: true, targetTier, message: `Switched to ${targetTier} plan.` });
+      }
+    } catch (error: any) {
+      console.error("Downgrade error:", error);
+      res.status(500).json({ error: "Failed to downgrade plan" });
+    }
+  });
+
+  // Legacy demo downgrade (kept for backward compatibility)
   app.post("/api/subscription/demo-downgrade", isAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user?.claims?.sub;
-      
       await db.update(users)
-        .set({ 
-          tier: "free",
-          subscriptionStatus: null,
-          updatedAt: new Date()
-        })
+        .set({ tier: "free", subscriptionStatus: null, updatedAt: new Date() })
         .where(eq(users.id, userId));
-      
-      res.json({ 
-        success: true, 
-        message: "Downgraded to free tier",
-        tier: "free"
-      });
+      res.json({ success: true, message: "Downgraded to free tier", tier: "free" });
     } catch (error) {
       res.status(500).json({ error: "Failed to downgrade tier" });
     }
