@@ -531,19 +531,24 @@ export default function Pricing() {
             return (
               <Card 
                 key={tier.name}
-                className={`relative ${tier.popular ? "border-lys-red border-2" : ""} ${isCurrentPlan ? "ring-2 ring-lys-teal" : ""}`}
+                className={`relative ${
+                  isCurrentPlan
+                    ? "border-lys-teal border-2"
+                    : tier.popular
+                    ? "border-lys-red border-2"
+                    : ""
+                }`}
                 data-testid={`card-pricing-${tier.name.toLowerCase()}`}
               >
-                {tier.popular && (
+                {isCurrentPlan ? (
+                  <Badge className="absolute -top-3 left-1/2 -translate-x-1/2 bg-lys-teal text-white">
+                    Current Plan
+                  </Badge>
+                ) : tier.popular ? (
                   <Badge className="absolute -top-3 left-1/2 -translate-x-1/2 bg-lys-red text-white">
                     Most Popular
                   </Badge>
-                )}
-                {isCurrentPlan && (
-                  <Badge className="absolute -top-3 right-4 bg-lys-teal text-white">
-                    Current Plan
-                  </Badge>
-                )}
+                ) : null}
                 <CardHeader className="text-center pb-2">
                   <div className="mx-auto mb-4 p-3 rounded-full bg-muted w-fit">
                     <tier.icon className="h-6 w-6 text-foreground" />
