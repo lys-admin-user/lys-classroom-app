@@ -9,7 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue, SelectGr
 import { Checkbox } from "@/components/ui/checkbox";
 import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
-import { GraduationCap, BookOpen, Building2, ChevronRight, ChevronLeft, Sparkles, Target, Compass, BookMarked, School, Home, Presentation, Shield, Globe } from "lucide-react";
+import { GraduationCap, BookOpen, Building2, ChevronRight, ChevronLeft, Sparkles, Target, Compass, BookMarked, School, Home, Presentation } from "lucide-react";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import type { StandardsJurisdiction } from "@shared/schema";
@@ -118,18 +118,27 @@ const COUNTRIES = [
   { code: "TN", name: "Tunisia", region: "Africa" },
 ];
 
-const PRIMARY_GOALS_BASE = [
+const PRIMARY_GOALS_STUDENT = [
   { id: "discover", label: "Discover my strengths and interests", icon: Compass },
   { id: "career", label: "Explore career pathways", icon: Target },
+];
+
+const PRIMARY_GOALS_EDUCATOR = [
   { id: "lessons", label: "Create engaging lesson plans", icon: BookOpen },
   { id: "curriculum", label: "Build scope & sequence", icon: BookMarked },
-  { id: "connect_family", label: "Connect with & track my child's education", icon: Home },
+  { id: "discover", label: "Explore professional development", icon: Compass },
 ];
 
 const PRIMARY_GOALS_ADMIN = [
   { id: "oversight", label: "Oversee campus/district performance", icon: Presentation },
   { id: "lessons", label: "Create engaging lesson plans", icon: BookOpen },
   { id: "curriculum", label: "Build scope & sequence", icon: BookMarked },
+];
+
+const PRIMARY_GOALS_PARENT = [
+  { id: "connect_family", label: "Track and support my child's education", icon: Home },
+  { id: "discover", label: "Help my child discover their strengths", icon: Compass },
+  { id: "curriculum", label: "Plan curriculum for home learning", icon: BookMarked },
 ];
 
 // Interests are now auto-derived from role and primary goal to streamline onboarding
@@ -277,13 +286,14 @@ export default function Onboarding() {
   };
 
   const getRecommendedPath = () => {
-    if (primaryGoal === "discover") return "/self-discovery";
+    if (primaryGoal === "discover") {
+      if (role === "educator" || role === "homeschool_parent") return "/professional-development";
+      return "/self-discovery";
+    }
     if (primaryGoal === "career") return "/careers";
     if (primaryGoal === "lessons") return "/lesson-generator";
     if (primaryGoal === "curriculum") return "/scope-sequence";
     if (primaryGoal === "oversight") {
-      if (role === "system_admin") return "/system-admin";
-      if (role === "site_admin") return "/admin";
       if (role === "district_admin") return "/district-admin";
       return "/admin";
     }
@@ -317,9 +327,16 @@ export default function Onboarding() {
     });
   };
 
-  const isEducator = role === "educator" || role === "campus_admin" || role === "district_admin" || role === "homeschool_parent" || role === "site_admin" || role === "system_admin";
-  const isAdmin = role === "campus_admin" || role === "district_admin" || role === "site_admin" || role === "system_admin";
-  const primaryGoals = isAdmin ? PRIMARY_GOALS_ADMIN : PRIMARY_GOALS_BASE;
+  const isEducator = role === "educator" || role === "campus_admin" || role === "district_admin" || role === "homeschool_parent";
+  const isAdmin = role === "campus_admin" || role === "district_admin";
+  const isParent = role === "homeschool_parent";
+  const primaryGoals = isAdmin
+    ? PRIMARY_GOALS_ADMIN
+    : isParent
+    ? PRIMARY_GOALS_PARENT
+    : role === "educator"
+    ? PRIMARY_GOALS_EDUCATOR
+    : PRIMARY_GOALS_STUDENT;
 
   const steps: { key: StepKey; label: string }[] = isEducator
     ? [
@@ -444,30 +461,6 @@ export default function Onboarding() {
                   <div>
                     <Label htmlFor="district_admin" className="cursor-pointer font-medium">District / Charter Network Administrator</Label>
                     <p className="text-sm text-muted-foreground">ISD, charter network (CMO/EMO), or multi-campus leadership overseeing multiple schools</p>
-                  </div>
-                </div>
-                <div 
-                  className={`flex items-center gap-4 p-4 rounded-md border cursor-pointer hover-elevate ${role === "site_admin" ? "border-lys-red bg-muted" : ""}`}
-                  onClick={() => { setRole("site_admin"); setPrimaryGoal(""); }}
-                  data-testid="option-site-admin"
-                >
-                  <RadioGroupItem value="site_admin" id="site_admin" />
-                  <Shield className="h-6 w-6 text-lys-red" />
-                  <div>
-                    <Label htmlFor="site_admin" className="cursor-pointer font-medium">Site Administrator</Label>
-                    <p className="text-sm text-muted-foreground">Platform admin managing all organizations, ISDs, and charter networks</p>
-                  </div>
-                </div>
-                <div 
-                  className={`flex items-center gap-4 p-4 rounded-md border cursor-pointer hover-elevate ${role === "system_admin" ? "border-lys-red bg-muted" : ""}`}
-                  onClick={() => { setRole("system_admin"); setPrimaryGoal(""); }}
-                  data-testid="option-system-admin"
-                >
-                  <RadioGroupItem value="system_admin" id="system_admin" />
-                  <Globe className="h-6 w-6 text-lys-red" />
-                  <div>
-                    <Label htmlFor="system_admin" className="cursor-pointer font-medium">System Administrator</Label>
-                    <p className="text-sm text-muted-foreground">Full platform oversight, global configuration, and system-wide settings</p>
                   </div>
                 </div>
               </RadioGroup>

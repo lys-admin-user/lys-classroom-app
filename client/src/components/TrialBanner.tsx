@@ -1,17 +1,26 @@
 import { useTrial } from "@/hooks/use-trial";
 import { useTier } from "@/hooks/use-tier";
+import { useAuth } from "@/hooks/use-auth";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { Clock, Sparkles, Gift, ArrowRight, X } from "lucide-react";
 import { Link } from "wouter";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 
 export function TrialBanner() {
+  const { isAuthenticated } = useAuth();
   const { isPaid, isLoading: tierLoading } = useTier();
   const { trialStatus, isTrialActive, daysRemaining, canStartTrial, startTrial, isStartingTrial } = useTrial();
   const [dismissed, setDismissed] = useState(false);
+
+  // Auto-start trial for authenticated free users who haven't used their trial yet
+  useEffect(() => {
+    if (isAuthenticated && !isPaid && !isTrialActive && canStartTrial && !isStartingTrial && trialStatus.trialsUsed === 0) {
+      startTrial();
+    }
+  }, [isAuthenticated, isPaid, isTrialActive, canStartTrial, isStartingTrial, trialStatus.trialsUsed]);
 
   if (tierLoading || dismissed) return null;
   if (isPaid) return null;

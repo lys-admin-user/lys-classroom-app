@@ -85,6 +85,13 @@ function OnboardingGuard({ children }: { children: React.ReactNode }) {
     if (isExemptPath) return;
 
     const skipCount = user.onboardingSkipCount || 0;
+    const loginCount = (user as any).loginCount || 0;
+
+    // Brand-new users (first login, never skipped) go straight to onboarding
+    if (loginCount <= 1 && skipCount === 0) {
+      setLocation("/onboarding");
+      return;
+    }
 
     // Hard redirect once all skips are used
     if (skipCount >= MAX_ONBOARDING_SKIPS) {
@@ -92,7 +99,7 @@ function OnboardingGuard({ children }: { children: React.ReactNode }) {
       return;
     }
 
-    // Show the explicit prompt once per browser session
+    // Show the explicit prompt once per browser session for returning users who haven't completed
     const alreadyPrompted = sessionStorage.getItem(SESSION_PROMPT_KEY);
     if (!alreadyPrompted) {
       sessionStorage.setItem(SESSION_PROMPT_KEY, "true");

@@ -51,14 +51,49 @@ function updateUserSession(
   user.expires_at = user.claims?.exp;
 }
 
-async function upsertUser(claims: any) {
-  await authStorage.upsertUser({
+async function upsertUser(claims: any, ipAddress?: string) {
+  const user = await authStorage.upsertUser({
     id: claims["sub"],
     email: claims["email"],
     firstName: claims["first_name"],
     lastName: claims["last_name"],
     profileImageUrl: claims["profile_image_url"],
   });
+
+  // Auto-start a 10-day trial for brand-new users (loginCount === 1)
+  if (user.loginCount === 1) {
+    try {
+      const { db } = await import("../../db");
+      const { freeTrials } = await import("@shared/schema");
+      const { eq } = await import("drizzle-orm");
+
+      const existingTrials = await db
+        .select()
+        .from(freeTrials)
+        .where(eq(freeTrials.userId, user.id))
+        .limit(1);
+
+      if (existingTrials.length === 0) {
+        const now = new Date();
+        const trialEndDate = new Date(now);
+        trialEndDate.setDate(trialEndDate.getDate() + 10);
+
+        await db.insert(freeTrials).values({
+          userId: user.id,
+          ipAddress: ipAddress || "unknown",
+          fingerprint: `auto_${user.id}`,
+          trialStartDate: now,
+          trialEndDate,
+          isActive: true,
+          abuseFlags: 0,
+        } as any);
+      }
+    } catch (e) {
+      console.error("Failed to auto-start trial:", e);
+    }
+  }
+
+  return user;
 }
 
 export async function setupAuth(app: Express) {
@@ -71,12 +106,14 @@ export async function setupAuth(app: Express) {
 
   const verify: VerifyFunction = async (
     tokens: client.TokenEndpointResponse & client.TokenEndpointResponseHelpers,
-    verified: passport.AuthenticateCallback
+    verified: passport.AuthenticateCallback,
+    req?: any
   ) => {
     const user = {};
     updateUserSession(user, tokens);
     const claims = tokens.claims();
-    await upsertUser(claims);
+    const ipAddress = req?.ip || req?.headers?.['x-forwarded-for'] || "unknown";
+    await upsertUser(claims, ipAddress);
     try {
       const { logAuditEvent } = await import("../../../server/services/auditLog");
       await logAuditEvent({
