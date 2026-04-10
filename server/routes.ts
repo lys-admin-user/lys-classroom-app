@@ -10224,8 +10224,8 @@ export async function registerRoutes(
             quantity: 1,
           },
         ],
-        success_url: `${origin}/billing?checkout_success=true&session_id={CHECKOUT_SESSION_ID}&tier=${tier}`,
-        cancel_url: `${origin}/billing?checkout_cancelled=true`,
+        success_url: `${origin}/pricing?checkout_success=true&session_id={CHECKOUT_SESSION_ID}&tier=${tier}`,
+        cancel_url: `${origin}/pricing?checkout_cancelled=true`,
         metadata: { userId, tier },
       });
 
