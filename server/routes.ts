@@ -10167,7 +10167,16 @@ export async function registerRoutes(
         try {
           const stripe = await getUncachableStripeClient();
           const subscription = await stripe.subscriptions.retrieve(user.stripeSubscriptionId);
-          currentPeriodEnd = new Date((subscription as any).current_period_end * 1000).toISOString();
+          const sub = subscription as any;
+          // current_period_end moved in newer Stripe API versions; try multiple locations
+          const rawTs: number | undefined =
+            typeof sub.current_period_end === "number" ? sub.current_period_end :
+            typeof sub.cancel_at === "number" ? sub.cancel_at :
+            typeof sub.billing_cycle_anchor === "number" ? sub.billing_cycle_anchor :
+            sub.items?.data?.[0]?.current_period_end;
+          if (rawTs && !isNaN(rawTs)) {
+            currentPeriodEnd = new Date(rawTs * 1000).toISOString();
+          }
         } catch {
           // Non-fatal: period end simply won't be shown
         }
@@ -10345,8 +10354,16 @@ export async function registerRoutes(
         const stripe = await getUncachableStripeClient();
         const sub = await stripe.subscriptions.update(user.stripeSubscriptionId, {
           cancel_at_period_end: true,
-        });
-        const periodEnd = new Date((sub as any).current_period_end * 1000).toISOString();
+        }) as any;
+        // current_period_end moved in newer Stripe API versions; try multiple locations
+        const rawTs: number | undefined =
+          typeof sub.current_period_end === "number" ? sub.current_period_end :
+          typeof sub.cancel_at === "number" ? sub.cancel_at :
+          typeof sub.billing_cycle_anchor === "number" ? sub.billing_cycle_anchor :
+          sub.items?.data?.[0]?.current_period_end;
+        const periodEnd = (rawTs && !isNaN(rawTs))
+          ? new Date(rawTs * 1000).toISOString()
+          : new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(); // fallback: 30 days
 
         await db.update(users)
           .set({ subscriptionStatus: "canceling", updatedAt: new Date() })
