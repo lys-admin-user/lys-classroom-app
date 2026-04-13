@@ -1,5 +1,6 @@
 import { useState, useMemo } from "react";
 import { useAuth } from "@/hooks/use-auth";
+import { PLAN_PRICES } from "@/lib/pricing";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -566,17 +567,17 @@ const helpArticles: HelpArticle[] = [
     tags: ["multi-tenant", "organizations", "hierarchy", "district", "campus", "school", "isolation", "charter network", "CMO", "EMO", "ISD", "network"],
     severity: "info",
     symptom: "You need to understand how multi-tenancy, organization hierarchy, and data isolation work.",
-    explanation: "LYS supports three client structures: (1) Single-Campus Charters — independent schools (type='school'/'campus', Campus tier at $99/mo), (2) Traditional ISDs — public school districts (type='district' with child schools, Enterprise tier at $299/mo), and (3) Multi-State Charter Networks — CMOs/EMOs like KIPP, IDEA, or Charter Schools USA (type='charter_network'/'network' with child orgs, Enterprise tier at $299/mo). Each organization has its own members, settings, and resources. Data isolation ensures users in one organization cannot access another's data unless explicitly shared. Charter networks support both unified master dashboard and per-state management views.",
+    explanation: `LYS supports three client structures: (1) Single-Campus Charters — independent schools (type='school'/'campus', Campus tier at $${PLAN_PRICES.campus}/mo), (2) Traditional ISDs — public school districts (type='district' with child schools, Enterprise tier at $${PLAN_PRICES.enterprise}/mo), and (3) Multi-State Charter Networks — CMOs/EMOs like KIPP, IDEA, or Charter Schools USA (type='charter_network'/'network' with child orgs, Enterprise tier at $${PLAN_PRICES.enterprise}/mo). Each organization has its own members, settings, and resources. Data isolation ensures users in one organization cannot access another's data unless explicitly shared. Charter networks support both unified master dashboard and per-state management views.`,
     steps: [
       "Organization types: school/campus (single sites), district (ISDs), charter_network/network (CMOs/EMOs), university — linked via parentOrganizationId",
-      "Single-Campus Charters: type='school' or 'campus', no parent org, full customization, Campus tier ($99/mo)",
-      "Traditional ISDs: type='district' with child 'school'/'campus' orgs, locally governed, Enterprise tier ($299/mo)",
-      "Charter Networks (CMOs/EMOs): type='charter_network' or 'network' with child orgs across states, Enterprise tier ($299/mo)",
+      `Single-Campus Charters: type='school' or 'campus', no parent org, full customization, Campus tier ($${PLAN_PRICES.campus}/mo)`,
+      `Traditional ISDs: type='district' with child 'school'/'campus' orgs, locally governed, Enterprise tier ($${PLAN_PRICES.enterprise}/mo)`,
+      `Charter Networks (CMOs/EMOs): type='charter_network' or 'network' with child orgs across states, Enterprise tier ($${PLAN_PRICES.enterprise}/mo)`,
       "Charter networks support unified master dashboard OR per-state management based on admin preference",
       "Data isolation: queries are scoped to the user's organization memberships by default",
       "Resources cascade: district/network-level resources are available to all child campuses",
       "SIS integrations cascade: a district or charter network SIS connection is available to all campus educators",
-      "Organization tiers: free, pro, campus ($99/mo), enterprise ($299/mo) — all districts and networks are Enterprise",
+      `Organization tiers: free, pro, campus ($${PLAN_PRICES.campus}/mo), enterprise ($${PLAN_PRICES.enterprise}/mo) — all districts and networks are Enterprise`,
       "Creating a new org: POST /api/organizations with type, name, and optional parentOrganizationId",
       "System admins can view and manage all organizations from the Admin > Organizations tab",
     ],
@@ -793,9 +794,9 @@ const helpArticles: HelpArticle[] = [
     tags: ["charter network", "CMO", "EMO", "multi-state", "KIPP", "IDEA", "network", "management", "master dashboard"],
     severity: "info",
     symptom: "You need to set up or manage a charter network (CMO/EMO) with campuses across multiple states.",
-    explanation: "Charter networks — both CMOs (Charter Management Organizations, non-profit) and EMOs (Education Management Organizations, for-profit) — use the 'charter_network' or 'network' organization type in LYS. Examples include KIPP, IDEA Public Schools, Green Dot, and Charter Schools USA. These organizations operate at the Enterprise tier ($299/mo) and support managing campuses across multiple states from a central headquarters. Admins can choose between a unified master dashboard showing all campuses or per-state management views.",
+    explanation: `Charter networks — both CMOs (Charter Management Organizations, non-profit) and EMOs (Education Management Organizations, for-profit) — use the 'charter_network' or 'network' organization type in LYS. Examples include KIPP, IDEA Public Schools, Green Dot, and Charter Schools USA. These organizations operate at the Enterprise tier ($${PLAN_PRICES.enterprise}/mo) and support managing campuses across multiple states from a central headquarters. Admins can choose between a unified master dashboard showing all campuses or per-state management views.`,
     steps: [
-      "Charter networks are created with type='charter_network' or 'network' and are automatically Enterprise tier ($299/mo)",
+      `Charter networks are created with type='charter_network' or 'network' and are automatically Enterprise tier ($${PLAN_PRICES.enterprise}/mo)`,
       "Add child campus organizations under your network — each campus can be in a different state",
       "Choose your management style: unified master dashboard (see all campuses at once) or per-state view",
       "Each campus within the network can have its own state standards, calendar, and local settings",
@@ -815,11 +816,11 @@ const helpArticles: HelpArticle[] = [
     symptom: "You need to understand which LYS organization type and tier applies to your school or network.",
     explanation: "LYS serves three distinct client structures, each with its own organization type and pricing tier. Understanding which structure fits your school helps you choose the right plan and configure the platform correctly.",
     steps: [
-      "Single-Campus Charter: Independent school with no parent organization. Uses type='school' or 'campus', Campus tier at $99/mo. Full customization, makes own rules.",
-      "Traditional ISD (Public School District): Geographically bound, locally governed district with elected board. Uses type='district' with child 'school'/'campus' orgs, Enterprise tier at $299/mo. Standardized calendar and curriculum.",
-      "Multi-State Charter Network (CMO/EMO): Central HQ managing schools across states. Uses type='charter_network' or 'network' with child orgs, Enterprise tier at $299/mo. Examples: KIPP, IDEA, Green Dot, Charter Schools USA.",
-      "All districts and charter networks are automatically Enterprise tier ($299/mo) regardless of size",
-      "Single-campus schools can operate independently at Campus tier ($99/mo) with full features",
+      `Single-Campus Charter: Independent school with no parent organization. Uses type='school' or 'campus', Campus tier at $${PLAN_PRICES.campus}/mo. Full customization, makes own rules.`,
+      `Traditional ISD (Public School District): Geographically bound, locally governed district with elected board. Uses type='district' with child 'school'/'campus' orgs, Enterprise tier at $${PLAN_PRICES.enterprise}/mo. Standardized calendar and curriculum.`,
+      `Multi-State Charter Network (CMO/EMO): Central HQ managing schools across states. Uses type='charter_network' or 'network' with child orgs, Enterprise tier at $${PLAN_PRICES.enterprise}/mo. Examples: KIPP, IDEA, Green Dot, Charter Schools USA.`,
+      `All districts and charter networks are automatically Enterprise tier ($${PLAN_PRICES.enterprise}/mo) regardless of size`,
+      `Single-campus schools can operate independently at Campus tier ($${PLAN_PRICES.campus}/mo) with full features`,
       "Charter networks can choose unified master dashboard or per-state management based on preference",
       "CMOs (non-profit) and EMOs (for-profit) both use the 'charter_network' organization type",
       "Contact sales or your system admin if you're unsure which structure fits your organization",

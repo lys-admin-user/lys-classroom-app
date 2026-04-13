@@ -756,7 +756,7 @@ export default function SiteAdminPage() {
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="campus">Campus ($99/mo)</SelectItem>
+                        <SelectItem value="campus">Campus (${PLAN_PRICES.campus}/mo)</SelectItem>
                         <SelectItem value="enterprise">Enterprise (Custom)</SelectItem>
                       </SelectContent>
                     </Select>
