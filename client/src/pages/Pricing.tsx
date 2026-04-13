@@ -12,6 +12,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Check, X, Building2, GraduationCap, AlertCircle, Eye, Globe, Info, TrendingDown, CreditCard, FileText, Landmark, Loader2, Sparkles } from "lucide-react";
 import { SiPaypal } from "react-icons/si";
 import { useAuth } from "@/hooks/use-auth";
+import { PLAN_PRICES } from "@/lib/pricing";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
@@ -97,7 +98,7 @@ const baseTiers = [
     id: "pro",
     name: "Pro",
     subtitle: "Focus Mode",
-    basePrice: 19,
+    basePrice: PLAN_PRICES.pro,
     period: "/class/month",
     description: "Per-class billing with assignment generation and student distribution (35 students max per class)",
     icon: Eye,
@@ -122,7 +123,7 @@ const baseTiers = [
     id: "campus",
     name: "Campus",
     subtitle: "Focus Mode + Team",
-    basePrice: 99,
+    basePrice: PLAN_PRICES.campus,
     period: "/month",
     description: "For single-campus charters, independent schools, and individual campuses with admin tools",
     icon: Building2,
@@ -146,7 +147,7 @@ const baseTiers = [
     id: "enterprise",
     name: "Enterprise",
     subtitle: "Full Platform",
-    basePrice: 299,
+    basePrice: PLAN_PRICES.enterprise,
     period: "/month",
     description: "For ISDs, charter networks (CMOs/EMOs), and multi-site organizations with full platform access",
     icon: Building2,

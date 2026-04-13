@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
+import { PLAN_PRICES } from "@/lib/pricing";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { VisuallyHidden } from "@radix-ui/react-visually-hidden";
 import { Button } from "@/components/ui/button";
@@ -594,9 +595,9 @@ const slides: DemoSlide[] = [
     visual: (
       <div className="w-full max-w-xs mx-auto space-y-2">
         {[
-          { type: "Single-Campus Charter", tier: "Campus — $99/mo", desc: "Independent school, full customization", color: "bg-lys-yellow" },
-          { type: "Traditional ISD", tier: "Enterprise — $299/mo", desc: "Multi-campus district, elected board", color: "bg-lys-teal" },
-          { type: "Charter Network (CMO/EMO)", tier: "Enterprise — $299/mo", desc: "Multi-state HQ with master dashboard", color: "bg-lys-red" },
+          { type: "Single-Campus Charter", tier: `Campus — $${PLAN_PRICES.campus}/mo`, desc: "Independent school, full customization", color: "bg-lys-yellow" },
+          { type: "Traditional ISD", tier: `Enterprise — $${PLAN_PRICES.enterprise}/mo`, desc: "Multi-campus district, elected board", color: "bg-lys-teal" },
+          { type: "Charter Network (CMO/EMO)", tier: `Enterprise — $${PLAN_PRICES.enterprise}/mo`, desc: "Multi-state HQ with master dashboard", color: "bg-lys-red" },
         ].map((s) => (
           <div key={s.type} className="bg-card rounded-lg border p-2 flex items-center gap-2">
             <div className={`w-2 h-full min-h-[2rem] rounded-full ${s.color}`} />

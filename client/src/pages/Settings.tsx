@@ -6,6 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { Settings as SettingsIcon, User, Crown, Loader2 } from "lucide-react";
 import { useLocation } from "wouter";
+import { PLAN_PRICES } from "@/lib/pricing";
 import EducatorProfileForm from "@/components/EducatorProfileForm";
 import ProfileTierSitemap from "@/components/ProfileTierSitemap";
 import type { EducatorProfile } from "@shared/schema";
@@ -72,8 +73,8 @@ export default function Settings() {
     free: "Basic access to core features with limited usage.",
     pro: "Full features for individual educators.",
     paid: "Full features for individual educators.",
-    campus: "Single-campus license for independent schools and charter schools ($99/mo).",
-    enterprise: "Full organizational access for ISDs, charter networks (CMOs/EMOs), and multi-campus districts ($299/mo).",
+    campus: `Single-campus license for independent schools and charter schools ($${PLAN_PRICES.campus}/mo).`,
+    enterprise: `Full organizational access for ISDs, charter networks (CMOs/EMOs), and multi-campus districts ($${PLAN_PRICES.enterprise}/mo).`,
   };
 
   return (

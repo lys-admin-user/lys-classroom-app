@@ -22,6 +22,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/use-auth";
 import { useTier } from "@/hooks/use-tier";
 import { useTrial } from "@/hooks/use-trial";
+import { PLAN_PRICES } from "@/lib/pricing";
 import type { Lesson, Assignment, Class, Student, StudentGroup, AccommodationType } from "@shared/schema";
 import { accommodationLabels } from "@shared/schema";
 
@@ -561,7 +562,7 @@ export default function Assignments() {
                     </div>
                     <div className="flex flex-col items-center gap-3 sm:border-l sm:border-border sm:pl-6 w-full sm:w-auto">
                       <div className="text-center">
-                        <p className="font-oswald text-3xl font-bold">$19<span className="text-base font-normal text-muted-foreground font-roboto">/mo</span></p>
+                        <p className="font-oswald text-3xl font-bold">${PLAN_PRICES.pro}<span className="text-base font-normal text-muted-foreground font-roboto">/mo</span></p>
                         <p className="text-xs text-muted-foreground font-roboto">Pro plan · billed monthly</p>
                       </div>
                       <Button

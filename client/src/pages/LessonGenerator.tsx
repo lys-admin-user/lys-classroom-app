@@ -17,6 +17,7 @@ import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useAuth } from "@/hooks/use-auth";
 import { useTier } from "@/hooks/use-tier";
 import { useTrial } from "@/hooks/use-trial";
+import { PLAN_PRICES } from "@/lib/pricing";
 import { AdBanner } from "@/components/AdBanner";
 import type { LessonPlan, EducatorProfile, Lesson } from "@shared/schema";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
@@ -927,7 +928,7 @@ ${addedResources.length > 0 ? addedResources.map(r => `- ${r.title}: ${r.url}`).
                           </div>
                         </div>
                         <div className="flex flex-col items-center gap-2 sm:border-l sm:border-border sm:pl-4 w-full sm:w-auto">
-                          <p className="font-oswald text-2xl font-bold">$19<span className="text-sm font-normal text-muted-foreground font-roboto">/mo</span></p>
+                          <p className="font-oswald text-2xl font-bold">${PLAN_PRICES.pro}<span className="text-sm font-normal text-muted-foreground font-roboto">/mo</span></p>
                           <Button
                             onClick={() => setLocation("/pricing")}
                             size="sm"
