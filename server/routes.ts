@@ -68,7 +68,7 @@ import { insertRssFeedSchema } from "@shared/schema";
 import { db } from "./db";
 import { logAuditEvent, getAuditLogs, getClientIP } from "./services/auditLog";
 import { filterChatMessage } from "./services/contentFilter";
-import { eq, desc, and, sql as drizzleSql, count, inArray } from "drizzle-orm";
+import { eq, desc, and, sql as drizzleSql, count, inArray, lte, gte } from "drizzle-orm";
 
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 10 * 1024 * 1024 } });
 
@@ -2142,15 +2142,20 @@ export async function registerRoutes(
       return;
     }
     const tier = await storage.getUserTier(userId);
-    if (tier === "free") {
-      res.status(403).json({ 
-        error: "Paid subscription required",
-        message: "Assignment generation is a Pro/Campus feature. Upgrade your plan to access this feature.",
-        requiredTier: "pro"
-      });
-      return;
-    }
-    next();
+    if (tier !== "free") return next();
+    // Also allow active free trial users
+    const now = new Date();
+    const activeTrial = await db
+      .select({ id: freeTrials.id })
+      .from(freeTrials)
+      .where(and(eq(freeTrials.userId, userId), eq(freeTrials.isActive, true), lte(freeTrials.trialStartDate, now), gte(freeTrials.trialEndDate, now)))
+      .limit(1);
+    if (activeTrial.length > 0) return next();
+    res.status(403).json({ 
+      error: "Paid subscription required",
+      message: "Assignment generation is a Pro/Campus feature. Upgrade your plan to access this feature.",
+      requiredTier: "pro"
+    });
   };
 
   // Get accommodation suggestions
@@ -12059,9 +12064,10 @@ export async function registerRoutes(
   // Get portfolio comments (with role-based filtering)
   app.get("/api/portfolio/:portfolioId/comments", isAuthenticated, async (req: any, res) => {
     try {
-      const userId = req.user.id;
+      const userId = req.user?.claims?.sub;
       const { portfolioId } = req.params;
-      const userRole = req.user.role;
+      const dbUser = await storage.getUser(userId);
+      const userRole = dbUser?.role;
       
       // Get the portfolio to verify ownership/access
       const portfolio = await storage.getStudentPortfolioBySlug(portfolioId);
@@ -12108,9 +12114,10 @@ export async function registerRoutes(
   // Get comments for a specific portfolio item
   app.get("/api/portfolio/items/:itemId/comments", isAuthenticated, async (req: any, res) => {
     try {
-      const userId = req.user.id;
+      const userId = req.user?.claims?.sub;
       const { itemId } = req.params;
-      const userRole = req.user.role;
+      const dbUser2 = await storage.getUser(userId);
+      const userRole = dbUser2?.role;
       
       const item = await storage.getPortfolioItem(itemId);
       if (!item) {
@@ -12155,10 +12162,11 @@ export async function registerRoutes(
   // Create a portfolio comment
   app.post("/api/portfolio/:portfolioId/comments", isAuthenticated, async (req: any, res) => {
     try {
-      const userId = req.user.id;
+      const userId = req.user?.claims?.sub;
       const { portfolioId } = req.params;
       const { content, portfolioItemId } = req.body;
-      const userRole = req.user.role;
+      const dbUser3 = await storage.getUser(userId);
+      const userRole = dbUser3?.role;
       
       if (!content || content.trim().length === 0) {
         res.status(400).json({ error: "Comment content is required" });
@@ -12209,7 +12217,7 @@ export async function registerRoutes(
   // Update a portfolio comment (only author can update)
   app.patch("/api/portfolio/comments/:commentId", isAuthenticated, async (req: any, res) => {
     try {
-      const userId = req.user.id;
+      const userId = req.user?.claims?.sub;
       const { commentId } = req.params;
       const { content } = req.body;
       
@@ -12237,7 +12245,7 @@ export async function registerRoutes(
   // Delete a portfolio comment (only author can delete)
   app.delete("/api/portfolio/comments/:commentId", isAuthenticated, async (req: any, res) => {
     try {
-      const userId = req.user.id;
+      const userId = req.user?.claims?.sub;
       const { commentId } = req.params;
       
       const deleted = await storage.deletePortfolioComment(commentId, userId);
@@ -13335,14 +13343,14 @@ export async function registerRoutes(
   // Create/update rating (authenticated)
   app.post("/api/resources/:resourceId/ratings", isAuthenticated, async (req: any, res) => {
     try {
-      const existing = await storage.getUserResourceRating(req.params.resourceId, req.user.id);
+      const existing = await storage.getUserResourceRating(req.params.resourceId, req.user?.claims?.sub);
       if (existing) {
         res.status(400).json({ error: "You have already rated this resource" });
         return;
       }
       const rating = await storage.createResourceRating({
         resourceId: req.params.resourceId,
-        userId: req.user.id,
+        userId: req.user?.claims?.sub,
         rating: req.body.rating,
         review: req.body.review,
         helpful: req.body.helpful ?? true,
@@ -13359,7 +13367,7 @@ export async function registerRoutes(
   
   app.get("/api/narratives", isAuthenticated, async (req: any, res) => {
     try {
-      const narratives = await storage.getStudentNarratives(req.user.id);
+      const narratives = await storage.getStudentNarratives(req.user?.claims?.sub);
       res.json(narratives);
     } catch (e) {
       res.status(500).json({ error: "Failed to fetch narratives" });
@@ -13369,7 +13377,7 @@ export async function registerRoutes(
   app.get("/api/narratives/:id", isAuthenticated, async (req: any, res) => {
     try {
       const narrative = await storage.getStudentNarrative(req.params.id);
-      if (!narrative || narrative.userId !== req.user.id) {
+      if (!narrative || narrative.userId !== req.user?.claims?.sub) {
         res.status(404).json({ error: "Narrative not found" });
         return;
       }
@@ -13383,7 +13391,7 @@ export async function registerRoutes(
     try {
       const narrative = await storage.createStudentNarrative({
         ...req.body,
-        userId: req.user.id,
+        userId: req.user?.claims?.sub,
         wordCount: req.body.content ? req.body.content.split(/\s+/).filter(Boolean).length : 0,
       });
       res.json(narrative);
@@ -13398,7 +13406,7 @@ export async function registerRoutes(
       if (updates.content) {
         updates.wordCount = updates.content.split(/\s+/).filter(Boolean).length;
       }
-      const narrative = await storage.updateStudentNarrative(req.params.id, updates, req.user.id);
+      const narrative = await storage.updateStudentNarrative(req.params.id, updates, req.user?.claims?.sub);
       if (!narrative) {
         res.status(404).json({ error: "Narrative not found" });
         return;
@@ -13411,7 +13419,7 @@ export async function registerRoutes(
 
   app.delete("/api/narratives/:id", isAuthenticated, async (req: any, res) => {
     try {
-      const success = await storage.deleteStudentNarrative(req.params.id, req.user.id);
+      const success = await storage.deleteStudentNarrative(req.params.id, req.user?.claims?.sub);
       if (!success) {
         res.status(404).json({ error: "Narrative not found" });
         return;
@@ -13428,7 +13436,7 @@ export async function registerRoutes(
   
   app.get("/api/strengths", isAuthenticated, async (req: any, res) => {
     try {
-      const strengths = await storage.getStrengthsInventory(req.user.id);
+      const strengths = await storage.getStrengthsInventory(req.user?.claims?.sub);
       res.json(strengths);
     } catch (e) {
       res.status(500).json({ error: "Failed to fetch strengths" });
@@ -13439,7 +13447,7 @@ export async function registerRoutes(
     try {
       const strength = await storage.createStrength({
         ...req.body,
-        userId: req.user.id,
+        userId: req.user?.claims?.sub,
       });
       res.json(strength);
     } catch (e) {
@@ -13449,7 +13457,7 @@ export async function registerRoutes(
 
   app.patch("/api/strengths/:id", isAuthenticated, async (req: any, res) => {
     try {
-      const strength = await storage.updateStrength(req.params.id, req.body, req.user.id);
+      const strength = await storage.updateStrength(req.params.id, req.body, req.user?.claims?.sub);
       if (!strength) {
         res.status(404).json({ error: "Strength not found" });
         return;
@@ -13462,7 +13470,7 @@ export async function registerRoutes(
 
   app.delete("/api/strengths/:id", isAuthenticated, async (req: any, res) => {
     try {
-      const success = await storage.deleteStrength(req.params.id, req.user.id);
+      const success = await storage.deleteStrength(req.params.id, req.user?.claims?.sub);
       if (!success) {
         res.status(404).json({ error: "Strength not found" });
         return;
@@ -13479,7 +13487,7 @@ export async function registerRoutes(
   
   app.get("/api/campus-activities", isAuthenticated, async (req: any, res) => {
     try {
-      const activities = await storage.getCampusActivities(req.user.id);
+      const activities = await storage.getCampusActivities(req.user?.claims?.sub);
       res.json(activities);
     } catch (e) {
       res.status(500).json({ error: "Failed to fetch activities" });
@@ -13490,7 +13498,7 @@ export async function registerRoutes(
     try {
       const activity = await storage.createCampusActivity({
         ...req.body,
-        userId: req.user.id,
+        userId: req.user?.claims?.sub,
       });
       res.json(activity);
     } catch (e) {
@@ -13500,7 +13508,7 @@ export async function registerRoutes(
 
   app.patch("/api/campus-activities/:id", isAuthenticated, async (req: any, res) => {
     try {
-      const activity = await storage.updateCampusActivity(req.params.id, req.body, req.user.id);
+      const activity = await storage.updateCampusActivity(req.params.id, req.body, req.user?.claims?.sub);
       if (!activity) {
         res.status(404).json({ error: "Activity not found" });
         return;
@@ -13513,7 +13521,7 @@ export async function registerRoutes(
 
   app.delete("/api/campus-activities/:id", isAuthenticated, async (req: any, res) => {
     try {
-      const success = await storage.deleteCampusActivity(req.params.id, req.user.id);
+      const success = await storage.deleteCampusActivity(req.params.id, req.user?.claims?.sub);
       if (!success) {
         res.status(404).json({ error: "Activity not found" });
         return;
@@ -13530,7 +13538,7 @@ export async function registerRoutes(
   
   app.get("/api/scholarship-applications", isAuthenticated, async (req: any, res) => {
     try {
-      const applications = await storage.getScholarshipApplications(req.user.id);
+      const applications = await storage.getScholarshipApplications(req.user?.claims?.sub);
       res.json(applications);
     } catch (e) {
       res.status(500).json({ error: "Failed to fetch applications" });
@@ -13540,7 +13548,7 @@ export async function registerRoutes(
   app.get("/api/scholarship-applications/:id", isAuthenticated, async (req: any, res) => {
     try {
       const application = await storage.getScholarshipApplication(req.params.id);
-      if (!application || application.userId !== req.user.id) {
+      if (!application || application.userId !== req.user?.claims?.sub) {
         res.status(404).json({ error: "Application not found" });
         return;
       }
@@ -13554,7 +13562,7 @@ export async function registerRoutes(
     try {
       const application = await storage.createScholarshipApplication({
         ...req.body,
-        userId: req.user.id,
+        userId: req.user?.claims?.sub,
       });
       res.json(application);
     } catch (e) {
@@ -13564,7 +13572,7 @@ export async function registerRoutes(
 
   app.patch("/api/scholarship-applications/:id", isAuthenticated, async (req: any, res) => {
     try {
-      const application = await storage.updateScholarshipApplication(req.params.id, req.body, req.user.id);
+      const application = await storage.updateScholarshipApplication(req.params.id, req.body, req.user?.claims?.sub);
       if (!application) {
         res.status(404).json({ error: "Application not found" });
         return;
@@ -13577,7 +13585,7 @@ export async function registerRoutes(
 
   app.delete("/api/scholarship-applications/:id", isAuthenticated, async (req: any, res) => {
     try {
-      const success = await storage.deleteScholarshipApplication(req.params.id, req.user.id);
+      const success = await storage.deleteScholarshipApplication(req.params.id, req.user?.claims?.sub);
       if (!success) {
         res.status(404).json({ error: "Application not found" });
         return;
@@ -13606,7 +13614,7 @@ export async function registerRoutes(
 
   app.get("/api/mentors/me", isAuthenticated, async (req: any, res) => {
     try {
-      const profile = await storage.getMentorProfileByUser(req.user.id);
+      const profile = await storage.getMentorProfileByUser(req.user?.claims?.sub);
       res.json(profile || null);
     } catch (e) {
       res.status(500).json({ error: "Failed to fetch mentor profile" });
@@ -13617,7 +13625,7 @@ export async function registerRoutes(
     try {
       const profile = await storage.createMentorProfile({
         ...req.body,
-        userId: req.user.id,
+        userId: req.user?.claims?.sub,
       });
       res.json(profile);
     } catch (e) {
@@ -13627,7 +13635,7 @@ export async function registerRoutes(
 
   app.patch("/api/mentors/:id", isAuthenticated, async (req: any, res) => {
     try {
-      const profile = await storage.updateMentorProfile(req.params.id, req.body, req.user.id);
+      const profile = await storage.updateMentorProfile(req.params.id, req.body, req.user?.claims?.sub);
       if (!profile) {
         res.status(404).json({ error: "Mentor profile not found" });
         return;
@@ -13641,7 +13649,7 @@ export async function registerRoutes(
   // Mentor connections
   app.get("/api/mentor-connections", isAuthenticated, async (req: any, res) => {
     try {
-      const connections = await storage.getMentorConnections(req.user.id);
+      const connections = await storage.getMentorConnections(req.user?.claims?.sub);
       res.json(connections);
     } catch (e) {
       res.status(500).json({ error: "Failed to fetch connections" });
@@ -13661,7 +13669,7 @@ export async function registerRoutes(
     try {
       const connection = await storage.createMentorConnection({
         ...req.body,
-        studentUserId: req.user.id,
+        studentUserId: req.user?.claims?.sub,
       });
       res.json(connection);
     } catch (e) {

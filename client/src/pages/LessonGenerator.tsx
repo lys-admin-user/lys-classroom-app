@@ -349,8 +349,10 @@ export default function LessonGenerator() {
   const saveMutation = useMutation({
     mutationFn: async () => {
       if (!generatedLesson) throw new Error("No lesson to save");
-      const standardsString = generatedLesson.standards 
-        ? `${generatedLesson.standards.standardsName}: ${generatedLesson.standards.codes.map(c => c.code).join(", ")}`
+      const standardsString = generatedLesson.standards
+        ? typeof generatedLesson.standards === "string"
+          ? generatedLesson.standards
+          : `${generatedLesson.standards.standardsName}: ${(generatedLesson.standards.codes || []).map((c: any) => c.code).join(", ")}`
         : "";
       // Combine AI resources with user-added resources
       const allResources = addedResources.map(r => ({
@@ -464,8 +466,10 @@ export default function LessonGenerator() {
 
   const copyToClipboard = () => {
     if (generatedLesson) {
-      const standardsText = generatedLesson.standards 
-        ? `${generatedLesson.standards.standardsName}: ${generatedLesson.standards.codes.map(c => c.code).join(", ")}`
+      const standardsText = generatedLesson.standards
+        ? typeof generatedLesson.standards === "string"
+          ? generatedLesson.standards
+          : `${generatedLesson.standards.standardsName}: ${(generatedLesson.standards.codes || []).map((c: any) => c.code).join(", ")}`
         : "";
       const text = `
 LESSON PLAN: ${generatedLesson.title}
@@ -1101,15 +1105,21 @@ ${addedResources.length > 0 ? addedResources.map(r => `- ${r.title}: ${r.url}`).
                           <div className="mt-3 p-3 bg-lys-teal/5 rounded-md">
                             <div className="flex items-center gap-2 mb-1">
                               <GraduationCap className="h-4 w-4 text-lys-teal" />
-                              <span className="font-oswald text-sm font-semibold">{generatedLesson.standards.standardsName}</span>
+                              <span className="font-oswald text-sm font-semibold">
+                                {typeof generatedLesson.standards === "string"
+                                  ? generatedLesson.standards
+                                  : generatedLesson.standards.standardsName}
+                              </span>
                             </div>
-                            <div className="flex flex-wrap gap-1">
-                              {generatedLesson.standards.codes.map((code) => (
-                                <Badge key={code.code} variant="outline" className="font-roboto text-xs">
-                                  {code.code}
-                                </Badge>
-                              ))}
-                            </div>
+                            {typeof generatedLesson.standards !== "string" && generatedLesson.standards.codes && (
+                              <div className="flex flex-wrap gap-1">
+                                {generatedLesson.standards.codes.map((code) => (
+                                  <Badge key={code.code} variant="outline" className="font-roboto text-xs">
+                                    {code.code}
+                                  </Badge>
+                                ))}
+                              </div>
+                            )}
                           </div>
                         )}
                       </div>
@@ -1599,8 +1609,16 @@ ${addedResources.length > 0 ? addedResources.map(r => `- ${r.title}: ${r.url}`).
                                         <div className="flex items-start gap-2">
                                           <GraduationCap className="h-3.5 w-3.5 text-lys-teal flex-shrink-0 mt-0.5" />
                                           <p className="text-xs font-roboto text-muted-foreground">
-                                            <span className="font-medium text-foreground">{generatedLesson.standards.standardsName}</span>
-                                            {' '}&mdash; {generatedLesson.standards.codes.map(c => c.code).join(', ')}
+                                            {typeof generatedLesson.standards === "string" ? (
+                                              <span className="font-medium text-foreground">{generatedLesson.standards}</span>
+                                            ) : (
+                                              <>
+                                                <span className="font-medium text-foreground">{generatedLesson.standards.standardsName}</span>
+                                                {generatedLesson.standards.codes?.length > 0 && (
+                                                  <>{' '}&mdash; {generatedLesson.standards.codes.map((c: any) => c.code).join(', ')}</>
+                                                )}
+                                              </>
+                                            )}
                                           </p>
                                         </div>
                                       )}

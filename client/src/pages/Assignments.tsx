@@ -20,6 +20,7 @@ import { Sparkles, FileText, Users, UserPlus, AlertTriangle, Check, Clock, BookO
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/use-auth";
+import { useTier } from "@/hooks/use-tier";
 import type { Lesson, Assignment, Class, Student, StudentGroup, AccommodationType } from "@shared/schema";
 import { accommodationLabels } from "@shared/schema";
 
@@ -81,6 +82,7 @@ export default function Assignments() {
   const [, setLocation] = useLocation();
   const { toast } = useToast();
   const { user, isAuthenticated } = useAuth();
+  const { isPaid: hasTrialOrPaid } = useTier();
   const [selectedLesson, setSelectedLesson] = useState<Lesson | null>(null);
   const [assignmentType, setAssignmentType] = useState("quiz");
   const [questionCount, setQuestionCount] = useState(5);
@@ -95,7 +97,7 @@ export default function Assignments() {
   const [recipientType, setRecipientType] = useState<"student" | "group" | "class">("student");
   const [suggestionsDialogOpen, setSuggestionsDialogOpen] = useState(false);
 
-  const isPaidUser = user?.tier === "pro" || user?.tier === "campus";
+  const isPaidUser = hasTrialOrPaid || user?.tier === "pro" || user?.tier === "campus";
   const isStudent = user?.role === "student";
   const isParent = (user?.role as any) === "parent";
   const [isEditing, setIsEditing] = useState(false);
