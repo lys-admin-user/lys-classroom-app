@@ -449,7 +449,8 @@ export default function SystemAdminPage({ params }: { params?: { tab?: string } 
 
   const impersonateMutation = useMutation({
     mutationFn: async (id: string) => {
-      return await apiRequest("POST", `/api/admin/users/${id}/impersonate`);
+      const res = await apiRequest("POST", `/api/admin/users/${id}/impersonate`);
+      return res.json();
     },
     onSuccess: (data: any) => {
       toast({ title: data.message || "Impersonation started" });
@@ -642,7 +643,8 @@ export default function SystemAdminPage({ params }: { params?: { tab?: string } 
 
   const bulkUploadMutation = useMutation({
     mutationFn: async ({ fileName, fileType, lessons }: { fileName: string; fileType: string; lessons: any[] }) => {
-      return await apiRequest("POST", "/api/admin/bulk-imports", { fileName, fileType, lessons });
+      const res = await apiRequest("POST", "/api/admin/bulk-imports", { fileName, fileType, lessons });
+      return res.json();
     },
     onSuccess: (data: any) => {
       queryClient.invalidateQueries({ queryKey: ["/api/admin/master-lessons"] });

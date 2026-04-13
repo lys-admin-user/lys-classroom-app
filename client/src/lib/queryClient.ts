@@ -6,7 +6,10 @@ async function throwIfResNotOk(res: Response) {
       queryClient.setQueryData(["/api/auth/user"], null);
     }
     const text = (await res.text()) || res.statusText;
-    throw new Error(`${res.status}: ${text}`);
+    let parsed: Record<string, unknown> = {};
+    try { parsed = JSON.parse(text); } catch {}
+    const err = Object.assign(new Error(`${res.status}: ${text}`), parsed);
+    throw err;
   }
 }
 

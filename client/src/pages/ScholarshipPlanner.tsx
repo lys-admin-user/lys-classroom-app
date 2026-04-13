@@ -257,7 +257,7 @@ function ApplicationsTab({ applications }: { applications: ScholarshipApplicatio
 }
 
 export default function ScholarshipPlanner() {
-  const { data: applications, isLoading } = useQuery<ScholarshipApplication[]>({
+  const { data: applications = [], isLoading } = useQuery<ScholarshipApplication[]>({
     queryKey: ["/api/scholarship-applications"],
   });
 

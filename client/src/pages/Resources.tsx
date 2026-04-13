@@ -546,7 +546,7 @@ export default function Resources() {
                                 </div>
                               )}
                               <div className="flex flex-wrap gap-1 mb-4">
-                                {scholarship.tags.slice(0, 3).map((tag, i) => (
+                                {(scholarship.tags ?? []).slice(0, 3).map((tag, i) => (
                                   <Badge key={i} variant="outline" className="text-xs font-roboto">
                                     {tag}
                                   </Badge>
@@ -614,7 +614,7 @@ export default function Resources() {
                             </CardHeader>
                             <CardContent>
                               <div className="flex flex-wrap gap-1 mb-4">
-                                {resource.tags.slice(0, 4).map((tag, i) => (
+                                {(resource.tags ?? []).slice(0, 4).map((tag, i) => (
                                   <Badge key={i} variant="secondary" className="text-xs font-roboto">
                                     {tag}
                                   </Badge>
@@ -1021,11 +1021,11 @@ export default function Resources() {
                     </div>
                   )}
 
-                  {selectedMarketItem.tags.length > 0 && (
+                  {(selectedMarketItem.tags ?? []).length > 0 && (
                     <div>
                       <p className="text-xs text-muted-foreground mb-2">Topics covered</p>
                       <div className="flex flex-wrap gap-1">
-                        {selectedMarketItem.tags.map((t, i) => (
+                        {(selectedMarketItem.tags ?? []).map((t, i) => (
                           <Badge key={i} variant="secondary" className="text-xs">{t}</Badge>
                         ))}
                       </div>

@@ -113,7 +113,8 @@ export default function SISIntegration() {
 
   const testConnectionMutation = useMutation({
     mutationFn: async (connectionId: string) => {
-      return await apiRequest("POST", `/api/integrations/sis/connections/${connectionId}/test`);
+      const res = await apiRequest("POST", `/api/integrations/sis/connections/${connectionId}/test`);
+      return res.json();
     },
     onSuccess: (data: any) => {
       queryClient.invalidateQueries({ queryKey: ["/api/integrations/sis/connections"] });
@@ -134,7 +135,8 @@ export default function SISIntegration() {
 
   const syncMutation = useMutation({
     mutationFn: async ({ connectionId, syncType }: { connectionId: string; syncType: string }) => {
-      return await apiRequest("POST", `/api/integrations/sis/connections/${connectionId}/sync`, { syncType });
+      const res = await apiRequest("POST", `/api/integrations/sis/connections/${connectionId}/sync`, { syncType });
+      return res.json();
     },
     onSuccess: (data: any) => {
       queryClient.invalidateQueries({ queryKey: ["/api/integrations/sis/connections"] });

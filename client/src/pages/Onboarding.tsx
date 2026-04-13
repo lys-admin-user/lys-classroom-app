@@ -259,7 +259,7 @@ export default function Onboarding() {
   });
 
   const skipMutation = useMutation({
-    mutationFn: () => apiRequest("POST", "/api/onboarding/skip", {}),
+    mutationFn: () => apiRequest("POST", "/api/onboarding/skip", {}).then(r => r.json()),
     onSuccess: (data: any) => {
       queryClient.invalidateQueries({ queryKey: ["/api/auth/user"] });
       toast({ 

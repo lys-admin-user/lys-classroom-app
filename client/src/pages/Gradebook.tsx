@@ -189,7 +189,8 @@ export default function Gradebook() {
 
   const exportToSisMutation = useMutation({
     mutationFn: async ({ connectionId, classId }: { connectionId: string; classId: string }) => {
-      return await apiRequest("POST", `/api/integrations/sis/connections/${connectionId}/export-grades`, { classId });
+      const res = await apiRequest("POST", `/api/integrations/sis/connections/${connectionId}/export-grades`, { classId });
+      return res.json();
     },
     onSuccess: (data: any) => {
       toast({ title: "Grades exported", description: data.message || "Grades successfully sent to SIS" });

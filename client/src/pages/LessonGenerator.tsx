@@ -322,15 +322,14 @@ export default function LessonGenerator() {
         description: "Great job! You just saved yourself 30+ minutes.",
       });
     },
-    onError: async (error: any) => {
-      const errorData = error?.response ? await error.response.json().catch(() => ({})) : {};
-      if (errorData.requiresSignup) {
+    onError: (error: any) => {
+      if (error?.requiresSignup) {
         toast({
           title: "Free Lessons Used",
           description: "Create a free account to continue generating lessons and save your work!",
           variant: "destructive",
         });
-      } else if (errorData.requiredTier) {
+      } else if (error?.requiredTier) {
         toast({
           title: "Monthly Limit Reached",
           description: "Free accounts can generate up to 3 lessons per month. Upgrade to Pro for unlimited lessons.",
