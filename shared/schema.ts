@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { pgTable, text, varchar, integer, boolean, jsonb, timestamp } from "drizzle-orm/pg-core";
+import { pgTable, text, varchar, integer, boolean, jsonb, timestamp, real } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
@@ -1995,8 +1995,14 @@ export const knowResources = pgTable("know_resources", {
   applicationUrl: text("application_url"),
   isRecurring: boolean("is_recurring").default(false), // can reapply each year
   gpaRequirement: text("gpa_requirement"), // e.g., "3.5", "2.5", "None"
+  minGpaDecimal: real("min_gpa_decimal"), // numeric GPA for comparisons, e.g. 3.5
   studentLevel: text("student_level"), // high_school, undergraduate, graduate, all
   firstGenFriendly: boolean("first_gen_friendly").default(false),
+  stateRestrictions: jsonb("state_restrictions").$type<string[]>().default([]), // e.g. ["TX","FL"] empty = any state
+  // Auto-import tracking
+  autoImported: boolean("auto_imported").default(false),
+  urlStatus: text("url_status").default("unknown"), // unknown, active, broken
+  lastValidatedAt: timestamp("last_validated_at"),
   
   // Metadata
   tags: jsonb("tags").$type<string[]>().default([]),
@@ -3160,6 +3166,20 @@ export const scholarshipApplications = pgTable("scholarship_applications", {
 export const insertScholarshipApplicationSchema = createInsertSchema(scholarshipApplications).omit({ id: true, createdAt: true, updatedAt: true });
 export type InsertScholarshipApplication = z.infer<typeof insertScholarshipApplicationSchema>;
 export type ScholarshipApplication = typeof scholarshipApplications.$inferSelect;
+
+// Scholarship sync log — tracks automated validation and import runs
+export const scholarshipSyncLog = pgTable("scholarship_sync_log", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  syncType: text("sync_type").notNull(), // 'validation' | 'import' | 'full'
+  status: text("status").notNull().default("running"), // running, completed, failed
+  newCount: integer("new_count").default(0),
+  deactivatedCount: integer("deactivated_count").default(0),
+  validatedCount: integer("validated_count").default(0),
+  errorCount: integer("error_count").default(0),
+  notes: text("notes"),
+  startedAt: timestamp("started_at").defaultNow(),
+  completedAt: timestamp("completed_at"),
+});
 
 // ===========================================
 // MENTOR CONNECTIONS

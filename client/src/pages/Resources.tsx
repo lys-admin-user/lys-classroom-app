@@ -62,6 +62,9 @@ type KnowResourceData = {
   isRecurring: boolean | null;
   tags: string[] | null;
   careerFields: string[] | null;
+  matchScore: number | null;
+  matchReasons: string[] | null;
+  isSaved: boolean | null;
 };
 
 type MarketplaceItemData = {
@@ -138,6 +141,9 @@ type DisplayResource = {
   firstGenFriendly?: boolean;
   isRecurring?: boolean;
   applicationUrl?: string;
+  matchScore?: number | null;
+  matchReasons?: string[] | null;
+  apiIsSaved?: boolean | null;
 };
 
 function normalizeKnowResource(kr: KnowResourceData): DisplayResource {
@@ -171,6 +177,9 @@ function normalizeKnowResource(kr: KnowResourceData): DisplayResource {
     firstGenFriendly: kr.firstGenFriendly || undefined,
     isRecurring: kr.isRecurring || undefined,
     applicationUrl: kr.applicationUrl || kr.url || undefined,
+    matchScore: kr.matchScore ?? null,
+    matchReasons: kr.matchReasons ?? null,
+    apiIsSaved: kr.isSaved ?? null,
   };
 }
 
@@ -466,9 +475,15 @@ export default function Resources() {
                     </div>
                     <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
                       {scholarships.map((scholarship) => {
-                        const isSaved = savedIds.has(scholarship.id);
+                        const isSaved = savedIds.has(scholarship.id) || scholarship.apiIsSaved === true;
+                        const score = scholarship.matchScore;
+                        const matchColor = score != null
+                          ? score >= 70 ? "bg-green-500/15 text-green-700 border-green-400/30"
+                          : score >= 45 ? "bg-amber-500/15 text-amber-700 border-amber-400/30"
+                          : "bg-muted text-muted-foreground"
+                          : "";
                         return (
-                          <Card key={scholarship.id} className="hover-elevate">
+                          <Card key={scholarship.id} className="hover-elevate flex flex-col">
                             <CardHeader className="pb-2">
                               <div className="flex items-start justify-between gap-2 flex-wrap">
                                 <Badge className="bg-green-500/10 text-green-600 border-green-500/20">
@@ -476,6 +491,16 @@ export default function Resources() {
                                   {formatAmount(scholarship.amount)}
                                 </Badge>
                                 <div className="flex items-center gap-1 flex-wrap">
+                                  {score != null && user && (
+                                    <Badge variant="outline" className={`text-xs font-roboto ${matchColor}`} title={(scholarship.matchReasons || []).join(" · ")}>
+                                      {score}% match
+                                    </Badge>
+                                  )}
+                                  {isSaved && (
+                                    <Badge className="text-xs font-roboto bg-lys-teal/10 text-lys-teal border-lys-teal/30">
+                                      <BookmarkCheck className="h-3 w-3 mr-1" />In Planner
+                                    </Badge>
+                                  )}
                                   {scholarship.scholarshipType && (
                                     <Badge variant="outline" className="text-xs font-roboto capitalize">
                                       {scholarship.scholarshipType}
@@ -493,11 +518,20 @@ export default function Resources() {
                                 {scholarship.description}
                               </CardDescription>
                             </CardHeader>
-                            <CardContent>
+                            <CardContent className="flex flex-col flex-1">
                               {scholarship.gpaRequirement && (
                                 <p className="text-xs text-muted-foreground font-roboto mb-2 flex items-center gap-1">
                                   <GraduationCap className="h-3 w-3" />GPA: {scholarship.gpaRequirement}+
                                 </p>
+                              )}
+                              {scholarship.matchReasons && scholarship.matchReasons.length > 0 && user && (
+                                <div className="mb-2 flex flex-wrap gap-1">
+                                  {scholarship.matchReasons.map((reason, i) => (
+                                    <span key={i} className="text-xs text-muted-foreground font-roboto bg-muted/50 rounded px-1.5 py-0.5">
+                                      {reason}
+                                    </span>
+                                  ))}
+                                </div>
                               )}
                               {scholarship.eligibility && scholarship.eligibility.length > 0 && (
                                 <div className="mb-3">
@@ -518,7 +552,7 @@ export default function Resources() {
                                   </Badge>
                                 ))}
                               </div>
-                              <div className="flex gap-2">
+                              <div className="flex gap-2 mt-auto">
                                 <Button 
                                   className="flex-1 font-oswald gap-2" 
                                   variant="secondary" 
@@ -529,14 +563,15 @@ export default function Resources() {
                                   View Details
                                 </Button>
                                 <Button
-                                  variant="outline"
+                                  variant={isSaved ? "default" : "outline"}
                                   size="icon"
                                   onClick={() => toggleSaveScholarship(scholarship)}
                                   data-testid={`button-save-scholarship-${scholarship.id}`}
                                   title={isSaved ? "Remove from Scholarship Planner" : "Save to Scholarship Planner"}
+                                  className={isSaved ? "bg-lys-teal hover:bg-lys-teal/90" : ""}
                                 >
                                   {isSaved
-                                    ? <BookmarkCheck className="h-4 w-4 text-lys-teal" />
+                                    ? <BookmarkCheck className="h-4 w-4" />
                                     : <Bookmark className="h-4 w-4" />}
                                 </Button>
                               </div>

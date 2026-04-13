@@ -46,6 +46,10 @@ import {
   organizationMemberships as orgMembershipsTable,
   freeTrials,
   hasRolePrivilege,
+  scholarshipApplications,
+  knowResources,
+  scholarshipSyncLog,
+  savedScholarships,
 } from "@shared/schema";
 import { z } from "zod";
 import { setupAuth, registerAuthRoutes, isAuthenticated } from "./replit_integrations/auth";
@@ -59,6 +63,7 @@ import { getUncachableStripeClient } from "./stripeClient";
 import * as hubspotService from "./services/hubspotService";
 import * as wordpressService from "./services/wordpressService";
 import { fetchAndProcessFeed, fetchAllActiveFeeds, startRssFeedScheduler } from "./services/rssFeedService";
+import { startScholarshipScheduler, runScholarshipSync, detectSeasonFromDeadline } from "./services/scholarshipService";
 import { insertRssFeedSchema } from "@shared/schema";
 import { db } from "./db";
 import { logAuditEvent, getAuditLogs, getClientIP } from "./services/auditLog";
@@ -3670,7 +3675,7 @@ export async function registerRoutes(
   // ================================
 
   // Get all KNOW resources (public - for students/educators)
-  app.get("/api/know-resources", async (req, res) => {
+  app.get("/api/know-resources", async (req: any, res) => {
     try {
       const { type, category, featured } = req.query;
       const resources = await storage.getKnowResources({
@@ -3679,6 +3684,65 @@ export async function registerRoutes(
         isActive: true,
         featured: featured === "true" ? true : undefined,
       });
+
+      // Personalize scholarships if the user is authenticated
+      const userId = req.user?.id || req.user?.claims?.sub;
+      const isRequestingScholarships = !type || type === "scholarship";
+      if (userId && isRequestingScholarships) {
+        // Gather user profile signals in parallel
+        const [prefRows, careerRows, savedRows] = await Promise.all([
+          db.select().from(userPreferences).where(eq(userPreferences.userId, userId)).limit(1),
+          db.select().from(savedCareers).where(eq(savedCareers.userId, userId)),
+          db.select({ resourceId: savedScholarships.resourceId })
+            .from(savedScholarships)
+            .where(eq(savedScholarships.userId, userId)),
+        ]);
+        const userState: string = prefRows[0]?.state || "";
+        const userCareerCategories = new Set(careerRows.map((c: any) => c.careerCategory?.toLowerCase()).filter(Boolean));
+        const savedResourceIds = new Set(savedRows.map((s: any) => s.resourceId));
+
+        const enriched = resources.map((r: any) => {
+          if (r.resourceType !== "scholarship") return { ...r, matchScore: null, matchReasons: [], isSaved: savedResourceIds.has(`know-${r.id}`) || savedResourceIds.has(r.id) };
+
+          let score = 20; // base
+          const reasons: string[] = [];
+
+          // Career field match
+          const scholarshipFields: string[] = (r.careerFields || []).map((f: string) => f.toLowerCase());
+          if (scholarshipFields.length > 0 && userCareerCategories.size > 0) {
+            const hasFieldMatch = scholarshipFields.some((f: string) =>
+              [...userCareerCategories].some((uc) => f.includes(uc) || uc.includes(f))
+            );
+            if (hasFieldMatch) { score += 30; reasons.push("Matches your career interests"); }
+          } else if (scholarshipFields.length === 0) {
+            score += 10; // general scholarship, open to all
+          }
+
+          // State match
+          const restrictions: string[] = r.stateRestrictions || [];
+          if (restrictions.length === 0) {
+            score += 10; reasons.push("Available in all states");
+          } else if (userState && restrictions.includes(userState)) {
+            score += 25; reasons.push(`Available in ${userState}`);
+          } else if (userState && restrictions.length > 0) {
+            score -= 20; // wrong state — lower priority
+          }
+
+          // First-gen friendly bonus
+          if (r.firstGenFriendly) { score += 10; reasons.push("First-gen friendly"); }
+
+          // Clamp
+          score = Math.max(0, Math.min(100, score));
+          const isSaved = savedResourceIds.has(`know-${r.id}`) || savedResourceIds.has(r.id);
+          return { ...r, matchScore: score, matchReasons: reasons, isSaved };
+        });
+
+        // Sort scholarships by match score desc, non-scholarships stay at original position
+        const scholarships = enriched.filter((r: any) => r.resourceType === "scholarship").sort((a: any, b: any) => (b.matchScore ?? 0) - (a.matchScore ?? 0));
+        const others = enriched.filter((r: any) => r.resourceType !== "scholarship");
+        return res.json([...others, ...scholarships]);
+      }
+
       res.json(resources);
     } catch (error) {
       console.error("Failed to fetch KNOW resources:", error);
@@ -4028,12 +4092,42 @@ export async function registerRoutes(
   app.post("/api/saved-scholarships", isAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user?.id || req.user?.claims?.sub;
-      const { resourceId, resourceTitle, resourceAmount, resourceDeadline, resourceUrl, notes } = req.body;
+      const { resourceId, resourceTitle, resourceAmount, resourceDeadline, resourceUrl, scholarshipType, notes } = req.body;
       if (!resourceId || !resourceTitle) return res.status(400).json({ error: "resourceId and resourceTitle required" });
       const already = await storage.isSavedScholarship(userId, resourceId);
       if (already) return res.json({ alreadySaved: true });
+
+      // Save to bookmarks
       const saved = await storage.saveScholarship({ userId, resourceId, resourceTitle, resourceAmount, resourceDeadline, resourceUrl, notes });
-      res.status(201).json(saved);
+
+      // Also add to scholarship planner (if not already there for this resource)
+      const existingApp = await db
+        .select({ id: scholarshipApplications.id })
+        .from(scholarshipApplications)
+        .where(and(eq(scholarshipApplications.userId, userId), eq(scholarshipApplications.resourceId, resourceId)))
+        .limit(1);
+
+      if (existingApp.length === 0) {
+        const season = detectSeasonFromDeadline(resourceDeadline || "");
+        await db.insert(scholarshipApplications).values({
+          userId,
+          scholarshipName: resourceTitle,
+          scholarshipUrl: resourceUrl || null,
+          resourceId,
+          amount: resourceAmount || null,
+          deadline: resourceDeadline || null,
+          season: season as any,
+          scholarshipType: scholarshipType || null,
+          status: "planned",
+          essayRequired: false,
+          transcriptRequired: false,
+          referencesRequired: 0,
+          checklist: [],
+          notes: notes || null,
+        });
+      }
+
+      res.status(201).json({ ...saved, addedToPlanner: existingApp.length === 0 });
     } catch (error) {
       res.status(500).json({ error: "Failed to save scholarship" });
     }
@@ -14713,6 +14807,31 @@ export async function registerRoutes(
   });
 
   startRssFeedScheduler(60);
+  startScholarshipScheduler();
+
+  // Scholarship sync admin routes
+  app.post("/api/admin/scholarship-sync", isAuthenticated, async (req: any, res) => {
+    try {
+      const role = req.user?.role || req.user?.claims?.role;
+      if (!["site_admin", "system_admin"].includes(role)) return res.status(403).json({ error: "Admin only" });
+      const { type = "full" } = req.body;
+      runScholarshipSync(type).catch(console.error); // non-blocking
+      res.json({ success: true, message: `Scholarship ${type} sync started` });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to start sync" });
+    }
+  });
+
+  app.get("/api/admin/scholarship-sync/history", isAuthenticated, async (req: any, res) => {
+    try {
+      const role = req.user?.role || req.user?.claims?.role;
+      if (!["site_admin", "system_admin"].includes(role)) return res.status(403).json({ error: "Admin only" });
+      const history = await db.select().from(scholarshipSyncLog).orderBy(scholarshipSyncLog.startedAt).limit(20);
+      res.json(history);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch sync history" });
+    }
+  });
 
   return httpServer;
 }
