@@ -21,6 +21,7 @@ import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/use-auth";
 import { useTier } from "@/hooks/use-tier";
+import { useTrial } from "@/hooks/use-trial";
 import type { Lesson, Assignment, Class, Student, StudentGroup, AccommodationType } from "@shared/schema";
 import { accommodationLabels } from "@shared/schema";
 
@@ -83,6 +84,7 @@ export default function Assignments() {
   const { toast } = useToast();
   const { user, isAuthenticated } = useAuth();
   const { isPaid: hasTrialOrPaid } = useTier();
+  const { canStartTrial } = useTrial();
   const [selectedLesson, setSelectedLesson] = useState<Lesson | null>(null);
   const [assignmentType, setAssignmentType] = useState("quiz");
   const [questionCount, setQuestionCount] = useState(5);
@@ -529,19 +531,57 @@ export default function Assignments() {
 
           <TabsContent value="generate" className="space-y-6">
             {!isPaidUser && (
-              <Card className="border-lys-yellow">
-                <CardContent className="flex items-center gap-4 py-4">
-                  <AlertTriangle className="h-8 w-8 text-lys-yellow shrink-0" />
-                  <div className="flex-1">
-                    <h3 className="font-oswald text-lg">Upgrade to Pro</h3>
-                    <p className="text-sm text-muted-foreground">
-                      Assignment generation is available for Pro and Campus subscribers. Upgrade to create AI-powered assessments.
-                    </p>
+              <Card className="border-0 overflow-hidden shadow-sm" data-testid="card-upgrade-prompt">
+                <div className="bg-gradient-to-br from-lys-red/8 via-background to-lys-yellow/8 p-6">
+                  <div className="flex flex-col sm:flex-row gap-6 items-start">
+                    <div className="flex-1">
+                      <div className="flex items-center gap-2 mb-2">
+                        <div className="p-1.5 rounded-md bg-lys-red/10">
+                          <Sparkles className="h-4 w-4 text-lys-red" />
+                        </div>
+                        <Badge className="bg-lys-red/10 text-lys-red border-lys-red/20 text-xs font-roboto">Pro Feature</Badge>
+                      </div>
+                      <h3 className="font-oswald text-xl mb-1">Unlock AI Assignment Generation</h3>
+                      <p className="text-sm text-muted-foreground font-roboto mb-4">
+                        Turn any saved lesson into a complete, standards-aligned assessment in under 60 seconds.
+                      </p>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                        {[
+                          { icon: <Sparkles className="h-3.5 w-3.5" />, text: "AI question generation" },
+                          { icon: <FileText className="h-3.5 w-3.5" />, text: "5 question types (quiz, project, reflection…)" },
+                          { icon: <BarChart3 className="h-3.5 w-3.5" />, text: "Class performance & BKD insights" },
+                          { icon: <Users className="h-3.5 w-3.5" />, text: "Assign to classes, groups, or students" },
+                        ].map((f) => (
+                          <div key={f.text} className="flex items-center gap-2 text-xs text-muted-foreground">
+                            <div className="text-lys-yellow shrink-0">{f.icon}</div>
+                            <span>{f.text}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                    <div className="flex flex-col items-center gap-3 sm:border-l sm:border-border sm:pl-6 w-full sm:w-auto">
+                      <div className="text-center">
+                        <p className="font-oswald text-3xl font-bold">$19<span className="text-base font-normal text-muted-foreground font-roboto">/mo</span></p>
+                        <p className="text-xs text-muted-foreground font-roboto">Pro plan · billed monthly</p>
+                      </div>
+                      <Button
+                        onClick={() => setLocation("/pricing")}
+                        className="w-full sm:w-40 bg-lys-red hover:bg-lys-red/90 text-white font-oswald gap-2"
+                        data-testid="button-upgrade"
+                      >
+                        <Sparkles className="h-4 w-4" />
+                        {canStartTrial ? "Start Free Trial" : "Upgrade to Pro"}
+                      </Button>
+                      <button
+                        onClick={() => setLocation("/pricing")}
+                        className="text-xs text-muted-foreground hover:text-foreground underline font-roboto"
+                        data-testid="button-view-all-plans"
+                      >
+                        View all plans
+                      </button>
+                    </div>
                   </div>
-                  <Button onClick={() => setLocation("/pricing")} data-testid="button-upgrade">
-                    View Plans
-                  </Button>
-                </CardContent>
+                </div>
               </Card>
             )}
 

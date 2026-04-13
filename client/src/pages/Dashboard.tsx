@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { BKDCard } from "@/components/BKDCard";
+import { GettingStartedGuide } from "@/components/GettingStartedGuide";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -578,7 +579,8 @@ function StudentDashboard() {
 
       <section className="py-8 lg:py-12 bg-muted/30">
         <div className="max-w-7xl mx-auto px-4 sm:px-6">
-          <div className="flex flex-wrap items-center justify-between gap-4 mb-6">
+          <GettingStartedGuide />
+          <div className="flex flex-wrap items-center justify-between gap-4 mb-6 mt-6">
             <div>
               <h2 className="font-marker text-2xl sm:text-3xl text-foreground mb-1">
                 What's Next?
@@ -931,11 +933,18 @@ function EducatorDashboard() {
       </section>
 
       {isAuthenticated && (
-        <section className="py-8 lg:py-12 bg-muted/20">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6">
-            <JourneyProgressCard />
-          </div>
-        </section>
+        <>
+          <section className="py-6 pb-0">
+            <div className="max-w-7xl mx-auto px-4 sm:px-6">
+              <GettingStartedGuide />
+            </div>
+          </section>
+          <section className="py-8 lg:py-12 bg-muted/20">
+            <div className="max-w-7xl mx-auto px-4 sm:px-6">
+              <JourneyProgressCard />
+            </div>
+          </section>
+        </>
       )}
 
       <section className="py-12 lg:py-16">

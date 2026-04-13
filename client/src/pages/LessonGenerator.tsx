@@ -16,6 +16,7 @@ import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useAuth } from "@/hooks/use-auth";
 import { useTier } from "@/hooks/use-tier";
+import { useTrial } from "@/hooks/use-trial";
 import { AdBanner } from "@/components/AdBanner";
 import type { LessonPlan, EducatorProfile, Lesson } from "@shared/schema";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
@@ -39,6 +40,7 @@ export default function LessonGenerator() {
   const { toast } = useToast();
   const { isAuthenticated } = useAuth();
   const { showAds, requiresScopeSequence, tier } = useTier();
+  const { canStartTrial } = useTrial();
   const [, setLocation] = useLocation();
   const [topic, setTopic] = useState("");
   const [course, setCourse] = useState("");
@@ -882,23 +884,68 @@ ${addedResources.length > 0 ? addedResources.map(r => `- ${r.title}: ${r.url}`).
                   </div>
                 </div>
 
-                {isAuthenticated && usageData && !usageData.unlimited && (
+                {isAuthenticated && usageData && !usageData.unlimited && usageData.remaining > 0 && (
                   <div className="flex items-center justify-between p-3 bg-muted rounded-md">
                     <div className="flex items-center gap-2">
                       <Sparkles className="h-4 w-4 text-lys-yellow" />
                       <span className="text-sm font-roboto">
-                        {usageData.remaining === 0 
-                          ? "Monthly limit reached" 
-                          : `${usageData.remaining} of ${usageData.limit} lessons remaining this month`}
+                        {`${usageData.remaining} of ${usageData.limit} lessons remaining this month`}
                       </span>
                     </div>
-                    {usageData.remaining === 0 && (
-                      <Link href="/pricing">
-                        <Button size="sm" variant="default" data-testid="button-upgrade-limit">
-                          Upgrade
-                        </Button>
-                      </Link>
-                    )}
+                    <Link href="/pricing">
+                      <Button size="sm" variant="ghost" className="text-xs font-roboto h-7" data-testid="button-upgrade-hint">
+                        Go unlimited →
+                      </Button>
+                    </Link>
+                  </div>
+                )}
+
+                {isAuthenticated && usageData && !usageData.unlimited && usageData.remaining === 0 && (
+                  <div className="rounded-lg border-0 overflow-hidden" data-testid="card-limit-reached">
+                    <div className="bg-gradient-to-br from-lys-yellow/10 via-background to-lys-red/10 p-5">
+                      <div className="flex flex-col sm:flex-row gap-4 items-start">
+                        <div className="flex-1">
+                          <div className="flex items-center gap-2 mb-2">
+                            <Badge className="bg-lys-yellow/15 text-lys-yellow border-lys-yellow/30 text-xs font-roboto">Monthly Limit Reached</Badge>
+                          </div>
+                          <h4 className="font-oswald text-lg mb-1">Unlock Unlimited Lessons</h4>
+                          <p className="text-xs text-muted-foreground font-roboto mb-3">
+                            Free accounts include 3 lessons/month. Upgrade to Pro for unlimited AI generation, saved templates, and assignment creation.
+                          </p>
+                          <div className="grid grid-cols-2 gap-1.5">
+                            {[
+                              "Unlimited lesson generation",
+                              "Save & share lesson library",
+                              "AI assignment creation",
+                              "Standards alignment tools",
+                            ].map((f) => (
+                              <div key={f} className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                                <div className="h-1.5 w-1.5 rounded-full bg-lys-yellow shrink-0" />
+                                {f}
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                        <div className="flex flex-col items-center gap-2 sm:border-l sm:border-border sm:pl-4 w-full sm:w-auto">
+                          <p className="font-oswald text-2xl font-bold">$19<span className="text-sm font-normal text-muted-foreground font-roboto">/mo</span></p>
+                          <Button
+                            onClick={() => setLocation("/pricing")}
+                            size="sm"
+                            className="w-full sm:w-36 bg-lys-red hover:bg-lys-red/90 text-white font-oswald gap-1.5"
+                            data-testid="button-upgrade-limit"
+                          >
+                            <Sparkles className="h-3.5 w-3.5" />
+                            {canStartTrial ? "Start Free Trial" : "Upgrade Now"}
+                          </Button>
+                          <button
+                            onClick={() => setLocation("/pricing")}
+                            className="text-xs text-muted-foreground hover:text-foreground underline font-roboto"
+                          >
+                            View all plans
+                          </button>
+                        </div>
+                      </div>
+                    </div>
                   </div>
                 )}
 
