@@ -18,6 +18,7 @@ import { useAuth } from "@/hooks/use-auth";
 import { useTier } from "@/hooks/use-tier";
 import { useTrial } from "@/hooks/use-trial";
 import { PLAN_PRICES } from "@/lib/pricing";
+import { resolveCountryName } from "@/lib/countries";
 import { AdBanner } from "@/components/AdBanner";
 import type { LessonPlan, EducatorProfile, Lesson } from "@shared/schema";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
@@ -146,7 +147,7 @@ export default function LessonGenerator() {
 
   useEffect(() => {
     if (educatorProfile && !profileApplied) {
-      if (educatorProfile.country) setSelectedCountry(educatorProfile.country);
+      if (educatorProfile.country) setSelectedCountry(resolveCountryName(educatorProfile.country));
       if (educatorProfile.state) setSelectedState(educatorProfile.state);
       if (educatorProfile.preferredSubject) setSelectedSubject(educatorProfile.preferredSubject);
       if (educatorProfile.preferredStandardCodes && (educatorProfile.preferredStandardCodes as StandardCode[]).length > 0) {

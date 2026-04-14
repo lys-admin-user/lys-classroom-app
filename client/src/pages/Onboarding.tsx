@@ -12,7 +12,7 @@ import { Badge } from "@/components/ui/badge";
 import { GraduationCap, BookOpen, Building2, ChevronRight, ChevronLeft, Sparkles, Target, Compass, BookMarked, School, Home, Presentation } from "lucide-react";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
-import type { StandardsJurisdiction } from "@shared/schema";
+import { COUNTRIES, codeToCountryName } from "@/lib/countries";
 
 const LANGUAGES = [
   // Top 25 most spoken languages in the world
@@ -41,81 +41,6 @@ const LANGUAGES = [
   { code: "gu", name: "Gujarati" },
   { code: "pl", name: "Polish" },
   { code: "uk", name: "Ukrainian" },
-];
-
-const COUNTRIES = [
-  // Americas
-  { code: "US", name: "United States", region: "Americas" },
-  { code: "CA", name: "Canada", region: "Americas" },
-  { code: "MX", name: "Mexico", region: "Americas" },
-  { code: "BR", name: "Brazil", region: "Americas" },
-  { code: "AR", name: "Argentina", region: "Americas" },
-  { code: "CO", name: "Colombia", region: "Americas" },
-  { code: "CL", name: "Chile", region: "Americas" },
-  { code: "PE", name: "Peru", region: "Americas" },
-  { code: "CR", name: "Costa Rica", region: "Americas" },
-  { code: "PA", name: "Panama", region: "Americas" },
-  { code: "DO", name: "Dominican Republic", region: "Americas" },
-  { code: "JM", name: "Jamaica", region: "Americas" },
-  { code: "TT", name: "Trinidad and Tobago", region: "Americas" },
-  // Europe
-  { code: "GB", name: "United Kingdom", region: "Europe" },
-  { code: "DE", name: "Germany", region: "Europe" },
-  { code: "FR", name: "France", region: "Europe" },
-  { code: "ES", name: "Spain", region: "Europe" },
-  { code: "IT", name: "Italy", region: "Europe" },
-  { code: "NL", name: "Netherlands", region: "Europe" },
-  { code: "BE", name: "Belgium", region: "Europe" },
-  { code: "SE", name: "Sweden", region: "Europe" },
-  { code: "NO", name: "Norway", region: "Europe" },
-  { code: "DK", name: "Denmark", region: "Europe" },
-  { code: "FI", name: "Finland", region: "Europe" },
-  { code: "IE", name: "Ireland", region: "Europe" },
-  { code: "PT", name: "Portugal", region: "Europe" },
-  { code: "CH", name: "Switzerland", region: "Europe" },
-  { code: "AT", name: "Austria", region: "Europe" },
-  { code: "PL", name: "Poland", region: "Europe" },
-  { code: "CZ", name: "Czech Republic", region: "Europe" },
-  { code: "GR", name: "Greece", region: "Europe" },
-  { code: "HU", name: "Hungary", region: "Europe" },
-  { code: "RO", name: "Romania", region: "Europe" },
-  // Asia-Pacific
-  { code: "AU", name: "Australia", region: "Asia-Pacific" },
-  { code: "NZ", name: "New Zealand", region: "Asia-Pacific" },
-  { code: "JP", name: "Japan", region: "Asia-Pacific" },
-  { code: "KR", name: "South Korea", region: "Asia-Pacific" },
-  { code: "CN", name: "China", region: "Asia-Pacific" },
-  { code: "IN", name: "India", region: "Asia-Pacific" },
-  { code: "SG", name: "Singapore", region: "Asia-Pacific" },
-  { code: "MY", name: "Malaysia", region: "Asia-Pacific" },
-  { code: "TH", name: "Thailand", region: "Asia-Pacific" },
-  { code: "PH", name: "Philippines", region: "Asia-Pacific" },
-  { code: "ID", name: "Indonesia", region: "Asia-Pacific" },
-  { code: "VN", name: "Vietnam", region: "Asia-Pacific" },
-  { code: "PK", name: "Pakistan", region: "Asia-Pacific" },
-  { code: "BD", name: "Bangladesh", region: "Asia-Pacific" },
-  { code: "HK", name: "Hong Kong", region: "Asia-Pacific" },
-  { code: "TW", name: "Taiwan", region: "Asia-Pacific" },
-  // Middle East
-  { code: "AE", name: "United Arab Emirates", region: "Middle East" },
-  { code: "SA", name: "Saudi Arabia", region: "Middle East" },
-  { code: "IL", name: "Israel", region: "Middle East" },
-  { code: "TR", name: "Turkey", region: "Middle East" },
-  { code: "EG", name: "Egypt", region: "Middle East" },
-  { code: "JO", name: "Jordan", region: "Middle East" },
-  { code: "QA", name: "Qatar", region: "Middle East" },
-  { code: "KW", name: "Kuwait", region: "Middle East" },
-  // Africa
-  { code: "ZA", name: "South Africa", region: "Africa" },
-  { code: "NG", name: "Nigeria", region: "Africa" },
-  { code: "KE", name: "Kenya", region: "Africa" },
-  { code: "GH", name: "Ghana", region: "Africa" },
-  { code: "TZ", name: "Tanzania", region: "Africa" },
-  { code: "UG", name: "Uganda", region: "Africa" },
-  { code: "ET", name: "Ethiopia", region: "Africa" },
-  { code: "RW", name: "Rwanda", region: "Africa" },
-  { code: "MA", name: "Morocco", region: "Africa" },
-  { code: "TN", name: "Tunisia", region: "Africa" },
 ];
 
 const PRIMARY_GOALS_STUDENT = [
@@ -206,10 +131,11 @@ export default function Onboarding() {
   const [country, setCountry] = useState("");
   const [stateValue, setStateValue] = useState("");
 
-  const { data: jurisdictions } = useQuery<StandardsJurisdiction[]>({
-    queryKey: ["/api/standards/jurisdictions"],
+  const { data: statesData } = useQuery<{ state: string; abbreviation: string; standardsName: string }[]>({
+    queryKey: ["/api/standards/states", codeToCountryName(country)],
     enabled: !!country,
   });
+  const states = statesData || [];
 
   const selectedGradeBands = useMemo(() => {
     const bands: string[] = [];
@@ -318,7 +244,7 @@ export default function Onboarding() {
       role,
       preferences: {
         language,
-        country,
+        country: codeToCountryName(country),
         state: stateValue,
         gradeLevels: selectedGradeLevels,
         gradeBands: selectedGradeBands,
@@ -616,15 +542,9 @@ export default function Onboarding() {
                         <SelectValue placeholder="Select state/region" />
                       </SelectTrigger>
                       <SelectContent className="max-h-[300px]">
-                        {(() => {
-                          const countryName = COUNTRIES.find(c => c.code === country)?.name || country;
-                          const matchingJurisdictions = jurisdictions?.filter(j => 
-                            j.country === countryName || j.country === country
-                          ) || [];
-                          
-                          if (matchingJurisdictions.length > 0) {
-                            // For US, group by region
-                            if (country === "US") {
+                        {states.length > 0 ? (
+                          country === "US" ? (
+                            (() => {
                               const usRegions: Record<string, string[]> = {
                                 "Northeast": ["CT", "ME", "MA", "NH", "NJ", "NY", "PA", "RI", "VT"],
                                 "Southeast": ["AL", "AR", "FL", "GA", "KY", "LA", "MD", "MS", "NC", "SC", "TN", "VA", "WV", "DE", "DC"],
@@ -632,55 +552,48 @@ export default function Onboarding() {
                                 "Southwest": ["AZ", "NM", "OK", "TX"],
                                 "West": ["AK", "CA", "CO", "HI", "ID", "MT", "NV", "OR", "UT", "WA", "WY"],
                               };
-                              
                               const groupedItems: JSX.Element[] = [];
-                              Object.entries(usRegions).forEach(([region, stateAbbrevs]) => {
-                                const regionStates = matchingJurisdictions.filter(j => 
-                                  stateAbbrevs.includes(j.abbreviation)
-                                ).sort((a, b) => a.name.localeCompare(b.name));
-                                
+                              const allRegionAbbrevs = Object.values(usRegions).flat();
+                              Object.entries(usRegions).forEach(([region, abbrevs]) => {
+                                const regionStates = states
+                                  .filter(s => abbrevs.includes(s.abbreviation))
+                                  .sort((a, b) => a.state.localeCompare(b.state));
                                 if (regionStates.length > 0) {
                                   groupedItems.push(
                                     <SelectGroup key={region}>
                                       <SelectLabel className="font-oswald text-xs text-muted-foreground">{region}</SelectLabel>
-                                      {regionStates.map((j) => (
-                                        <SelectItem key={j.id} value={j.abbreviation}>{j.name}</SelectItem>
+                                      {regionStates.map(s => (
+                                        <SelectItem key={s.abbreviation} value={s.abbreviation}>{s.state}</SelectItem>
                                       ))}
                                     </SelectGroup>
                                   );
                                 }
                               });
-                              
-                              // Add any states not in regions (national standards, etc.)
-                              const allRegionAbbrevs = Object.values(usRegions).flat();
-                              const otherStandards = matchingJurisdictions.filter(j => 
-                                !allRegionAbbrevs.includes(j.abbreviation)
-                              ).sort((a, b) => a.name.localeCompare(b.name));
-                              
-                              if (otherStandards.length > 0) {
+                              const otherStates = states
+                                .filter(s => !allRegionAbbrevs.includes(s.abbreviation))
+                                .sort((a, b) => a.state.localeCompare(b.state));
+                              if (otherStates.length > 0) {
                                 groupedItems.push(
                                   <SelectGroup key="national">
                                     <SelectLabel className="font-oswald text-xs text-muted-foreground">National / Other</SelectLabel>
-                                    {otherStandards.map((j) => (
-                                      <SelectItem key={j.id} value={j.abbreviation}>{j.name}</SelectItem>
+                                    {otherStates.map(s => (
+                                      <SelectItem key={s.abbreviation} value={s.abbreviation}>{s.state}</SelectItem>
                                     ))}
                                   </SelectGroup>
                                 );
                               }
-                              
                               return groupedItems;
-                            }
-                            
-                            // For other countries, sort alphabetically
-                            return matchingJurisdictions
-                              .sort((a, b) => a.name.localeCompare(b.name))
-                              .map((j) => (
-                                <SelectItem key={j.id} value={j.abbreviation}>{j.name}</SelectItem>
-                              ));
-                          }
-                          
-                          return <SelectItem value="other">Other / Not Listed</SelectItem>;
-                        })()}
+                            })()
+                          ) : (
+                            states
+                              .sort((a, b) => a.state.localeCompare(b.state))
+                              .map(s => (
+                                <SelectItem key={s.abbreviation} value={s.abbreviation}>{s.state}</SelectItem>
+                              ))
+                          )
+                        ) : (
+                          <SelectItem value="other">Other / Not Listed</SelectItem>
+                        )}
                       </SelectContent>
                     </Select>
                     <p className="text-xs text-muted-foreground mt-1">
