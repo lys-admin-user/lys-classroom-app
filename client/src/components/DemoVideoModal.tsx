@@ -712,9 +712,9 @@ const slides: DemoSlide[] = [
       <div className="w-full max-w-xs mx-auto">
         <div className="bg-card rounded-lg border p-3 space-y-2">
           {[
-            { country: "United States", price: "$19.99/mo", idx: "1.00" },
-            { country: "Brazil", price: "$6.99/mo", idx: "0.35" },
-            { country: "India", price: "$3.99/mo", idx: "0.20" },
+            { country: "United States", price: `$${PLAN_PRICES.pro}/mo`, idx: "1.00" },
+            { country: "Brazil", price: `$${(PLAN_PRICES.pro * 0.35).toFixed(2)}/mo`, idx: "0.35" },
+            { country: "India", price: `$${(PLAN_PRICES.pro * 0.20).toFixed(2)}/mo`, idx: "0.20" },
           ].map((c) => (
             <div key={c.country} className="flex items-center justify-between text-xs">
               <span className="font-roboto">{c.country}</span>

@@ -6,7 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { Settings as SettingsIcon, User, Crown, Loader2 } from "lucide-react";
 import { useLocation } from "wouter";
-import { PLAN_PRICES } from "@/lib/pricing";
+import { PLAN_PRICES, SEAT_PRICES } from "@/lib/pricing";
 import EducatorProfileForm from "@/components/EducatorProfileForm";
 import ProfileTierSitemap from "@/components/ProfileTierSitemap";
 import type { EducatorProfile } from "@shared/schema";
@@ -73,8 +73,8 @@ export default function Settings() {
     free: "Basic access to core features with limited usage.",
     pro: "Full features for individual educators.",
     paid: "Full features for individual educators.",
-    campus: `Single-campus license — $${PLAN_PRICES.campus}/mo base + $15/seat/mo per Pro educator.`,
-    enterprise: `Multi-campus/district plan — Campus fee per campus + $15/seat/mo per Pro educator.`,
+    campus: `Single-campus license — $${PLAN_PRICES.campus}/mo base + $${SEAT_PRICES.campus}/seat/mo per Pro educator.`,
+    enterprise: `Multi-campus/district plan — Campus fee per campus + $${SEAT_PRICES.enterprise}/seat/mo per Pro educator.`,
   };
 
   return (
