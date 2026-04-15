@@ -235,7 +235,7 @@ export async function registerRoutes(
       }
 
       const isUnlimited = tier !== "free" || hasActiveTrial;
-      const limit = isUnlimited ? null : 3;
+      const limit = isUnlimited ? null : 5;
       const remaining = limit !== null ? Math.max(0, limit - monthlyCount) : null;
       
       res.json({
@@ -251,20 +251,20 @@ export async function registerRoutes(
     }
   });
 
-  // Guest Lesson Generation - limited to 3 total per IP for unauthenticated users
+  // Guest Lesson Generation - limited to 5 total per IP for unauthenticated users
   app.post("/api/lessons/generate-guest", async (req: any, res) => {
     try {
       const validated = generateLessonRequestSchema.parse(req.body);
       const ipAddress = req.ip || req.headers['x-forwarded-for'] || req.connection.remoteAddress || 'unknown';
       
-      // Check and reserve guest generation (3 total per IP)
-      const { success, currentCount } = await storage.tryReserveGuestLessonGeneration(ipAddress, 3, validated.topic);
+      // Check and reserve guest generation (5 total per IP)
+      const { success, currentCount } = await storage.tryReserveGuestLessonGeneration(ipAddress, 5, validated.topic);
       if (!success) {
         res.status(403).json({ 
           error: "Guest limit reached", 
           message: "Create a free account to continue generating lessons.",
           guestCount: currentCount,
-          limit: 3,
+          limit: 5,
           requiresSignup: true
         });
         return;
@@ -273,7 +273,7 @@ export async function registerRoutes(
       const generatedPlan = await generateLessonPlan(validated);
       res.json({ 
         ...generatedPlan, 
-        guestUsage: { used: currentCount + 1, limit: 3, remaining: 3 - currentCount - 1 }
+        guestUsage: { used: currentCount + 1, limit: 5, remaining: 5 - currentCount - 1 }
       });
     } catch (error) {
       if (error instanceof z.ZodError) {
@@ -290,7 +290,7 @@ export async function registerRoutes(
     try {
       const ipAddress = req.ip || req.headers['x-forwarded-for'] || req.connection.remoteAddress || 'unknown';
       const count = await storage.countGuestGenerations(ipAddress);
-      res.json({ used: count, limit: 3, remaining: Math.max(0, 3 - count) });
+      res.json({ used: count, limit: 5, remaining: Math.max(0, 5 - count) });
     } catch (error) {
       res.status(500).json({ error: "Failed to check guest usage" });
     }
@@ -556,13 +556,13 @@ export async function registerRoutes(
       }
 
       if (tier === "free" && !hasActiveTrial) {
-        const { success, currentCount } = await storage.tryReserveLessonGeneration(userId, 3, validated.topic);
+        const { success, currentCount } = await storage.tryReserveLessonGeneration(userId, 5, validated.topic);
         if (!success) {
           res.status(403).json({ 
             error: "Monthly limit reached", 
-            message: "Free accounts can generate up to 3 lessons per month. Upgrade to Pro for unlimited lessons.",
+            message: "Free accounts can generate up to 5 lessons per month. Upgrade to Pro for unlimited lessons.",
             monthlyCount: currentCount,
-            limit: 3,
+            limit: 5,
             requiredTier: "pro"
           });
           return;

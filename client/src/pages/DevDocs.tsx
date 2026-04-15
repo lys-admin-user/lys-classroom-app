@@ -764,7 +764,7 @@ const requireSystemAdmin = requireRole("system_admin");`,
         table: {
           headers: ["Tier", "Target", "Key Features"],
           rows: [
-            ["Free", "Individual users", "Basic access, 3 AI lessons/month, ad-supported"],
+            ["Free", "Individual users", "Basic access, 5 AI lessons/month, ad-supported"],
             ["Pro", "Individual educators", "Unlimited AI, no ads, focus mode, advanced analytics"],
             ["Campus", "Single-campus charters / Schools", "All Pro features + org management, SIS integration, collaboration"],
             ["Enterprise", "ISDs / Charter Networks (CMO/EMO) / Universities", "All Campus features + multi-campus management, master dashboard, per-state management, priority support, custom branding"],

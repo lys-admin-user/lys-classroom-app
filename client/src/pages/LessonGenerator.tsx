@@ -336,7 +336,7 @@ export default function LessonGenerator() {
       } else if (error?.requiredTier) {
         toast({
           title: "Monthly Limit Reached",
-          description: "Free accounts can generate up to 3 lessons per month. Upgrade to Pro for unlimited lessons.",
+          description: "Free accounts can generate up to 5 lessons per month. Upgrade to Pro for unlimited lessons.",
           variant: "destructive",
         });
       } else {
@@ -912,7 +912,7 @@ ${addedResources.length > 0 ? addedResources.map(r => `- ${r.title}: ${r.url}`).
                           </div>
                           <h4 className="font-oswald text-lg mb-1">Unlock Unlimited Lessons</h4>
                           <p className="text-xs text-muted-foreground font-roboto mb-3">
-                            Free accounts include 3 lessons/month. Upgrade to Pro for unlimited AI generation, saved templates, and assignment creation.
+                            Free accounts include 5 lessons/month. Upgrade to Pro for unlimited AI generation, saved templates, and assignment creation.
                           </p>
                           <div className="grid grid-cols-2 gap-1.5">
                             {[

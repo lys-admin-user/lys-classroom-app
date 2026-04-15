@@ -932,6 +932,59 @@ function EducatorDashboard() {
         </div>
       </section>
 
+      <section className="py-10 bg-gradient-to-r from-lys-yellow/10 via-background to-lys-teal/10 border-y border-border/50">
+        <div className="max-w-5xl mx-auto px-4 sm:px-6">
+          <div className="grid md:grid-cols-5 gap-8 items-center">
+            <div className="md:col-span-2 text-center md:text-left">
+              <Badge className="bg-lys-red/10 text-lys-red border-lys-red/20 mb-3 font-roboto">
+                2-Minute Overview
+              </Badge>
+              <h2 className="font-marker text-2xl sm:text-3xl text-foreground mb-3 leading-tight">
+                See LYS in Action
+              </h2>
+              <p className="font-roboto text-muted-foreground mb-5 text-sm sm:text-base">
+                Watch how LYS helps educators generate standards-aligned lessons, assign work to students, and track real growth — all in under 2 minutes.
+              </p>
+              <Button
+                size="lg"
+                className="bg-lys-red hover:bg-lys-red/90 text-white font-oswald gap-2 shadow-md"
+                onClick={() => setShowDemo(true)}
+                data-testid="button-watch-demo-banner"
+              >
+                <Play className="h-5 w-5" />
+                Watch the 2-Min Demo
+              </Button>
+            </div>
+            <div className="md:col-span-3">
+              <button
+                className="relative w-full rounded-2xl overflow-hidden border-2 border-lys-yellow/40 shadow-xl cursor-pointer group"
+                onClick={() => setShowDemo(true)}
+                data-testid="button-demo-thumbnail"
+                aria-label="Watch 2-minute demo video"
+              >
+                <div className="aspect-video bg-gradient-to-br from-lys-yellow/20 via-lys-teal/10 to-lys-red/20 flex items-center justify-center">
+                  <div className="absolute inset-0 flex flex-col items-center justify-center gap-4">
+                    <div className="w-20 h-20 rounded-full bg-lys-red/90 flex items-center justify-center shadow-2xl group-hover:scale-110 transition-transform duration-200">
+                      <Play className="h-9 w-9 text-white ml-1" />
+                    </div>
+                    <div className="text-center px-6">
+                      <p className="font-oswald text-lg font-semibold text-foreground">Laddering Your Success</p>
+                      <p className="font-roboto text-sm text-muted-foreground">Platform walkthrough · 2 minutes</p>
+                    </div>
+                  </div>
+                  <div className="absolute bottom-4 left-4 right-4 flex items-center gap-2">
+                    <div className="flex-1 h-1 bg-foreground/10 rounded-full overflow-hidden">
+                      <div className="h-full w-0 bg-lys-red rounded-full"></div>
+                    </div>
+                    <span className="font-roboto text-xs text-muted-foreground">2:00</span>
+                  </div>
+                </div>
+              </button>
+            </div>
+          </div>
+        </div>
+      </section>
+
       {isAuthenticated && (
         <>
           <section className="py-6 pb-0">

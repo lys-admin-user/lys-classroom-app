@@ -73,8 +73,8 @@ export default function Settings() {
     free: "Basic access to core features with limited usage.",
     pro: "Full features for individual educators.",
     paid: "Full features for individual educators.",
-    campus: `Single-campus license for independent schools and charter schools ($${PLAN_PRICES.campus}/mo).`,
-    enterprise: `Full organizational access for ISDs, charter networks (CMOs/EMOs), and multi-campus districts ($${PLAN_PRICES.enterprise}/mo).`,
+    campus: `Single-campus license — $${PLAN_PRICES.campus}/mo base + $15/seat/mo per Pro educator.`,
+    enterprise: `Multi-campus/district plan — Campus fee per campus + $15/seat/mo per Pro educator.`,
   };
 
   return (

@@ -1,9 +1,16 @@
 export const PLAN_PRICES = {
   free: 0,
   pro: 19,
-  campus: 99,
+  campus: 299,
   enterprise: 299,
 } as const;
+
+export const SEAT_PRICES = {
+  campus: 15,
+  enterprise: 15,
+} as const;
+
+export const FREE_LESSON_LIMIT = 5;
 
 export type PlanId = keyof typeof PLAN_PRICES;
 

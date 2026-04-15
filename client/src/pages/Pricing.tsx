@@ -9,10 +9,10 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Check, X, Building2, GraduationCap, AlertCircle, Eye, Globe, Info, TrendingDown, CreditCard, FileText, Landmark, Loader2, Sparkles } from "lucide-react";
+import { Check, X, Building2, GraduationCap, AlertCircle, Eye, Globe, Info, TrendingDown, CreditCard, FileText, Landmark, Loader2, Sparkles, Users } from "lucide-react";
 import { SiPaypal } from "react-icons/si";
 import { useAuth } from "@/hooks/use-auth";
-import { PLAN_PRICES } from "@/lib/pricing";
+import { PLAN_PRICES, SEAT_PRICES, FREE_LESSON_LIMIT } from "@/lib/pricing";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
@@ -78,12 +78,13 @@ const baseTiers = [
     period: "forever",
     description: "Perfect for students exploring career paths and self-discovery",
     icon: GraduationCap,
+    seatBased: false,
     features: [
       { name: "Self-Discovery Assessments", included: true },
       { name: "Career Exploration", included: true },
       { name: "Action Plans (3 max)", included: true },
       { name: "Resource Library", included: true },
-      { name: "AI Lesson Generator (3/month)", included: true },
+      { name: `AI Lesson Generator (${FREE_LESSON_LIMIT}/month)`, included: true },
       { name: "Ad-Supported Experience", included: true, note: "Contextual sponsorships" },
       { name: "Scope & Sequence Builder", included: false },
       { name: "Standards Database Access", included: false },
@@ -102,6 +103,7 @@ const baseTiers = [
     period: "/class/month",
     description: "Per-class billing with assignment generation and student distribution (35 students max per class)",
     icon: Eye,
+    seatBased: false,
     features: [
       { name: "Focus Mode (No Ads)", included: true, highlight: true },
       { name: "Assignment Generation & Distribution", included: true, highlight: true },
@@ -124,13 +126,15 @@ const baseTiers = [
     name: "Campus",
     subtitle: "Focus Mode + Team",
     basePrice: PLAN_PRICES.campus,
-    period: "/month",
-    description: "For single-campus charters, independent schools, and individual campuses with admin tools",
+    seatPrice: SEAT_PRICES.campus,
+    period: "/month base",
+    description: "Single-campus license. Includes a base fee plus Pro educator seats chosen by your campus admin.",
     icon: Building2,
+    seatBased: true,
     features: [
       { name: "Focus Mode (No Ads)", included: true, highlight: true },
       { name: "Everything in Pro", included: true },
-      { name: "Unlimited Educators", included: true },
+      { name: `$${SEAT_PRICES.campus}/seat/mo for Pro Educators`, included: true, highlight: true },
       { name: "Campus Admin Dashboard", included: true },
       { name: "Scope Change Approval Workflow", included: true },
       { name: "Team Analytics & Reports", included: true },
@@ -140,7 +144,7 @@ const baseTiers = [
       { name: "Priority Support", included: true },
       { name: "Custom Branding", included: true },
     ],
-    cta: "Upgrade to Campus",
+    cta: "Get Campus",
     popular: false,
   },
   {
@@ -148,11 +152,14 @@ const baseTiers = [
     name: "Enterprise",
     subtitle: "Full Platform",
     basePrice: PLAN_PRICES.enterprise,
-    period: "/month",
-    description: "For ISDs, charter networks (CMOs/EMOs), and multi-site organizations with full platform access",
+    seatPrice: SEAT_PRICES.enterprise,
+    period: "/month base",
+    description: "For ISDs, charter networks (CMOs/EMOs), and multi-site orgs. Campus fee per campus + per-seat pricing.",
     icon: Building2,
+    seatBased: true,
     features: [
       { name: "Everything in Campus", included: true, highlight: true },
+      { name: `Campus fee per campus + $${SEAT_PRICES.enterprise}/seat/mo`, included: true, highlight: true },
       { name: "Multi-District & Charter Network Management", included: true },
       { name: "Master Dashboard across all campuses", included: true },
       { name: "Per-State Management for multi-state networks", included: true },
@@ -607,6 +614,12 @@ export default function Pricing() {
                         <span className="text-3xl md:text-4xl font-bold text-foreground">{displayPrice}</span>
                         <span className="text-muted-foreground">{tier.period}</span>
                       </>
+                    )}
+                    {(tier as any).seatBased && (tier as any).seatPrice && (
+                      <div className="mt-2 flex items-center justify-center gap-1.5 text-xs text-muted-foreground bg-lys-teal/10 rounded-full px-3 py-1">
+                        <Users className="h-3 w-3 text-lys-teal" />
+                        <span>+ <strong className="text-foreground">${(tier as any).seatPrice}/seat/mo</strong> for Pro educators</span>
+                      </div>
                     )}
                   </div>
                   <CardDescription className="mt-2">{tier.description}</CardDescription>
