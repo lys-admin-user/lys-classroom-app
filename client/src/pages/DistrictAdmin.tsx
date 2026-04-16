@@ -91,7 +91,8 @@ export default function DistrictAdmin() {
     queryFn: async () => {
       if (!districtOrg?.organization?.id) return [];
       const res = await fetch(
-        `/api/organizations/${districtOrg.organization.id}/children`
+        `/api/organizations/${districtOrg.organization.id}/children`,
+        { credentials: "include" }
       );
       if (!res.ok) return [];
       return res.json();
@@ -106,7 +107,7 @@ export default function DistrictAdmin() {
   const { data: orgInvitations = [] } = useQuery<any[]>({
     queryKey: ["/api/admin/organizations", selectedCampusForPeople, "invitations"],
     queryFn: async () => {
-      const res = await fetch(`/api/admin/organizations/${selectedCampusForPeople}/invitations`);
+      const res = await fetch(`/api/admin/organizations/${selectedCampusForPeople}/invitations`, { credentials: "include" });
       if (!res.ok) throw new Error("Failed");
       return res.json();
     },

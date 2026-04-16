@@ -616,7 +616,7 @@ export default function Classroom() {
   const { data: quietHoursList = [] } = useQuery<any[]>({
     queryKey: ["/api/quiet-hours", user?.id],
     queryFn: async () => {
-      const res = await fetch(`/api/quiet-hours?teacherUserId=${user?.id}`);
+      const res = await fetch(`/api/quiet-hours?teacherUserId=${user?.id}`, { credentials: "include" });
       if (!res.ok) return [];
       return res.json();
     },

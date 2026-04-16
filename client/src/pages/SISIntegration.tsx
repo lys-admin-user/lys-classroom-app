@@ -547,7 +547,7 @@ function SisStudentsTab({ connectionId }: { connectionId: string }) {
   const { data: students, isLoading } = useQuery({
     queryKey: ["/api/integrations/sis/connections", connectionId, "students"],
     queryFn: async () => {
-      const response = await fetch(`/api/integrations/sis/connections/${connectionId}/students`);
+      const response = await fetch(`/api/integrations/sis/connections/${connectionId}/students`, { credentials: "include" });
       return response.json();
     },
   });
@@ -598,7 +598,7 @@ function SisCoursesTab({ connectionId }: { connectionId: string }) {
   const { data: courses, isLoading } = useQuery({
     queryKey: ["/api/integrations/sis/connections", connectionId, "courses"],
     queryFn: async () => {
-      const response = await fetch(`/api/integrations/sis/connections/${connectionId}/courses`);
+      const response = await fetch(`/api/integrations/sis/connections/${connectionId}/courses`, { credentials: "include" });
       return response.json();
     },
   });
@@ -649,7 +649,7 @@ function SisSyncHistoryTab({ connectionId }: { connectionId: string }) {
   const { data: history, isLoading } = useQuery({
     queryKey: ["/api/integrations/sis/connections", connectionId, "history"],
     queryFn: async () => {
-      const response = await fetch(`/api/integrations/sis/connections/${connectionId}/history`);
+      const response = await fetch(`/api/integrations/sis/connections/${connectionId}/history`, { credentials: "include" });
       return response.json();
     },
   });

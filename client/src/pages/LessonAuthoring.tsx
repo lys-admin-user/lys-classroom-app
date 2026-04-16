@@ -54,6 +54,7 @@ export default function LessonAuthoringPage() {
     mutationFn: async (lesson: typeof newLesson) => {
       const response = await fetch("/api/lesson-author/master-lessons", {
         method: "POST",
+        credentials: "include",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           title: lesson.title,
@@ -96,6 +97,7 @@ export default function LessonAuthoringPage() {
     mutationFn: async ({ id, ...lesson }: { id: string } & typeof newLesson) => {
       const response = await fetch(`/api/lesson-author/master-lessons/${id}`, {
         method: "PATCH",
+        credentials: "include",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           title: lesson.title,
@@ -138,6 +140,7 @@ export default function LessonAuthoringPage() {
     mutationFn: async (lessonId: string) => {
       const response = await fetch(`/api/lesson-author/master-lessons/${lessonId}/submit`, {
         method: "POST",
+        credentials: "include",
       });
       if (!response.ok) throw new Error("Failed to submit lesson");
       return response.json();
@@ -155,6 +158,7 @@ export default function LessonAuthoringPage() {
     mutationFn: async (lessonId: string) => {
       const response = await fetch(`/api/lesson-author/master-lessons/${lessonId}`, {
         method: "DELETE",
+        credentials: "include",
       });
       if (!response.ok) throw new Error("Failed to delete lesson");
       return response.json();

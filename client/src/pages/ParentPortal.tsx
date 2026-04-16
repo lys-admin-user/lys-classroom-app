@@ -899,7 +899,7 @@ export default function ParentPortal() {
   const { data: parentLinks = [], isLoading: parentLinksLoading } = useQuery<EnrichedLink[]>({
     queryKey: ["/api/parent-portal/links", "parent"],
     queryFn: async () => {
-      const res = await fetch(`/api/parent-portal/links?role=parent`);
+      const res = await fetch(`/api/parent-portal/links?role=parent`, { credentials: "include" });
       if (!res.ok) {
         if (res.status === 403) return [];
         throw new Error("Failed to fetch parent links");
@@ -916,7 +916,7 @@ export default function ParentPortal() {
   const { data: links = [], isLoading: linksLoading } = useQuery<EnrichedLink[]>({
     queryKey: ["/api/parent-portal/links", "student"],
     queryFn: async () => {
-      const res = await fetch(`/api/parent-portal/links?role=student`);
+      const res = await fetch(`/api/parent-portal/links?role=student`, { credentials: "include" });
       if (!res.ok) throw new Error("Failed to fetch links");
       return res.json();
     },
@@ -931,7 +931,7 @@ export default function ParentPortal() {
   const { data: studentData, isLoading: studentDataLoading } = useQuery<StudentData>({
     queryKey: ["/api/parent-portal/student", selectedStudent],
     queryFn: async () => {
-      const res = await fetch(`/api/parent-portal/student/${selectedStudent}`);
+      const res = await fetch(`/api/parent-portal/student/${selectedStudent}`, { credentials: "include" });
       if (!res.ok) throw new Error("Failed to fetch student data");
       return res.json();
     },
@@ -965,7 +965,7 @@ export default function ParentPortal() {
   const { data: threadMessages = [], isLoading: threadMessagesLoading } = useQuery<any[]>({
     queryKey: ["/api/parent-messages/thread", selectedThreadId],
     queryFn: async () => {
-      const res = await fetch(`/api/parent-messages/thread/${selectedThreadId}`);
+      const res = await fetch(`/api/parent-messages/thread/${selectedThreadId}`, { credentials: "include" });
       if (!res.ok) return [];
       return res.json();
     },

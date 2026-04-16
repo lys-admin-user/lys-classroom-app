@@ -684,7 +684,7 @@ export default function MyJourney() {
   });
 
   const { data: savedCareers = [] } = useQuery<Career[]>({
-    queryKey: ["/api/careers/saved"],
+    queryKey: ["/api/saved-careers"],
     enabled: isAuthenticated,
   });
 

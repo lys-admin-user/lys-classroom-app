@@ -1035,7 +1035,7 @@ function PDCoursesTab() {
   }>>({
     queryKey: ["/api/marketplace", { audience: "educators" }],
     queryFn: async () => {
-      const res = await fetch("/api/marketplace?audience=educators");
+      const res = await fetch("/api/marketplace?audience=educators", { credentials: "include" });
       if (!res.ok) throw new Error("Failed to fetch");
       return res.json();
     },
@@ -1053,7 +1053,7 @@ function PDCoursesTab() {
   }>>({
     queryKey: ["/api/pd-content"],
     queryFn: async () => {
-      const res = await fetch("/api/pd-content");
+      const res = await fetch("/api/pd-content", { credentials: "include" });
       if (!res.ok) return [];
       return res.json();
     },

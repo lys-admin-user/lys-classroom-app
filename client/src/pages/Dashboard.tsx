@@ -251,7 +251,7 @@ function StudentMessagingWidget() {
     queryKey: ["/api/parent-messages/unread-count"],
     enabled: isAuthenticated,
     queryFn: async () => {
-      const res = await fetch("/api/parent-messages/unread-count");
+      const res = await fetch("/api/parent-messages/unread-count", { credentials: "include" });
       if (!res.ok) return 0;
       const d = await res.json();
       return typeof d === "number" ? d : (d?.count ?? 0);
@@ -262,7 +262,7 @@ function StudentMessagingWidget() {
     queryKey: ["/api/parent-messages/threads"],
     enabled: isAuthenticated,
     queryFn: async () => {
-      const res = await fetch("/api/parent-messages/threads");
+      const res = await fetch("/api/parent-messages/threads", { credentials: "include" });
       if (!res.ok) return [];
       return res.json();
     },
@@ -272,7 +272,7 @@ function StudentMessagingWidget() {
     queryKey: ["/api/parent-messages/thread", activeThreadId],
     enabled: !!activeThreadId,
     queryFn: async () => {
-      const res = await fetch(`/api/parent-messages/thread/${activeThreadId}`);
+      const res = await fetch(`/api/parent-messages/thread/${activeThreadId}`, { credentials: "include" });
       if (!res.ok) return [];
       return res.json();
     },
@@ -451,7 +451,7 @@ function StudentDashboard() {
   });
 
   const { data: savedCareers = [] } = useQuery<Career[]>({
-    queryKey: ["/api/careers/saved"],
+    queryKey: ["/api/saved-careers"],
     enabled: isAuthenticated,
   });
 

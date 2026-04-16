@@ -98,7 +98,7 @@ export default function SiteAdminPage() {
   const { data: orgInvitations = [] } = useQuery<any[]>({
     queryKey: ["/api/admin/organizations", selectedOrgForPeople, "invitations"],
     queryFn: async () => {
-      const res = await fetch(`/api/admin/organizations/${selectedOrgForPeople}/invitations`);
+      const res = await fetch(`/api/admin/organizations/${selectedOrgForPeople}/invitations`, { credentials: "include" });
       if (!res.ok) throw new Error("Failed");
       return res.json();
     },
