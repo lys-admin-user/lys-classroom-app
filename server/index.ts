@@ -158,11 +158,11 @@ async function scheduleWeeklyScholarshipVerification() {
 
   const runJob = async () => {
     try {
-      const scholarships = await storage.getKnowResources({ resourceType: "scholarship" });
-      const ids = scholarships.map((s) => s.id);
+      const allResources = await storage.getKnowResources({});
+      const ids = allResources.filter((r) => r.isActive !== false).map((r) => r.id);
       if (ids.length === 0) return;
       const count = await storage.bulkVerifyKnowResources(ids, SYSTEM_USER_ID);
-      log(`Weekly verification refreshed ${count} scholarship(s)`, "scheduler");
+      log(`Weekly verification refreshed ${count} resource(s)`, "scheduler");
     } catch (err: any) {
       log(`Weekly verification failed: ${err?.message || err}`, "scheduler");
     }
