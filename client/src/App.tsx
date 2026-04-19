@@ -263,6 +263,8 @@ const AuthStrengthsInventory = withAuth(StrengthsInventory);
 const AuthMentorConnect = withAuth(MentorConnect);
 const AuthDistrictAdmin = withAuth(DistrictAdmin);
 const AuthStandardsAdmin = withAuth(StandardsAdmin);
+const AuthOnboarding = withAuth(Onboarding);
+const AuthDevDocs = withAuth(DevDocs);
 
 function Router() {
   return (
@@ -274,17 +276,19 @@ function Router() {
       <Route path="/lesson-generator" component={LessonGenerator} />
       <Route path="/assessments" component={Assessments} />
       <Route path="/careers" component={Careers} />
-      <Route path="/action-plans" component={ActionPlans} />
       <Route path="/resources" component={Resources} />
       <Route path="/self-discovery" component={SelfDiscovery} />
-      <Route path="/strengths-inventory" component={StrengthsInventory} />
-      <Route path="/scholarship-planner" component={ScholarshipPlanner} />
       <Route path="/mentor-connect" component={MentorConnect} />
       <Route path="/shared/:shareId" component={SharedLesson} />
       <Route path="/pricing" component={Pricing} />
-      <Route path="/onboarding" component={Onboarding} />
       <Route path="/help" component={HelpDesk} />
       <Route path="/p/:slug" component={PortfolioView} />
+
+      {/* Personal-data pages that need a signed-in account */}
+      <Route path="/action-plans" component={AuthActionPlans} />
+      <Route path="/strengths-inventory" component={AuthStrengthsInventory} />
+      <Route path="/scholarship-planner" component={AuthScholarshipPlanner} />
+      <Route path="/onboarding" component={AuthOnboarding} />
 
       {/* Account-required pages — personal data or admin tools */}
       <Route path="/my-lessons" component={AuthMyLessons} />
@@ -321,7 +325,7 @@ function Router() {
       <Route path="/campus-activities" component={AuthCampusActivities} />
       <Route path="/district-admin" component={AuthDistrictAdmin} />
       <Route path="/district-admin/campuses" component={AuthDistrictAdmin} />
-      <Route path="/dev-docs" component={DevDocs} />
+      <Route path="/dev-docs" component={AuthDevDocs} />
       <Route component={NotFound} />
     </Switch>
   );
