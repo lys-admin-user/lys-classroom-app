@@ -969,6 +969,7 @@ export interface IStorage {
   getSavedScholarships(userId: string): Promise<SavedScholarship[]>;
   saveScholarship(data: InsertSavedScholarship): Promise<SavedScholarship>;
   unsaveScholarship(userId: string, resourceId: string): Promise<boolean>;
+  updateSavedScholarshipReason(userId: string, resourceId: string, pursuitReason: string): Promise<SavedScholarship | undefined>;
   isSavedScholarship(userId: string, resourceId: string): Promise<boolean>;
 
   // Resource Reports (scholarship moderation)
@@ -6169,6 +6170,14 @@ export class DatabaseStorage implements IStorage {
   async unsaveScholarship(userId: string, resourceId: string): Promise<boolean> {
     await db.delete(savedScholarships).where(and(eq(savedScholarships.userId, userId), eq(savedScholarships.resourceId, resourceId)));
     return true;
+  }
+
+  async updateSavedScholarshipReason(userId: string, resourceId: string, pursuitReason: string): Promise<SavedScholarship | undefined> {
+    const [updated] = await db.update(savedScholarships)
+      .set({ pursuitReason })
+      .where(and(eq(savedScholarships.userId, userId), eq(savedScholarships.resourceId, resourceId)))
+      .returning();
+    return updated;
   }
 
   async isSavedScholarship(userId: string, resourceId: string): Promise<boolean> {

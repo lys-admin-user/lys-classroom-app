@@ -11,7 +11,9 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Skeleton } from "@/components/ui/skeleton";
-import { GraduationCap, Calendar, CheckCircle, Clock, Plus, Trash2, DollarSign, Heart, Bookmark, ExternalLink } from "lucide-react";
+import { GraduationCap, Calendar, CheckCircle, Clock, Plus, Trash2, DollarSign, Heart, Bookmark, ExternalLink, Pencil } from "lucide-react";
+import { PursuitReasonDialog } from "@/components/PursuitReasonDialog";
+import { Link } from "wouter";
 
 type SavedScholarship = {
   id: string;
@@ -37,6 +39,7 @@ function urgencyOf(deadline: string | null) {
 
 function SavedScholarshipsTab() {
   const { toast } = useToast();
+  const [editTarget, setEditTarget] = useState<SavedScholarship | null>(null);
   const { data: saved = [], isLoading } = useQuery<SavedScholarship[]>({ queryKey: ["/api/saved-scholarships"] });
   const removeMutation = useMutation({
     mutationFn: (resourceId: string) => apiRequest("DELETE", `/api/saved-scholarships/${encodeURIComponent(resourceId)}`),
@@ -44,6 +47,16 @@ function SavedScholarshipsTab() {
       queryClient.invalidateQueries({ queryKey: ["/api/saved-scholarships"] });
       toast({ title: "Removed" });
     },
+  });
+  const editMutation = useMutation({
+    mutationFn: ({ resourceId, pursuitReason }: { resourceId: string; pursuitReason: string }) =>
+      apiRequest("PATCH", `/api/saved-scholarships/${encodeURIComponent(resourceId)}`, { pursuitReason }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/saved-scholarships"] });
+      toast({ title: "Reason updated" });
+      setEditTarget(null);
+    },
+    onError: () => toast({ title: "Couldn't update", variant: "destructive" }),
   });
 
   const sorted = [...saved].sort((a, b) => {
@@ -54,9 +67,11 @@ function SavedScholarshipsTab() {
 
   if (isLoading) return <div className="grid gap-4 md:grid-cols-2">{[1,2].map((i) => <Skeleton key={i} className="h-40 rounded-md" />)}</div>;
   if (sorted.length === 0) return (
-    <Card><CardContent className="py-8 text-center">
+    <Card><CardContent className="py-8 text-center" data-testid="empty-saved-scholarships">
       <Bookmark className="w-10 h-10 mx-auto text-muted-foreground mb-2" />
-      <p className="text-muted-foreground">No saved scholarships yet. Save some from the Resources page.</p>
+      <p className="text-muted-foreground mb-1">You haven't saved any scholarships yet.</p>
+      <p className="text-sm text-muted-foreground mb-4">When you save one, your pursuit reason and deadline urgency will show up here.</p>
+      <Button asChild variant="outline" data-testid="link-browse-resources"><Link href="/resources">Browse scholarships</Link></Button>
     </CardContent></Card>
   );
 
@@ -81,12 +96,19 @@ function SavedScholarshipsTab() {
                   <Calendar className="w-3 h-3" />{s.resourceDeadline}
                 </p>
               )}
-              {s.pursuitReason && (
-                <div className="rounded-md bg-muted/40 p-2 text-sm border-l-2 border-lys-yellow" data-testid={`text-pursuit-reason-${s.id}`}>
+              <div className="rounded-md bg-muted/40 p-2 text-sm border-l-2 border-lys-yellow" data-testid={`text-pursuit-reason-${s.id}`}>
+                <div className="flex items-center justify-between gap-2">
                   <span className="inline-flex items-center gap-1 font-semibold text-xs text-muted-foreground"><Heart className="w-3 h-3 text-lys-yellow" />My reason</span>
-                  <p className="italic mt-1">"{s.pursuitReason}"</p>
+                  <Button size="icon" variant="ghost" className="h-6 w-6" onClick={() => setEditTarget(s)} data-testid={`button-edit-reason-${s.id}`}>
+                    <Pencil className="w-3 h-3" />
+                  </Button>
                 </div>
-              )}
+                {s.pursuitReason ? (
+                  <p className="italic mt-1">"{s.pursuitReason}"</p>
+                ) : (
+                  <p className="text-muted-foreground mt-1 text-xs">Add a sentence about why this scholarship matters to you.</p>
+                )}
+              </div>
               <div className="flex gap-2">
                 {s.resourceUrl && (
                   <Button asChild size="sm" variant="outline" className="flex-1 gap-1" data-testid={`button-open-saved-${s.id}`}>
@@ -101,6 +123,15 @@ function SavedScholarshipsTab() {
           </Card>
         );
       })}
+      <PursuitReasonDialog
+        open={!!editTarget}
+        onClose={() => setEditTarget(null)}
+        onConfirm={(reason) => editTarget && editMutation.mutate({ resourceId: editTarget.resourceId, pursuitReason: reason })}
+        scholarshipTitle={editTarget?.resourceTitle}
+        initialValue={editTarget?.pursuitReason || ""}
+        mode="edit"
+        isSaving={editMutation.isPending}
+      />
     </div>
   );
 }

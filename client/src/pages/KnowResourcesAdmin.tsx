@@ -12,6 +12,16 @@ import { Switch } from "@/components/ui/switch";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Plus, Pencil, Trash2, Book, Youtube, Podcast, MessageCircle, FileText, ExternalLink, Star, Eye, EyeOff, GraduationCap, DollarSign, PenTool, ShieldCheck, Flag, CheckCircle2, ShieldAlert, AlertTriangle } from "lucide-react";
 import type { KnowResource, InsertKnowResource, KnowResourceType } from "@shared/schema";
 
@@ -900,6 +910,29 @@ export default function KnowResourcesAdmin() {
   }, {} as Record<string, number>);
 
   const visibleScholarships = filteredResources.filter((r) => r.resourceType === "scholarship");
+  const allScholarships = resources.filter((r) => r.resourceType === "scholarship");
+  const trustStats = allScholarships.reduce(
+    (acc, r) => {
+      const t = (((r as any).trustLevel as string) || "external").toLowerCase();
+      if (t === "verified") acc.verified++;
+      else if (t === "community") acc.community++;
+      else acc.external++;
+      return acc;
+    },
+    { verified: 0, community: 0, external: 0 },
+  );
+  const unparseableDeadlines = allScholarships.filter((r: any) => {
+    const raw = r.scholarshipDeadline;
+    if (!raw) return false;
+    if (r.nextDeadline) return false;
+    return isNaN(new Date(raw).getTime());
+  });
+
+  // Pending reports count for badge
+  const { data: allReports = [] } = useQuery<any[]>({ queryKey: ["/api/admin/resource-reports"] });
+  const pendingReportsCount = (allReports || []).filter((r: any) => r.status === "pending").length;
+
+  const [bulkConfirmOpen, setBulkConfirmOpen] = useState(false);
 
   return (
     <div className="container mx-auto py-6 px-4 max-w-6xl">
@@ -946,8 +979,30 @@ export default function KnowResourcesAdmin() {
           ))}
           <TabsTrigger value="reports" data-testid="tab-reports">
             <Flag className="w-4 h-4 mr-1" />Reports
+            {pendingReportsCount > 0 && (
+              <Badge variant="destructive" className="ml-1.5 h-5 px-1.5 text-[10px]" data-testid="badge-pending-reports">
+                {pendingReportsCount}
+              </Badge>
+            )}
           </TabsTrigger>
         </TabsList>
+
+        {(activeType === "all" || activeType === "scholarship") && allScholarships.length > 0 && (
+          <Card className="bg-muted/30" data-testid="card-trust-stats">
+            <CardContent className="py-3 flex flex-wrap items-center gap-3 text-sm">
+              <span className="font-semibold">Scholarship trust:</span>
+              <span className="inline-flex items-center gap-1"><span className="h-2 w-2 rounded-full bg-green-500" />Verified <strong>{trustStats.verified}</strong></span>
+              <span className="inline-flex items-center gap-1"><span className="h-2 w-2 rounded-full bg-amber-500" />Community <strong>{trustStats.community}</strong></span>
+              <span className="inline-flex items-center gap-1"><span className="h-2 w-2 rounded-full bg-red-500" />External <strong>{trustStats.external}</strong></span>
+              {unparseableDeadlines.length > 0 && (
+                <span className="ml-auto inline-flex items-center gap-1 text-amber-700" data-testid="text-unparseable-deadlines">
+                  <Flag className="w-3.5 h-3.5" />
+                  <strong>{unparseableDeadlines.length}</strong> listing{unparseableDeadlines.length === 1 ? "" : "s"} have unparseable deadlines — review the deadline field.
+                </span>
+              )}
+            </CardContent>
+          </Card>
+        )}
 
         {visibleScholarships.length > 0 && activeType !== "reports" && (
           <div className="flex items-center justify-end gap-2">
@@ -958,7 +1013,7 @@ export default function KnowResourcesAdmin() {
               size="sm"
               variant="outline"
               className="gap-1"
-              onClick={() => bulkVerifyMutation.mutate(visibleScholarships.map((r) => r.id))}
+              onClick={() => setBulkConfirmOpen(true)}
               disabled={bulkVerifyMutation.isPending}
               data-testid="button-bulk-verify"
             >
@@ -967,6 +1022,30 @@ export default function KnowResourcesAdmin() {
             </Button>
           </div>
         )}
+
+        <AlertDialog open={bulkConfirmOpen} onOpenChange={setBulkConfirmOpen}>
+          <AlertDialogContent data-testid="dialog-bulk-verify-confirm">
+            <AlertDialogHeader>
+              <AlertDialogTitle>Verify {visibleScholarships.length} scholarship{visibleScholarships.length === 1 ? "" : "s"}?</AlertDialogTitle>
+              <AlertDialogDescription>
+                This stamps "verified today" on every scholarship currently visible on this tab and re-derives their BKD alignment + next deadline.
+                Only do this after you've actually checked the official source for each one.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Cancel</AlertDialogCancel>
+              <AlertDialogAction
+                onClick={() => {
+                  bulkVerifyMutation.mutate(visibleScholarships.map((r) => r.id));
+                  setBulkConfirmOpen(false);
+                }}
+                data-testid="button-bulk-verify-confirm"
+              >
+                Yes, verify all
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
 
         <TabsContent value="reports" className="space-y-4">
           <ReportsTab />

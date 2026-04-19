@@ -5,7 +5,13 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Shield, ExternalLink, AlertTriangle, CheckCircle2, Info } from "lucide-react";
-import { markKnowingCheckSeen } from "@/lib/externalLinkPolicy";
+import {
+  markKnowingCheckSeen,
+  incrementConfirmCount,
+  canOfferSuppressOption,
+  isSuppressVerifiedEnabled,
+  setSuppressVerified,
+} from "@/lib/externalLinkPolicy";
 
 export type ScholarshipKnowingPanel = {
   resourceId: string;
@@ -29,21 +35,25 @@ export function ExternalLinkInterstitial({ open, onClose, scholarship }: Props) 
   const [verifiedDeadline, setVerifiedDeadline] = useState(false);
   const [verifiedEligibility, setVerifiedEligibility] = useState(false);
   const [noFeePledge, setNoFeePledge] = useState(false);
+  const [suppressForVerified, setSuppressForVerified] = useState(false);
 
   useEffect(() => {
     if (open) {
       setVerifiedDeadline(false);
       setVerifiedEligibility(false);
       setNoFeePledge(false);
+      setSuppressForVerified(isSuppressVerifiedEnabled());
     }
   }, [open, scholarship?.resourceId]);
 
   if (!scholarship) return null;
   const allChecked = verifiedDeadline && verifiedEligibility && noFeePledge;
+  const isVerifiedListing = scholarship.trustLevel === "verified";
+  const showSuppressOption = isVerifiedListing && canOfferSuppressOption();
 
   const verifiedDate = scholarship.lastVerifiedAt
     ? new Date(scholarship.lastVerifiedAt).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" })
-    : "Not yet verified";
+    : null;
 
   const deadlineDate = scholarship.nextDeadline
     ? new Date(scholarship.nextDeadline)
@@ -55,6 +65,8 @@ export function ExternalLinkInterstitial({ open, onClose, scholarship }: Props) 
   const handleProceed = () => {
     if (!allChecked) return;
     markKnowingCheckSeen(scholarship.resourceId);
+    incrementConfirmCount();
+    if (showSuppressOption) setSuppressVerified(suppressForVerified);
     window.open(scholarship.url, "_blank", "noopener,noreferrer");
     onClose();
   };
@@ -65,10 +77,10 @@ export function ExternalLinkInterstitial({ open, onClose, scholarship }: Props) 
         <DialogHeader>
           <DialogTitle className="font-oswald text-xl flex items-center gap-2">
             <Shield className="h-5 w-5 text-lys-teal" />
-            Knowing Check
+            You're leaving Laddering Your Success
           </DialogTitle>
           <DialogDescription className="font-roboto">
-            You're about to leave LYS for an external scholarship site. Take 10 seconds to verify before you go.
+            A 10-second Knowing Check before you head to the official scholarship site.
           </DialogDescription>
         </DialogHeader>
 
@@ -78,7 +90,7 @@ export function ExternalLinkInterstitial({ open, onClose, scholarship }: Props) 
             <div className="grid grid-cols-2 gap-2 text-xs font-roboto">
               <div className="flex items-center gap-1.5">
                 <CheckCircle2 className="h-3.5 w-3.5 text-lys-teal" />
-                <span>LYS verified: <strong>{verifiedDate}</strong></span>
+                <span>{verifiedDate ? <>Verified by LYS on <strong>{verifiedDate}</strong></> : <>Not yet verified by LYS</>}</span>
               </div>
               <div className="flex items-center gap-1.5">
                 <Badge variant="outline" className="text-xs capitalize">{scholarship.trustLevel || "external"}</Badge>
@@ -91,7 +103,16 @@ export function ExternalLinkInterstitial({ open, onClose, scholarship }: Props) 
                 {deadlinePassed ? (
                   <Badge variant="destructive" className="text-xs">Deadline passed</Badge>
                 ) : daysLeft != null ? (
-                  <Badge variant="secondary" className="text-xs">{daysLeft} day{daysLeft === 1 ? "" : "s"} left</Badge>
+                  <Badge
+                    className={`text-xs ${
+                      daysLeft <= 7 ? "bg-red-500/15 text-red-700 border-red-500/30" :
+                      daysLeft <= 30 ? "bg-amber-500/15 text-amber-700 border-amber-500/30" :
+                      "bg-muted text-muted-foreground"
+                    }`}
+                    variant="outline"
+                  >
+                    {daysLeft} day{daysLeft === 1 ? "" : "s"} left
+                  </Badge>
                 ) : null}
               </div>
             </div>
@@ -130,6 +151,20 @@ export function ExternalLinkInterstitial({ open, onClose, scholarship }: Props) 
               <span>I will <strong>never pay a fee</strong> to apply. Real scholarships are free.</span>
             </label>
           </div>
+
+          {showSuppressOption && (
+            <label className="flex items-start gap-2 text-xs font-roboto cursor-pointer pt-1 border-t" data-testid="label-suppress-verified">
+              <Checkbox
+                checked={suppressForVerified}
+                onCheckedChange={(v) => setSuppressForVerified(!!v)}
+                data-testid="check-suppress-verified"
+                className="mt-0.5"
+              />
+              <span className="text-muted-foreground">
+                Don't show this check again for <strong>verified</strong> scholarships. (You can re-enable it any time.)
+              </span>
+            </label>
+          )}
         </div>
 
         <DialogFooter className="gap-2">

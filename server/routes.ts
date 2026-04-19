@@ -4219,6 +4219,21 @@ export async function registerRoutes(
     }
   });
 
+  app.patch("/api/saved-scholarships/:resourceId", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user?.id || req.user?.claims?.sub;
+      const cleanReason = ((req.body?.pursuitReason ?? "") as string).toString().trim();
+      if (cleanReason.length < 5) {
+        return res.status(400).json({ error: "Tell us why you're pursuing this scholarship (at least 5 characters)." });
+      }
+      const updated = await storage.updateSavedScholarshipReason(userId, req.params.resourceId, cleanReason);
+      if (!updated) return res.status(404).json({ error: "Saved scholarship not found" });
+      res.json(updated);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to update saved scholarship" });
+    }
+  });
+
   // ================================
   // Student Matriculation & Achievement Tracking (System-Level)
   // ================================

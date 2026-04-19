@@ -16,12 +16,13 @@ interface Props {
 }
 
 const REASONS = [
-  { value: "broken_link", label: "Link is broken or doesn't load" },
-  { value: "expired", label: "Scholarship has expired or no longer exists" },
-  { value: "scam_or_fee", label: "Asks for a fee or feels like a scam" },
-  { value: "misleading", label: "Information is misleading or inaccurate" },
-  { value: "privacy_concern", label: "Site collects too much personal data" },
-  { value: "other", label: "Other concern" },
+  { value: "scam_or_fee", label: "Asks for a fee" },
+  { value: "scam_or_fee_other", label: "Looks like a scam" },
+  { value: "expired", label: "Deadline already passed" },
+  { value: "broken_link", label: "Broken link" },
+  { value: "misleading", label: "Misleading or inaccurate info" },
+  { value: "privacy_concern", label: "Asks for too much personal data" },
+  { value: "other", label: "Other" },
 ];
 
 export function ReportScholarshipDialog({ open, onClose, resourceId, resourceTitle }: Props) {
@@ -36,7 +37,10 @@ export function ReportScholarshipDialog({ open, onClose, resourceId, resourceTit
   const mutation = useMutation({
     mutationFn: () => apiRequest("POST", "/api/resource-reports", { resourceId, reason, details: details || undefined }),
     onSuccess: () => {
-      toast({ title: "Thank you", description: "Your report helps protect other students. An admin will review it." });
+      toast({
+        title: "Thanks for the heads-up",
+        description: "Our team reviews flags within 7 days. If 3 students report the same listing, it auto-hides while we investigate.",
+      });
       onClose();
     },
     onError: () => {

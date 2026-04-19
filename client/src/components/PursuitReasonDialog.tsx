@@ -11,11 +11,14 @@ interface Props {
   onConfirm: (reason: string) => void;
   scholarshipTitle?: string;
   isSaving?: boolean;
+  /** When provided, dialog is in "edit" mode and pre-fills with this value. */
+  initialValue?: string;
+  mode?: "save" | "edit";
 }
 
-export function PursuitReasonDialog({ open, onClose, onConfirm, scholarshipTitle, isSaving }: Props) {
-  const [reason, setReason] = useState("");
-  useEffect(() => { if (open) setReason(""); }, [open, scholarshipTitle]);
+export function PursuitReasonDialog({ open, onClose, onConfirm, scholarshipTitle, isSaving, initialValue, mode = "save" }: Props) {
+  const [reason, setReason] = useState(initialValue || "");
+  useEffect(() => { if (open) setReason(initialValue || ""); }, [open, scholarshipTitle, initialValue]);
 
   const valid = reason.trim().length >= 5;
 
@@ -25,11 +28,14 @@ export function PursuitReasonDialog({ open, onClose, onConfirm, scholarshipTitle
         <DialogHeader>
           <DialogTitle className="font-oswald flex items-center gap-2">
             <Heart className="h-5 w-5 text-lys-yellow" />
-            Why are you pursuing this?
+            {mode === "edit" ? "Edit your reason" : "Why are you pursuing this?"}
           </DialogTitle>
           <DialogDescription className="font-roboto text-sm">
-            Before saving <strong>{scholarshipTitle || "this scholarship"}</strong>, write one sentence about why this matters to you.
-            Doing reflects your Being.
+            {mode === "edit" ? (
+              <>Update why <strong>{scholarshipTitle || "this scholarship"}</strong> matters to you.</>
+            ) : (
+              <>Before saving <strong>{scholarshipTitle || "this scholarship"}</strong>, write one sentence about why this matters to you. Doing reflects your Being.</>
+            )}
           </DialogDescription>
         </DialogHeader>
         <div className="space-y-2">
@@ -38,7 +44,7 @@ export function PursuitReasonDialog({ open, onClose, onConfirm, scholarshipTitle
             id="pursuit-reason"
             value={reason}
             onChange={(e) => setReason(e.target.value)}
-            placeholder="e.g. This honors my family's sacrifice and matches the future I'm building."
+            placeholder="e.g., Aligns with my goal of studying nursing, and the essay topic matches my story."
             className="min-h-[90px]"
             data-testid="input-pursuit-reason"
           />
@@ -47,7 +53,7 @@ export function PursuitReasonDialog({ open, onClose, onConfirm, scholarshipTitle
         <DialogFooter className="gap-2">
           <Button variant="outline" onClick={onClose} data-testid="button-cancel-pursuit">Cancel</Button>
           <Button onClick={() => onConfirm(reason.trim())} disabled={!valid || isSaving} data-testid="button-confirm-pursuit">
-            {isSaving ? "Saving..." : "Save to Planner"}
+            {isSaving ? "Saving..." : mode === "edit" ? "Save changes" : "Save to Planner"}
           </Button>
         </DialogFooter>
       </DialogContent>

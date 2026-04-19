@@ -40,7 +40,8 @@ import {
   ShieldCheck
 } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { ScholarshipBkdBadge, type BkdAlignment } from "@/components/ScholarshipBkdBadge";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { ScholarshipBkdBadge, BkdLegend, type BkdAlignment } from "@/components/ScholarshipBkdBadge";
 import { ExternalLinkInterstitial, type ScholarshipKnowingPanel } from "@/components/ExternalLinkInterstitial";
 import { ReportScholarshipDialog } from "@/components/ReportScholarshipDialog";
 import { PursuitReasonDialog } from "@/components/PursuitReasonDialog";
@@ -279,7 +280,10 @@ export default function Resources() {
       apiRequest("POST", "/api/saved-scholarships", data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/saved-scholarships"] });
-      toast({ title: "Scholarship saved", description: "Added to your Scholarship Planner." });
+      toast({
+        title: "Saved to your planner",
+        description: "Open the Scholarship Planner to see it under Saved.",
+      });
     },
     onError: () => {
       toast({ title: "Error", description: "Failed to save scholarship", variant: "destructive" });
@@ -392,6 +396,18 @@ export default function Resources() {
   const [interstitialTarget, setInterstitialTarget] = useState<ScholarshipKnowingPanel | null>(null);
   const [hideExpired, setHideExpired] = useState<boolean>(true);
   const [sortByUrgency, setSortByUrgency] = useState<boolean>(true);
+  const [feeBannerDismissed, setFeeBannerDismissed] = useState<boolean>(() => {
+    try { return sessionStorage.getItem("lys.feeBannerDismissed") === "1"; } catch { return false; }
+  });
+  const dismissFeeBanner = () => {
+    try { sessionStorage.setItem("lys.feeBannerDismissed", "1"); } catch { /* ignore */ }
+    setFeeBannerDismissed(true);
+  };
+  const resetFilters = () => {
+    setSearchQuery("");
+    setSelectedCategory("all");
+    setHideExpired(false);
+  };
 
   const toggleSaveScholarship = (scholarship: DisplayResource) => {
     if (savedIds.has(scholarship.id)) {
@@ -417,7 +433,7 @@ export default function Resources() {
   const openExternal = (scholarship: DisplayResource) => {
     const url = scholarship.applicationUrl || scholarship.url;
     if (!url) return;
-    if (shouldShowKnowingCheck(scholarship.rawId)) {
+    if (shouldShowKnowingCheck(scholarship.rawId, scholarship.trustLevel)) {
       setInterstitialTarget({
         resourceId: scholarship.rawId,
         title: scholarship.title,
@@ -525,14 +541,22 @@ export default function Resources() {
                 </div>
               </div>
             ) : filteredResources.length === 0 ? (
-              <div className="text-center py-12">
+              <div className="text-center py-12" data-testid="empty-state-resources">
                 <div className="w-16 h-16 rounded-full bg-muted/50 flex items-center justify-center mx-auto mb-4">
                   <Search className="h-8 w-8 text-muted-foreground/50" />
                 </div>
-                <h3 className="font-oswald text-lg text-muted-foreground">No resources found</h3>
+                <h3 className="font-oswald text-lg text-muted-foreground">No scholarships match</h3>
                 <p className="text-sm text-muted-foreground/70 font-roboto mt-2">
-                  Try adjusting your search or category filter
+                  Try a different search term, category, or clear all filters.
                 </p>
+                <Button
+                  variant="outline"
+                  className="mt-4 font-roboto"
+                  onClick={resetFilters}
+                  data-testid="button-reset-filters"
+                >
+                  Clear all filters
+                </Button>
               </div>
             ) : (
               <div className="space-y-10">
@@ -556,17 +580,30 @@ export default function Resources() {
                   }
                   return (
                   <section>
-                    <Alert className="mb-4 border-lys-yellow/40 bg-lys-yellow/5" data-testid="alert-no-fee-banner">
-                      <ShieldCheck className="h-4 w-4 text-lys-yellow" />
-                      <AlertTitle className="font-oswald">Never pay to apply</AlertTitle>
-                      <AlertDescription className="font-roboto text-sm">
-                        Real scholarships are free. If a site asks for an application fee or your bank info, leave and report it.
-                      </AlertDescription>
-                    </Alert>
+                    {!feeBannerDismissed && (
+                      <Alert className="mb-4 border-lys-yellow/40 bg-lys-yellow/5 relative pr-12" data-testid="alert-no-fee-banner">
+                        <ShieldCheck className="h-4 w-4 text-lys-yellow" />
+                        <AlertTitle className="font-oswald">Never pay to apply</AlertTitle>
+                        <AlertDescription className="font-roboto text-sm">
+                          Real scholarships are free. If a site asks for an application fee or your bank info, leave and report it.
+                        </AlertDescription>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={dismissFeeBanner}
+                          className="absolute right-2 top-2 h-7 w-7"
+                          data-testid="button-dismiss-fee-banner"
+                          title="Dismiss for this session"
+                        >
+                          <X className="h-4 w-4" />
+                        </Button>
+                      </Alert>
+                    )}
 
                     <div className="flex items-center gap-3 mb-4 flex-wrap">
                       <DollarSign className="h-6 w-6 text-green-600" />
                       <h2 className="font-oswald text-xl font-semibold">Scholarships</h2>
+                      <BkdLegend />
                       <Badge variant="secondary" className="font-roboto">
                         {displayed.length} of {scholarships.length}
                       </Badge>
@@ -602,8 +639,31 @@ export default function Resources() {
                           : "";
                         const urgency = deadlineUrgency(scholarship.nextDeadline);
                         const verifiedDateStr = scholarship.lastVerifiedAt
-                          ? new Date(scholarship.lastVerifiedAt).toLocaleDateString(undefined, { month: "short", day: "numeric" })
+                          ? new Date(scholarship.lastVerifiedAt).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" })
                           : null;
+                        const daysSinceVerified = scholarship.lastVerifiedAt
+                          ? Math.floor((Date.now() - new Date(scholarship.lastVerifiedAt).getTime()) / 86400000)
+                          : null;
+                        const freshness = daysSinceVerified == null
+                          ? { dot: "bg-muted-foreground/40", label: "Not yet verified" }
+                          : daysSinceVerified < 14
+                            ? { dot: "bg-green-500", label: `Verified ${daysSinceVerified}d ago` }
+                            : daysSinceVerified <= 30
+                              ? { dot: "bg-amber-500", label: `Verified ${daysSinceVerified}d ago` }
+                              : { dot: "bg-red-500", label: `Last verified ${daysSinceVerified}d ago` };
+                        const trust = (scholarship.trustLevel || "external").toLowerCase();
+                        const trustVisual = trust === "verified"
+                          ? { Icon: ShieldCheck, color: "text-green-600", label: "LYS verified" }
+                          : trust === "community"
+                            ? { Icon: Shield, color: "text-amber-600", label: "Community" }
+                            : { Icon: ShieldAlert, color: "text-red-500", label: "External" };
+                        const urgencyClass = urgency.passed
+                          ? "bg-muted text-muted-foreground border-muted-foreground/20"
+                          : urgency.daysLeft != null && urgency.daysLeft <= 7
+                            ? "bg-red-500/15 text-red-700 border-red-500/30"
+                            : urgency.daysLeft != null && urgency.daysLeft <= 30
+                              ? "bg-amber-500/15 text-amber-700 border-amber-500/30"
+                              : "bg-muted text-muted-foreground border-muted-foreground/20";
                         return (
                           <Card key={scholarship.id} className="hover-elevate flex flex-col" data-testid={`card-scholarship-${scholarship.rawId}`}>
                             <CardHeader className="pb-2">
@@ -632,18 +692,40 @@ export default function Resources() {
                               </CardDescription>
                             </CardHeader>
                             <CardContent className="flex flex-col flex-1">
-                              {/* Knowing Panel */}
-                              <div className="rounded-md border bg-muted/30 p-2 mb-3 text-xs font-roboto space-y-1" data-testid={`knowing-panel-${scholarship.rawId}`}>
-                                <div className="flex items-center justify-between flex-wrap gap-1">
-                                  <span className="flex items-center gap-1">
-                                    <ShieldCheck className="h-3 w-3 text-lys-teal" />
-                                    <span className="capitalize">{scholarship.trustLevel || "external"}</span>
-                                    {verifiedDateStr && <span className="text-muted-foreground">· verified {verifiedDateStr}</span>}
-                                  </span>
+                              {/* Knowing Panel — compact single-line with tooltip on mobile */}
+                              <div
+                                className="rounded-md border bg-muted/30 p-2 mb-3 text-xs font-roboto space-y-1"
+                                data-testid={`knowing-panel-${scholarship.rawId}`}
+                              >
+                                <div className="flex items-center justify-between flex-wrap gap-2">
+                                  <Tooltip>
+                                    <TooltipTrigger asChild>
+                                      <span className="flex items-center gap-1.5 min-w-0" data-testid={`trust-${scholarship.rawId}`}>
+                                        <span className={`h-2 w-2 rounded-full ${freshness.dot}`} aria-hidden />
+                                        <trustVisual.Icon className={`h-3.5 w-3.5 ${trustVisual.color}`} />
+                                        <span className="truncate">
+                                          <span className="hidden sm:inline">
+                                            {trustVisual.label}{verifiedDateStr ? <> on <strong>{verifiedDateStr}</strong></> : null}
+                                          </span>
+                                          <span className="sm:hidden">{trustVisual.label}</span>
+                                        </span>
+                                      </span>
+                                    </TooltipTrigger>
+                                    <TooltipContent side="top" className="text-xs">
+                                      <div><strong>{trustVisual.label}</strong></div>
+                                      <div className="opacity-80">{freshness.label}</div>
+                                    </TooltipContent>
+                                  </Tooltip>
                                   {urgency.passed ? (
-                                    <Badge variant="destructive" className="text-[10px]" data-testid={`badge-deadline-passed-${scholarship.rawId}`}>Deadline passed</Badge>
+                                    <Badge
+                                      variant="outline"
+                                      className={`text-[10px] ${urgencyClass}`}
+                                      data-testid={`badge-deadline-passed-${scholarship.rawId}`}
+                                    >Deadline passed</Badge>
                                   ) : urgency.daysLeft != null ? (
-                                    <Badge variant="secondary" className="text-[10px]">{urgency.daysLeft} day{urgency.daysLeft === 1 ? "" : "s"} left</Badge>
+                                    <Badge variant="outline" className={`text-[10px] ${urgencyClass}`}>
+                                      {urgency.daysLeft} day{urgency.daysLeft === 1 ? "" : "s"} left
+                                    </Badge>
                                   ) : null}
                                 </div>
                                 {(scholarship.requiresFee || scholarship.privacyConcern) && (
@@ -1231,10 +1313,15 @@ export default function Resources() {
           scholarship={interstitialTarget}
         />
 
-        <div className="mt-12 pt-6 border-t text-center text-xs text-muted-foreground font-roboto max-w-3xl mx-auto" data-testid="text-resources-disclaimer">
-          LYS curates and verifies scholarship listings to the best of our ability. Deadlines, eligibility, and award amounts can change at any time —
-          always verify on the official site before applying. LYS will never charge you to apply, and we never share your data with scholarship providers.
-          See something off? Use the report flag on any listing.
+        <div className="mt-12 pt-6 border-t text-center text-xs text-muted-foreground font-roboto max-w-3xl mx-auto space-y-2" data-testid="text-resources-disclaimer">
+          <p>
+            LYS curates and verifies scholarship listings to the best of our ability. Deadlines, eligibility, and award amounts can change at any time —
+            always verify on the official site before applying. LYS will never charge you to apply, and we never share your data with scholarship providers.
+            See something off? Use the report flag on any listing.
+          </p>
+          <p className="opacity-80">
+            <strong>BKD</strong> = Being, Knowing, Doing — our framework for evaluating opportunities.
+          </p>
         </div>
       </div>
     </div>
