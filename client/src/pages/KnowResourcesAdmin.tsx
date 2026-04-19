@@ -12,7 +12,7 @@ import { Switch } from "@/components/ui/switch";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Plus, Pencil, Trash2, Book, Youtube, Podcast, MessageCircle, FileText, ExternalLink, Star, Eye, EyeOff, GraduationCap, DollarSign, PenTool } from "lucide-react";
+import { Plus, Pencil, Trash2, Book, Youtube, Podcast, MessageCircle, FileText, ExternalLink, Star, Eye, EyeOff, GraduationCap, DollarSign, PenTool, ShieldCheck, Flag, CheckCircle2, ShieldAlert, AlertTriangle } from "lucide-react";
 import type { KnowResource, InsertKnowResource, KnowResourceType } from "@shared/schema";
 
 const RESOURCE_TYPES = [
@@ -581,13 +581,22 @@ function ResourceCard({
   onDelete,
   onToggleActive,
   onToggleFeatured,
+  onVerify,
+  isVerifying,
 }: {
   resource: KnowResource;
   onEdit: () => void;
   onDelete: () => void;
   onToggleActive: () => void;
   onToggleFeatured: () => void;
+  onVerify?: () => void;
+  isVerifying?: boolean;
 }) {
+  const trustLevel = (resource as any).trustLevel as string | undefined;
+  const lastVerifiedAt = (resource as any).lastVerifiedAt as string | undefined;
+  const requiresFee = (resource as any).requiresFee as boolean | undefined;
+  const privacyConcern = (resource as any).privacyConcern as boolean | undefined;
+  const verifiedStr = lastVerifiedAt ? new Date(lastVerifiedAt).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" }) : "Never";
   const resourceUrl = resource.url || resource.whatsappLink || "";
   
   return (
@@ -631,6 +640,21 @@ function ResourceCard({
           ))}
         </div>
 
+        {resource.resourceType === "scholarship" && (
+          <div className="flex flex-wrap gap-2 text-xs items-center">
+            <Badge variant="outline" className="capitalize gap-1">
+              <ShieldCheck className="w-3 h-3" />{trustLevel || "external"}
+            </Badge>
+            <span className="text-muted-foreground">Verified: {verifiedStr}</span>
+            {requiresFee && (
+              <Badge variant="destructive" className="gap-1"><AlertTriangle className="w-3 h-3" />Fee</Badge>
+            )}
+            {privacyConcern && (
+              <Badge variant="outline" className="gap-1 text-orange-600 border-orange-300"><ShieldAlert className="w-3 h-3" />Privacy</Badge>
+            )}
+          </div>
+        )}
+
         <div className="flex items-center justify-between pt-2 border-t">
           {resourceUrl && (
             <a
@@ -646,6 +670,19 @@ function ResourceCard({
           )}
 
           <div className="flex items-center gap-1 ml-auto">
+            {resource.resourceType === "scholarship" && onVerify && (
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={onVerify}
+                disabled={isVerifying}
+                className="gap-1 text-xs"
+                title={`Last verified: ${verifiedStr}`}
+                data-testid={`button-verify-${resource.id}`}
+              >
+                <ShieldCheck className="w-3 h-3" />Verify
+              </Button>
+            )}
             <Button
               size="icon"
               variant="ghost"
@@ -684,6 +721,99 @@ function ResourceCard({
         </div>
       </CardContent>
     </Card>
+  );
+}
+
+type ResourceReport = {
+  id: string;
+  resourceId: string;
+  userId: string;
+  reason: string;
+  details: string | null;
+  status: string;
+  resolvedAt: string | null;
+  createdAt: string | null;
+};
+
+function ReportsTab() {
+  const { toast } = useToast();
+  const { data: reports = [], isLoading } = useQuery<ResourceReport[]>({
+    queryKey: ["/api/admin/resource-reports"],
+  });
+  const { data: resources = [] } = useQuery<KnowResource[]>({
+    queryKey: ["/api/admin/know-resources"],
+  });
+  const resourceMap = new Map(resources.map((r) => [r.id, r] as const));
+
+  const resolveMutation = useMutation({
+    mutationFn: ({ id, status }: { id: string; status: "resolved" | "dismissed" }) =>
+      apiRequest("PATCH", `/api/admin/resource-reports/${id}`, { status }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/resource-reports"] });
+      toast({ title: "Report updated" });
+    },
+    onError: () => toast({ title: "Failed to update report", variant: "destructive" }),
+  });
+
+  const pending = reports.filter((r) => r.status === "pending");
+
+  if (isLoading) {
+    return <div className="text-center py-8 text-muted-foreground">Loading reports...</div>;
+  }
+  if (pending.length === 0) {
+    return (
+      <Card className="py-12">
+        <CardContent className="text-center">
+          <CheckCircle2 className="w-10 h-10 mx-auto text-lys-teal mb-2" />
+          <p className="text-muted-foreground">No pending reports. Nice work.</p>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  return (
+    <div className="grid gap-3">
+      {pending.map((report) => {
+        const r = resourceMap.get(report.resourceId);
+        return (
+          <Card key={report.id} data-testid={`card-report-${report.id}`}>
+            <CardContent className="py-4 flex items-start justify-between gap-3 flex-wrap">
+              <div className="min-w-0 flex-1 space-y-1">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <Badge variant="destructive" className="capitalize">{report.reason.replace(/_/g, " ")}</Badge>
+                  {r ? (
+                    <span className="font-semibold text-sm">{r.title}</span>
+                  ) : (
+                    <span className="text-sm text-muted-foreground">Resource removed</span>
+                  )}
+                  <span className="text-xs text-muted-foreground">
+                    {report.createdAt ? new Date(report.createdAt).toLocaleString() : ""}
+                  </span>
+                </div>
+                {report.details && (
+                  <p className="text-sm text-muted-foreground italic">"{report.details}"</p>
+                )}
+              </div>
+              <div className="flex gap-2">
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => resolveMutation.mutate({ id: report.id, status: "dismissed" })}
+                  disabled={resolveMutation.isPending}
+                  data-testid={`button-dismiss-report-${report.id}`}
+                >Dismiss</Button>
+                <Button
+                  size="sm"
+                  onClick={() => resolveMutation.mutate({ id: report.id, status: "resolved" })}
+                  disabled={resolveMutation.isPending}
+                  data-testid={`button-resolve-report-${report.id}`}
+                >Resolve</Button>
+              </div>
+            </CardContent>
+          </Card>
+        );
+      })}
+    </div>
   );
 }
 
@@ -740,6 +870,26 @@ export default function KnowResourcesAdmin() {
     },
   });
 
+  const verifyMutation = useMutation({
+    mutationFn: (id: string) => apiRequest("POST", `/api/admin/know-resources/${id}/verify`, {}),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/know-resources"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/know-resources"] });
+      toast({ title: "Verified" });
+    },
+    onError: () => toast({ title: "Verify failed", variant: "destructive" }),
+  });
+
+  const bulkVerifyMutation = useMutation({
+    mutationFn: (ids: string[]) => apiRequest("POST", `/api/admin/know-resources/bulk-verify`, { ids }),
+    onSuccess: (_d, ids) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/know-resources"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/know-resources"] });
+      toast({ title: `Verified ${ids.length} resource${ids.length === 1 ? "" : "s"}` });
+    },
+    onError: () => toast({ title: "Bulk verify failed", variant: "destructive" }),
+  });
+
   const filteredResources = activeType === "all"
     ? resources
     : resources.filter((r) => r.resourceType === activeType);
@@ -748,6 +898,8 @@ export default function KnowResourcesAdmin() {
     acc[type.value] = resources.filter((r) => r.resourceType === type.value).length;
     return acc;
   }, {} as Record<string, number>);
+
+  const visibleScholarships = filteredResources.filter((r) => r.resourceType === "scholarship");
 
   return (
     <div className="container mx-auto py-6 px-4 max-w-6xl">
@@ -792,7 +944,33 @@ export default function KnowResourcesAdmin() {
               {type.label} ({resourceCounts[type.value] || 0})
             </TabsTrigger>
           ))}
+          <TabsTrigger value="reports" data-testid="tab-reports">
+            <Flag className="w-4 h-4 mr-1" />Reports
+          </TabsTrigger>
         </TabsList>
+
+        {visibleScholarships.length > 0 && activeType !== "reports" && (
+          <div className="flex items-center justify-end gap-2">
+            <span className="text-xs text-muted-foreground">
+              {visibleScholarships.length} scholarship{visibleScholarships.length === 1 ? "" : "s"} on this page
+            </span>
+            <Button
+              size="sm"
+              variant="outline"
+              className="gap-1"
+              onClick={() => bulkVerifyMutation.mutate(visibleScholarships.map((r) => r.id))}
+              disabled={bulkVerifyMutation.isPending}
+              data-testid="button-bulk-verify"
+            >
+              <ShieldCheck className="w-4 h-4" />
+              {bulkVerifyMutation.isPending ? "Verifying..." : "Verify all on this page"}
+            </Button>
+          </div>
+        )}
+
+        <TabsContent value="reports" className="space-y-4">
+          <ReportsTab />
+        </TabsContent>
 
         <TabsContent value={activeType} className="space-y-4">
           {isLoading ? (
@@ -832,6 +1010,8 @@ export default function KnowResourcesAdmin() {
                       data: { featured: !resource.featured },
                     })
                   }
+                  onVerify={() => verifyMutation.mutate(resource.id)}
+                  isVerifying={verifyMutation.isPending}
                 />
               ))}
             </div>

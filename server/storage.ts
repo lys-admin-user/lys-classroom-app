@@ -167,6 +167,10 @@ import {
   marketplaceWishlists,
   marketplaceRatings,
   savedScholarships,
+  resourceReports,
+  type ResourceReport,
+  type InsertResourceReport,
+  REPORT_AUTOHIDE_THRESHOLD,
   type MarketplaceItem,
   type InsertMarketplaceItem,
   type MarketplacePurchase,
@@ -966,6 +970,14 @@ export interface IStorage {
   saveScholarship(data: InsertSavedScholarship): Promise<SavedScholarship>;
   unsaveScholarship(userId: string, resourceId: string): Promise<boolean>;
   isSavedScholarship(userId: string, resourceId: string): Promise<boolean>;
+
+  // Resource Reports (scholarship moderation)
+  createResourceReport(data: InsertResourceReport): Promise<ResourceReport>;
+  listResourceReports(filters?: { status?: string; resourceId?: string }): Promise<ResourceReport[]>;
+  resolveResourceReport(id: string, userId: string, status: "resolved" | "dismissed"): Promise<ResourceReport | undefined>;
+  countActiveReportsForResource(resourceId: string): Promise<number>;
+  verifyKnowResource(id: string, userId: string): Promise<KnowResource | undefined>;
+  bulkVerifyKnowResources(ids: string[], userId: string): Promise<number>;
 
   // Student Matriculation History (System-Level Tracking)
   getStudentMatriculationHistory(studentId: string): Promise<StudentMatriculationHistory[]>;
@@ -6162,6 +6174,88 @@ export class DatabaseStorage implements IStorage {
   async isSavedScholarship(userId: string, resourceId: string): Promise<boolean> {
     const [row] = await db.select().from(savedScholarships).where(and(eq(savedScholarships.userId, userId), eq(savedScholarships.resourceId, resourceId)));
     return !!row;
+  }
+
+  // Resource Reports — community moderation for scholarship listings
+  async createResourceReport(data: InsertResourceReport): Promise<ResourceReport> {
+    const [created] = await db.insert(resourceReports).values(data as any).returning();
+    // Auto-hide if pending reports >= threshold
+    const pending = await db.select({ id: resourceReports.id }).from(resourceReports)
+      .where(and(eq(resourceReports.resourceId, data.resourceId), eq(resourceReports.status, "pending")));
+    if (pending.length >= REPORT_AUTOHIDE_THRESHOLD) {
+      await db.update(knowResources).set({ isActive: false, updatedAt: new Date() }).where(eq(knowResources.id, data.resourceId));
+    }
+    return created;
+  }
+
+  async listResourceReports(filters?: { status?: string; resourceId?: string }): Promise<ResourceReport[]> {
+    const conditions: any[] = [];
+    if (filters?.status) conditions.push(eq(resourceReports.status, filters.status as any));
+    if (filters?.resourceId) conditions.push(eq(resourceReports.resourceId, filters.resourceId));
+    const q = conditions.length > 0
+      ? db.select().from(resourceReports).where(and(...conditions))
+      : db.select().from(resourceReports);
+    return await q.orderBy(desc(resourceReports.createdAt));
+  }
+
+  async resolveResourceReport(id: string, userId: string, status: "resolved" | "dismissed"): Promise<ResourceReport | undefined> {
+    const [updated] = await db.update(resourceReports)
+      .set({ status, resolvedBy: userId, resolvedAt: new Date() })
+      .where(eq(resourceReports.id, id))
+      .returning();
+    return updated;
+  }
+
+  async countActiveReportsForResource(resourceId: string): Promise<number> {
+    const rows = await db.select({ id: resourceReports.id }).from(resourceReports)
+      .where(and(eq(resourceReports.resourceId, resourceId), eq(resourceReports.status, "pending")));
+    return rows.length;
+  }
+
+  async verifyKnowResource(id: string, userId: string): Promise<KnowResource | undefined> {
+    const { computeBkdAlignment, parseNextDeadline } = await import("./lib/bkdAlignment");
+    const [existing] = await db.select().from(knowResources).where(eq(knowResources.id, id));
+    if (!existing) return undefined;
+
+    const now = new Date();
+    const refreshed: any = {
+      ...existing,
+      lastVerifiedAt: now,
+      trustLevel: "verified",
+    };
+    if (!refreshed.nextDeadline) {
+      const parsed = parseNextDeadline(existing.scholarshipDeadline);
+      if (parsed) refreshed.nextDeadline = parsed;
+    }
+
+    const updates: any = {
+      lastVerifiedAt: now,
+      trustLevel: "verified",
+      updatedBy: userId,
+      updatedAt: now,
+    };
+    if (refreshed.nextDeadline && !existing.nextDeadline) {
+      updates.nextDeadline = refreshed.nextDeadline;
+    }
+    if (!(existing as any).bkdManualOverride) {
+      updates.bkdAlignment = computeBkdAlignment(refreshed);
+    }
+
+    const [updated] = await db.update(knowResources)
+      .set(updates)
+      .where(eq(knowResources.id, id))
+      .returning();
+    return updated;
+  }
+
+  async bulkVerifyKnowResources(ids: string[], userId: string): Promise<number> {
+    if (!ids.length) return 0;
+    let count = 0;
+    for (const id of ids) {
+      const r = await this.verifyKnowResource(id, userId);
+      if (r) count++;
+    }
+    return count;
   }
 
   // Student Matriculation History (System-Level Tracking)

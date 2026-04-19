@@ -34,8 +34,17 @@ import {
   Download,
   Lock,
   Package,
-  MessageSquare
+  MessageSquare,
+  Flag,
+  ShieldAlert,
+  ShieldCheck
 } from "lucide-react";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { ScholarshipBkdBadge, type BkdAlignment } from "@/components/ScholarshipBkdBadge";
+import { ExternalLinkInterstitial, type ScholarshipKnowingPanel } from "@/components/ExternalLinkInterstitial";
+import { ReportScholarshipDialog } from "@/components/ReportScholarshipDialog";
+import { PursuitReasonDialog } from "@/components/PursuitReasonDialog";
+import { shouldShowKnowingCheck, markKnowingCheckSeen } from "@/lib/externalLinkPolicy";
 import type { Resource } from "@shared/schema";
 import { useTier } from "@/hooks/use-tier";
 import { AdBanner } from "@/components/AdBanner";
@@ -65,6 +74,12 @@ type KnowResourceData = {
   matchScore: number | null;
   matchReasons: string[] | null;
   isSaved: boolean | null;
+  trustLevel: string | null;
+  lastVerifiedAt: string | null;
+  requiresFee: boolean | null;
+  privacyConcern: boolean | null;
+  nextDeadline: string | null;
+  bkdAlignment: BkdAlignment | null;
 };
 
 type MarketplaceItemData = {
@@ -125,6 +140,7 @@ const marketplaceTypeConfig: Record<string, { label: string; icon: typeof BookOp
 
 type DisplayResource = {
   id: string;
+  rawId: string;
   title: string;
   description: string;
   type: string;
@@ -144,6 +160,12 @@ type DisplayResource = {
   matchScore?: number | null;
   matchReasons?: string[] | null;
   apiIsSaved?: boolean | null;
+  trustLevel?: string;
+  lastVerifiedAt?: string | null;
+  requiresFee?: boolean;
+  privacyConcern?: boolean;
+  nextDeadline?: string | null;
+  bkdAlignment?: BkdAlignment | null;
 };
 
 function normalizeKnowResource(kr: KnowResourceData): DisplayResource {
@@ -162,6 +184,7 @@ function normalizeKnowResource(kr: KnowResourceData): DisplayResource {
 
   return {
     id: `know-${kr.id}`,
+    rawId: kr.id,
     title: kr.title,
     description: kr.description || "",
     type: kr.resourceType,
@@ -180,7 +203,21 @@ function normalizeKnowResource(kr: KnowResourceData): DisplayResource {
     matchScore: kr.matchScore ?? null,
     matchReasons: kr.matchReasons ?? null,
     apiIsSaved: kr.isSaved ?? null,
+    trustLevel: kr.trustLevel || "external",
+    lastVerifiedAt: kr.lastVerifiedAt || null,
+    requiresFee: kr.requiresFee || false,
+    privacyConcern: kr.privacyConcern || false,
+    nextDeadline: kr.nextDeadline || null,
+    bkdAlignment: kr.bkdAlignment || null,
   };
+}
+
+function deadlineUrgency(d: string | null | undefined): { passed: boolean; daysLeft: number | null } {
+  if (!d) return { passed: false, daysLeft: null };
+  const dt = new Date(d);
+  if (isNaN(dt.getTime())) return { passed: false, daysLeft: null };
+  const days = Math.ceil((dt.getTime() - Date.now()) / (24 * 60 * 60 * 1000));
+  return { passed: days < 0, daysLeft: days };
 }
 
 const MARKET_CATEGORIES = [
@@ -238,7 +275,7 @@ export default function Resources() {
   const savedIds = new Set(savedScholarships.map((s) => s.resourceId));
 
   const saveScholarshipMutation = useMutation({
-    mutationFn: (data: { resourceId: string; resourceTitle: string; resourceAmount?: string; resourceDeadline?: string; resourceUrl?: string }) =>
+    mutationFn: (data: { resourceId: string; resourceTitle: string; resourceAmount?: string; resourceDeadline?: string; resourceUrl?: string; pursuitReason: string }) =>
       apiRequest("POST", "/api/saved-scholarships", data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/saved-scholarships"] });
@@ -292,6 +329,7 @@ export default function Resources() {
   const allResources: DisplayResource[] = [
     ...resources.map((r): DisplayResource => ({
       id: r.id,
+      rawId: r.id,
       title: r.title,
       description: r.description,
       type: r.type,
@@ -349,17 +387,51 @@ export default function Resources() {
     return new Intl.NumberFormat(undefined, { style: "currency", currency: "USD" }).format(cents / 100);
   };
 
+  const [pursuitTarget, setPursuitTarget] = useState<DisplayResource | null>(null);
+  const [reportTarget, setReportTarget] = useState<{ id: string; title: string } | null>(null);
+  const [interstitialTarget, setInterstitialTarget] = useState<ScholarshipKnowingPanel | null>(null);
+  const [hideExpired, setHideExpired] = useState<boolean>(true);
+  const [sortByUrgency, setSortByUrgency] = useState<boolean>(true);
+
   const toggleSaveScholarship = (scholarship: DisplayResource) => {
     if (savedIds.has(scholarship.id)) {
       unsaveScholarshipMutation.mutate(scholarship.id);
     } else {
-      saveScholarshipMutation.mutate({
-        resourceId: scholarship.id,
-        resourceTitle: scholarship.title,
-        resourceAmount: scholarship.amount,
-        resourceDeadline: scholarship.deadline,
-        resourceUrl: scholarship.applicationUrl || scholarship.url,
+      setPursuitTarget(scholarship);
+    }
+  };
+
+  const confirmPursuit = (reason: string) => {
+    if (!pursuitTarget) return;
+    saveScholarshipMutation.mutate({
+      resourceId: pursuitTarget.id,
+      resourceTitle: pursuitTarget.title,
+      resourceAmount: pursuitTarget.amount,
+      resourceDeadline: pursuitTarget.deadline,
+      resourceUrl: pursuitTarget.applicationUrl || pursuitTarget.url,
+      pursuitReason: reason,
+    });
+    setPursuitTarget(null);
+  };
+
+  const openExternal = (scholarship: DisplayResource) => {
+    const url = scholarship.applicationUrl || scholarship.url;
+    if (!url) return;
+    if (shouldShowKnowingCheck(scholarship.rawId)) {
+      setInterstitialTarget({
+        resourceId: scholarship.rawId,
+        title: scholarship.title,
+        url,
+        trustLevel: scholarship.trustLevel as any,
+        lastVerifiedAt: scholarship.lastVerifiedAt || null,
+        requiresFee: scholarship.requiresFee || false,
+        privacyConcern: scholarship.privacyConcern || false,
+        nextDeadline: scholarship.nextDeadline || null,
+        scholarshipDeadline: scholarship.deadline || null,
       });
+    } else {
+      markKnowingCheckSeen(scholarship.rawId);
+      window.open(url, "_blank", "noopener,noreferrer");
     }
   };
 
@@ -464,17 +536,63 @@ export default function Resources() {
               </div>
             ) : (
               <div className="space-y-10">
-                {scholarships.length > 0 && (
+                {scholarships.length > 0 && (() => {
+                  // Apply expired filter + urgency sort
+                  let displayed = scholarships.slice();
+                  if (hideExpired) {
+                    displayed = displayed.filter((s) => {
+                      const u = deadlineUrgency(s.nextDeadline);
+                      return !u.passed;
+                    });
+                  }
+                  if (sortByUrgency) {
+                    displayed.sort((a, b) => {
+                      const ua = deadlineUrgency(a.nextDeadline);
+                      const ub = deadlineUrgency(b.nextDeadline);
+                      const va = ua.daysLeft ?? 99999;
+                      const vb = ub.daysLeft ?? 99999;
+                      return va - vb;
+                    });
+                  }
+                  return (
                   <section>
-                    <div className="flex items-center gap-3 mb-4">
+                    <Alert className="mb-4 border-lys-yellow/40 bg-lys-yellow/5" data-testid="alert-no-fee-banner">
+                      <ShieldCheck className="h-4 w-4 text-lys-yellow" />
+                      <AlertTitle className="font-oswald">Never pay to apply</AlertTitle>
+                      <AlertDescription className="font-roboto text-sm">
+                        Real scholarships are free. If a site asks for an application fee or your bank info, leave and report it.
+                      </AlertDescription>
+                    </Alert>
+
+                    <div className="flex items-center gap-3 mb-4 flex-wrap">
                       <DollarSign className="h-6 w-6 text-green-600" />
                       <h2 className="font-oswald text-xl font-semibold">Scholarships</h2>
                       <Badge variant="secondary" className="font-roboto">
-                        {scholarships.length} available
+                        {displayed.length} of {scholarships.length}
                       </Badge>
+                      <div className="ml-auto flex gap-2">
+                        <Button
+                          variant={sortByUrgency ? "default" : "outline"}
+                          size="sm"
+                          onClick={() => setSortByUrgency((v) => !v)}
+                          data-testid="button-sort-urgency"
+                          className="text-xs font-roboto gap-1"
+                        >
+                          <Clock className="h-3 w-3" /> Urgency
+                        </Button>
+                        <Button
+                          variant={hideExpired ? "default" : "outline"}
+                          size="sm"
+                          onClick={() => setHideExpired((v) => !v)}
+                          data-testid="button-hide-expired"
+                          className="text-xs font-roboto"
+                        >
+                          {hideExpired ? "Hiding expired" : "Showing all"}
+                        </Button>
+                      </div>
                     </div>
                     <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
-                      {scholarships.map((scholarship) => {
+                      {displayed.map((scholarship) => {
                         const isSaved = savedIds.has(scholarship.id) || scholarship.apiIsSaved === true;
                         const score = scholarship.matchScore;
                         const matchColor = score != null
@@ -482,8 +600,12 @@ export default function Resources() {
                           : score >= 45 ? "bg-amber-500/15 text-amber-700 border-amber-400/30"
                           : "bg-muted text-muted-foreground"
                           : "";
+                        const urgency = deadlineUrgency(scholarship.nextDeadline);
+                        const verifiedDateStr = scholarship.lastVerifiedAt
+                          ? new Date(scholarship.lastVerifiedAt).toLocaleDateString(undefined, { month: "short", day: "numeric" })
+                          : null;
                         return (
-                          <Card key={scholarship.id} className="hover-elevate flex flex-col">
+                          <Card key={scholarship.id} className="hover-elevate flex flex-col" data-testid={`card-scholarship-${scholarship.rawId}`}>
                             <CardHeader className="pb-2">
                               <div className="flex items-start justify-between gap-2 flex-wrap">
                                 <Badge className="bg-green-500/10 text-green-600 border-green-500/20">
@@ -491,6 +613,7 @@ export default function Resources() {
                                   {formatAmount(scholarship.amount)}
                                 </Badge>
                                 <div className="flex items-center gap-1 flex-wrap">
+                                  <ScholarshipBkdBadge alignment={scholarship.bkdAlignment} />
                                   {score != null && user && (
                                     <Badge variant="outline" className={`text-xs font-roboto ${matchColor}`} title={(scholarship.matchReasons || []).join(" · ")}>
                                       {score}% match
@@ -501,16 +624,6 @@ export default function Resources() {
                                       <BookmarkCheck className="h-3 w-3 mr-1" />In Planner
                                     </Badge>
                                   )}
-                                  {scholarship.scholarshipType && (
-                                    <Badge variant="outline" className="text-xs font-roboto capitalize">
-                                      {scholarship.scholarshipType}
-                                    </Badge>
-                                  )}
-                                  {scholarship.firstGenFriendly && (
-                                    <Badge variant="outline" className="text-xs font-roboto text-green-600 border-green-300">
-                                      <Star className="h-3 w-3 mr-1" />1st Gen
-                                    </Badge>
-                                  )}
                                 </div>
                               </div>
                               <CardTitle className="font-oswald text-lg mt-2">{scholarship.title}</CardTitle>
@@ -519,20 +632,33 @@ export default function Resources() {
                               </CardDescription>
                             </CardHeader>
                             <CardContent className="flex flex-col flex-1">
-                              {scholarship.gpaRequirement && (
-                                <p className="text-xs text-muted-foreground font-roboto mb-2 flex items-center gap-1">
-                                  <GraduationCap className="h-3 w-3" />GPA: {scholarship.gpaRequirement}+
-                                </p>
-                              )}
-                              {scholarship.matchReasons && scholarship.matchReasons.length > 0 && user && (
-                                <div className="mb-2 flex flex-wrap gap-1">
-                                  {scholarship.matchReasons.map((reason, i) => (
-                                    <span key={i} className="text-xs text-muted-foreground font-roboto bg-muted/50 rounded px-1.5 py-0.5">
-                                      {reason}
-                                    </span>
-                                  ))}
+                              {/* Knowing Panel */}
+                              <div className="rounded-md border bg-muted/30 p-2 mb-3 text-xs font-roboto space-y-1" data-testid={`knowing-panel-${scholarship.rawId}`}>
+                                <div className="flex items-center justify-between flex-wrap gap-1">
+                                  <span className="flex items-center gap-1">
+                                    <ShieldCheck className="h-3 w-3 text-lys-teal" />
+                                    <span className="capitalize">{scholarship.trustLevel || "external"}</span>
+                                    {verifiedDateStr && <span className="text-muted-foreground">· verified {verifiedDateStr}</span>}
+                                  </span>
+                                  {urgency.passed ? (
+                                    <Badge variant="destructive" className="text-[10px]" data-testid={`badge-deadline-passed-${scholarship.rawId}`}>Deadline passed</Badge>
+                                  ) : urgency.daysLeft != null ? (
+                                    <Badge variant="secondary" className="text-[10px]">{urgency.daysLeft} day{urgency.daysLeft === 1 ? "" : "s"} left</Badge>
+                                  ) : null}
                                 </div>
-                              )}
+                                {(scholarship.requiresFee || scholarship.privacyConcern) && (
+                                  <div className="flex items-center gap-1 text-lys-red">
+                                    <ShieldAlert className="h-3 w-3" />
+                                    {scholarship.requiresFee ? "Reports an application fee" : "Possible privacy concern"}
+                                  </div>
+                                )}
+                                <div className="flex items-center gap-2 flex-wrap text-muted-foreground">
+                                  {scholarship.scholarshipType && <span className="capitalize">{scholarship.scholarshipType}</span>}
+                                  {scholarship.firstGenFriendly && <span className="text-green-600">· 1st-gen friendly</span>}
+                                  {scholarship.gpaRequirement && <span>· GPA {scholarship.gpaRequirement}+</span>}
+                                </div>
+                              </div>
+
                               {scholarship.eligibility && scholarship.eligibility.length > 0 && (
                                 <div className="mb-3">
                                   <p className="text-xs text-muted-foreground font-roboto mb-1">Eligibility:</p>
@@ -557,11 +683,22 @@ export default function Resources() {
                                   className="flex-1 font-oswald gap-2" 
                                   variant="secondary" 
                                   onClick={() => openResourceDetails(scholarship)}
-                                  data-testid={`button-apply-${scholarship.id}`}
+                                  data-testid={`button-view-${scholarship.id}`}
                                 >
                                   <Star className="h-4 w-4" />
                                   View Details
                                 </Button>
+                                {(scholarship.applicationUrl || scholarship.url) && (
+                                  <Button
+                                    size="icon"
+                                    variant="outline"
+                                    onClick={() => openExternal(scholarship)}
+                                    data-testid={`button-apply-${scholarship.id}`}
+                                    title="Apply on official site"
+                                  >
+                                    <ExternalLink className="h-4 w-4" />
+                                  </Button>
+                                )}
                                 <Button
                                   variant={isSaved ? "default" : "outline"}
                                   size="icon"
@@ -574,6 +711,15 @@ export default function Resources() {
                                     ? <BookmarkCheck className="h-4 w-4" />
                                     : <Bookmark className="h-4 w-4" />}
                                 </Button>
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  onClick={() => setReportTarget({ id: scholarship.rawId, title: scholarship.title })}
+                                  data-testid={`button-report-${scholarship.id}`}
+                                  title="Report this scholarship"
+                                >
+                                  <Flag className="h-4 w-4" />
+                                </Button>
                               </div>
                             </CardContent>
                           </Card>
@@ -581,7 +727,8 @@ export default function Resources() {
                       })}
                     </div>
                   </section>
-                )}
+                  );
+                })()}
 
                 {otherResources.length > 0 && (
                   <section>
@@ -949,7 +1096,13 @@ export default function Resources() {
                     {(selectedResource.applicationUrl || selectedResource.url) && (
                       <Button 
                         className="flex-1 font-oswald gap-2" 
-                        onClick={() => window.open(selectedResource.applicationUrl || selectedResource.url, "_blank")}
+                        onClick={() => {
+                          if (selectedResource.type === "scholarship") {
+                            openExternal(selectedResource);
+                          } else {
+                            window.open(selectedResource.applicationUrl || selectedResource.url, "_blank", "noopener,noreferrer");
+                          }
+                        }}
                         data-testid="button-open-resource"
                       >
                         <ExternalLink className="h-4 w-4" />
@@ -1058,6 +1211,31 @@ export default function Resources() {
             )}
           </DialogContent>
         </Dialog>
+
+        <PursuitReasonDialog
+          open={!!pursuitTarget}
+          onClose={() => setPursuitTarget(null)}
+          onConfirm={confirmPursuit}
+          scholarshipTitle={pursuitTarget?.title}
+          isSaving={saveScholarshipMutation.isPending}
+        />
+        <ReportScholarshipDialog
+          open={!!reportTarget}
+          onClose={() => setReportTarget(null)}
+          resourceId={reportTarget?.id || null}
+          resourceTitle={reportTarget?.title}
+        />
+        <ExternalLinkInterstitial
+          open={!!interstitialTarget}
+          onClose={() => setInterstitialTarget(null)}
+          scholarship={interstitialTarget}
+        />
+
+        <div className="mt-12 pt-6 border-t text-center text-xs text-muted-foreground font-roboto max-w-3xl mx-auto" data-testid="text-resources-disclaimer">
+          LYS curates and verifies scholarship listings to the best of our ability. Deadlines, eligibility, and award amounts can change at any time —
+          always verify on the official site before applying. LYS will never charge you to apply, and we never share your data with scholarship providers.
+          See something off? Use the report flag on any listing.
+        </div>
       </div>
     </div>
   );

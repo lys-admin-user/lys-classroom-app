@@ -11,7 +11,99 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Skeleton } from "@/components/ui/skeleton";
-import { GraduationCap, Calendar, CheckCircle, Clock, Plus, Trash2, DollarSign } from "lucide-react";
+import { GraduationCap, Calendar, CheckCircle, Clock, Plus, Trash2, DollarSign, Heart, Bookmark, ExternalLink } from "lucide-react";
+
+type SavedScholarship = {
+  id: string;
+  resourceId: string;
+  resourceTitle: string;
+  resourceAmount: string | null;
+  resourceDeadline: string | null;
+  resourceUrl: string | null;
+  pursuitReason: string | null;
+  createdAt: string | null;
+};
+
+function urgencyOf(deadline: string | null) {
+  if (!deadline) return { label: "No date", tone: "secondary" as const, daysLeft: null as number | null };
+  const dt = new Date(deadline);
+  if (isNaN(dt.getTime())) return { label: deadline, tone: "secondary" as const, daysLeft: null };
+  const days = Math.ceil((dt.getTime() - Date.now()) / 86400000);
+  if (days < 0) return { label: "Deadline passed", tone: "destructive" as const, daysLeft: days };
+  if (days <= 14) return { label: `${days}d left`, tone: "destructive" as const, daysLeft: days };
+  if (days <= 45) return { label: `${days}d left`, tone: "default" as const, daysLeft: days };
+  return { label: `${days}d left`, tone: "secondary" as const, daysLeft: days };
+}
+
+function SavedScholarshipsTab() {
+  const { toast } = useToast();
+  const { data: saved = [], isLoading } = useQuery<SavedScholarship[]>({ queryKey: ["/api/saved-scholarships"] });
+  const removeMutation = useMutation({
+    mutationFn: (resourceId: string) => apiRequest("DELETE", `/api/saved-scholarships/${encodeURIComponent(resourceId)}`),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/saved-scholarships"] });
+      toast({ title: "Removed" });
+    },
+  });
+
+  const sorted = [...saved].sort((a, b) => {
+    const ua = urgencyOf(a.resourceDeadline).daysLeft ?? 99999;
+    const ub = urgencyOf(b.resourceDeadline).daysLeft ?? 99999;
+    return ua - ub;
+  });
+
+  if (isLoading) return <div className="grid gap-4 md:grid-cols-2">{[1,2].map((i) => <Skeleton key={i} className="h-40 rounded-md" />)}</div>;
+  if (sorted.length === 0) return (
+    <Card><CardContent className="py-8 text-center">
+      <Bookmark className="w-10 h-10 mx-auto text-muted-foreground mb-2" />
+      <p className="text-muted-foreground">No saved scholarships yet. Save some from the Resources page.</p>
+    </CardContent></Card>
+  );
+
+  return (
+    <div className="grid gap-4 md:grid-cols-2">
+      {sorted.map((s) => {
+        const u = urgencyOf(s.resourceDeadline);
+        return (
+          <Card key={s.id} data-testid={`card-saved-${s.id}`}>
+            <CardHeader className="flex flex-row items-start justify-between gap-2">
+              <div className="min-w-0">
+                <CardTitle className="text-base">{s.resourceTitle}</CardTitle>
+                {s.resourceAmount && <p className="text-sm text-muted-foreground mt-1">{s.resourceAmount}</p>}
+              </div>
+              <Badge variant={u.tone === "destructive" ? "destructive" : u.tone === "default" ? "default" : "secondary"} data-testid={`badge-urgency-${s.id}`}>
+                <Clock className="w-3 h-3 mr-1" />{u.label}
+              </Badge>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              {s.resourceDeadline && (
+                <p className="text-xs text-muted-foreground flex items-center gap-1">
+                  <Calendar className="w-3 h-3" />{s.resourceDeadline}
+                </p>
+              )}
+              {s.pursuitReason && (
+                <div className="rounded-md bg-muted/40 p-2 text-sm border-l-2 border-lys-yellow" data-testid={`text-pursuit-reason-${s.id}`}>
+                  <span className="inline-flex items-center gap-1 font-semibold text-xs text-muted-foreground"><Heart className="w-3 h-3 text-lys-yellow" />My reason</span>
+                  <p className="italic mt-1">"{s.pursuitReason}"</p>
+                </div>
+              )}
+              <div className="flex gap-2">
+                {s.resourceUrl && (
+                  <Button asChild size="sm" variant="outline" className="flex-1 gap-1" data-testid={`button-open-saved-${s.id}`}>
+                    <a href={s.resourceUrl} target="_blank" rel="noopener noreferrer"><ExternalLink className="w-3 h-3" />Open</a>
+                  </Button>
+                )}
+                <Button size="sm" variant="ghost" onClick={() => removeMutation.mutate(s.resourceId)} disabled={removeMutation.isPending} data-testid={`button-remove-saved-${s.id}`}>
+                  <Trash2 className="w-4 h-4" />
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        );
+      })}
+    </div>
+  );
+}
 
 type ScholarshipApplication = {
   id: string;
@@ -272,11 +364,16 @@ export default function ScholarshipPlanner() {
         <p className="text-muted-foreground mt-1" data-testid="text-page-subtitle">Plan your scholarship applications by season</p>
       </div>
 
-      <Tabs defaultValue="timeline" data-testid="tabs-scholarship">
+      <Tabs defaultValue="saved" data-testid="tabs-scholarship">
         <TabsList>
+          <TabsTrigger value="saved" data-testid="tab-saved"><Bookmark className="w-4 h-4 mr-1" />Saved</TabsTrigger>
           <TabsTrigger value="timeline" data-testid="tab-timeline"><Calendar className="w-4 h-4 mr-1" />Timeline</TabsTrigger>
           <TabsTrigger value="applications" data-testid="tab-applications"><CheckCircle className="w-4 h-4 mr-1" />My Applications</TabsTrigger>
         </TabsList>
+
+        <TabsContent value="saved" className="mt-4">
+          <SavedScholarshipsTab />
+        </TabsContent>
 
         <TabsContent value="timeline" className="mt-4">
           {isLoading ? (

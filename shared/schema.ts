@@ -1989,7 +1989,8 @@ export const knowResources = pgTable("know_resources", {
   // Scholarship specific
   scholarshipType: text("scholarship_type"), // merit, need, both
   scholarshipAmount: text("scholarship_amount"), // e.g., "$5,000", "$40,000/year", "Varies"
-  scholarshipDeadline: text("scholarship_deadline"), // deadline date string
+  scholarshipDeadline: text("scholarship_deadline"), // deadline date string (display)
+  nextDeadline: timestamp("next_deadline"), // parsed concrete deadline (auto-rolled for recurring)
   scholarshipSeason: text("scholarship_season"), // early_fall, late_fall, early_spring, late_spring
   eligibilityCriteria: jsonb("eligibility_criteria").$type<string[]>().default([]),
   applicationUrl: text("application_url"),
@@ -1999,6 +2000,21 @@ export const knowResources = pgTable("know_resources", {
   studentLevel: text("student_level"), // high_school, undergraduate, graduate, all
   firstGenFriendly: boolean("first_gen_friendly").default(false),
   stateRestrictions: jsonb("state_restrictions").$type<string[]>().default([]), // e.g. ["TX","FL"] empty = any state
+  // Trust & verification (LYS curation signals)
+  trustLevel: text("trust_level").default("verified").$type<"verified" | "community" | "external">(),
+  lastVerifiedAt: timestamp("last_verified_at"),
+  requiresFee: boolean("requires_fee").default(false), // flag/hide if true — never pay to apply
+  privacyConcern: boolean("privacy_concern").default(false), // known data-harvesting aggregator
+  // Being / Knowing / Doing alignment (auto-derived, admin-overridable)
+  bkdAlignment: jsonb("bkd_alignment").$type<{
+    being: boolean;
+    knowing: boolean;
+    doing: boolean;
+    beingReason?: string;
+    knowingReason?: string;
+    doingReason?: string;
+  }>().default({ being: false, knowing: false, doing: false }),
+  bkdManualOverride: boolean("bkd_manual_override").default(false),
   // Auto-import tracking
   autoImported: boolean("auto_imported").default(false),
   urlStatus: text("url_status").default("unknown"), // unknown, active, broken
@@ -2135,6 +2151,7 @@ export const savedScholarships = pgTable("saved_scholarships", {
   resourceAmount: text("resource_amount"),
   resourceDeadline: text("resource_deadline"),
   resourceUrl: text("resource_url"),
+  pursuitReason: text("pursuit_reason"), // BKD Being-tied reflection: "Why I'm pursuing this"
   notes: text("notes"),
   createdAt: timestamp("created_at").defaultNow(),
 });
@@ -2144,6 +2161,40 @@ export const insertSavedScholarshipSchema = createInsertSchema(savedScholarships
 });
 export type InsertSavedScholarship = z.infer<typeof insertSavedScholarshipSchema>;
 export type SavedScholarship = typeof savedScholarships.$inferSelect;
+
+// Resource Reports — students/educators flag suspect or broken scholarship listings
+export const RESOURCE_REPORT_REASONS = [
+  "broken_link",
+  "expired",
+  "scam_or_fee",
+  "misleading",
+  "privacy_concern",
+  "other",
+] as const;
+export type ResourceReportReason = typeof RESOURCE_REPORT_REASONS[number];
+
+export const RESOURCE_REPORT_STATUSES = ["pending", "resolved", "dismissed"] as const;
+export type ResourceReportStatus = typeof RESOURCE_REPORT_STATUSES[number];
+
+export const REPORT_AUTOHIDE_THRESHOLD = 3;
+
+export const resourceReports = pgTable("resource_reports", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  resourceId: varchar("resource_id").notNull(), // know_resources.id (no "know-" prefix)
+  userId: varchar("user_id").notNull(),
+  reason: text("reason").notNull().$type<ResourceReportReason>(),
+  details: text("details"),
+  status: text("status").notNull().default("pending").$type<ResourceReportStatus>(),
+  resolvedBy: varchar("resolved_by"),
+  resolvedAt: timestamp("resolved_at"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertResourceReportSchema = createInsertSchema(resourceReports).omit({
+  id: true, createdAt: true, resolvedAt: true, resolvedBy: true, status: true,
+});
+export type InsertResourceReport = z.infer<typeof insertResourceReportSchema>;
+export type ResourceReport = typeof resourceReports.$inferSelect;
 
 // Session Edit History (for tracking collaborative changes)
 export const sessionEditHistory = pgTable("session_edit_history", {

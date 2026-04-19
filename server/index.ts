@@ -149,9 +149,35 @@ async function initStripe() {
   }
 }
 
+let weeklyVerificationIntervalHandle: NodeJS.Timeout | null = null;
+async function scheduleWeeklyScholarshipVerification() {
+  if (weeklyVerificationIntervalHandle) return; // idempotent guard
+  const ONE_WEEK_MS = 7 * 24 * 60 * 60 * 1000;
+  const { storage } = await import("./storage");
+  const SYSTEM_USER_ID = "system-weekly-job";
+
+  const runJob = async () => {
+    try {
+      const scholarships = await storage.getKnowResources({ resourceType: "scholarship" });
+      const ids = scholarships.map((s) => s.id);
+      if (ids.length === 0) return;
+      const count = await storage.bulkVerifyKnowResources(ids, SYSTEM_USER_ID);
+      log(`Weekly verification refreshed ${count} scholarship(s)`, "scheduler");
+    } catch (err: any) {
+      log(`Weekly verification failed: ${err?.message || err}`, "scheduler");
+    }
+  };
+
+  weeklyVerificationIntervalHandle = setInterval(runJob, ONE_WEEK_MS);
+  log("Weekly scholarship verification scheduled (every 7 days)", "scheduler");
+}
+
 (async () => {
   await initStripe();
   await registerRoutes(httpServer, app);
+  scheduleWeeklyScholarshipVerification().catch((err) =>
+    log(`Failed to schedule verification job: ${err?.message || err}`, "scheduler"),
+  );
 
   app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
     const status = err.status || err.statusCode || 500;

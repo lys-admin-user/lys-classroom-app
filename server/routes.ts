@@ -3875,6 +3875,73 @@ export async function registerRoutes(
     }
   });
 
+  // Mark a single KNOW resource as verified today (admin)
+  app.post("/api/admin/know-resources/:id/verify", isAuthenticated, requireCampusAdmin, async (req: any, res) => {
+    try {
+      const userId = req.user?.id || req.user?.claims?.sub;
+      const updated = await storage.verifyKnowResource(req.params.id, userId);
+      if (!updated) return res.status(404).json({ error: "Not found" });
+      res.json(updated);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to verify resource" });
+    }
+  });
+
+  // Bulk verify (admin)
+  app.post("/api/admin/know-resources/bulk-verify", isAuthenticated, requireCampusAdmin, async (req: any, res) => {
+    try {
+      const userId = req.user?.id || req.user?.claims?.sub;
+      const ids: string[] = Array.isArray(req.body?.ids) ? req.body.ids : [];
+      const count = await storage.bulkVerifyKnowResources(ids, userId);
+      res.json({ count });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to bulk verify" });
+    }
+  });
+
+  // Submit a resource report (any authenticated user)
+  app.post("/api/resource-reports", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user?.id || req.user?.claims?.sub;
+      const { resourceId, reason, details } = req.body || {};
+      const allowedReasons = ["broken_link", "expired", "scam_or_fee", "misleading", "privacy_concern", "other"];
+      if (!resourceId || !reason || !allowedReasons.includes(reason)) {
+        return res.status(400).json({ error: "resourceId and a valid reason are required" });
+      }
+      // Strip "know-" prefix if present
+      const normalizedId = resourceId.startsWith("know-") ? resourceId.slice(5) : resourceId;
+      const report = await storage.createResourceReport({ resourceId: normalizedId, userId, reason, details: details || null } as any);
+      res.status(201).json(report);
+    } catch (error) {
+      console.error("Resource report error:", error);
+      res.status(500).json({ error: "Failed to submit report" });
+    }
+  });
+
+  // List resource reports (admin moderation queue)
+  app.get("/api/admin/resource-reports", isAuthenticated, requireCampusAdmin, async (req: any, res) => {
+    try {
+      const status = (req.query?.status as string) || "pending";
+      const reports = await storage.listResourceReports({ status });
+      res.json(reports);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to load reports" });
+    }
+  });
+
+  // Resolve / dismiss a report (admin)
+  app.patch("/api/admin/resource-reports/:id", isAuthenticated, requireCampusAdmin, async (req: any, res) => {
+    try {
+      const userId = req.user?.id || req.user?.claims?.sub;
+      const status = req.body?.status === "dismissed" ? "dismissed" : "resolved";
+      const updated = await storage.resolveResourceReport(req.params.id, userId, status);
+      if (!updated) return res.status(404).json({ error: "Not found" });
+      res.json(updated);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to update report" });
+    }
+  });
+
   // ================================
   // LYS Marketplace
   // ================================
@@ -4097,13 +4164,17 @@ export async function registerRoutes(
   app.post("/api/saved-scholarships", isAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user?.id || req.user?.claims?.sub;
-      const { resourceId, resourceTitle, resourceAmount, resourceDeadline, resourceUrl, scholarshipType, notes } = req.body;
+      const { resourceId, resourceTitle, resourceAmount, resourceDeadline, resourceUrl, scholarshipType, notes, pursuitReason } = req.body;
       if (!resourceId || !resourceTitle) return res.status(400).json({ error: "resourceId and resourceTitle required" });
+      const cleanReason = (pursuitReason || "").toString().trim();
+      if (cleanReason.length < 5) {
+        return res.status(400).json({ error: "Tell us why you're pursuing this scholarship (at least 5 characters)." });
+      }
       const already = await storage.isSavedScholarship(userId, resourceId);
       if (already) return res.json({ alreadySaved: true });
 
       // Save to bookmarks
-      const saved = await storage.saveScholarship({ userId, resourceId, resourceTitle, resourceAmount, resourceDeadline, resourceUrl, notes });
+      const saved = await storage.saveScholarship({ userId, resourceId, resourceTitle, resourceAmount, resourceDeadline, resourceUrl, notes, pursuitReason: cleanReason });
 
       // Also add to scholarship planner (if not already there for this resource)
       const existingApp = await db
