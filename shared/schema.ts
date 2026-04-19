@@ -2019,6 +2019,11 @@ export const knowResources = pgTable("know_resources", {
   autoImported: boolean("auto_imported").default(false),
   urlStatus: text("url_status").default("unknown"), // unknown, active, broken
   lastValidatedAt: timestamp("last_validated_at"),
+  // Provenance for institution-scraped scholarships
+  sourceInstitutionId: varchar("source_institution_id"), // FK to institutions.id (nullable)
+  sourceUrl: text("source_url"), // exact URL we scraped this from
+  lastSeenAt: timestamp("last_seen_at"), // last scrape that confirmed this scholarship still exists
+  scrapeRunId: varchar("scrape_run_id"), // last scrape run id that touched this row
   
   // Metadata
   tags: jsonb("tags").$type<string[]>().default([]),
@@ -3536,6 +3541,97 @@ export const rssContentItems = pgTable("rss_content_items", {
 export const insertRssContentItemSchema = createInsertSchema(rssContentItems).omit({ id: true, createdAt: true, updatedAt: true, reviewedAt: true });
 export type InsertRssContentItem = z.infer<typeof insertRssContentItemSchema>;
 export type RssContentItem = typeof rssContentItems.$inferSelect;
+
+// =============================================================================
+// Scholarship Scraper — Top-500 institutions, quarterly scrape, admin-approval
+// =============================================================================
+
+export const INSTITUTION_SECTORS = [
+  "public_4yr",
+  "private_nonprofit_4yr",
+  "private_forprofit_4yr",
+  "public_2yr",
+  "private_nonprofit_2yr",
+  "private_forprofit_2yr",
+  "trade_vocational",
+  "parallel_org",
+  "other",
+] as const;
+export type InstitutionSector = typeof INSTITUTION_SECTORS[number];
+
+export const URL_DISCOVERY_STATUS = ["pending", "found", "not_found", "failed"] as const;
+export type UrlDiscoveryStatus = typeof URL_DISCOVERY_STATUS[number];
+
+export const INSTITUTION_SCRAPE_STATUS = [
+  "pending",
+  "ok",
+  "skipped_unchanged",
+  "no_url",
+  "blocked_by_robots",
+  "fetch_failed",
+  "extract_failed",
+] as const;
+export type InstitutionScrapeStatus = typeof INSTITUTION_SCRAPE_STATUS[number];
+
+export const institutions = pgTable("institutions", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  ipedsId: text("ipeds_id"),
+  name: text("name").notNull(),
+  websiteUrl: text("website_url"),
+  scholarshipUrl: text("scholarship_url"),
+  state: varchar("state"),
+  sector: text("sector").$type<InstitutionSector>(),
+  enrollment: integer("enrollment"),
+  scholarshipUrlDiscoveryStatus: text("scholarship_url_discovery_status").default("pending").$type<UrlDiscoveryStatus>(),
+  lastDiscoveryAttemptAt: timestamp("last_discovery_attempt_at"),
+  lastScrapedAt: timestamp("last_scraped_at"),
+  lastContentHash: text("last_content_hash"),
+  lastScrapeStatus: text("last_scrape_status").$type<InstitutionScrapeStatus>(),
+  lastScrapeError: text("last_scrape_error"),
+  lastScrapeScholarshipsFound: integer("last_scrape_scholarships_found").default(0),
+  isActive: boolean("is_active").default(true),
+  notes: text("notes"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertInstitutionSchema = createInsertSchema(institutions).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+export type InsertInstitution = z.infer<typeof insertInstitutionSchema>;
+export type Institution = typeof institutions.$inferSelect;
+
+export const SCRAPE_RUN_STATUS = ["running", "completed", "failed"] as const;
+export type ScrapeRunStatus = typeof SCRAPE_RUN_STATUS[number];
+
+export const SCRAPE_TRIGGER = ["scheduled", "manual", "startup"] as const;
+export type ScrapeTrigger = typeof SCRAPE_TRIGGER[number];
+
+export const scholarshipScrapeRuns = pgTable("scholarship_scrape_runs", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  triggerType: text("trigger_type").notNull().$type<ScrapeTrigger>(),
+  triggeredBy: varchar("triggered_by"),
+  startedAt: timestamp("started_at").defaultNow(),
+  finishedAt: timestamp("finished_at"),
+  status: text("status").notNull().default("running").$type<ScrapeRunStatus>(),
+  institutionsTotal: integer("institutions_total").default(0),
+  institutionsScraped: integer("institutions_scraped").default(0),
+  institutionsSkipped: integer("institutions_skipped").default(0),
+  institutionsFailed: integer("institutions_failed").default(0),
+  scholarshipsFound: integer("scholarships_found").default(0),
+  scholarshipsUpdated: integer("scholarships_updated").default(0),
+  scholarshipsDeactivated: integer("scholarships_deactivated").default(0),
+  errorMessage: text("error_message"),
+});
+
+export const insertScholarshipScrapeRunSchema = createInsertSchema(scholarshipScrapeRuns).omit({
+  id: true,
+  startedAt: true,
+});
+export type InsertScholarshipScrapeRun = z.infer<typeof insertScholarshipScrapeRunSchema>;
+export type ScholarshipScrapeRun = typeof scholarshipScrapeRuns.$inferSelect;
 
 // User data region tracking (Rule 4: Data Residency)
 export const userDataRegions = pgTable("user_data_regions", {

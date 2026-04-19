@@ -3899,6 +3899,99 @@ export async function registerRoutes(
     }
   });
 
+  // ==========================================================================
+  // Scholarship Scraper Admin Routes (system_admin only)
+  // ==========================================================================
+  app.get("/api/admin/scholarship-scrape/runs", isAuthenticated, requireSystemAdmin, async (_req: any, res) => {
+    try {
+      const runs = await storage.listScholarshipScrapeRuns({ limit: 25 });
+      res.json(runs);
+    } catch (error: any) {
+      res.status(500).json({ error: error?.message || "Failed to list scrape runs" });
+    }
+  });
+
+  app.get("/api/admin/scholarship-scrape/institutions", isAuthenticated, requireSystemAdmin, async (req: any, res) => {
+    try {
+      const limit = Math.min(parseInt((req.query.limit as string) || "200", 10) || 200, 500);
+      const offset = parseInt((req.query.offset as string) || "0", 10) || 0;
+      const list = await storage.listInstitutions({ limit, offset });
+      res.json(list);
+    } catch (error: any) {
+      res.status(500).json({ error: error?.message || "Failed to list institutions" });
+    }
+  });
+
+  app.post("/api/admin/scholarship-scrape/run", isAuthenticated, requireSystemAdmin, async (req: any, res) => {
+    try {
+      const userId = req.user?.id || req.user?.claims?.sub;
+      const { triggerScrape, isScrapeRunning } = await import("./scholarshipScraper/scheduler");
+      if (isScrapeRunning()) return res.status(409).json({ error: "A scrape is already in progress." });
+      // Run async; return immediately with the run id
+      const result = await triggerScrape({ trigger: "manual", triggeredBy: userId });
+      if (!result.ok) return res.status(500).json({ error: result.error });
+      res.json({ runId: result.runId, summary: result.summary });
+    } catch (error: any) {
+      res.status(500).json({ error: error?.message || "Failed to trigger scrape" });
+    }
+  });
+
+  app.post("/api/admin/scholarship-scrape/seed-institutions", isAuthenticated, requireSystemAdmin, async (_req: any, res) => {
+    try {
+      const { refreshInstitutionsFromScorecard, seedInstitutionsFromJsonIfEmpty } = await import(
+        "./scholarshipScraper/seedInstitutions"
+      );
+      // Try Scorecard first; fall back to JSON
+      const scorecardResult = await refreshInstitutionsFromScorecard();
+      if (scorecardResult.upserted > 0 || !scorecardResult.error) {
+        return res.json({ source: "scorecard", ...scorecardResult });
+      }
+      const jsonResult = await seedInstitutionsFromJsonIfEmpty();
+      res.json({ source: "json_fallback", scorecardError: scorecardResult.error, ...jsonResult });
+    } catch (error: any) {
+      res.status(500).json({ error: error?.message || "Failed to seed institutions" });
+    }
+  });
+
+  app.post("/api/admin/scholarship-scrape/discover-urls", isAuthenticated, requireSystemAdmin, async (req: any, res) => {
+    try {
+      const { discoverScholarshipUrls } = await import("./scholarshipScraper/discoverUrls");
+      const limit = Math.min(parseInt((req.body?.limit as string) || "1000", 10) || 1000, 1000);
+      const result = await discoverScholarshipUrls({ limit });
+      res.json(result);
+    } catch (error: any) {
+      res.status(500).json({ error: error?.message || "Failed to discover URLs" });
+    }
+  });
+
+  app.patch("/api/admin/scholarship-scrape/institutions/:id", isAuthenticated, requireSystemAdmin, async (req: any, res) => {
+    try {
+      const { id } = req.params;
+      const allowed: any = {};
+      const body = req.body || {};
+      if (typeof body.scholarshipUrl === "string") {
+        allowed.scholarshipUrl = body.scholarshipUrl.trim() || null;
+        allowed.scholarshipUrlDiscoveryStatus = allowed.scholarshipUrl ? "found" : "pending";
+      }
+      if (typeof body.isActive === "boolean") allowed.isActive = body.isActive;
+      if (typeof body.notes === "string") allowed.notes = body.notes;
+      const updated = await storage.updateInstitution(id, allowed);
+      if (!updated) return res.status(404).json({ error: "Institution not found" });
+      res.json(updated);
+    } catch (error: any) {
+      res.status(500).json({ error: error?.message || "Failed to update institution" });
+    }
+  });
+
+  app.delete("/api/admin/scholarship-scrape/institutions/:id", isAuthenticated, requireSystemAdmin, async (req: any, res) => {
+    try {
+      const ok = await storage.deleteInstitution(req.params.id);
+      res.json({ ok });
+    } catch (error: any) {
+      res.status(500).json({ error: error?.message || "Failed to delete institution" });
+    }
+  });
+
   // Submit a resource report (any authenticated user)
   app.post("/api/resource-reports", isAuthenticated, async (req: any, res) => {
     try {

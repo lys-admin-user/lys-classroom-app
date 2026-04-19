@@ -178,6 +178,12 @@ async function scheduleWeeklyScholarshipVerification() {
   scheduleWeeklyScholarshipVerification().catch((err) =>
     log(`Failed to schedule verification job: ${err?.message || err}`, "scheduler"),
   );
+  const { scheduleQuarterlyScholarshipScrape } = await import(
+    "./scholarshipScraper/scheduler"
+  );
+  scheduleQuarterlyScholarshipScrape().catch((err) =>
+    log(`Failed to schedule scholarship scraper: ${err?.message || err}`, "scheduler"),
+  );
 
   app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
     const status = err.status || err.statusCode || 500;

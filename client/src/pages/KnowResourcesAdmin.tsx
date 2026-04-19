@@ -22,8 +22,8 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { Plus, Pencil, Trash2, Book, Youtube, Podcast, MessageCircle, FileText, ExternalLink, Star, Eye, EyeOff, GraduationCap, DollarSign, PenTool, ShieldCheck, Flag, CheckCircle2, ShieldAlert, AlertTriangle } from "lucide-react";
-import type { KnowResource, InsertKnowResource, KnowResourceType } from "@shared/schema";
+import { Plus, Pencil, Trash2, Book, Youtube, Podcast, MessageCircle, FileText, ExternalLink, Star, Eye, EyeOff, GraduationCap, DollarSign, PenTool, ShieldCheck, Flag, CheckCircle2, ShieldAlert, AlertTriangle, Building2, RefreshCw, Bot, Globe } from "lucide-react";
+import type { KnowResource, InsertKnowResource, KnowResourceType, Institution, ScholarshipScrapeRun } from "@shared/schema";
 
 const RESOURCE_TYPES = [
   { value: "book", label: "Book", icon: Book },
@@ -985,6 +985,9 @@ export default function KnowResourcesAdmin() {
               </Badge>
             )}
           </TabsTrigger>
+          <TabsTrigger value="auto-scrape" data-testid="tab-auto-scrape">
+            <Bot className="w-4 h-4 mr-1" />Auto-Scrape
+          </TabsTrigger>
         </TabsList>
 
         {(activeType === "all" || activeType === "scholarship") && allScholarships.length > 0 && (
@@ -1051,7 +1054,15 @@ export default function KnowResourcesAdmin() {
           <ReportsTab />
         </TabsContent>
 
-        <TabsContent value={activeType} className="space-y-4">
+        <TabsContent value="auto-scrape" className="space-y-4">
+          <AutoScrapeTab />
+        </TabsContent>
+
+        <TabsContent
+          value={activeType}
+          className="space-y-4"
+          hidden={activeType === "reports" || activeType === "auto-scrape"}
+        >
           {isLoading ? (
             <div className="text-center py-8 text-muted-foreground">Loading resources...</div>
           ) : filteredResources.length === 0 ? (
@@ -1142,6 +1153,282 @@ export default function KnowResourcesAdmin() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+    </div>
+  );
+}
+
+// =============================================================================
+// AutoScrapeTab — quarterly scholarship scraper admin UI
+// =============================================================================
+function AutoScrapeTab() {
+  const { toast } = useToast();
+  const [seedConfirmOpen, setSeedConfirmOpen] = useState(false);
+  const [runConfirmOpen, setRunConfirmOpen] = useState(false);
+
+  const { data: runs = [], isLoading: runsLoading } = useQuery<ScholarshipScrapeRun[]>({
+    queryKey: ["/api/admin/scholarship-scrape/runs"],
+    refetchInterval: 5000,
+  });
+  const { data: institutions = [], isLoading: instLoading } = useQuery<Institution[]>({
+    queryKey: ["/api/admin/scholarship-scrape/institutions"],
+  });
+
+  const runMutation = useMutation({
+    mutationFn: () => apiRequest("POST", "/api/admin/scholarship-scrape/run").then((r) => r.json()),
+    onSuccess: (data: any) => {
+      toast({ title: "Scrape complete", description: data.summary || "Done." });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/scholarship-scrape/runs"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/scholarship-scrape/institutions"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/know-resources"] });
+    },
+    onError: (err: any) =>
+      toast({ title: "Scrape failed", description: err?.message || "Unknown error", variant: "destructive" }),
+  });
+
+  const seedMutation = useMutation({
+    mutationFn: () =>
+      apiRequest("POST", "/api/admin/scholarship-scrape/seed-institutions").then((r) => r.json()),
+    onSuccess: (data: any) => {
+      const desc =
+        data.source === "scorecard"
+          ? `Loaded ${data.upserted ?? 0} from College Scorecard.`
+          : data.source === "json_fallback"
+            ? `Loaded ${data.seeded ?? 0} from starter pack (Scorecard error: ${data.scorecardError})`
+            : "Done.";
+      toast({ title: "Institutions seeded", description: desc });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/scholarship-scrape/institutions"] });
+    },
+    onError: (err: any) =>
+      toast({ title: "Seed failed", description: err?.message || "Unknown error", variant: "destructive" }),
+  });
+
+  const discoverMutation = useMutation({
+    mutationFn: () =>
+      apiRequest("POST", "/api/admin/scholarship-scrape/discover-urls", { limit: 1000 }).then((r) => r.json()),
+    onSuccess: (data: any) => {
+      toast({
+        title: "URL discovery complete",
+        description: `${data.found} found, ${data.notFound} not_found, ${data.failed} failed (of ${data.attempted} attempted)`,
+      });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/scholarship-scrape/institutions"] });
+    },
+    onError: (err: any) =>
+      toast({ title: "Discovery failed", description: err?.message || "Unknown error", variant: "destructive" }),
+  });
+
+  const totalInst = institutions.length;
+  const withUrl = institutions.filter((i) => !!i.scholarshipUrl).length;
+  const lastRun = runs[0];
+
+  return (
+    <div className="space-y-4">
+      <Card>
+        <CardHeader>
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <CardTitle className="flex items-center gap-2">
+                <Bot className="w-5 h-5" />
+                Scholarship Auto-Scraper
+              </CardTitle>
+              <CardDescription>
+                Quarterly scrape of the top 500 US institutions (sourced from the US Dept of Ed). All scraped
+                scholarships land in the Scholarships tab as <strong>inactive</strong> and require your approval
+                before students see them.
+              </CardDescription>
+            </div>
+          </div>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+            <Stat label="Institutions" value={totalInst} icon={Building2} testId="stat-institutions" />
+            <Stat label="With scholarship URL" value={withUrl} icon={Globe} testId="stat-with-url" />
+            <Stat
+              label="Last scrape"
+              value={lastRun?.startedAt ? new Date(lastRun.startedAt).toLocaleDateString() : "Never"}
+              icon={RefreshCw}
+              testId="stat-last-scrape"
+            />
+            <Stat
+              label="Last run new scholarships"
+              value={lastRun?.scholarshipsFound ?? 0}
+              icon={GraduationCap}
+              testId="stat-last-found"
+            />
+          </div>
+
+          <div className="flex flex-wrap gap-2">
+            <Button
+              onClick={() => setSeedConfirmOpen(true)}
+              disabled={seedMutation.isPending}
+              variant="outline"
+              data-testid="button-seed-institutions"
+            >
+              <Building2 className="w-4 h-4 mr-2" />
+              {seedMutation.isPending ? "Seeding..." : "Seed/refresh from Dept of Ed"}
+            </Button>
+            <Button
+              onClick={() => discoverMutation.mutate()}
+              disabled={discoverMutation.isPending}
+              variant="outline"
+              data-testid="button-discover-urls"
+            >
+              <Globe className="w-4 h-4 mr-2" />
+              {discoverMutation.isPending ? "Discovering..." : "Discover scholarship URLs"}
+            </Button>
+            <Button
+              onClick={() => setRunConfirmOpen(true)}
+              disabled={runMutation.isPending}
+              data-testid="button-run-scrape"
+            >
+              <RefreshCw className={`w-4 h-4 mr-2 ${runMutation.isPending ? "animate-spin" : ""}`} />
+              {runMutation.isPending ? "Scraping..." : "Run scrape now"}
+            </Button>
+          </div>
+
+          <p className="text-xs text-muted-foreground">
+            Tip: The first scrape (and the URL discovery step) can take a while because we throttle to 1 request/second
+            per school to be polite. Set the <code>DATA_GOV_API_KEY</code> env var (free at api.data.gov) to refresh the
+            full top-500 list from the College Scorecard.
+          </p>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">Recent scrape runs</CardTitle>
+        </CardHeader>
+        <CardContent>
+          {runsLoading ? (
+            <div className="text-sm text-muted-foreground">Loading…</div>
+          ) : runs.length === 0 ? (
+            <div className="text-sm text-muted-foreground" data-testid="text-no-runs">
+              No scrapes yet. The first one will run automatically ~30 seconds after server boot.
+            </div>
+          ) : (
+            <div className="text-sm divide-y">
+              {runs.slice(0, 10).map((r) => (
+                <div key={r.id} className="py-2 flex flex-wrap items-center gap-2" data-testid={`row-run-${r.id}`}>
+                  <Badge variant={r.status === "completed" ? "default" : r.status === "failed" ? "destructive" : "secondary"}>
+                    {r.status}
+                  </Badge>
+                  <span className="text-muted-foreground">{r.triggerType}</span>
+                  <span>{r.startedAt ? new Date(r.startedAt).toLocaleString() : ""}</span>
+                  <span className="ml-auto">
+                    +{r.scholarshipsFound} new · {r.institutionsScraped}/{r.institutionsTotal} sites · {r.institutionsFailed} failed
+                  </span>
+                </div>
+              ))}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">Institutions ({institutions.length})</CardTitle>
+          <CardDescription>Showing the largest by enrollment first.</CardDescription>
+        </CardHeader>
+        <CardContent>
+          {instLoading ? (
+            <div className="text-sm text-muted-foreground">Loading…</div>
+          ) : institutions.length === 0 ? (
+            <div className="text-sm text-muted-foreground" data-testid="text-no-institutions">
+              No institutions seeded yet. Click "Seed/refresh from Dept of Ed" above.
+            </div>
+          ) : (
+            <div className="text-xs divide-y max-h-[600px] overflow-y-auto">
+              {institutions.map((inst) => (
+                <div key={inst.id} className="py-2 flex items-center gap-2" data-testid={`row-inst-${inst.id}`}>
+                  <span className="flex-1 truncate font-medium">{inst.name}</span>
+                  <span className="text-muted-foreground w-10">{inst.state}</span>
+                  <span className="text-muted-foreground w-20 text-right">
+                    {inst.enrollment ? inst.enrollment.toLocaleString() : "—"}
+                  </span>
+                  <Badge variant={inst.scholarshipUrl ? "default" : "outline"} className="w-24 justify-center">
+                    {inst.scholarshipUrlDiscoveryStatus || "pending"}
+                  </Badge>
+                  <Badge
+                    variant={
+                      inst.lastScrapeStatus === "ok"
+                        ? "default"
+                        : inst.lastScrapeStatus === "skipped_unchanged"
+                          ? "secondary"
+                          : inst.lastScrapeStatus
+                            ? "destructive"
+                            : "outline"
+                    }
+                    className="w-32 justify-center"
+                  >
+                    {inst.lastScrapeStatus || "never"}
+                  </Badge>
+                </div>
+              ))}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      <AlertDialog open={seedConfirmOpen} onOpenChange={setSeedConfirmOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Seed/refresh institutions?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This pulls the top 500 US institutions by undergrad enrollment from the College Scorecard (US Dept of
+              Ed). Existing institutions are updated by IPEDS ID; nothing is deleted. Falls back to a built-in starter
+              pack of ~80 schools if no API key is configured.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                seedMutation.mutate();
+                setSeedConfirmOpen(false);
+              }}
+              data-testid="button-confirm-seed"
+            >
+              Yes, seed
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog open={runConfirmOpen} onOpenChange={setRunConfirmOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Run scrape now?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This visits every active institution's scholarship page (1 req/sec/site, robots.txt respected) and uses
+              gpt-4o-mini to extract scholarship listings. New scholarships land as inactive in the Scholarships tab and
+              require your approval. Estimated cost per full run: under $1. Estimated time: 10–30 minutes.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                runMutation.mutate();
+                setRunConfirmOpen(false);
+              }}
+              data-testid="button-confirm-run"
+            >
+              Yes, run now
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </div>
+  );
+}
+
+function Stat({ label, value, icon: Icon, testId }: { label: string; value: any; icon: any; testId: string }) {
+  return (
+    <div className="rounded-lg border p-3" data-testid={testId}>
+      <div className="flex items-center gap-2 text-xs text-muted-foreground">
+        <Icon className="w-3.5 h-3.5" />
+        {label}
+      </div>
+      <div className="mt-1 text-lg font-semibold">{value}</div>
     </div>
   );
 }

@@ -81,6 +81,11 @@ import {
   type InsertResourceLike,
   type KnowResource,
   type InsertKnowResource,
+  type Institution,
+  type InsertInstitution,
+  type ScholarshipScrapeRun,
+  type InsertScholarshipScrapeRun,
+  type UrlDiscoveryStatus,
   type StudentMatriculationHistory,
   type InsertStudentMatriculationHistory,
   type SystemAchievement,
@@ -162,6 +167,8 @@ import {
   sharedResources,
   resourceLikes,
   knowResources,
+  institutions,
+  scholarshipScrapeRuns,
   marketplaceItems,
   marketplacePurchases,
   marketplaceWishlists,
@@ -979,6 +986,47 @@ export interface IStorage {
   countActiveReportsForResource(resourceId: string): Promise<number>;
   verifyKnowResource(id: string, userId: string): Promise<KnowResource | undefined>;
   bulkVerifyKnowResources(ids: string[], userId: string): Promise<number>;
+
+  // Scholarship Scraper — Institutions
+  listInstitutions(filters?: {
+    isActive?: boolean;
+    discoveryStatus?: UrlDiscoveryStatus;
+    missingScholarshipUrl?: boolean;
+    limit?: number;
+    offset?: number;
+  }): Promise<Institution[]>;
+  getInstitution(id: string): Promise<Institution | undefined>;
+  createInstitution(data: InsertInstitution): Promise<Institution>;
+  upsertInstitutionByIpedsId(data: InsertInstitution): Promise<Institution>;
+  updateInstitution(id: string, updates: Partial<Institution>): Promise<Institution | undefined>;
+  deleteInstitution(id: string): Promise<boolean>;
+
+  // Scholarship Scraper — Scrape runs
+  createScholarshipScrapeRun(data: InsertScholarshipScrapeRun): Promise<ScholarshipScrapeRun>;
+  updateScholarshipScrapeRun(
+    id: string,
+    updates: Partial<ScholarshipScrapeRun>,
+  ): Promise<ScholarshipScrapeRun | undefined>;
+  listScholarshipScrapeRuns(filters?: { limit?: number }): Promise<ScholarshipScrapeRun[]>;
+
+  // Scholarship Scraper — Scholarship upserts/lifecycle
+  upsertAutoImportedScholarship(data: {
+    title: string;
+    description?: string | null;
+    url?: string | null;
+    applicationUrl?: string | null;
+    sourceInstitutionId: string;
+    sourceUrl: string;
+    scrapeRunId: string;
+    scholarshipAmount?: string | null;
+    scholarshipDeadline?: string | null;
+    eligibilityCriteria?: string[];
+    studentLevel?: string | null;
+    isRecurring?: boolean;
+    category?: string | null;
+  }): Promise<{ created: boolean; resource: KnowResource }>;
+  touchScholarshipsForInstitution(institutionId: string, scrapeRunId: string): Promise<number>;
+  deactivateUnseenAutoImportedScholarships(currentRunId: string, institutionIds: string[]): Promise<number>;
 
   // Student Matriculation History (System-Level Tracking)
   getStudentMatriculationHistory(studentId: string): Promise<StudentMatriculationHistory[]>;
@@ -6265,6 +6313,222 @@ export class DatabaseStorage implements IStorage {
       if (r) count++;
     }
     return count;
+  }
+
+  // ==========================================================================
+  // Scholarship Scraper — Institutions
+  // ==========================================================================
+  async listInstitutions(filters?: {
+    isActive?: boolean;
+    discoveryStatus?: UrlDiscoveryStatus;
+    missingScholarshipUrl?: boolean;
+    limit?: number;
+    offset?: number;
+  }): Promise<Institution[]> {
+    const conds: any[] = [];
+    if (filters?.isActive !== undefined) conds.push(eq(institutions.isActive, filters.isActive));
+    if (filters?.discoveryStatus)
+      conds.push(eq(institutions.scholarshipUrlDiscoveryStatus as any, filters.discoveryStatus));
+    if (filters?.missingScholarshipUrl) {
+      conds.push(sql`${institutions.scholarshipUrl} IS NULL OR ${institutions.scholarshipUrl} = ''`);
+    }
+    let q: any = db.select().from(institutions);
+    if (conds.length) q = q.where(and(...conds));
+    q = q.orderBy(desc(institutions.enrollment));
+    if (filters?.limit) q = q.limit(filters.limit);
+    if (filters?.offset) q = q.offset(filters.offset);
+    return await q;
+  }
+
+  async getInstitution(id: string): Promise<Institution | undefined> {
+    const [row] = await db.select().from(institutions).where(eq(institutions.id, id));
+    return row || undefined;
+  }
+
+  async createInstitution(data: InsertInstitution): Promise<Institution> {
+    const [row] = await db.insert(institutions).values(data as any).returning();
+    return row;
+  }
+
+  async upsertInstitutionByIpedsId(data: InsertInstitution): Promise<Institution> {
+    if (!data.ipedsId) {
+      return await this.createInstitution(data);
+    }
+    const [existing] = await db
+      .select()
+      .from(institutions)
+      .where(eq(institutions.ipedsId, data.ipedsId));
+    if (existing) {
+      const [updated] = await db
+        .update(institutions)
+        .set({
+          name: data.name,
+          websiteUrl: data.websiteUrl ?? existing.websiteUrl,
+          state: data.state ?? existing.state,
+          sector: (data.sector as any) ?? existing.sector,
+          enrollment: data.enrollment ?? existing.enrollment,
+          updatedAt: new Date(),
+        })
+        .where(eq(institutions.id, existing.id))
+        .returning();
+      return updated;
+    }
+    return await this.createInstitution(data);
+  }
+
+  async updateInstitution(id: string, updates: Partial<Institution>): Promise<Institution | undefined> {
+    const [row] = await db
+      .update(institutions)
+      .set({ ...updates, updatedAt: new Date() } as any)
+      .where(eq(institutions.id, id))
+      .returning();
+    return row || undefined;
+  }
+
+  async deleteInstitution(id: string): Promise<boolean> {
+    const result = await db.delete(institutions).where(eq(institutions.id, id));
+    return (result.rowCount ?? 0) > 0;
+  }
+
+  // ==========================================================================
+  // Scholarship Scraper — Scrape runs
+  // ==========================================================================
+  async createScholarshipScrapeRun(data: InsertScholarshipScrapeRun): Promise<ScholarshipScrapeRun> {
+    const [row] = await db.insert(scholarshipScrapeRuns).values(data as any).returning();
+    return row;
+  }
+
+  async updateScholarshipScrapeRun(
+    id: string,
+    updates: Partial<ScholarshipScrapeRun>,
+  ): Promise<ScholarshipScrapeRun | undefined> {
+    const [row] = await db
+      .update(scholarshipScrapeRuns)
+      .set(updates as any)
+      .where(eq(scholarshipScrapeRuns.id, id))
+      .returning();
+    return row || undefined;
+  }
+
+  async listScholarshipScrapeRuns(filters?: { limit?: number }): Promise<ScholarshipScrapeRun[]> {
+    let q: any = db.select().from(scholarshipScrapeRuns).orderBy(desc(scholarshipScrapeRuns.startedAt));
+    if (filters?.limit) q = q.limit(filters.limit);
+    return await q;
+  }
+
+  // ==========================================================================
+  // Scholarship Scraper — Scholarship upserts/lifecycle
+  // ==========================================================================
+  async upsertAutoImportedScholarship(data: {
+    title: string;
+    description?: string | null;
+    url?: string | null;
+    applicationUrl?: string | null;
+    sourceInstitutionId: string;
+    sourceUrl: string;
+    scrapeRunId: string;
+    scholarshipAmount?: string | null;
+    scholarshipDeadline?: string | null;
+    eligibilityCriteria?: string[];
+    studentLevel?: string | null;
+    isRecurring?: boolean;
+    category?: string | null;
+  }): Promise<{ created: boolean; resource: KnowResource }> {
+    const now = new Date();
+    // Match on (sourceInstitutionId, title) — this is the natural dedupe key
+    const [existing] = await db
+      .select()
+      .from(knowResources)
+      .where(
+        and(
+          eq(knowResources.sourceInstitutionId, data.sourceInstitutionId),
+          eq(knowResources.title, data.title),
+          eq(knowResources.autoImported, true),
+        ),
+      )
+      .limit(1);
+
+    if (existing) {
+      const [updated] = await db
+        .update(knowResources)
+        .set({
+          description: data.description ?? existing.description,
+          url: data.url ?? existing.url,
+          applicationUrl: data.applicationUrl ?? existing.applicationUrl,
+          sourceUrl: data.sourceUrl,
+          scrapeRunId: data.scrapeRunId,
+          scholarshipAmount: data.scholarshipAmount ?? existing.scholarshipAmount,
+          scholarshipDeadline: data.scholarshipDeadline ?? existing.scholarshipDeadline,
+          eligibilityCriteria: data.eligibilityCriteria ?? existing.eligibilityCriteria,
+          studentLevel: data.studentLevel ?? existing.studentLevel,
+          isRecurring: data.isRecurring ?? existing.isRecurring,
+          lastSeenAt: now,
+          updatedAt: now,
+        } as any)
+        .where(eq(knowResources.id, existing.id))
+        .returning();
+      return { created: false, resource: updated };
+    }
+
+    const [created] = await db
+      .insert(knowResources)
+      .values({
+        title: data.title,
+        description: data.description || null,
+        url: data.url || null,
+        applicationUrl: data.applicationUrl || null,
+        resourceType: "scholarship",
+        category: data.category || null,
+        sourceInstitutionId: data.sourceInstitutionId,
+        sourceUrl: data.sourceUrl,
+        scrapeRunId: data.scrapeRunId,
+        scholarshipAmount: data.scholarshipAmount || null,
+        scholarshipDeadline: data.scholarshipDeadline || null,
+        eligibilityCriteria: data.eligibilityCriteria || [],
+        studentLevel: data.studentLevel || null,
+        isRecurring: data.isRecurring ?? false,
+        autoImported: true,
+        trustLevel: "community",
+        isActive: false, // requires admin approval
+        lastSeenAt: now,
+        createdBy: "system-scholarship-scraper",
+      } as any)
+      .returning();
+    return { created: true, resource: created };
+  }
+
+  async touchScholarshipsForInstitution(institutionId: string, scrapeRunId: string): Promise<number> {
+    const now = new Date();
+    const result = await db
+      .update(knowResources)
+      .set({ lastSeenAt: now, scrapeRunId } as any)
+      .where(
+        and(
+          eq(knowResources.sourceInstitutionId, institutionId),
+          eq(knowResources.autoImported, true),
+        ),
+      );
+    return result.rowCount ?? 0;
+  }
+
+  async deactivateUnseenAutoImportedScholarships(currentRunId: string, institutionIds: string[]): Promise<number> {
+    // Only deactivate auto-imported scholarships from institutions that were
+    // successfully scraped/extracted this run. Institutions that failed
+    // (fetch_failed, extract_failed, blocked_by_robots) are skipped so a
+    // transient outage does not wipe out previously-approved listings.
+    if (institutionIds.length === 0) return 0;
+    const result = await db
+      .update(knowResources)
+      .set({ isActive: false, updatedAt: new Date() } as any)
+      .where(
+        and(
+          eq(knowResources.autoImported, true),
+          inArray(knowResources.sourceInstitutionId, institutionIds),
+          sql`(${knowResources.scrapeRunId} IS NULL OR ${knowResources.scrapeRunId} <> ${currentRunId})`,
+          eq(knowResources.isActive, true),
+        ),
+      );
+    return result.rowCount ?? 0;
   }
 
   // Student Matriculation History (System-Level Tracking)
