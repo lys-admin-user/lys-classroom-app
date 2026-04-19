@@ -13,7 +13,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Skeleton } from "@/components/ui/skeleton";
 import { GraduationCap, Calendar, CheckCircle, Clock, Plus, Trash2, DollarSign, Heart, Bookmark, ExternalLink, Pencil } from "lucide-react";
 import { PursuitReasonDialog } from "@/components/PursuitReasonDialog";
-import { Link } from "wouter";
+import { useLocation } from "wouter";
 
 type SavedScholarship = {
   id: string;
@@ -39,6 +39,7 @@ function urgencyOf(deadline: string | null) {
 
 function SavedScholarshipsTab() {
   const { toast } = useToast();
+  const [, setLocation] = useLocation();
   const [editTarget, setEditTarget] = useState<SavedScholarship | null>(null);
   const { data: saved = [], isLoading } = useQuery<SavedScholarship[]>({ queryKey: ["/api/saved-scholarships"] });
   const removeMutation = useMutation({
@@ -71,7 +72,7 @@ function SavedScholarshipsTab() {
       <Bookmark className="w-10 h-10 mx-auto text-muted-foreground mb-2" />
       <p className="text-muted-foreground mb-1">You haven't saved any scholarships yet.</p>
       <p className="text-sm text-muted-foreground mb-4">When you save one, your pursuit reason and deadline urgency will show up here.</p>
-      <Button asChild variant="outline" data-testid="link-browse-resources"><Link href="/resources">Browse scholarships</Link></Button>
+      <Button variant="outline" onClick={() => setLocation("/resources")} data-testid="link-browse-resources">Browse scholarships</Button>
     </CardContent></Card>
   );
 
