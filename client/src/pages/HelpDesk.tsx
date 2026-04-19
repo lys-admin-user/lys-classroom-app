@@ -43,6 +43,7 @@ import {
   ShoppingBag,
   Bookmark,
   ClipboardList,
+  Bot,
 } from "lucide-react";
 
 interface HelpArticle {
@@ -1189,6 +1190,27 @@ const helpArticles: HelpArticle[] = [
     relatedArticles: ["auth-role-denied"],
   },
   {
+    id: "scholarship-auto-scraper",
+    title: "Auto-Scraping Scholarships from Top US Institutions (System Admin)",
+    category: "system-admin",
+    tags: ["scholarship", "scraper", "auto-import", "institutions", "system admin", "approval", "know resources"],
+    severity: "info",
+    symptom: "You are a system admin and want to bulk-import scholarship listings from the top US universities every quarter without hand-curating each one.",
+    explanation: "The Auto-Scrape system pulls scholarship listings from the top 500 US institutions (sourced from the US Dept of Ed College Scorecard) on a quarterly schedule. Each institution's scholarship page is fetched politely (1 req/sec/domain, robots.txt respected, identifying user-agent), and gpt-4o-mini extracts structured listings. Every scraped scholarship lands as INACTIVE with 'community' trust — students never see it until you approve it. Estimated cost is under $1 per full quarterly run because pages whose content hasn't changed are skipped before any LLM call. The first scrape kicks off automatically about 30 seconds after server boot if no scrape has ever run.",
+    steps: [
+      "Open KNOW Resources Admin from the sidebar (system_admin only)",
+      "Click the 'Auto-Scrape' tab at the top",
+      "If institutions table is empty, click 'Seed/refresh from Dept of Ed' (set DATA_GOV_API_KEY to refresh from the live College Scorecard; otherwise the built-in 88-school starter pack is used)",
+      "Click 'Discover scholarship URLs' once — this finds each school's scholarship page (uses gpt-4o-mini sparingly, max 1 LLM call per school)",
+      "Click 'Run scrape now' to trigger a full scrape immediately, or wait for the quarterly schedule (every 90 days)",
+      "When scraping finishes, switch to the Scholarships tab — newly scraped items appear as inactive (hidden from students)",
+      "Review each one, edit if needed, and toggle Active to publish it",
+      "Auto-scraped items keep a sourceInstitutionId, sourceUrl, and scrapeRunId so you can audit where they came from",
+      "If a scholarship disappears from the source page on a future scrape, it is automatically deactivated (only when that institution was successfully re-scraped — transient fetch/extraction failures never wipe approved listings)",
+    ],
+    relatedArticles: ["scholarship-save-planner", "sysadmin-scholarship-scraper-architecture"],
+  },
+  {
     id: "pd-lys-courses",
     title: "Accessing LYS Courses in Professional Development",
     category: "resources",
@@ -1245,6 +1267,7 @@ const quickLinks = [
   { label: "Parent portal guide?", articleId: "parent-portal-overview", icon: Users },
   { label: "Browse marketplace?", articleId: "marketplace-browse", icon: ShoppingBag },
   { label: "Save a scholarship?", articleId: "scholarship-save-planner", icon: Bookmark },
+  { label: "Auto-scrape scholarships?", articleId: "scholarship-auto-scraper", icon: Bot },
   { label: "Student assignments?", articleId: "student-assignments-view", icon: ClipboardList },
 ];
 
