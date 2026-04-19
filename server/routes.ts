@@ -8063,7 +8063,7 @@ export async function registerRoutes(
       const proUsers = allUsers.filter(u => u.tier === "pro").length;
       const campusUsers = allUsers.filter(u => u.tier === "campus").length;
       const enterpriseUsers = allUsers.filter(u => u.tier === "enterprise").length;
-      const estimatedMRR = (proUsers * 14.99) + (campusUsers * 39.99) + (enterpriseUsers * 199);
+      const estimatedMRR = (proUsers * 7.99) + (campusUsers * 299) + (enterpriseUsers * 299);
       const runwayMonths = estimatedBurnRate > 0 ? Math.round(estimatedMRR / estimatedBurnRate * 10) / 10 : Infinity;
 
       // Retention by cohort (monthly)
@@ -10158,8 +10158,8 @@ export async function registerRoutes(
 
       const basePrices = {
         free: { base: 0, name: "Free" },
-        pro: { base: 19, name: "Pro" },
-        campus: { base: 99, name: "Campus" },
+        pro: { base: 7.99, name: "Pro" },
+        campus: { base: 299, name: "Campus" },
         enterprise: { base: 299, name: "Enterprise" },
       };
 
@@ -10311,8 +10311,8 @@ export async function registerRoutes(
       const user = userRecord[0];
 
       const tierPrices: Record<string, { amount: number; name: string; period: string }> = {
-        pro: { amount: 1900, name: "LYS Pro (Focus Mode)", period: "month" },
-        campus: { amount: 9900, name: "LYS Campus", period: "month" },
+        pro: { amount: 799, name: "LYS Pro (Focus Mode)", period: "month" },
+        campus: { amount: 29900, name: "LYS Campus", period: "month" },
       };
       const tierInfo = tierPrices[tier];
 

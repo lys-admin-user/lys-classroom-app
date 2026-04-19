@@ -1,9 +1,12 @@
 export const PLAN_PRICES = {
   free: 0,
-  pro: 19,
+  pro: 7.99,
   campus: 299,
   enterprise: 299,
 } as const;
+
+export const PRO_REGULAR_PRICE = 19;
+export const PRO_PROMO_END_DATE = "2026-06-30";
 
 export const SEAT_PRICES = {
   campus: 15,
