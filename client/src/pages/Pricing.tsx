@@ -12,7 +12,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Check, X, Building2, GraduationCap, AlertCircle, Eye, Globe, Info, TrendingDown, CreditCard, FileText, Landmark, Loader2, Sparkles, Users } from "lucide-react";
 import { SiPaypal } from "react-icons/si";
 import { useAuth } from "@/hooks/use-auth";
-import { PLAN_PRICES, SEAT_PRICES, FREE_LESSON_LIMIT } from "@/lib/pricing";
+import { PLAN_PRICES, SEAT_PRICES, FREE_LESSON_LIMIT, PRO_REGULAR_PRICE, PRO_PROMO_END_DATE } from "@/lib/pricing";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
@@ -598,7 +598,31 @@ export default function Pricing() {
                     </Badge>
                   )}
                   <div className="mt-2">
-                    {hasSavings && tier.basePrice > 0 ? (
+                    {tier.id === "pro" ? (
+                      <div className="space-y-1">
+                        <div className="flex items-center justify-center gap-2">
+                          <span className="text-lg text-muted-foreground line-through" data-testid="text-pro-regular-price">${PRO_REGULAR_PRICE}</span>
+                          <Badge variant="secondary" className="bg-lys-red/10 text-lys-red border-lys-red/20" data-testid="badge-pro-promo">
+                            Limited time
+                          </Badge>
+                        </div>
+                        <div>
+                          <span className="text-3xl md:text-4xl font-bold text-foreground" data-testid="text-pro-promo-price">{displayPrice}</span>
+                          <span className="text-muted-foreground">{tier.period}</span>
+                        </div>
+                        <div className="text-xs text-muted-foreground" data-testid="text-pro-promo-end">
+                          Promo ends {(() => {
+                            const [y, m, d] = PRO_PROMO_END_DATE.split("-").map(Number);
+                            return new Date(y, m - 1, d).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" });
+                          })()}
+                        </div>
+                        {hasSavings && (
+                          <Badge variant="secondary" className="bg-green-500/10 text-green-600 dark:text-green-400 border-green-500/20">
+                            +{adjustedPricing.savingsPercent}% country discount
+                          </Badge>
+                        )}
+                      </div>
+                    ) : hasSavings && tier.basePrice > 0 ? (
                       <div className="space-y-1">
                         <div className="flex items-center justify-center gap-2">
                           <span className="text-lg text-muted-foreground line-through">${tier.basePrice}</span>

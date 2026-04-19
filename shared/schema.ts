@@ -2693,8 +2693,8 @@ export type CAIPricing = z.infer<typeof caiPricingSchema>;
 // Base prices in USD (Global Reference Prices)
 export const BASE_PRICES_USD = {
   free: 0,
-  pro: 19,
-  campus: 99,
+  pro: 7.99,
+  campus: 299,
   enterprise: 299,
 } as const;
 

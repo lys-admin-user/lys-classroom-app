@@ -10378,7 +10378,7 @@ export async function registerRoutes(
         return;
       }
 
-      const tier = (session.metadata?.tier || "pro") as string;
+      const tier = (session.metadata?.tier || "pro") as "free" | "pro" | "campus" | "enterprise";
       const subscription = session.subscription as any;
 
       await db.update(users)
