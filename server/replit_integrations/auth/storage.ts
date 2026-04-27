@@ -15,16 +15,53 @@ class AuthStorage implements IAuthStorage {
   }
 
   async upsertUser(userData: UpsertUser): Promise<User> {
+    const now = new Date();
+
+    // If an account already exists with this email under a different id,
+    // update that existing row instead of attempting an insert that would
+    // violate the email unique constraint. This keeps the original user id
+    // (and all of its related records) stable.
+    if (userData.email) {
+      const [existingByEmail] = await db
+        .select()
+        .from(users)
+        .where(eq(users.email, userData.email));
+
+      if (existingByEmail && existingByEmail.id !== userData.id) {
+        const { id: _ignoredId, ...rest } = userData;
+        const [updated] = await db
+          .update(users)
+          .set({
+            ...rest,
+            lastLoginAt: now,
+            loginCount: sql`COALESCE(${users.loginCount}, 0) + 1`,
+            updatedAt: now,
+          })
+          .where(eq(users.id, existingByEmail.id))
+          .returning();
+
+        logAuditEvent({
+          userId: updated.id,
+          action: "user_login",
+          category: "auth",
+          severity: "info",
+          details: { email: userData.email, method: "replit_auth", note: "matched_by_email" },
+        }).catch(() => {});
+
+        return updated;
+      }
+    }
+
     const [user] = await db
       .insert(users)
-      .values({ ...userData, lastLoginAt: new Date(), loginCount: 1 })
+      .values({ ...userData, lastLoginAt: now, loginCount: 1 })
       .onConflictDoUpdate({
         target: users.id,
         set: {
           ...userData,
-          lastLoginAt: new Date(),
+          lastLoginAt: now,
           loginCount: sql`COALESCE(${users.loginCount}, 0) + 1`,
-          updatedAt: new Date(),
+          updatedAt: now,
         },
       })
       .returning();

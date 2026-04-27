@@ -109,22 +109,27 @@ export async function setupAuth(app: Express) {
     verified: passport.AuthenticateCallback,
     req?: any
   ) => {
-    const user = {};
-    updateUserSession(user, tokens);
-    const claims = tokens.claims();
-    const ipAddress = req?.ip || req?.headers?.['x-forwarded-for'] || "unknown";
-    await upsertUser(claims, ipAddress);
     try {
-      const { logAuditEvent } = await import("../../../server/services/auditLog");
-      await logAuditEvent({
-        userId: claims?.sub as string,
-        action: "login_success",
-        category: "auth",
-        severity: "info",
-        details: { method: "replit_oidc" },
-      });
-    } catch {}
-    verified(null, user);
+      const user = {};
+      updateUserSession(user, tokens);
+      const claims = tokens.claims();
+      const ipAddress = req?.ip || req?.headers?.['x-forwarded-for'] || "unknown";
+      await upsertUser(claims, ipAddress);
+      try {
+        const { logAuditEvent } = await import("../../../server/services/auditLog");
+        await logAuditEvent({
+          userId: claims?.sub as string,
+          action: "login_success",
+          category: "auth",
+          severity: "info",
+          details: { method: "replit_oidc" },
+        });
+      } catch {}
+      verified(null, user);
+    } catch (err) {
+      console.error("[auth] verify failed:", err);
+      verified(err as Error);
+    }
   };
 
   // Keep track of registered strategies
