@@ -28,27 +28,56 @@ class AuthStorage implements IAuthStorage {
         .where(eq(users.email, userData.email));
 
       if (existingByEmail && existingByEmail.id !== userData.id) {
-        const { id: _ignoredId, ...rest } = userData;
-        const [updated] = await db
-          .update(users)
-          .set({
-            ...rest,
-            lastLoginAt: now,
-            loginCount: sql`COALESCE(${users.loginCount}, 0) + 1`,
-            updatedAt: now,
-          })
-          .where(eq(users.id, existingByEmail.id))
-          .returning();
+        // Migrate the existing row's id to match the new OIDC sub so that
+        // session lookups (which key off claims.sub) all hit this row going
+        // forward. This is safe when no FK references to the old id exist.
+        // If FK references do exist, fall back to keeping the existing id.
+        try {
+          const [migrated] = await db
+            .update(users)
+            .set({
+              ...userData,
+              lastLoginAt: now,
+              loginCount: sql`COALESCE(${users.loginCount}, 0) + 1`,
+              updatedAt: now,
+            })
+            .where(eq(users.id, existingByEmail.id))
+            .returning();
 
-        logAuditEvent({
-          userId: updated.id,
-          action: "user_login",
-          category: "auth",
-          severity: "info",
-          details: { email: userData.email, method: "replit_auth", note: "matched_by_email" },
-        }).catch(() => {});
+          logAuditEvent({
+            userId: migrated.id,
+            action: "user_login",
+            category: "auth",
+            severity: "info",
+            details: { email: userData.email, method: "replit_auth", note: "id_migrated", previousId: existingByEmail.id },
+          }).catch(() => {});
 
-        return updated;
+          return migrated;
+        } catch (e: any) {
+          console.error("[auth] Could not migrate user id (likely FK refs exist), keeping existing id:", e?.message);
+
+          const { id: _ignoredId, ...rest } = userData;
+          const [updated] = await db
+            .update(users)
+            .set({
+              ...rest,
+              lastLoginAt: now,
+              loginCount: sql`COALESCE(${users.loginCount}, 0) + 1`,
+              updatedAt: now,
+            })
+            .where(eq(users.id, existingByEmail.id))
+            .returning();
+
+          logAuditEvent({
+            userId: updated.id,
+            action: "user_login",
+            category: "auth",
+            severity: "warning",
+            details: { email: userData.email, method: "replit_auth", note: "id_mismatch_keeping_existing", sessionSub: userData.id },
+          }).catch(() => {});
+
+          return updated;
+        }
       }
     }
 

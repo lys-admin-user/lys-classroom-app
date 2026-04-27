@@ -117,7 +117,7 @@ const baseTiers = [
       { name: "Educator Influence Program", included: true },
       { name: "Priority Support", included: false },
     ],
-    cta: "Upgrade to Focus Mode",
+    cta: "Upgrade to Pro",
     popular: true,
   },
   {
