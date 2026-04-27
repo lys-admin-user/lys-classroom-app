@@ -1,5 +1,4 @@
 import { useState, useMemo, useEffect } from "react";
-import { Link } from "wouter";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -692,15 +691,14 @@ export default function Pricing() {
                        tier.cta}
                     </Button>
                   ) : (
-                    <Link href="/api/login" className="w-full">
-                      <Button 
-                        className="w-full" 
-                        variant={tier.popular ? "default" : "outline"}
-                        data-testid={`button-select-${tier.name.toLowerCase()}`}
-                      >
-                        {tier.cta}
-                      </Button>
-                    </Link>
+                    <Button
+                      className="w-full"
+                      variant={tier.popular ? "default" : "outline"}
+                      onClick={() => { window.location.href = "/api/login"; }}
+                      data-testid={`button-select-${tier.name.toLowerCase()}`}
+                    >
+                      {tier.cta}
+                    </Button>
                   )}
                 </CardFooter>
               </Card>
