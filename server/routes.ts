@@ -10339,7 +10339,7 @@ export async function registerRoutes(
         free: { base: 0, name: "Free" },
         pro: { base: 7.99, name: "Pro" },
         campus: { base: 299, name: "Campus" },
-        enterprise: { base: 299, name: "Enterprise" },
+        enterprise: { base: 599, name: "Enterprise" },
       };
 
       const adjustmentFactor = country.caiScore + country.lcsiAdjustment;
@@ -10489,9 +10489,10 @@ export async function registerRoutes(
       const userRecord = await db.select().from(users).where(eq(users.id, userId)).limit(1);
       const user = userRecord[0];
 
+      // Campus minimum bill = $299 base + 10 seats × $12/seat = $419/mo
       const tierPrices: Record<string, { amount: number; name: string; period: string }> = {
         pro: { amount: 799, name: "LYS Pro (Focus Mode)", period: "month" },
-        campus: { amount: 29900, name: "LYS Campus", period: "month" },
+        campus: { amount: 41900, name: "LYS Campus (10-seat minimum)", period: "month" },
       };
       const tierInfo = tierPrices[tier];
 

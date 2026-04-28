@@ -11,7 +11,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Check, X, Building2, GraduationCap, AlertCircle, Eye, Globe, Info, TrendingDown, CreditCard, FileText, Landmark, Loader2, Sparkles, Users } from "lucide-react";
 import { SiPaypal } from "react-icons/si";
 import { useAuth } from "@/hooks/use-auth";
-import { PLAN_PRICES, SEAT_PRICES, FREE_LESSON_LIMIT, PRO_REGULAR_PRICE, PRO_PROMO_END_DATE } from "@/lib/pricing";
+import { PLAN_PRICES, SEAT_PRICES, SEAT_MINIMUMS, FREE_LESSON_LIMIT, PRO_REGULAR_PRICE, PRO_PROMO_END_DATE } from "@/lib/pricing";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
@@ -126,14 +126,16 @@ const baseTiers = [
     subtitle: "Focus Mode + Team",
     basePrice: PLAN_PRICES.campus,
     seatPrice: SEAT_PRICES.campus,
+    seatMinimum: SEAT_MINIMUMS.campus,
     period: "/month base",
-    description: "Single-campus license. Includes a base fee plus Pro educator seats chosen by your campus admin.",
+    description: `Single-campus license. $${PLAN_PRICES.campus}/mo base + $${SEAT_PRICES.campus}/seat/mo (${SEAT_MINIMUMS.campus} seat minimum).`,
     icon: Building2,
     seatBased: true,
     features: [
       { name: "Focus Mode (No Ads)", included: true, highlight: true },
       { name: "Everything in Pro", included: true },
       { name: `$${SEAT_PRICES.campus}/seat/mo for Pro Educators`, included: true, highlight: true },
+      { name: `${SEAT_MINIMUMS.campus} seat minimum`, included: true, note: `starts at $${PLAN_PRICES.campus + SEAT_MINIMUMS.campus * SEAT_PRICES.campus}/mo` },
       { name: "Campus Admin Dashboard", included: true },
       { name: "Scope Change Approval Workflow", included: true },
       { name: "Team Analytics & Reports", included: true },
@@ -152,13 +154,15 @@ const baseTiers = [
     subtitle: "Full Platform",
     basePrice: PLAN_PRICES.enterprise,
     seatPrice: SEAT_PRICES.enterprise,
+    seatMinimum: SEAT_MINIMUMS.enterprise,
     period: "/month base",
-    description: "For ISDs, charter networks (CMOs/EMOs), and multi-site orgs. Campus fee per campus + per-seat pricing.",
+    description: `For ISDs, charter networks (CMOs/EMOs), and multi-site orgs. $${PLAN_PRICES.enterprise}/mo base + $${SEAT_PRICES.enterprise}/seat/mo (${SEAT_MINIMUMS.enterprise} seat minimum).`,
     icon: Building2,
     seatBased: true,
     features: [
       { name: "Everything in Campus", included: true, highlight: true },
-      { name: `Campus fee per campus + $${SEAT_PRICES.enterprise}/seat/mo`, included: true, highlight: true },
+      { name: `$${SEAT_PRICES.enterprise}/seat/mo for Pro Educators`, included: true, highlight: true },
+      { name: `${SEAT_MINIMUMS.enterprise} seat minimum`, included: true, note: `starts at $${PLAN_PRICES.enterprise + SEAT_MINIMUMS.enterprise * SEAT_PRICES.enterprise}/mo` },
       { name: "Multi-District & Charter Network Management", included: true },
       { name: "Master Dashboard across all campuses", included: true },
       { name: "Per-State Management for multi-state networks", included: true },
@@ -425,7 +429,14 @@ export default function Pricing() {
 
   const selectedTierData = baseTiers.find(t => t.id === checkoutTier);
   const checkoutPrice = getAdjustedPrice(checkoutTier);
-  const displayCheckoutPrice = checkoutPrice ? formatPrice(checkoutPrice.price) : selectedTierData ? `$${selectedTierData.basePrice}` : "$0";
+  const seatMinTotal = selectedTierData && (selectedTierData as any).seatBased && (selectedTierData as any).seatMinimum
+    ? selectedTierData.basePrice + (selectedTierData as any).seatMinimum * (selectedTierData as any).seatPrice
+    : null;
+  const displayCheckoutPrice = checkoutPrice
+    ? formatPrice(checkoutPrice.price)
+    : seatMinTotal !== null
+      ? `Starts at $${seatMinTotal}`
+      : selectedTierData ? `$${selectedTierData.basePrice}` : "$0";
   const isPending = upgradeMutation.isPending || downgradeMutation.isPending || poMutation.isPending || bankTransferMutation.isPending || stripeLoading;
 
   const downgradeToData = baseTiers.find(t => t.id === downgradeTo);
