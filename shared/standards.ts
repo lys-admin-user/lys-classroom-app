@@ -178,6 +178,66 @@ export const educationalStandards: CountryStandards[] = [
       },
     ],
   },
+  // ============================================================
+  // AFRICAN COUNTRIES
+  // Country/grade structure only. Standard codes are intentionally
+  // empty — the AI lesson generator infers outcomes from the topic +
+  // subject + grade + the African context block (see shared/africaContext.ts).
+  // ============================================================
+  ...(() => {
+    // Generic subject list shared across African systems. Per-country grade
+    // structure is owned by shared/africaContext.ts and surfaced in the UI.
+    const africanCoreSubjects = (grades: string[]) => [
+      { subject: "English Language", grades, standards: [] },
+      { subject: "Mathematics", grades, standards: [] },
+      { subject: "Integrated Science", grades, standards: [] },
+      { subject: "Social Studies", grades, standards: [] },
+      { subject: "Civic Education", grades, standards: [] },
+      { subject: "Computer Studies / ICT", grades, standards: [] },
+      { subject: "Agricultural Science", grades, standards: [] },
+      { subject: "Business Studies / Entrepreneurship", grades, standards: [] },
+      { subject: "Cultural & Creative Arts", grades, standards: [] },
+      { subject: "Religious & Moral Education", grades, standards: [] },
+      { subject: "French", grades, standards: [] },
+      { subject: "Physical & Health Education", grades, standards: [] },
+    ];
+    type AfricanEntry = { name: string; exam: string; grades: string[] };
+    const africanCountries: AfricanEntry[] = [
+      { name: "Nigeria", exam: "WASSCE / NECO", grades: ["Primary 1","Primary 2","Primary 3","Primary 4","Primary 5","Primary 6","JSS 1","JSS 2","JSS 3","SSS 1","SSS 2","SSS 3"] },
+      { name: "Ghana", exam: "WASSCE (Standards-Based / 4Rs)", grades: ["KG 1","KG 2","Basic 1","Basic 2","Basic 3","Basic 4","Basic 5","Basic 6","JHS 1","JHS 2","JHS 3","SHS 1","SHS 2","SHS 3"] },
+      { name: "Sierra Leone", exam: "WASSCE", grades: ["Primary 1","Primary 2","Primary 3","Primary 4","Primary 5","Primary 6","JSS 1","JSS 2","JSS 3","SSS 1","SSS 2","SSS 3"] },
+      { name: "The Gambia", exam: "WASSCE", grades: ["Lower Basic 1","Lower Basic 2","Lower Basic 3","Lower Basic 4","Lower Basic 5","Lower Basic 6","Upper Basic 7","Upper Basic 8","Upper Basic 9","Senior Secondary 10","Senior Secondary 11","Senior Secondary 12"] },
+      { name: "Liberia", exam: "WASSCE (US-style K-12)", grades: ["Kindergarten","Grade 1","Grade 2","Grade 3","Grade 4","Grade 5","Grade 6","Grade 7","Grade 8","Grade 9","Grade 10","Grade 11","Grade 12"] },
+      { name: "South Africa", exam: "NSC (Matric) — CAPS", grades: ["Grade R","Grade 1","Grade 2","Grade 3","Grade 4","Grade 5","Grade 6","Grade 7","Grade 8","Grade 9","Grade 10","Grade 11","Grade 12"] },
+      { name: "Kenya", exam: "KCSE (CBC)", grades: ["PP1","PP2","Grade 1","Grade 2","Grade 3","Grade 4","Grade 5","Grade 6","Grade 7","Grade 8","Grade 9","Grade 10","Grade 11","Grade 12"] },
+      { name: "Tanzania", exam: "CSEE", grades: ["Standard 1","Standard 2","Standard 3","Standard 4","Standard 5","Standard 6","Standard 7","Form 1","Form 2","Form 3","Form 4","Form 5","Form 6"] },
+      { name: "Uganda", exam: "UCE / UACE", grades: ["Primary 1","Primary 2","Primary 3","Primary 4","Primary 5","Primary 6","Primary 7","Senior 1","Senior 2","Senior 3","Senior 4","Senior 5","Senior 6"] },
+      { name: "Rwanda", exam: "Rwandan National Exams (CBC)", grades: ["P1","P2","P3","P4","P5","P6","S1","S2","S3","S4","S5","S6"] },
+      { name: "Ethiopia", exam: "EUEE", grades: ["Grade 1","Grade 2","Grade 3","Grade 4","Grade 5","Grade 6","Grade 7","Grade 8","Grade 9","Grade 10","Grade 11","Grade 12"] },
+      { name: "Egypt", exam: "Thanaweya Amma", grades: ["Primary 1","Primary 2","Primary 3","Primary 4","Primary 5","Primary 6","Preparatory 1","Preparatory 2","Preparatory 3","Secondary 1","Secondary 2","Secondary 3"] },
+      { name: "Morocco", exam: "Baccalauréat", grades: ["Primaire 1","Primaire 2","Primaire 3","Primaire 4","Primaire 5","Primaire 6","Collège 1","Collège 2","Collège 3","Lycée 1","Lycée 2","Lycée 3 (Bac)"] },
+      { name: "Tunisia", exam: "Baccalauréat", grades: ["Primaire 1","Primaire 2","Primaire 3","Primaire 4","Primaire 5","Primaire 6","Collège 1","Collège 2","Collège 3","Secondaire 1","Secondaire 2","Secondaire 3","Bac"] },
+      { name: "Algeria", exam: "Baccalauréat", grades: ["Primaire 1","Primaire 2","Primaire 3","Primaire 4","Primaire 5","Moyen 1","Moyen 2","Moyen 3","Moyen 4","Secondaire 1","Secondaire 2","Bac"] },
+      { name: "Senegal", exam: "Baccalauréat", grades: ["CI","CP","CE1","CE2","CM1","CM2","6e","5e","4e","3e","2nde","1ère","Terminale"] },
+      { name: "Côte d'Ivoire", exam: "Baccalauréat", grades: ["CP1","CP2","CE1","CE2","CM1","CM2","6e","5e","4e","3e","2nde","1ère","Terminale"] },
+      { name: "Cameroon", exam: "GCE / Baccalauréat", grades: ["Class 1","Class 2","Class 3","Class 4","Class 5","Class 6","Form 1","Form 2","Form 3","Form 4","Form 5","Lower Sixth","Upper Sixth"] },
+      { name: "Democratic Republic of the Congo", exam: "Diplôme d'État", grades: ["Primaire 1","Primaire 2","Primaire 3","Primaire 4","Primaire 5","Primaire 6","Secondaire 1","Secondaire 2","Secondaire 3","Secondaire 4","Secondaire 5","Secondaire 6"] },
+      { name: "Angola", exam: "Exame Nacional", grades: ["1ª Classe","2ª Classe","3ª Classe","4ª Classe","5ª Classe","6ª Classe","7ª Classe","8ª Classe","9ª Classe","10ª Classe","11ª Classe","12ª Classe"] },
+      { name: "Mozambique", exam: "Exame Nacional", grades: ["1ª Classe","2ª Classe","3ª Classe","4ª Classe","5ª Classe","6ª Classe","7ª Classe","8ª Classe","9ª Classe","10ª Classe","11ª Classe","12ª Classe"] },
+      { name: "Zambia", exam: "ECZ (Grade 12)", grades: ["Grade 1","Grade 2","Grade 3","Grade 4","Grade 5","Grade 6","Grade 7","Grade 8","Grade 9","Grade 10","Grade 11","Grade 12"] },
+    ];
+    return africanCountries.map<CountryStandards>(c => ({
+      country: c.name,
+      states: [
+        {
+          state: "National Curriculum",
+          abbreviation: "NAT",
+          standardsName: c.exam,
+          subjects: africanCoreSubjects(c.grades),
+        },
+      ],
+    }));
+  })(),
   {
     country: "Common Core (Multi-State)",
     states: [

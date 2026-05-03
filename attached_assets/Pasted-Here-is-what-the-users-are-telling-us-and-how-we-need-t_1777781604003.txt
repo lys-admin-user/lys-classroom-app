@@ -1,0 +1,41 @@
+Here is what the users are telling us, and how we need to adapt the codebase right now to address it.
+
+1. The Legal/IEP Privacy Fix (Highest Priority)
+
+The Feedback: Ugochi from Yes Prep specifically asked: "How can you legally add students info for an IEP to make the work you create differentiated?" The Dev Action: Our users are terrified of FERPA/privacy violations. We cannot launch the AI without proving it's safe.
+
+Database (RLS): Ensure PostgreSQL Row-Level Security (RLS) is bulletproof. Every single table must have a tenant_id. Your middleware needs to extract the tenant_id from the Auth0/Clerk JWT and enforce the session variable. If a query fires without a tenant_id, the DB should reject it.
+
+AI Gateway (LangChain PII Scrubber): Before any prompt goes to the LLM (OpenAI, Gemini, etc.) to differentiate an assignment for an IEP, you must build a pre-processing function that strips all PII (names, specific medical terms, student IDs). The LLM should only ever see "Student A requires reading level X."
+
+2. The Dynamic Pricing Engine (The Cost Fix)
+
+The Feedback: "Cost" was listed as the biggest adoption barrier (e.g., from Katy ISD and our Nigerian respondents).
+The Dev Action: We need the Global Parity Pricing logic running flawlessly.
+
+GeoIP Middleware: Implement a lightweight middleware to check the incoming IP.
+
+Pricing Logic: Hook this into a lookup table for the World Bank API's "GDP Spend per Capita on Education." If a user logs in from Lagos, the Stripe checkout should dynamically adjust the Tier 2/Tier 3 pricing down to the local parity rate.
+
+VPN Guardrail: Don't forget the security check on this. If the IP says Kenya but the credit card is issued in Texas, flag the account.
+
+3. The Master Builder AI (The "Time" Fix)
+
+The Feedback: 66% of respondents are spending over an hour on lesson plans. Homeschoolers specifically noted they need "statements for each subject."
+The Dev Action: The AI generation needs to be fast and explicitly tied to standards.
+
+RAG Implementation: Make sure the Retrieval-Augmented Generation (RAG) is properly querying our "Spotify Library" of Bricks.
+
+Standards Tagging: When the AI generates the output, ensure it clearly lists the academic standards (TEKS, Common Core, or general subject statements) at the top of the UI. This is crucial for both public school compliance and homeschooling parents.
+
+4. Immediate Infrastructure (Days 1-7)
+
+To hit our August launch, please ensure these are locked in by the end of the week:
+
+AWS Terraform: Multi-region setup (US, EU, Cape Town) for data sovereignty (NDPR compliance for our African users).
+
+Auth0/Clerk Auth: Hooked up with the COPPA Age Gate (if age < 13, require parental consent token).
+
+Schema Deployment: Push the initial Postgres schema with the tenant_id isolation logic tested.
+
+Let's get the "Apartment Building" isolation built first. If the data isn't safe, the AI doesn't matter. Let me know what blockers you have on the AWS setup or the LangChain integration.

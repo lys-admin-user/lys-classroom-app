@@ -1,6 +1,7 @@
 import OpenAI from "openai";
 import type { Lesson } from "@shared/schema";
 import { randomUUID } from "crypto";
+import { buildAfricanPromptAddendum } from "@shared/africaContext";
 
 const openai = process.env.OPENAI_API_KEY 
   ? new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
@@ -40,6 +41,10 @@ interface GenerateAssignmentRequest {
   accommodationNotes?: string;
   projectTemplate?: ProjectTemplateType;
   differentiationLevel?: "standard" | "scaffolded" | "enrichment"; // Tiered question generation
+  // African / WAEC support — optional country (display name) and bilingual local language.
+  // Ignored for non-African countries; the addendum builder returns "" in that case.
+  country?: string;
+  language?: string;
 }
 
 // Differentiation level configurations
@@ -559,6 +564,16 @@ export async function generateAssignment(request: GenerateAssignmentRequest): Pr
     ? `\n\nIMPORTANT ACCOMMODATION REQUIREMENTS:\n${request.accommodationTypes.map(t => `- ${accommodationGuidelines[t] || t}`).join('\n')}\n${request.accommodationNotes ? `Additional notes: ${request.accommodationNotes}` : ""}`
     : "";
 
+  // African / WAEC context — empty string for non-African countries (no behavior change).
+  const africanContext = buildAfricanPromptAddendum({
+    country: request.country,
+    language: request.language,
+    mode: "assignment",
+  });
+  const africanInSystem = africanContext
+    ? `\n\nWhen the user prompt below contains an "AFRICAN CONTEXT" block, you MUST follow every requirement in that block — WAEC exam framing, dual-path bridge (WAEC outcome + global digital portfolio piece), African case studies (NOT silicon valley defaults), BE-pillar emphasis to fill the WAEC "character" gap, and bilingual output formatting if requested. Treat it as overriding any default Western framing.`
+    : "";
+
   // Get differentiation config based on difficulty level
   const differentiationLevel = request.difficulty === "easy" ? "scaffolded" 
     : request.difficulty === "hard" ? "enrichment" 
@@ -647,7 +662,7 @@ Return JSON with this structure:
     "vocational": "Career relevance of skills assessed",
     "social": "How this connects to relationships/collaboration"
   }
-}`;
+}${africanInSystem}`;
 
   // Extract lesson components for alignment
   const lessonObjectives = request.lesson.objectives as string[] || [];
@@ -688,7 +703,7 @@ Create a ${request.assignmentType} that directly assesses mastery of the above o
       model: "gpt-4o",
       messages: [
         { role: "system", content: systemPrompt },
-        { role: "user", content: `Create a ${request.assignmentType} based on this lesson:\n${lessonContext}` }
+        { role: "user", content: `Create a ${request.assignmentType} based on this lesson:\n${lessonContext}${africanContext}` }
       ],
       response_format: { type: "json_object" },
       temperature: 0.7,

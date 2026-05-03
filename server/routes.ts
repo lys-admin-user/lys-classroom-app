@@ -2,6 +2,7 @@ import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { generateLessonPlan } from "./openai";
+import { detectAfricanCountryFromText } from "@shared/africaContext";
 import { calculateLessonQualityScore, getQualityLevel } from "./lessonQualityScorer";
 import { parseDocument } from "./documentParser";
 import { 
@@ -2176,7 +2177,7 @@ export async function registerRoutes(
   app.post("/api/assignments/generate", isAuthenticated, requirePaidTier, async (req: any, res) => {
     try {
       const userId = req.user?.claims?.sub;
-      const { lessonId, assignmentType, questionCount, difficulty, includeBeKnowDo, accommodationTypes, accommodationNotes, projectTemplate } = req.body;
+      const { lessonId, assignmentType, questionCount, difficulty, includeBeKnowDo, accommodationTypes, accommodationNotes, projectTemplate, country, language } = req.body;
       
       const lesson = await storage.getLesson(lessonId);
       if (!lesson) {
@@ -2189,6 +2190,14 @@ export async function registerRoutes(
         return;
       }
       
+      // Auto-detect African country from the saved lesson's STRUCTURED
+      // standards string only (never the user-authored topic, which would
+      // false-positive on lessons like "History of Nigeria" written by a
+      // US teacher). The lesson save flow embeds "[Country] " at the head of
+      // standards for new lessons; older saved lessons rely on the exam-name /
+      // word-boundary detection in detectAfricanCountryFromText.
+      const resolvedCountry = country || detectAfricanCountryFromText(lesson.standards) || undefined;
+
       const { generateAssignment } = await import("./assignmentGenerator");
       const generated = await generateAssignment({
         lesson,
@@ -2199,6 +2208,8 @@ export async function registerRoutes(
         accommodationTypes,
         accommodationNotes,
         projectTemplate: projectTemplate || "community_consultant",
+        country: resolvedCountry,
+        language,
       });
       
       res.json(generated);

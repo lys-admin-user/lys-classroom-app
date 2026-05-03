@@ -2,6 +2,7 @@ import { sql } from "drizzle-orm";
 import { pgTable, text, varchar, integer, boolean, jsonb, timestamp, real } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
+import { isAfricanCountry } from "./africaContext";
 
 // Re-export auth schema (users and sessions tables)
 export * from "./models/auth";
@@ -402,11 +403,26 @@ export const generateLessonRequestSchema = z.object({
     codes: z.array(z.object({
       code: z.string().min(1, "Standard code is required"),
       description: z.string(),
-    })).min(1, "At least one standard code is required"),
+    })).default([]),
   }),
   duration: z.string().optional().default("45 minutes"),
   lessonPart: z.string().optional(),
   skipValidation: z.boolean().optional(), // Skip quality validation loop for faster generation
+  // African / WAEC support — optional bilingual local-language code or name
+  // (e.g., "yo", "Yoruba"). Ignored for non-African countries.
+  language: z.string().optional(),
+}).superRefine((data, ctx) => {
+  // Preserve the original "at least one standard code is required" contract for
+  // NON-African countries (US/CCSS/etc). African countries are exempted because
+  // most national curricula don't expose a public per-outcome code system —
+  // the AI infers outcomes from the African context block instead.
+  if (!isAfricanCountry(data.standards.country) && data.standards.codes.length === 0) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ["standards", "codes"],
+      message: "At least one standard code is required",
+    });
+  }
 });
 
 export type GenerateLessonRequest = z.infer<typeof generateLessonRequestSchema>;

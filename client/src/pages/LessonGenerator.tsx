@@ -19,6 +19,7 @@ import { useTier } from "@/hooks/use-tier";
 import { useTrial } from "@/hooks/use-trial";
 import { PLAN_PRICES } from "@/lib/pricing";
 import { resolveCountryName } from "@/lib/countries";
+import { isAfricanCountry, getAfricanProfile, isWAECCountry } from "@shared/africaContext";
 import { AdBanner } from "@/components/AdBanner";
 import type { LessonPlan, EducatorProfile, Lesson } from "@shared/schema";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
@@ -28,7 +29,7 @@ import { Link, useLocation, useSearch } from "wouter";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
-const gradeLevels = [
+const defaultGradeLevels = [
   "Elementary (K-2)",
   "Elementary (3-5)",
   "Middle School (6-8)",
@@ -56,6 +57,19 @@ export default function LessonGenerator() {
   const [selectedState, setSelectedState] = useState("");
   const [selectedSubject, setSelectedSubject] = useState("");
   const [selectedStandardCodes, setSelectedStandardCodes] = useState<StandardCode[]>([]);
+  // Bilingual local-language code (e.g., "yo", "ig", "ha"). Empty = English only.
+  // Only used / shown when selectedCountry is an African country.
+  const [selectedLanguage, setSelectedLanguage] = useState("");
+
+  // Africa-aware derived state. For non-African countries these all collapse
+  // to the existing behavior (no grade override, no language selector).
+  const africanProfile = useMemo(() => getAfricanProfile(selectedCountry), [selectedCountry]);
+  const isAfrican = !!africanProfile;
+  const isWAEC = isWAECCountry(selectedCountry);
+  const displayGradeLevels = useMemo(
+    () => (africanProfile ? africanProfile.gradeLevels : defaultGradeLevels),
+    [africanProfile],
+  );
   
   const [generatedLesson, setGeneratedLesson] = useState<LessonPlan | null>(null);
   const [isSaved, setIsSaved] = useState(false);
@@ -191,6 +205,14 @@ export default function LessonGenerator() {
     setSelectedState("");
     setSelectedSubject("");
     setSelectedStandardCodes([]);
+    setSelectedLanguage("");
+    // Clear an incompatible US-style grade selection when switching to an
+    // African country (and vice-versa) so the dropdown shows a valid placeholder.
+    const nextProfile = getAfricanProfile(country);
+    const nextGrades = nextProfile ? nextProfile.gradeLevels : defaultGradeLevels;
+    if (gradeLevel && !nextGrades.includes(gradeLevel)) {
+      setGradeLevel("");
+    }
   };
 
   const handleStateChange = (stateAbbr: string) => {
@@ -297,6 +319,8 @@ export default function LessonGenerator() {
         },
         duration,
         lessonPart,
+        // Optional bilingual language for African countries; ignored server-side otherwise.
+        language: isAfrican ? selectedLanguage || undefined : undefined,
       });
       return await response.json() as LessonPlan;
     },
@@ -352,11 +376,15 @@ export default function LessonGenerator() {
   const saveMutation = useMutation({
     mutationFn: async () => {
       if (!generatedLesson) throw new Error("No lesson to save");
+      // Embed the selected country up front so older saved lessons can later
+      // be detected as African (e.g., for assignment generation) without
+      // depending on fuzzy substring matching of the topic.
+      const countryPrefix = selectedCountry ? `[${selectedCountry}] ` : "";
       const standardsString = generatedLesson.standards
         ? typeof generatedLesson.standards === "string"
-          ? generatedLesson.standards
-          : `${generatedLesson.standards.standardsName}: ${(generatedLesson.standards.codes || []).map((c: any) => c.code).join(", ")}`
-        : "";
+          ? `${countryPrefix}${generatedLesson.standards}`
+          : `${countryPrefix}${generatedLesson.standards.standardsName}: ${(generatedLesson.standards.codes || []).map((c: any) => c.code).join(", ")}`
+        : countryPrefix;
       // Combine AI resources with user-added resources
       const allResources = addedResources.map(r => ({
         title: r.title,
@@ -415,6 +443,10 @@ export default function LessonGenerator() {
         questionCount: assignmentQuestionCount,
         difficulty: assignmentDifficulty,
         includeBeKnowDo: true,
+        // Carry African / WAEC context through to the assignment generator
+        // so questions stay culturally and exam-aligned. No-op for non-African.
+        country: isAfrican ? selectedCountry : undefined,
+        language: isAfrican ? selectedLanguage || undefined : undefined,
       });
       return await response.json();
     },
@@ -456,7 +488,19 @@ export default function LessonGenerator() {
       });
       return;
     }
-    if (!selectedCountry || !selectedState || !selectedSubject || selectedStandardCodes.length === 0) {
+    // For non-African countries, we still require specific standard codes (legal alignment).
+    // For African countries we require country/state/subject but allow empty code lists,
+    // since most national curricula don't expose a public per-outcome code system —
+    // the AI infers outcomes from the African context block instead.
+    if (!selectedCountry || !selectedState || !selectedSubject) {
+      toast({
+        title: "Curriculum Required",
+        description: "Please select country, region, and subject so the lesson aligns to the right curriculum.",
+        variant: "destructive",
+      });
+      return;
+    }
+    if (!isAfrican && selectedStandardCodes.length === 0) {
       toast({
         title: "Standards Required",
         description: "Please select your educational standards. This ensures your lesson meets legal requirements.",
@@ -637,7 +681,7 @@ ${addedResources.length > 0 ? addedResources.map(r => `- ${r.title}: ${r.url}`).
                       <SelectValue placeholder="Select grade level" />
                     </SelectTrigger>
                     <SelectContent>
-                      {gradeLevels.map((level) => (
+                      {displayGradeLevels.map((level) => (
                         <SelectItem key={level} value={level} className="font-roboto">
                           {level}
                         </SelectItem>
@@ -802,6 +846,56 @@ ${addedResources.length > 0 ? addedResources.map(r => `- ${r.title}: ${r.url}`).
                     </div>
                   )}
                 </div>
+
+                {isAfrican && africanProfile && (
+                  <div
+                    className="space-y-3 rounded-md border border-lys-yellow/30 bg-lys-yellow/5 p-4"
+                    data-testid="panel-african-context"
+                  >
+                    <div className="flex items-start gap-2">
+                      <Globe className="h-4 w-4 text-lys-yellow mt-0.5 flex-shrink-0" />
+                      <div className="flex-1 space-y-1">
+                        <p className="font-oswald text-sm font-semibold" data-testid="text-african-profile-title">
+                          {`${africanProfile.name} curriculum mode`}
+                        </p>
+                        <p className="text-xs text-muted-foreground font-roboto">
+                          {`Lessons will be aligned to ${africanProfile.examName} (${africanProfile.examFullName}), use ${africanProfile.region} grade names, and lead with African case studies instead of US defaults.`}
+                          {isWAEC && " A WAEC dual-path bridge (exam outcome + global digital portfolio piece) will be added to every lesson."}
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label className="font-roboto text-sm text-muted-foreground flex items-center gap-1">
+                        <BookOpen className="h-3 w-3" />
+                        Language of Instruction
+                      </Label>
+                      <Select
+                        value={selectedLanguage || "english"}
+                        onValueChange={(v) => setSelectedLanguage(v === "english" ? "" : v)}
+                      >
+                        <SelectTrigger className="font-roboto" data-testid="select-language">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="english" className="font-roboto">
+                            English only
+                          </SelectItem>
+                          {africanProfile.localLanguages.map((lang) => (
+                            <SelectItem key={lang.code} value={lang.code} className="font-roboto">
+                              {`English + ${lang.name} (bilingual side-by-side)`}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      {selectedLanguage && (
+                        <p className="text-xs text-muted-foreground font-roboto" data-testid="text-bilingual-hint">
+                          Student-facing fields (objectives, questions, activities, materials) will appear in English and the selected language side-by-side.
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                )}
 
                 <Separator />
 

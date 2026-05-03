@@ -1,0 +1,56 @@
+To translate our CMO/CIO vision into a technical requirements document (TRD) for your engineering team, we need to focus on **data orchestration**, **schema alignment**, and **latency**. We aren't just building a UI; we are building a high-performance data pipeline.
+
+Here is the technical breakdown for the development sprint.
+
+---
+
+## 1. The Data Architecture (The "Single Source of Truth")
+We cannot have "Marketing Data" and "App Data" in separate silos. We need a **Modern Data Stack (MDS)** approach.
+
+* **Ingestion (ETL/ELT):** Use tools like Fivetran or Airbyte to pull from marketing APIs (Google Ads, Meta, LinkedIn) and our production DB (PostgreSQL/MongoDB).
+* **Storage:** A centralized Data Warehouse (Snowflake, BigQuery, or Redshift).
+* **Transformation:** Use **dbt (data build tool)** to transform raw event logs into analytics-ready tables.
+* **Reverse ETL:** Push processed "Propensity Scores" back into the CRM (Salesforce/HubSpot) so the sales team can act on app behavior.
+
+## 2. Core Feature Specifications
+
+### A. Unified Attribution Engine (Marketing Focus)
+Developers need to implement a robust tracking plan. We move beyond simple UTMs to a persistent user identity.
+* **Technical Requirement:** Implement a cross-domain `anonymous_id` that maps to a `user_id` upon sign-up (Identify call).
+* **Feature:** A dashboard view that joins `ad_click_id` with `course_completion_rate`.
+* **The Goal:** Calculate **CAC** ($Cost / Conversions$) at the granular campaign level.
+
+### B. Global Performance & Experience Monitoring (IT Focus)
+A global EdTech app lives or dies by its CDN and edge performance.
+* **Technical Requirement:** Integrate Real User Monitoring (RUM) via Datadog or New Relic.
+* **Feature:** A "Latency vs. Churn" scatter plot. 
+* **The Goal:** Visualize the correlation between Time to First Byte (TTFB) and drop-off rates in high-latency regions like Southeast Asia or Sub-Saharan Africa.
+
+### C. The "Learning Velocity" Funnel (Product Focus)
+This is a state-machine visualization of the user journey.
+* **Technical Requirement:** Event-driven tracking (e.g., `video_played`, `quiz_submitted`, `module_completed`) sent via a Segment/PostHog middleware.
+* **Feature:** Cohort Analysis. Group users by "Join Month" and track their retention over 12 months using a standard **Heatmap Grid**.
+
+
+
+---
+
+## 3. Dashboard API & UI Requirements
+The dashboard should not query the production database directly (to avoid performance degradation). It should query the **OLAP (Online Analytical Processing)** warehouse.
+
+* **Frontend:** React-based dashboard using a library like **Tremor** or **Nivo** for high-density charts.
+* **Real-time Layer:** Use WebSockets or Polling for "Active Learner" counts.
+* **Internationalization (i18n):** The dashboard must support timezone-aware reporting for our global stakeholders.
+
+## 4. Technical Constraints & Compliance
+* **Privacy by Design:** Implement a **Data Masking** layer in the warehouse. Marketing should see *trends*, not PII (Personally Identifiable Information), unless authorized.
+* **Caching Strategy:** Implement a Redis caching layer for the dashboard's heavy aggregate queries to ensure <200ms load times for the exec team.
+
+---
+
+### Implementation Priority (The "Backlog")
+1.  **Phase 1:** Set up the Data Warehouse and sync core Marketing APIs + Production User table.
+2.  **Phase 2:** Implement the Event Tracking Schema (Segment/PostHog) across the Web App.
+3.  **Phase 3:** Build the "North Star" Dashboard (CAC, LTV, and Completion Rates).
+
+**Does your current tech stack lean more toward a monolithic architecture or microservices, and do we have an existing data warehouse in place?**

@@ -8,6 +8,7 @@ import { storage } from "./storage";
 import { db } from "./db";
 import { eq, sql } from "drizzle-orm";
 import { sanitizePromptText } from "./services/piiSanitizer";
+import { isAfricanCountry, buildAfricanPromptAddendum } from "@shared/africaContext";
 
 function generateCacheKey(request: GenerateLessonRequest): string {
   const normalizedParts = [
@@ -18,6 +19,9 @@ function generateCacheKey(request: GenerateLessonRequest): string {
     request.bkdFocus,
     (request.duration || "45 minutes").toLowerCase().trim(),
     request.standards?.codes?.map(c => c.code).sort().join(",") || "",
+    // Country + language influence the African context block, so cache must vary by them.
+    (request.standards?.country || "").toLowerCase().trim(),
+    (request.language || "").toLowerCase().trim(),
   ];
   return crypto.createHash("sha256").update(normalizedParts.join("|")).digest("hex");
 }
@@ -152,8 +156,21 @@ export async function generateLessonPlan(request: GenerateLessonRequest): Promis
   }
   console.log(`Cache MISS for lesson: "${request.topic}" [${request.gradeLevel}/${request.bkdFocus}]`);
 
-  const standardsInfo = request.standards 
-    ? `Standards: ${request.standards.standardsName} - ${request.standards.codes.map(c => `${c.code}: ${c.description}`).join("; ")}`
+  const standardsInfo = request.standards
+    ? request.standards.codes && request.standards.codes.length > 0
+      ? `Standards: ${request.standards.standardsName} - ${request.standards.codes.map(c => `${c.code}: ${c.description}`).join("; ")}`
+      : `Standards system: ${request.standards.standardsName} (${request.standards.country} — ${request.standards.subject}). No specific code list selected; infer the most appropriate national curriculum outcome for the given topic, subject, and grade.`
+    : "";
+
+  // Inject African / WAEC context block ONLY when an African country is selected.
+  // Returns "" for non-African countries — preserves existing behavior exactly.
+  const africanContext = buildAfricanPromptAddendum({
+    country: request.standards?.country,
+    language: request.language,
+    mode: "lesson",
+  });
+  const africanInSystem = africanContext
+    ? `\n\nWhen the user prompt below contains an "AFRICAN CONTEXT" block, you MUST follow every requirement in that block (WAEC framing, dual-path bridge, African case studies, BE pillar emphasis, facilitator pedagogy, bilingual output if requested). Treat it as overriding any default Western framing.`
     : "";
 
   const systemPrompt = `You are a master educator creating DISTINGUISHED-level lesson plans for the LYS (Laddering Your Success) platform.
@@ -180,7 +197,7 @@ QUALITY CHECK BEFORE OUTPUT:
 5. Does the lesson have differentiation for diverse learners?
 6. Does the Lesson Close address ALL 7 life dimensions?
 
-IMPORTANT: Respond ONLY with a valid JSON object, no additional text.`;
+IMPORTANT: Respond ONLY with a valid JSON object, no additional text.${africanInSystem}`;
 
   // Get master lesson examples for AI guidance
   const subject = request.course || request.topic;
@@ -215,7 +232,7 @@ ${safeUnit ? `- Unit: ${safeUnit}` : ""}
 - Primary Focus: ${request.bkdFocus.toUpperCase()} (${bkdDescriptions[request.bkdFocus]})
 - Duration: ${request.duration}
 ${request.lessonPart ? `- Lesson Part: ${request.lessonPart}` : ""}
-${standardsInfo}
+${standardsInfo}${africanContext}
 ${masterExamples}${rssSupplementalSection}
 
 Generate a complete LYS lesson plan in JSON format. Include:
