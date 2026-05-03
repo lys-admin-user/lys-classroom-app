@@ -1,5 +1,7 @@
 import { useState, useEffect, useMemo } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
@@ -23,101 +25,82 @@ type QuizQuestion = {
   explanation?: string;
 };
 
-/** Render markdown-ish body: ## headings, > blockquotes, - bullets, **bold**, paragraphs. */
+/** Render module body using full GitHub-flavored markdown (headings, lists, links, tables, etc.). */
 function renderBody(body: string) {
-  const lines = body.split("\n");
-  const blocks: JSX.Element[] = [];
-  let buf: string[] = [];
-  let listBuf: string[] = [];
-
-  const flushParagraph = () => {
-    if (buf.length === 0) return;
-    const text = buf.join(" ").trim();
-    if (text) {
-      blocks.push(
-        <p key={`p-${blocks.length}`} className="text-sm leading-relaxed text-foreground/90 mb-3">
-          {renderInline(text)}
-        </p>
-      );
-    }
-    buf = [];
-  };
-  const flushList = () => {
-    if (listBuf.length === 0) return;
-    blocks.push(
-      <ul key={`ul-${blocks.length}`} className="list-disc pl-5 space-y-1 mb-3 text-sm text-foreground/90">
-        {listBuf.map((li, i) => (
-          <li key={i}>{renderInline(li)}</li>
-        ))}
-      </ul>
-    );
-    listBuf = [];
-  };
-
-  for (const raw of lines) {
-    const line = raw.trimEnd();
-    if (line.startsWith("## ")) {
-      flushParagraph();
-      flushList();
-      blocks.push(
-        <h3 key={`h-${blocks.length}`} className="font-oswald text-lg font-semibold mt-5 mb-2 text-lys-teal dark:text-lys-yellow">
-          {line.slice(3)}
-        </h3>
-      );
-    } else if (line.startsWith("### ")) {
-      flushParagraph();
-      flushList();
-      blocks.push(
-        <h4 key={`h-${blocks.length}`} className="font-oswald text-base font-semibold mt-4 mb-1 text-foreground">
-          {line.slice(4)}
-        </h4>
-      );
-    } else if (line.startsWith("> ")) {
-      flushParagraph();
-      flushList();
-      blocks.push(
-        <blockquote key={`q-${blocks.length}`} className="border-l-4 border-lys-yellow pl-4 italic text-sm text-foreground/80 my-3">
-          {renderInline(line.slice(2))}
-        </blockquote>
-      );
-    } else if (/^\s*-\s+/.test(line)) {
-      flushParagraph();
-      listBuf.push(line.replace(/^\s*-\s+/, ""));
-    } else if (line === "") {
-      flushParagraph();
-      flushList();
-    } else {
-      flushList();
-      buf.push(line);
-    }
-  }
-  flushParagraph();
-  flushList();
-  return <div>{blocks}</div>;
-}
-
-function renderInline(text: string): JSX.Element {
-  // Bold **text**
-  const parts = text.split(/(\*\*[^*]+\*\*)/g);
   return (
-    <>
-      {parts.map((part, i) => {
-        if (part.startsWith("**") && part.endsWith("**")) {
-          return <strong key={i} className="font-semibold text-foreground">{part.slice(2, -2)}</strong>;
-        }
-        return <span key={i}>{part}</span>;
-      })}
-    </>
+    <div className="text-sm leading-relaxed text-foreground/90 [&_p]:mb-3 [&_ul]:list-disc [&_ul]:pl-5 [&_ul]:space-y-1 [&_ul]:mb-3 [&_ol]:list-decimal [&_ol]:pl-5 [&_ol]:space-y-1 [&_ol]:mb-3 [&_a]:text-lys-teal [&_a]:underline [&_a:hover]:opacity-80 [&_strong]:font-semibold [&_strong]:text-foreground [&_code]:bg-muted [&_code]:px-1 [&_code]:py-0.5 [&_code]:rounded [&_code]:text-xs [&_img]:rounded-md [&_img]:my-3 [&_img]:max-w-full [&_table]:w-full [&_table]:my-3 [&_th]:border [&_th]:px-2 [&_th]:py-1 [&_th]:bg-muted [&_th]:text-left [&_td]:border [&_td]:px-2 [&_td]:py-1 [&_hr]:my-4">
+      <ReactMarkdown
+        remarkPlugins={[remarkGfm]}
+        components={{
+          h1: ({ children }) => <h2 className="font-oswald text-xl font-bold mt-5 mb-2 text-lys-teal dark:text-lys-yellow">{children}</h2>,
+          h2: ({ children }) => <h3 className="font-oswald text-lg font-semibold mt-5 mb-2 text-lys-teal dark:text-lys-yellow">{children}</h3>,
+          h3: ({ children }) => <h4 className="font-oswald text-base font-semibold mt-4 mb-1 text-foreground">{children}</h4>,
+          blockquote: ({ children }) => (
+            <blockquote className="border-l-4 border-lys-yellow pl-4 italic text-foreground/80 my-3">{children}</blockquote>
+          ),
+          a: ({ href, children }) => (
+            <a href={href} target="_blank" rel="noopener noreferrer">{children}</a>
+          ),
+        }}
+      >
+        {body}
+      </ReactMarkdown>
+    </div>
   );
 }
 
+/** Convert a video URL to a safe embeddable iframe src.
+ *  STRICT ALLOWLIST: returns null for any URL that is not https + a known provider
+ *  or a direct video file. Unknown URLs must NEVER be passed through to an iframe
+ *  src — that would let an admin store a javascript: / data: / arbitrary-origin
+ *  URL and XSS every staff member who opens the drawer. */
 function getEmbedUrl(url: string): string | null {
   if (!url) return null;
-  const yt = url.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/)([\w-]+)/);
+  const u = url.trim();
+
+  // Reject anything that isn't https up front.
+  let parsed: URL;
+  try {
+    parsed = new URL(u);
+  } catch {
+    return null;
+  }
+  if (parsed.protocol !== "https:") return null;
+
+  // YouTube — watch / youtu.be / shorts / embed
+  const yt = u.match(/(?:youtube\.com\/(?:watch\?v=|shorts\/|embed\/)|youtu\.be\/)([\w-]+)/);
   if (yt) return `https://www.youtube.com/embed/${yt[1]}`;
-  const vimeo = url.match(/vimeo\.com\/(\d+)/);
+
+  // Vimeo — vimeo.com/123456789
+  const vimeo = u.match(/vimeo\.com\/(?:video\/)?(\d+)/);
   if (vimeo) return `https://player.vimeo.com/video/${vimeo[1]}`;
-  return url;
+
+  // Loom — loom.com/share/<id>
+  const loom = u.match(/loom\.com\/(?:share|embed)\/([\w-]+)/);
+  if (loom) return `https://www.loom.com/embed/${loom[1]}`;
+
+  // Wistia — fast.wistia.com/embed/medias/<id> or <something>.wistia.com/medias/<id>
+  const wistia = u.match(/wistia\.com\/(?:embed\/)?medias\/([\w-]+)/);
+  if (wistia) return `https://fast.wistia.net/embed/iframe/${wistia[1]}`;
+
+  // Google Drive — drive.google.com/file/d/<id>/view
+  const gdrive = u.match(/drive\.google\.com\/file\/d\/([\w-]+)/);
+  if (gdrive) return `https://drive.google.com/file/d/${gdrive[1]}/preview`;
+
+  // Direct video file (will be rendered via <video>, not iframe).
+  if (/\.(mp4|webm|ogg|mov)(\?|$)/i.test(parsed.pathname)) return u;
+
+  return null;
+}
+
+function isDirectVideoFile(url: string): boolean {
+  try {
+    const parsed = new URL(url.trim());
+    if (parsed.protocol !== "https:") return false;
+    return /\.(mp4|webm|ogg|mov)(\?|$)/i.test(parsed.pathname);
+  } catch {
+    return false;
+  }
 }
 
 export function FoundationDrawer({ open, onOpenChange }: FoundationDrawerProps) {
@@ -294,19 +277,39 @@ export function FoundationDrawer({ open, onOpenChange }: FoundationDrawerProps) 
                     <p className="text-sm text-muted-foreground mb-4">{activeModule.subtitle}</p>
                   )}
 
-                  {activeModule.videoUrl && (
-                    <div className="mb-5 rounded-lg overflow-hidden border bg-black/5 aspect-video">
-                      <iframe
-                        src={getEmbedUrl(activeModule.videoUrl) || activeModule.videoUrl}
-                        title={activeModule.title}
-                        loading="lazy"
-                        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                        allowFullScreen
-                        className="w-full h-full"
-                        data-testid={`video-${activeModule.slug}`}
-                      />
-                    </div>
-                  )}
+                  {activeModule.videoUrl && (() => {
+                    const safeSrc = getEmbedUrl(activeModule.videoUrl);
+                    if (!safeSrc) {
+                      return (
+                        <div className="mb-5 rounded-lg border border-dashed bg-muted/30 p-4 text-center text-xs text-muted-foreground" data-testid={`video-unsupported-${activeModule.slug}`}>
+                          This video URL isn't from a supported provider (YouTube, Vimeo, Loom, Wistia, Google Drive, or a direct .mp4/.webm/.ogg/.mov file). Ask HR to update it.
+                        </div>
+                      );
+                    }
+                    return (
+                      <div className="mb-5 rounded-lg overflow-hidden border bg-black/5 aspect-video">
+                        {isDirectVideoFile(activeModule.videoUrl) ? (
+                          <video
+                            src={safeSrc}
+                            controls
+                            preload="metadata"
+                            className="w-full h-full"
+                            data-testid={`video-${activeModule.slug}`}
+                          />
+                        ) : (
+                          <iframe
+                            src={safeSrc}
+                            title={activeModule.title}
+                            loading="lazy"
+                            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                            allowFullScreen
+                            className="w-full h-full"
+                            data-testid={`video-${activeModule.slug}`}
+                          />
+                        )}
+                      </div>
+                    );
+                  })()}
 
                   {!activeModule.videoUrl && activeModule.contentType === "video" && (
                     <div className="mb-5 rounded-lg border border-dashed bg-muted/30 p-6 text-center text-sm text-muted-foreground">

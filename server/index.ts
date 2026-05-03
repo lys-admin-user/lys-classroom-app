@@ -7,6 +7,34 @@ import helmet from "helmet";
 import rateLimit from "express-rate-limit";
 import { WebhookHandlers } from "./webhookHandlers";
 import { getStripeSync } from "./stripeClient";
+import { readdirSync, statSync } from "node:fs";
+import { join } from "node:path";
+
+// Dev-time guard: warn if any LYS reference .txt is newer than the generated
+// embedded.ts file. Easy to forget to re-run scripts/regen_lys_embedded.mjs
+// after editing a .txt — this surfaces it on every restart.
+function checkLysReferenceFreshness(): void {
+  try {
+    const dir = "server/reference/lys";
+    const embeddedPath = join(dir, "embedded.ts");
+    const embeddedMtime = statSync(embeddedPath).mtimeMs;
+    const stale: string[] = [];
+    for (const f of readdirSync(dir)) {
+      if (!f.endsWith(".txt")) continue;
+      const mtime = statSync(join(dir, f)).mtimeMs;
+      if (mtime > embeddedMtime) stale.push(f);
+    }
+    if (stale.length > 0) {
+      console.warn(
+        `\n[lys-reference] WARNING: ${stale.length} source file(s) newer than embedded.ts: ${stale.join(", ")}\n` +
+        `[lys-reference] Run: node scripts/regen_lys_embedded.mjs\n`
+      );
+    }
+  } catch {
+    /* embedded.ts may not exist on first run; ignore */
+  }
+}
+checkLysReferenceFreshness();
 
 const app = express();
 const httpServer = createServer(app);

@@ -15406,14 +15406,56 @@ export async function registerRoutes(
     }
   });
 
+  const foundationQuizQuestionSchema = z.object({
+    question: z.string().min(1).max(500),
+    options: z.array(z.string().min(1).max(300)).min(2).max(6),
+    correctIndex: z.number().int().min(0).max(5),
+    explanation: z.string().max(1000).optional(),
+  });
+
+  // Strict allowlist for video URLs. Must be https + an approved provider host
+  // (or a direct .mp4/.webm/.ogg/.mov file). This is the authoritative gate —
+  // never trust the client allowlist alone; an admin could still craft a request
+  // that bypasses the UI.
+  const APPROVED_VIDEO_HOSTS = [
+    /^(?:www\.)?youtube\.com$/i,
+    /^youtu\.be$/i,
+    /^(?:www\.|player\.)?vimeo\.com$/i,
+    /^(?:www\.)?loom\.com$/i,
+    /^(?:[a-z0-9-]+\.)?wistia\.(?:com|net)$/i,
+    /^drive\.google\.com$/i,
+  ];
+  const isApprovedVideoUrl = (raw: string): boolean => {
+    try {
+      const u = new URL(raw);
+      if (u.protocol !== "https:") return false;
+      if (APPROVED_VIDEO_HOSTS.some((re) => re.test(u.hostname))) return true;
+      // Also allow https direct video files on any host.
+      if (/\.(mp4|webm|ogg|mov)(\?|$)/i.test(u.pathname)) return true;
+      return false;
+    } catch {
+      return false;
+    }
+  };
+  const videoUrlSchema = z
+    .string()
+    .max(1000)
+    .refine(isApprovedVideoUrl, {
+      message: "Video URL must be https and from an approved provider (YouTube, Vimeo, Loom, Wistia, Google Drive) or a direct .mp4/.webm/.ogg/.mov file.",
+    });
+
   const foundationModuleUpdateSchema = z.object({
     title: z.string().min(1).max(200).optional(),
     subtitle: z.string().max(500).nullable().optional(),
-    videoUrl: z.string().url().max(1000).nullable().optional().or(z.literal("").transform(() => null)),
+    videoUrl: videoUrlSchema.nullable().optional().or(z.literal("").transform(() => null)),
     body: z.string().max(50000).optional(),
     isPublished: z.boolean().optional(),
     order: z.number().int().min(0).max(999).optional(),
-  });
+    quizJson: z.array(foundationQuizQuestionSchema).max(20).optional(),
+  }).refine(
+    (data) => !data.quizJson || data.quizJson.every((q) => q.correctIndex < q.options.length),
+    { message: "Each question's correctIndex must be less than its number of options." }
+  );
 
   app.patch("/api/admin/foundation/modules/:slug", isAuthenticated, requireFoundationAdmin, async (req: any, res) => {
     try {
