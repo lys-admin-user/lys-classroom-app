@@ -78,6 +78,7 @@ Preferred communication style: Simple, everyday language.
 
 ### AI Services
 -   **OpenAI API**: For AI lesson plan generation and LLM-powered standards extraction.
+-   **LYS Reference Corpus**: Real teacher artifacts (cheat sheet, rubric, template, assignment form, and four Distinguished-rated finished lessons across Science, ELA, and Social Studies / grades 6–8) are distilled to plain text in `server/reference/lys/` and embedded at build time via `server/reference/lys/embedded.ts`. `server/lysReference.ts` exposes `buildLysCanonPromptBlock`, `LYS_BKD_VOCAB`, `LYS_DOMAINS`, `LYS_ACCOMMODATIONS`, and `LYS_REF_VERSION`. The lesson generator (`server/openai.ts`) injects the canon block into the user prompt and includes `LYS_REF_VERSION` in the cache key so corpus updates invalidate stale caches; the assignment generator (`server/assignmentGenerator.ts`) injects the BKD vocabulary, life-domain labels, and accommodation matrix into the system prompt. To refresh the corpus, replace the `.txt` files and regenerate `embedded.ts`.
 
 ### Database
 -   **PostgreSQL**: Primary data store.

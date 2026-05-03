@@ -9,6 +9,7 @@ import { db } from "./db";
 import { eq, sql } from "drizzle-orm";
 import { sanitizePromptText } from "./services/piiSanitizer";
 import { isAfricanCountry, buildAfricanPromptAddendum } from "@shared/africaContext";
+import { buildLysCanonPromptBlock, LYS_REF_VERSION } from "./lysReference";
 
 function generateCacheKey(request: GenerateLessonRequest): string {
   const normalizedParts = [
@@ -22,6 +23,9 @@ function generateCacheKey(request: GenerateLessonRequest): string {
     // Country + language influence the African context block, so cache must vary by them.
     (request.standards?.country || "").toLowerCase().trim(),
     (request.language || "").toLowerCase().trim(),
+    // LYS reference corpus version — bumping this invalidates all prior
+    // cached lessons so the new canon takes effect immediately.
+    `lys:${LYS_REF_VERSION}`,
   ];
   return crypto.createHash("sha256").update(normalizedParts.join("|")).digest("hex");
 }
@@ -203,6 +207,12 @@ IMPORTANT: Respond ONLY with a valid JSON object, no additional text.${africanIn
   const subject = request.course || request.topic;
   const masterExamples = await getMasterLessonExamples(subject, request.gradeLevel);
 
+  // LYS canonical reference distilled from real teacher exemplars
+  // (cheat sheet, rubric, template, and Distinguished-rated finished lessons
+  // across Science, ELA, and Social Studies — grades 6–8). See
+  // server/reference/lys/README.md for sources.
+  const lysCanon = buildLysCanonPromptBlock(subject, request.gradeLevel);
+
   let rssSupplementalSection = "";
   try {
     const rssContent = await storage.getApprovedRssContentByPlacement("ai_lesson", {
@@ -233,6 +243,7 @@ ${safeUnit ? `- Unit: ${safeUnit}` : ""}
 - Duration: ${request.duration}
 ${request.lessonPart ? `- Lesson Part: ${request.lessonPart}` : ""}
 ${standardsInfo}${africanContext}
+${lysCanon}
 ${masterExamples}${rssSupplementalSection}
 
 Generate a complete LYS lesson plan in JSON format. Include:
@@ -244,7 +255,7 @@ Generate a complete LYS lesson plan in JSON format. Include:
 6. Resources with URLs where applicable
 7. Materials list
 8. Assessment strategy
-9. Lesson Close with life application connections (educational, social, vocational, financial, spiritual as relevant)
+9. Lesson Close with life application connections to ALL SEVEN dimensions (educational, social, cultural, financial, health, vocational, spiritual) — none are optional
 
 JSON structure:
 {

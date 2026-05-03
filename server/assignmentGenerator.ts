@@ -3,6 +3,7 @@ import type { Lesson } from "@shared/schema";
 import { randomUUID } from "crypto";
 import { buildAfricanPromptAddendum } from "@shared/africaContext";
 import { sanitizePromptText, stripPII } from "./services/piiSanitizer";
+import { LYS_ACCOMMODATIONS, LYS_BKD_VOCAB, LYS_DOMAINS } from "./lysReference";
 
 const openai = process.env.OPENAI_API_KEY 
   ? new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
@@ -613,10 +614,18 @@ Your assignments MUST directly align with the lesson's:
 3. LYS METHODOLOGY (BE-KNOW-DO) - Balance questions across all three pillars
 4. LIFE DIMENSIONS - For reflection/essay questions, connect to the 7 life dimensions (Educational, Social, Cultural, Financial, Health, Vocational, Spiritual)
 
-BE-KNOW-DO FRAMEWORK:
-- BE questions: Identity, values, character development, self-reflection, personal growth
-- KNOW questions: Knowledge, facts, concepts, understanding, resource awareness
-- DO questions: Skills, action steps, practical application, execution with excellence
+BE-KNOW-DO FRAMEWORK (vocabulary distilled from real LYS teacher exemplars):
+- BE questions: Identity, values, character development, self-reflection, personal growth.
+  Draw from traits like: ${LYS_BKD_VOCAB.being.slice(0, 10).join(", ")}.
+- KNOW questions: Knowledge, facts, concepts, understanding, resource awareness.
+  Draw from strategies like: ${LYS_BKD_VOCAB.knowing.slice(0, 8).join(", ")}.
+- DO questions: Skills, action steps, practical application, execution with excellence.
+  Draw from actions like: ${LYS_BKD_VOCAB.doing.slice(0, 8).join(", ")}.
+
+LIFE DIMENSIONS (use these exact 7 labels for any reflection prompt that asks students to apply learning to life): ${LYS_DOMAINS.join(", ")}.
+
+LYS-RECOGNIZED ACCOMMODATIONS (when generating accommodation-aware variants, prefer this canonical list — same vocabulary every LYS teacher sees on the Assignment Form):
+${LYS_ACCOMMODATIONS.map(a => `- ${a}`).join("\n")}
 
 ${request.includeBeKnowDo ? "Include questions from ALL three pillars (BE, KNOW, DO) with clear balance." : "Focus primarily on KNOW and DO questions."}
 ${accommodationContext}
