@@ -1,0 +1,62 @@
+Lecturer's name: N/A
+
+Date: Day 1
+Course: Math 6
+
+Unit: Equivalent Forms of Fractions, Decimals, and Percents
+Unit Duration: 10 days
+Lesson Duration: 1 day
+TEKS: 6.4E, 6.4F, 6.4G, 6.5B, 6.5C
+Lesson Part #1
+
+Topic: Converting Fractions and Decimals to Percentages
+
+Lesson objectives:
+1. SWBAT (Students will be able to) define a percent as a fraction (or part-to-whole ratio) with a denominator of 100.
+2. SWBAT find equivalent decimals, fractions, and ratios to percents.
+3. SWBAT model equivalent decimals, fractions, and percents on 10 x 10 grids.
+
+Essential Questions:
+What is a percent?
+How are fractions and decimals converted to percentages?
+
+LYS Methodology
+Be (Character/Values/Principles) — Educational and Financial — How can learning about percentages help you become a responsible individual in regard to your time, finances, and creativity?
+Know (What resources are available to the student / how can they use them) — Educational and Financial — Why is it important that we know how to calculate percentages from fractions and decimals? And why is this related to the financial umbrella?
+Do (Execute with Excellence) — Educational, Financial, and Vocational — How do we become resourceful? How can we use percents to stay on a budget or forecast earnings?
+
+Resources (Include Technology):
+- Simplifying Fractions warm-up: https://www.mathworksheets4kids.com/simplify-fractions.php
+- Fraction–Decimal–Percent practice handout (3 tiered pages: Level 1, Level 2, Level 3)
+- Online quiz for independent practice
+
+Instructional Input — Asynchronous (the Synchronous flow follows the same sequence below)
+
+AS: Anticipatory Set (Introduction)
+Students warm up for today's lesson by practicing simplifying fractions. This skill will be assessed during this unit.
+
+M: Modeling (I do)
+Teacher reviews how to convert percent to decimal.
+- Steps: When going from percent to decimal, move TWO places to the LEFT.
+Teacher reviews how to convert decimal to percent.
+- Steps: When going from decimal to percent, move TWO places to the RIGHT.
+Teacher reviews how to convert fraction to decimal and percent.
+- When going from fraction to percent: scale the fraction up or down to 100; convert the scaled fraction to a decimal using place value; move the decimal point TWO places to the RIGHT.
+
+GP: Guided Practice (We do)
+Teacher reviews the first 1–2 problems of each section to model how students should complete it.
+Use the tiered Fraction/Decimal/Percent Practice handout — target Level 1, Level 2, and Level 3 (high-achieving) students by providing varied forms of practice and splitting them evenly.
+- This activity becomes intentionally repetitive so students can internalize how to move from one form to the next.
+- Push students to ALWAYS simplify fractions.
+- Some students may be unable to simplify; provide necessary scaffolding for those students.
+
+Independent Practice / Homework
+Students complete the practice online after the lesson — Fractions, Decimal, Percent Quiz — and the additional practice page.
+
+Lesson Close
+Financial
+"Financial freedom is available for those who learn about it and work for it." — Robert T. Kiyosaki
+
+The term "percent" means "out of a hundred." In mathematics, percentages are used like fractions and decimals — as ways to describe parts of a whole. When you are using percentages, the whole is considered to be made up of a hundred equal parts. Learning about percentages is another way to learn how to be a responsible individual regarding your time commitment to becoming financially independent. Think about the amount of time, in percent form, that you spend either reading a book, connecting with mentors, or crafting your creativity through different outlets. What percent of time are you spending bettering yourself and others?
+
+You will see percentages almost everywhere: in shops, on the internet, in advertisements, and in the media. Being able to understand what percentages mean is a key skill that will potentially save you time and money and will also make you more employable. Percentages are important for understanding the financial aspects of everyday life and can help you become resourceful when handling budgets for yourself, a business, or any important financial decisions.

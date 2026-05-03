@@ -211,7 +211,7 @@ IMPORTANT: Respond ONLY with a valid JSON object, no additional text.${africanIn
   // (cheat sheet, rubric, template, and Distinguished-rated finished lessons
   // across Science, ELA, and Social Studies — grades 6–8). See
   // server/reference/lys/README.md for sources.
-  const lysCanon = buildLysCanonPromptBlock(subject, request.gradeLevel);
+  const lysCanon = buildLysCanonPromptBlock(subject, request.gradeLevel, request.topic);
 
   let rssSupplementalSection = "";
   try {
