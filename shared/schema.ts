@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { pgTable, text, varchar, integer, boolean, jsonb, timestamp, real, index } from "drizzle-orm/pg-core";
+import { pgTable, text, varchar, integer, boolean, jsonb, timestamp, real, index, uniqueIndex } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 import { isAfricanCountry } from "./africaContext";
@@ -3700,4 +3700,53 @@ export const userDataRegions = pgTable("user_data_regions", {
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
+
+// ============================================================================
+// Foundation (Internal Onboarding) — staff-facing "Our Foundation" widget
+// ============================================================================
+
+// One row per onboarding module (Mission, Vision, Values, Brand, Strategy, Goals).
+// HR can edit the title / video URL / body copy in the Admin Foundation page.
+export const foundationModules = pgTable("foundation_modules", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  slug: varchar("slug").notNull().unique(),
+  order: integer("order").notNull(),
+  title: text("title").notNull(),
+  subtitle: text("subtitle"),
+  contentType: varchar("content_type").notNull().default("text").$type<"text" | "video" | "quiz" | "timeline" | "okr">(),
+  body: text("body").notNull().default(""),
+  videoUrl: varchar("video_url"),
+  quizJson: jsonb("quiz_json").$type<{
+    question: string;
+    options: string[];
+    correctIndex: number;
+    explanation?: string;
+  }[]>().default([]),
+  isPublished: boolean("is_published").notNull().default(true),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertFoundationModuleSchema = createInsertSchema(foundationModules).omit({ id: true, createdAt: true, updatedAt: true });
+export type InsertFoundationModule = z.infer<typeof insertFoundationModuleSchema>;
+export type FoundationModule = typeof foundationModules.$inferSelect;
+
+// One row per (user, module). viewedAt set on first open; completedAt set when the
+// user clicks "Mark complete" or passes the quiz. quizScore is 0-100 for the Values quiz.
+export const foundationProgress = pgTable("foundation_progress", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull(),
+  moduleSlug: varchar("module_slug").notNull(),
+  viewedAt: timestamp("viewed_at").defaultNow(),
+  completedAt: timestamp("completed_at"),
+  quizScore: integer("quiz_score"),
+  updatedAt: timestamp("updated_at").defaultNow(),
+}, (table) => [
+  index("idx_foundation_progress_user").on(table.userId),
+  uniqueIndex("uq_foundation_progress_user_module").on(table.userId, table.moduleSlug),
+]);
+
+export const insertFoundationProgressSchema = createInsertSchema(foundationProgress).omit({ id: true, viewedAt: true, updatedAt: true });
+export type InsertFoundationProgress = z.infer<typeof insertFoundationProgressSchema>;
+export type FoundationProgress = typeof foundationProgress.$inferSelect;
 

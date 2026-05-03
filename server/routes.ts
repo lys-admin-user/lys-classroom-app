@@ -15345,6 +15345,98 @@ export async function registerRoutes(
     }
   });
 
+  // ==========================================================================
+  // Foundation onboarding (staff-facing widget)
+  // ==========================================================================
+  const requireStaffOrAdmin = requireRole("staff", "site_admin", "system_admin");
+  const requireFoundationAdmin = requireRole("site_admin", "system_admin");
+
+  // Seed the 6 default modules on first boot (idempotent — leaves edits alone).
+  // Run in the background so route registration / health checks aren't blocked.
+  import("./seedFoundation").then(async ({ seedFoundationModules }) => {
+    try {
+      const seedResult = await seedFoundationModules();
+      if (seedResult.inserted > 0) {
+        console.log(`[foundation] Seeded ${seedResult.inserted} module(s); ${seedResult.skipped} already existed.`);
+      }
+    } catch (e) {
+      console.error("[foundation] seed failed:", e);
+    }
+  }).catch((e) => console.error("[foundation] seed import failed:", e));
+
+  app.get("/api/foundation/modules", isAuthenticated, requireStaffOrAdmin, async (_req: any, res) => {
+    try {
+      const modules = await storage.getFoundationModules();
+      res.json(modules);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to load foundation modules" });
+    }
+  });
+
+  app.get("/api/foundation/progress", isAuthenticated, requireStaffOrAdmin, async (req: any, res) => {
+    try {
+      const userId = req.user?.claims?.sub;
+      const rows = await storage.getFoundationProgressForUser(userId);
+      res.json(rows);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to load foundation progress" });
+    }
+  });
+
+  const foundationProgressBodySchema = z.object({
+    moduleSlug: z.string().min(1).max(64),
+    action: z.enum(["viewed", "completed"]),
+    quizScore: z.number().int().min(0).max(100).optional(),
+  });
+
+  app.post("/api/foundation/progress", isAuthenticated, requireStaffOrAdmin, async (req: any, res) => {
+    try {
+      const userId = req.user?.claims?.sub;
+      const parsed = foundationProgressBodySchema.parse(req.body);
+      const row = await storage.recordFoundationProgress(
+        userId,
+        parsed.moduleSlug,
+        parsed.action,
+        parsed.quizScore
+      );
+      res.json(row);
+    } catch (error: any) {
+      if (error?.issues) return res.status(400).json({ error: "Invalid body", issues: error.issues });
+      res.status(500).json({ error: "Failed to record progress" });
+    }
+  });
+
+  const foundationModuleUpdateSchema = z.object({
+    title: z.string().min(1).max(200).optional(),
+    subtitle: z.string().max(500).nullable().optional(),
+    videoUrl: z.string().url().max(1000).nullable().optional().or(z.literal("").transform(() => null)),
+    body: z.string().max(50000).optional(),
+    isPublished: z.boolean().optional(),
+    order: z.number().int().min(0).max(999).optional(),
+  });
+
+  app.patch("/api/admin/foundation/modules/:slug", isAuthenticated, requireFoundationAdmin, async (req: any, res) => {
+    try {
+      const slug = req.params.slug;
+      const updates = foundationModuleUpdateSchema.parse(req.body);
+      const updated = await storage.updateFoundationModule(slug, updates as any);
+      if (!updated) return res.status(404).json({ error: "Module not found" });
+      res.json(updated);
+    } catch (error: any) {
+      if (error?.issues) return res.status(400).json({ error: "Invalid body", issues: error.issues });
+      res.status(500).json({ error: "Failed to update module" });
+    }
+  });
+
+  app.get("/api/admin/foundation/rollup", isAuthenticated, requireFoundationAdmin, async (_req: any, res) => {
+    try {
+      const rollup = await storage.getFoundationRollup();
+      res.json(rollup);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to load rollup" });
+    }
+  });
+
   startRssFeedScheduler(60);
   startScholarshipScheduler();
 

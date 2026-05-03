@@ -34,6 +34,7 @@ import ScopeEditor from "@/pages/ScopeEditor";
 import SelfDiscovery from "@/pages/SelfDiscovery";
 import EducatorInfluence from "@/pages/EducatorInfluence";
 import StandardsAdmin from "@/pages/StandardsAdmin";
+import AdminFoundation from "@/pages/AdminFoundation";
 import Pricing from "@/pages/Pricing";
 import Onboarding from "@/pages/Onboarding";
 import Assignments from "@/pages/Assignments";
@@ -244,6 +245,7 @@ const AuthCollaboration = withAuth(Collaboration);
 const AuthResourceLibrary = withAuth(ResourceLibrary);
 const AuthSiteAdmin = withAuth(SiteAdmin);
 const AuthSystemAdmin = withAuth(SystemAdmin);
+const AuthAdminFoundation = withAuth(AdminFoundation);
 const AuthParentPortal = withAuth(ParentPortal);
 const AuthMilestones = withAuth(Milestones);
 const AuthClassroom = withAuth(Classroom);
@@ -302,6 +304,7 @@ function Router() {
       <Route path="/scope/:id" component={AuthScopeEditor} />
       <Route path="/educator-influence" component={AuthEducatorInfluence} />
       <Route path="/admin/standards" component={AuthStandardsAdmin} />
+      <Route path="/admin/foundation" component={AuthAdminFoundation} />
       <Route path="/assignments" component={AuthAssignments} />
       <Route path="/collaboration" component={AuthCollaboration} />
       <Route path="/collaboration/:id" component={AuthCollaboration} />

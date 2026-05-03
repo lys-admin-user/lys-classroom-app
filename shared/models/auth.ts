@@ -27,16 +27,19 @@ export type UserTier = "free" | "pro" | "campus" | "enterprise";
 // site_admin: platform-level admin with full access to manage all orgs
 // district_admin: district-level admin managing multiple campuses/schools
 // campus_admin: school/campus admin managing educators within one school
+// staff: internal LYS employee/team member (HR, ops, marketing) — sees Foundation onboarding
 // educator: teacher creating lessons, scope/sequence, managing classrooms
 // homeschool_parent: parent-educator hybrid with simplified tools (1-5 students)
 // student: K-12 or higher ed student using self-discovery and career tools
-export type UserRole = "student" | "educator" | "homeschool_parent" | "campus_admin" | "district_admin" | "site_admin" | "system_admin";
+export type UserRole = "student" | "educator" | "homeschool_parent" | "staff" | "campus_admin" | "district_admin" | "site_admin" | "system_admin";
 
 // Role hierarchy levels for permission checks (higher number = more privilege)
+// Note: staff sits between educator and campus_admin — they're internal team but not org admins
 export const ROLE_HIERARCHY: Record<UserRole, number> = {
   student: 0,
   homeschool_parent: 1,
   educator: 2,
+  staff: 2.5,
   campus_admin: 3,
   district_admin: 4,
   site_admin: 5,

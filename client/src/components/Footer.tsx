@@ -1,6 +1,7 @@
 import { Link } from "wouter";
 import { Mail, Phone, Globe } from "lucide-react";
 import { SiFacebook, SiInstagram, SiLinkedin, SiX } from "react-icons/si";
+import { FoundationFooterPill } from "./FoundationFooterPill";
 
 export function Footer() {
   return (
@@ -109,6 +110,11 @@ export function Footer() {
               </li>
             </ul>
           </div>
+        </div>
+
+        {/* Foundation widget — only renders for staff + site/system admins */}
+        <div className="mt-8 flex justify-center">
+          <FoundationFooterPill />
         </div>
 
         <div className="mt-8 pt-8 border-t border-white/20 flex flex-col sm:flex-row items-center justify-between gap-4 text-sm text-white/60">

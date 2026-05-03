@@ -10,6 +10,11 @@ import {
   type LessonPlan,
   type EducatorProfile,
   type InsertEducatorProfile,
+  type FoundationModule,
+  type InsertFoundationModule,
+  type FoundationProgress,
+  foundationModules,
+  foundationProgress,
   type User,
   type UserRole,
   type UserTier,
@@ -393,6 +398,23 @@ export interface IStorage {
   updateUserRole(userId: string, role: UserRole): Promise<User | undefined>;
   completeOnboarding(userId: string): Promise<User | undefined>;
   incrementOnboardingSkipCount(userId: string): Promise<User>;
+
+  // Foundation onboarding (staff-facing)
+  getFoundationModules(): Promise<FoundationModule[]>;
+  updateFoundationModule(slug: string, updates: Partial<InsertFoundationModule>): Promise<FoundationModule | undefined>;
+  getFoundationProgressForUser(userId: string): Promise<FoundationProgress[]>;
+  recordFoundationProgress(userId: string, moduleSlug: string, action: "viewed" | "completed", quizScore?: number): Promise<FoundationProgress>;
+  getFoundationRollup(): Promise<Array<{
+    slug: string;
+    title: string;
+    order: number;
+    contentType: string;
+    totalStaff: number;
+    viewedCount: number;
+    completedCount: number;
+    completionPct: number;
+    avgQuizScore: number | null;
+  }>>;
   
   // Sponsored Access
   getUserSponsoredAccess(userId: string): Promise<SponsoredAccess | undefined>;
@@ -4448,6 +4470,107 @@ export class DatabaseStorage implements IStorage {
       .returning();
     
     return updated;
+  }
+
+  // ==========================================================================
+  // Foundation onboarding
+  // ==========================================================================
+
+  async getFoundationModules(): Promise<FoundationModule[]> {
+    return db.select().from(foundationModules)
+      .where(eq(foundationModules.isPublished, true))
+      .orderBy(foundationModules.order);
+  }
+
+  async updateFoundationModule(slug: string, updates: Partial<InsertFoundationModule>): Promise<FoundationModule | undefined> {
+    const [updated] = await db.update(foundationModules)
+      .set({ ...updates, updatedAt: new Date() })
+      .where(eq(foundationModules.slug, slug))
+      .returning();
+    return updated || undefined;
+  }
+
+  async getFoundationProgressForUser(userId: string): Promise<FoundationProgress[]> {
+    return db.select().from(foundationProgress).where(eq(foundationProgress.userId, userId));
+  }
+
+  async recordFoundationProgress(
+    userId: string,
+    moduleSlug: string,
+    action: "viewed" | "completed",
+    quizScore?: number
+  ): Promise<FoundationProgress> {
+    const now = new Date();
+    // Atomic upsert backed by the unique (userId, moduleSlug) index.
+    // - completedAt: only set on first completion (don't clobber a prior completion timestamp).
+    // - quizScore: keep the highest score across attempts.
+    const [row] = await db.insert(foundationProgress).values({
+      userId,
+      moduleSlug,
+      viewedAt: now,
+      completedAt: action === "completed" ? now : null,
+      quizScore: typeof quizScore === "number" ? quizScore : null,
+    }).onConflictDoUpdate({
+      target: [foundationProgress.userId, foundationProgress.moduleSlug],
+      set: {
+        completedAt: action === "completed"
+          ? sql`COALESCE(${foundationProgress.completedAt}, ${now})`
+          : sql`${foundationProgress.completedAt}`,
+        quizScore: typeof quizScore === "number"
+          ? sql`GREATEST(COALESCE(${foundationProgress.quizScore}, 0), ${quizScore})`
+          : sql`${foundationProgress.quizScore}`,
+        updatedAt: now,
+      },
+    }).returning();
+    return row;
+  }
+
+  async getFoundationRollup(): Promise<Array<{
+    slug: string;
+    title: string;
+    order: number;
+    contentType: string;
+    totalStaff: number;
+    viewedCount: number;
+    completedCount: number;
+    completionPct: number;
+    avgQuizScore: number | null;
+  }>> {
+    const FOUNDATION_ROLES = ["staff", "site_admin", "system_admin"];
+    const staffRows = await db.select({ id: users.id }).from(users)
+      .where(inArray(users.role, FOUNDATION_ROLES as any));
+    const staffIds = new Set(staffRows.map((r) => r.id));
+    const totalStaff = staffIds.size;
+
+    const modules = await db.select().from(foundationModules)
+      .where(eq(foundationModules.isPublished, true))
+      .orderBy(foundationModules.order);
+
+    const allProgress = await db.select().from(foundationProgress);
+    // Filter to staff progress only.
+    const staffProgress = allProgress.filter((p) => staffIds.has(p.userId));
+
+    return modules.map((m) => {
+      const rows = staffProgress.filter((p) => p.moduleSlug === m.slug);
+      const viewedCount = rows.length;
+      const completedCount = rows.filter((p) => p.completedAt).length;
+      const quizScores = rows.map((p) => p.quizScore).filter((s): s is number => typeof s === "number");
+      const avgQuizScore = quizScores.length > 0
+        ? Math.round(quizScores.reduce((a, b) => a + b, 0) / quizScores.length)
+        : null;
+      const completionPct = totalStaff > 0 ? Math.round((completedCount / totalStaff) * 100) : 0;
+      return {
+        slug: m.slug,
+        title: m.title,
+        order: m.order,
+        contentType: m.contentType,
+        totalStaff,
+        viewedCount,
+        completedCount,
+        completionPct,
+        avgQuizScore,
+      };
+    });
   }
 
   // Sponsored Access
