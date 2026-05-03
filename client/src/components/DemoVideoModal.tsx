@@ -1,5 +1,6 @@
-import { useState, useEffect, useCallback } from "react";
-import { PLAN_PRICES, SEAT_PRICES, SEAT_MINIMUMS } from "@/lib/pricing";
+import { useState, useEffect, useCallback, useRef } from "react";
+import { motion, AnimatePresence } from "framer-motion";
+import { PLAN_PRICES, SEAT_PRICES, SEAT_MINIMUMS, FREE_LESSON_LIMIT } from "@/lib/pricing";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { VisuallyHidden } from "@radix-ui/react-visually-hidden";
 import { Button } from "@/components/ui/button";
@@ -10,754 +11,385 @@ import {
   Heart,
   Compass,
   Target,
-  BookOpen,
-  Users,
-  TrendingUp,
-  GraduationCap,
-  Shield,
   Brain,
-  Briefcase,
-  ChevronRight,
-  ChevronLeft,
+  GraduationCap,
   Play,
   Pause,
   X,
-  CheckCircle2,
-  Lightbulb,
-  BarChart3,
-  Globe,
-  Lock,
-  Award,
-  DollarSign,
-  ClipboardList,
-  HelpCircle,
-  MessageSquare,
-  Layers,
-  Star,
-  FileText,
+  ChevronLeft,
+  ChevronRight,
+  Volume2,
+  VolumeX,
   Building2,
-  ShoppingBag,
-  Bookmark,
-  BookmarkCheck,
-  Rss,
-  Calendar,
+  Briefcase,
+  ClipboardList,
+  CheckCircle2,
+  Globe,
+  Wand2,
 } from "lucide-react";
+import pricingScreenshot from "@assets/demo/pricing.jpg";
 
 interface DemoSlide {
+  id: string;
+  duration: number; // ms
+  narration: string;
+  eyebrow: string;
   title: string;
-  subtitle: string;
-  description: string;
-  icon: React.ReactNode;
-  color: string;
-  bgGradient: string;
-  features: { icon: React.ReactNode; text: string }[];
+  body: string;
+  accent: string; // tailwind text class
+  accentBg: string; // tailwind bg class
+  bg: string; // background gradient
   visual: React.ReactNode;
 }
 
 const slides: DemoSlide[] = [
   {
-    title: "Welcome to LYS",
-    subtitle: "Laddering Your Success",
-    description: "AI-powered education built on Be-Know-Do — bridging academics with real-world success.",
-    icon: <GraduationCap className="h-10 w-10" />,
-    color: "text-lys-red",
-    bgGradient: "from-lys-red/20 via-lys-yellow/10 to-lys-teal/20",
-    features: [
-      { icon: <Brain className="h-4 w-4" />, text: "AI Lesson Planning" },
-      { icon: <Briefcase className="h-4 w-4" />, text: "40+ Careers" },
-      { icon: <Shield className="h-4 w-4" />, text: "Zero-Trust Security" },
-    ],
+    id: "hook",
+    duration: 9000,
+    narration:
+      "Welcome to LYS — Laddering Your Success. Education that connects who you are to where you're going.",
+    eyebrow: "LYS — Laddering Your Success",
+    title: "Education that ladders to real life.",
+    body: "AI-powered learning built on Be, Know, Do — bridging academics with real-world success.",
+    accent: "text-lys-red",
+    accentBg: "bg-lys-red",
+    bg: "from-lys-red/30 via-lys-yellow/15 to-lys-teal/25",
     visual: (
-      <div className="flex items-center justify-center gap-6">
+      <div className="flex items-center justify-center gap-6 sm:gap-10">
         {[
-          { icon: <Heart className="h-8 w-8 text-lys-yellow" />, label: "BE", bg: "bg-lys-yellow/20" },
-          { icon: <Compass className="h-8 w-8 text-lys-teal" />, label: "KNOW", bg: "bg-lys-teal/20" },
-          { icon: <Target className="h-8 w-8 text-lys-red" />, label: "DO", bg: "bg-lys-red/20" },
+          { Icon: Heart, label: "BE", color: "text-lys-yellow", bg: "bg-lys-yellow/20", desc: "Identity" },
+          { Icon: Compass, label: "KNOW", color: "text-lys-teal", bg: "bg-lys-teal/20", desc: "Careers" },
+          { Icon: Target, label: "DO", color: "text-lys-red", bg: "bg-lys-red/20", desc: "Action" },
         ].map((item, i) => (
-          <div key={item.label} className="flex flex-col items-center gap-2 animate-fade-up" style={{ animationDelay: `${i * 0.15}s` }}>
-            <div className={`w-14 h-14 rounded-2xl ${item.bg} flex items-center justify-center`}>{item.icon}</div>
-            <span className="text-sm font-oswald">{item.label}</span>
-            {i < 2 && <ChevronRight className="h-4 w-4 text-muted-foreground absolute" style={{ display: "none" }} />}
-          </div>
+          <motion.div
+            key={item.label}
+            className="flex flex-col items-center gap-2"
+            initial={{ opacity: 0, y: 24, scale: 0.85 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            transition={{ delay: 0.15 + i * 0.18, type: "spring", stiffness: 220, damping: 18 }}
+          >
+            <div className={`w-20 h-20 sm:w-24 sm:h-24 rounded-3xl ${item.bg} flex items-center justify-center shadow-lg ring-1 ring-white/20`}>
+              <item.Icon className={`h-10 w-10 sm:h-12 sm:w-12 ${item.color}`} />
+            </div>
+            <span className="font-marker text-xl sm:text-2xl">{item.label}</span>
+            <span className="text-[11px] sm:text-xs text-muted-foreground font-roboto">{item.desc}</span>
+          </motion.div>
         ))}
       </div>
     ),
   },
   {
-    title: "BE — Self-Discovery",
-    subtitle: "Explore Identity & Strengths",
-    description: "Students discover strengths, values, and personality traits through guided assessments.",
-    icon: <Heart className="h-10 w-10" />,
-    color: "text-lys-yellow",
-    bgGradient: "from-lys-yellow/20 via-lys-yellow/5 to-transparent",
-    features: [
-      { icon: <Lightbulb className="h-4 w-4" />, text: "Strengths Assessment" },
-      { icon: <CheckCircle2 className="h-4 w-4" />, text: "Milestone Tracking" },
-    ],
+    id: "be",
+    duration: 9000,
+    narration:
+      "It starts with BE — students discover their strengths, values, and identity through guided assessments.",
+    eyebrow: "BE — Self-Discovery",
+    title: "Discover who you are first.",
+    body: "Guided assessments help students name their strengths, values, and personality before choosing a path.",
+    accent: "text-lys-yellow",
+    accentBg: "bg-lys-yellow",
+    bg: "from-lys-yellow/30 via-lys-yellow/10 to-background",
     visual: (
-      <div className="space-y-2 w-full max-w-xs mx-auto">
-        <div className="bg-card rounded-lg border p-3">
+      <div className="w-full max-w-md mx-auto space-y-3">
+        <motion.div
+          initial={{ opacity: 0, y: 16 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.2 }}
+          className="bg-card rounded-2xl border p-4 shadow-md"
+        >
           <div className="flex items-center justify-between mb-2">
-            <span className="text-sm font-oswald">Identity Score</span>
-            <span className="text-lg font-bold text-lys-yellow">78%</span>
+            <span className="font-oswald text-sm">Identity Score</span>
+            <span className="font-oswald text-2xl font-bold text-lys-yellow">78%</span>
           </div>
-          <Progress value={78} className="h-2" />
-        </div>
+          <Progress value={78} className="h-2.5" />
+        </motion.div>
         <div className="grid grid-cols-3 gap-2">
-          {["Creative", "Empathetic", "Leader"].map((trait) => (
-            <Badge key={trait} variant="secondary" className="justify-center text-xs py-1">{trait}</Badge>
+          {["Creative", "Empathetic", "Leader", "Resilient", "Curious", "Collaborative"].map((trait, i) => (
+            <motion.div
+              key={trait}
+              initial={{ opacity: 0, scale: 0.7 }}
+              animate={{ opacity: 1, scale: 1 }}
+              transition={{ delay: 0.35 + i * 0.06 }}
+            >
+              <Badge variant="secondary" className="w-full justify-center py-1.5 text-xs">
+                {trait}
+              </Badge>
+            </motion.div>
           ))}
         </div>
       </div>
     ),
   },
   {
-    title: "Digital Portfolios",
-    subtitle: "Showcase Student Growth",
-    description: "Customizable portfolios with privacy controls and shareable links for college applications.",
-    icon: <FileText className="h-10 w-10" />,
-    color: "text-lys-yellow",
-    bgGradient: "from-lys-yellow/20 via-lys-red/5 to-transparent",
-    features: [
-      { icon: <Lock className="h-4 w-4" />, text: "Privacy Controls" },
-      { icon: <Globe className="h-4 w-4" />, text: "Shareable Links" },
-    ],
+    id: "know",
+    duration: 10000,
+    narration:
+      "Then KNOW — 40-plus career paths, matched to each student using our Be-Know-Do model.",
+    eyebrow: "KNOW — Career Explorer",
+    title: "40+ careers, matched to every student.",
+    body: "Our BKD matching engine recommends careers based on identity, strengths, and interests — not just test scores.",
+    accent: "text-lys-teal",
+    accentBg: "bg-lys-teal",
+    bg: "from-lys-teal/25 via-lys-teal/10 to-background",
     visual: (
-      <div className="w-full max-w-xs mx-auto">
-        <div className="bg-card rounded-lg border p-3 space-y-2">
-          <div className="flex items-center gap-2">
-            <div className="w-8 h-8 rounded-full bg-lys-yellow/20 flex items-center justify-center text-xs font-bold">JS</div>
-            <div>
-              <p className="text-sm font-oswald">Jamie's Portfolio</p>
-              <p className="text-xs text-muted-foreground">Grade 10 — Science & Tech</p>
-            </div>
-          </div>
-          <div className="grid grid-cols-3 gap-1.5 text-center">
-            {[{ n: "12", l: "Projects" }, { n: "3", l: "Awards" }, { n: "85%", l: "BE Score" }].map((s) => (
-              <div key={s.l} className="bg-muted/50 rounded p-1.5">
-                <div className="text-sm font-bold font-oswald">{s.n}</div>
-                <div className="text-[10px] text-muted-foreground">{s.l}</div>
-              </div>
-            ))}
-          </div>
-        </div>
-      </div>
-    ),
-  },
-  {
-    title: "KNOW — Career Explorer",
-    subtitle: "40+ Careers, Real Data",
-    description: "Browse careers with BLS salary data, growth rates, and education pathways by state.",
-    icon: <Compass className="h-10 w-10" />,
-    color: "text-lys-teal",
-    bgGradient: "from-lys-teal/20 via-lys-teal/5 to-transparent",
-    features: [
-      { icon: <TrendingUp className="h-4 w-4" />, text: "BLS Market Data" },
-      { icon: <Globe className="h-4 w-4" />, text: "State Salaries" },
-    ],
-    visual: (
-      <div className="space-y-2 w-full max-w-xs mx-auto">
-        {[
-          { title: "AI/ML Engineer", salary: "$112K–$189K", growth: "+40%" },
-          { title: "Cybersecurity Analyst", salary: "$85K–$145K", growth: "+33%" },
-          { title: "EV/Battery Tech", salary: "$40K–$85K", growth: "+25%" },
-        ].map((c) => (
-          <div key={c.title} className="bg-card rounded-lg border p-2 flex items-center justify-between">
-            <div>
-              <p className="text-sm font-oswald">{c.title}</p>
-              <p className="text-xs text-muted-foreground">{c.salary}</p>
-            </div>
-            <Badge className="bg-green-500/10 text-green-600 border-green-500/20 text-xs">{c.growth}</Badge>
-          </div>
-        ))}
-      </div>
-    ),
-  },
-  {
-    title: "BKD Career Matching",
-    subtitle: "Personalized Recommendations",
-    description: "AI matches student profiles to careers based on their Be-Know-Do assessment scores.",
-    icon: <BarChart3 className="h-10 w-10" />,
-    color: "text-lys-teal",
-    bgGradient: "from-lys-teal/20 via-lys-yellow/5 to-transparent",
-    features: [
-      { icon: <Target className="h-4 w-4" />, text: "Score Matching" },
-      { icon: <Briefcase className="h-4 w-4" />, text: "Career Fit %" },
-    ],
-    visual: (
-      <div className="w-full max-w-xs mx-auto space-y-2">
-        {[
-          { career: "Software Developer", match: 94, pillar: "DO" },
-          { career: "Data Scientist", match: 87, pillar: "KNOW" },
-          { career: "Product Manager", match: 82, pillar: "DO" },
-        ].map((r) => (
-          <div key={r.career} className="bg-card rounded-lg border p-2 flex items-center justify-between">
-            <div>
-              <p className="text-sm font-oswald">{r.career}</p>
-              <Badge variant="secondary" className="text-[10px]">{r.pillar} Focus</Badge>
-            </div>
-            <span className="font-oswald text-lg text-lys-teal">{r.match}%</span>
-          </div>
-        ))}
-      </div>
-    ),
-  },
-  {
-    title: "DO — AI Lesson Planner",
-    subtitle: "Rubric-Scored in Seconds",
-    description: "Enter a topic — AI generates a complete lesson plan scored across 6 quality categories.",
-    icon: <Target className="h-10 w-10" />,
-    color: "text-lys-red",
-    bgGradient: "from-lys-red/20 via-lys-red/5 to-transparent",
-    features: [
-      { icon: <Sparkles className="h-4 w-4" />, text: "AI Generation" },
-      { icon: <BookOpen className="h-4 w-4" />, text: "6-Category Rubric" },
-    ],
-    visual: (
-      <div className="w-full max-w-xs mx-auto">
-        <div className="bg-card rounded-lg border p-3">
-          <div className="flex items-center gap-2 mb-2">
-            <Sparkles className="h-4 w-4 text-lys-red" />
-            <span className="text-sm font-oswald">AI Lesson Generated</span>
-            <Badge className="ml-auto bg-green-500/10 text-green-600 text-xs">92/100</Badge>
-          </div>
-          <p className="text-xs text-muted-foreground mb-2">"Growth Mindset for 9th Grade"</p>
-          <div className="grid grid-cols-2 gap-1">
-            {["Objectives", "Activities", "Assessment", "Standards"].map((c) => (
-              <div key={c} className="flex items-center gap-1 text-xs">
-                <CheckCircle2 className="h-3 w-3 text-green-500" />
-                <span>{c}</span>
-              </div>
-            ))}
-          </div>
-        </div>
-      </div>
-    ),
-  },
-  {
-    title: "Scope & Sequence",
-    subtitle: "Full Curriculum Planner",
-    description: "Map your school year with pacing, standards alignment, and department-wide sharing.",
-    icon: <BookOpen className="h-10 w-10" />,
-    color: "text-lys-teal",
-    bgGradient: "from-lys-teal/20 via-lys-yellow/5 to-transparent",
-    features: [
-      { icon: <Layers className="h-4 w-4" />, text: "Pacing Tracker" },
-      { icon: <CheckCircle2 className="h-4 w-4" />, text: "Standards Extraction" },
-    ],
-    visual: (
-      <div className="w-full max-w-xs mx-auto space-y-2">
-        {[
-          { week: "Weeks 1–3", unit: "Intro to Algebra", progress: 100 },
-          { week: "Weeks 4–6", unit: "Linear Equations", progress: 65 },
-          { week: "Weeks 7–9", unit: "Graphing", progress: 10 },
-        ].map((item) => (
-          <div key={item.unit} className="bg-card rounded-lg border p-2">
-            <div className="flex items-center justify-between mb-1">
-              <span className="text-xs text-muted-foreground">{item.week}</span>
-              <span className="text-xs font-oswald">{item.progress}%</span>
-            </div>
-            <p className="text-sm font-oswald mb-1">{item.unit}</p>
-            <Progress value={item.progress} className="h-1.5" />
-          </div>
-        ))}
-      </div>
-    ),
-  },
-  {
-    title: "AI Assignments",
-    subtitle: "Aligned to Lesson Rubric",
-    description: "Generate assignments that align with lesson objectives and BKD principles automatically.",
-    icon: <ClipboardList className="h-10 w-10" />,
-    color: "text-lys-red",
-    bgGradient: "from-lys-red/20 via-lys-yellow/5 to-transparent",
-    features: [
-      { icon: <Sparkles className="h-4 w-4" />, text: "AI-Generated" },
-      { icon: <Target className="h-4 w-4" />, text: "BKD Aligned" },
-    ],
-    visual: (
-      <div className="w-full max-w-xs mx-auto">
-        <div className="bg-card rounded-lg border p-3 space-y-2">
-          <div className="flex items-center gap-2">
-            <Sparkles className="h-4 w-4 text-lys-red" />
-            <span className="text-sm font-oswald">Assignment Created</span>
-          </div>
-          {["Research Essay — Growth Mindset", "Lab Report — Scientific Method", "Group Project — Real-World Application"].map((a) => (
-            <div key={a} className="flex items-center gap-2 text-xs">
-              <CheckCircle2 className="h-3 w-3 text-green-500" />
-              <span>{a}</span>
-            </div>
-          ))}
-        </div>
-      </div>
-    ),
-  },
-  {
-    title: "Gradebook",
-    subtitle: "Track & Export Grades",
-    description: "Manage grades, calculate letter grades, export CSV, and integrate with your SIS.",
-    icon: <ClipboardList className="h-10 w-10" />,
-    color: "text-lys-yellow",
-    bgGradient: "from-lys-yellow/20 via-lys-teal/5 to-transparent",
-    features: [
-      { icon: <BarChart3 className="h-4 w-4" />, text: "Auto Letter Grades" },
-      { icon: <Globe className="h-4 w-4" />, text: "SIS Integration" },
-    ],
-    visual: (
-      <div className="w-full max-w-xs mx-auto">
-        <div className="bg-card rounded-lg border overflow-hidden">
-          <div className="grid grid-cols-4 text-xs font-oswald bg-muted/50 p-2 border-b">
-            <span>Student</span><span className="text-center">Score</span><span className="text-center">Grade</span><span className="text-center">Career</span>
-          </div>
+      <div className="w-full max-w-md mx-auto">
+        <div className="grid grid-cols-2 gap-3">
           {[
-            { name: "Alex M.", score: 94, grade: "A", career: "92%" },
-            { name: "Sam R.", score: 87, grade: "B+", career: "85%" },
-            { name: "Jamie L.", score: 78, grade: "C+", career: "71%" },
-          ].map((s) => (
-            <div key={s.name} className="grid grid-cols-4 text-xs p-2 border-b last:border-0">
-              <span className="font-roboto">{s.name}</span>
-              <span className="text-center">{s.score}</span>
-              <span className="text-center font-bold">{s.grade}</span>
-              <span className="text-center text-lys-teal">{s.career}</span>
-            </div>
+            { name: "Software Engineer", match: 94, icon: Brain, color: "text-lys-teal" },
+            { name: "UX Designer", match: 89, icon: Sparkles, color: "text-lys-yellow" },
+            { name: "Data Scientist", match: 85, icon: Briefcase, color: "text-lys-red" },
+            { name: "Product Manager", match: 81, icon: Compass, color: "text-lys-teal" },
+          ].map((c, i) => (
+            <motion.div
+              key={c.name}
+              initial={{ opacity: 0, x: i % 2 === 0 ? -20 : 20 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ delay: 0.2 + i * 0.1 }}
+              className="bg-card rounded-xl border p-3 shadow-sm"
+            >
+              <div className="flex items-center gap-2 mb-1.5">
+                <c.icon className={`h-4 w-4 ${c.color}`} />
+                <span className="text-xs font-oswald truncate">{c.name}</span>
+              </div>
+              <div className="flex items-center justify-between">
+                <Progress value={c.match} className="h-1.5 flex-1 mr-2" />
+                <span className={`text-xs font-bold ${c.color}`}>{c.match}%</span>
+              </div>
+            </motion.div>
           ))}
         </div>
       </div>
     ),
   },
   {
-    title: "Real-Time Collaboration",
-    subtitle: "Co-Create with Your Team",
-    description: "Co-edit lesson plans live with invite codes, chat, and shared templates.",
-    icon: <Users className="h-10 w-10" />,
-    color: "text-lys-teal",
-    bgGradient: "from-lys-teal/20 via-lys-teal/5 to-transparent",
-    features: [
-      { icon: <MessageSquare className="h-4 w-4" />, text: "Live Chat" },
-      { icon: <Users className="h-4 w-4" />, text: "Cursor Presence" },
-    ],
+    id: "do",
+    duration: 10000,
+    narration:
+      "And DO — educators generate standards-aligned lessons in seconds with our AI lesson planner.",
+    eyebrow: "DO — AI Lesson Planner",
+    title: "Standards-aligned lessons in seconds.",
+    body: "Generate full lesson plans, scope & sequence, and assignments — aligned to your state's standards.",
+    accent: "text-lys-red",
+    accentBg: "bg-lys-red",
+    bg: "from-lys-red/25 via-lys-yellow/10 to-background",
     visual: (
-      <div className="w-full max-w-xs mx-auto">
-        <div className="bg-card rounded-lg border p-3">
-          <div className="flex items-center gap-2 mb-2">
-            <div className="flex -space-x-2">
-              {["A", "B", "C"].map((l, i) => (
-                <div key={l} className="w-6 h-6 rounded-full flex items-center justify-center text-white text-[10px] font-bold border-2 border-background" style={{ backgroundColor: ["#E53935", "#00897B", "#F9A825"][i] }}>{l}</div>
-              ))}
-            </div>
-            <span className="text-xs text-muted-foreground">3 active</span>
-            <Badge className="ml-auto bg-green-500/10 text-green-600 text-xs">Live</Badge>
+      <div className="w-full max-w-md mx-auto">
+        <motion.div
+          initial={{ opacity: 0, y: 16 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.2 }}
+          className="bg-card rounded-2xl border p-4 shadow-lg"
+        >
+          <div className="flex items-center gap-2 mb-3">
+            <Wand2 className="h-4 w-4 text-lys-red" />
+            <span className="font-oswald text-sm">AI Lesson Generator</span>
+            <Badge variant="secondary" className="ml-auto text-[10px]">TEKS</Badge>
           </div>
-          <div className="space-y-1 text-xs">
-            <div className="flex items-center gap-2"><div className="w-1.5 h-1.5 rounded-full bg-green-500" /><span className="text-muted-foreground">Ms. Johnson editing objectives...</span></div>
-            <div className="flex items-center gap-2"><div className="w-1.5 h-1.5 rounded-full bg-blue-500" /><span className="text-muted-foreground">Mr. Davis reviewing standards...</span></div>
+          <div className="text-xs font-roboto text-muted-foreground mb-2">
+            Algebra I · Linear Functions · 9th grade
           </div>
-        </div>
-      </div>
-    ),
-  },
-  {
-    title: "Parent Portal v2",
-    subtitle: "Free for Every Family · Now with Family Connect",
-    description: "Parents connect via magic invite links, read teacher announcements, track their child's Be-Know-Do journey, and message teachers securely — all in one place.",
-    icon: <Users className="h-10 w-10" />,
-    color: "text-lys-yellow",
-    bgGradient: "from-lys-yellow/20 via-lys-yellow/5 to-transparent",
-    features: [
-      { icon: <Heart className="h-4 w-4" />, text: "BKD Journey View" },
-      { icon: <Briefcase className="h-4 w-4" />, text: "Career Readiness" },
-      { icon: <MessageSquare className="h-4 w-4" />, text: "1-to-1 Secure Messaging" },
-      { icon: <Layers className="h-4 w-4" />, text: "Magic Invite Links" },
-    ],
-    visual: (
-      <div className="w-full max-w-xs mx-auto space-y-2">
-        <div className="bg-card rounded-lg border p-3 space-y-2">
-          <p className="text-xs text-muted-foreground font-roboto">Your Child's Progress</p>
-          <div className="grid grid-cols-3 gap-2 text-center">
+          <div className="space-y-1.5">
             {[
-              { label: "Being", value: "82%", color: "text-lys-yellow" },
-              { label: "Knowing", value: "75%", color: "text-lys-teal" },
-              { label: "Doing", value: "88%", color: "text-lys-red" },
-            ].map((p) => (
-              <div key={p.label}>
-                <div className={`text-lg font-bold font-oswald ${p.color}`}>{p.value}</div>
-                <div className="text-[10px] text-muted-foreground">{p.label}</div>
-              </div>
+              "Objectives: Solve y = mx + b",
+              "Warm-up: 5-min slope review",
+              "Activity: Real-world data plotting",
+              "Assessment: 10-question exit ticket",
+            ].map((line, i) => (
+              <motion.div
+                key={line}
+                initial={{ opacity: 0, x: -8 }}
+                animate={{ opacity: 1, x: 0 }}
+                transition={{ delay: 0.4 + i * 0.15 }}
+                className="flex items-start gap-2 text-xs font-roboto"
+              >
+                <CheckCircle2 className="h-3.5 w-3.5 text-lys-teal flex-shrink-0 mt-0.5" />
+                <span>{line}</span>
+              </motion.div>
             ))}
           </div>
-        </div>
-        <div className="bg-card rounded-lg border p-2 flex items-center gap-2">
-          <MessageSquare className="h-4 w-4 text-lys-teal flex-shrink-0" />
-          <div className="flex-1 min-w-0">
-            <p className="text-xs font-medium truncate">Ms. Johnson</p>
-            <p className="text-[10px] text-muted-foreground truncate">Field trip forms due Friday!</p>
-          </div>
-          <span className="text-[10px] bg-lys-yellow/20 text-lys-yellow px-1.5 py-0.5 rounded-full">New</span>
-        </div>
-        <div className="bg-card rounded-lg border p-2 flex items-center gap-2">
-          <Briefcase className="h-4 w-4 text-lys-red flex-shrink-0" />
-          <p className="text-[10px] text-muted-foreground">Top match: Software Developer (94%)</p>
-        </div>
+        </motion.div>
       </div>
     ),
   },
   {
-    title: "Teacher Communications Hub",
-    subtitle: "Quiet Hours · Announcements · Portfolio Oversight",
-    description: "Teachers set quiet hours so families aren't notified at midnight, post class-wide announcements to parents and students, and flag inappropriate portfolio items for review.",
-    icon: <Layers className="h-10 w-10" />,
-    color: "text-lys-teal",
-    bgGradient: "from-lys-teal/20 via-lys-teal/5 to-transparent",
-    features: [
-      { icon: <Shield className="h-4 w-4" />, text: "Portfolio Oversight" },
-      { icon: <FileText className="h-4 w-4" />, text: "Class Announcements" },
-      { icon: <Brain className="h-4 w-4" />, text: "Quiet Hours Scheduling" },
-    ],
+    id: "educators",
+    duration: 10000,
+    narration:
+      "Built for educators — assignments, gradebook, parent portal, and real-time collaboration in one place.",
+    eyebrow: "For Educators",
+    title: "One platform. Every classroom tool.",
+    body: "Assignments, gradebook, parent portal, scope & sequence, and real-time collaboration — all integrated.",
+    accent: "text-lys-teal",
+    accentBg: "bg-lys-teal",
+    bg: "from-lys-teal/20 via-lys-red/10 to-background",
     visual: (
-      <div className="w-full max-w-xs mx-auto space-y-2">
-        <div className="bg-card rounded-lg border p-2 flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <div className="w-2 h-2 rounded-full bg-amber-400" />
-            <p className="text-xs font-medium">Field Trip Reminder</p>
-          </div>
-          <span className="text-[10px] text-muted-foreground">Parents</span>
-        </div>
-        <div className="bg-card rounded-lg border p-2 flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <div className="w-2 h-2 rounded-full bg-blue-400" />
-            <p className="text-xs font-medium">Quiet Hours: 9pm–7am</p>
-          </div>
-          <span className="text-[10px] text-green-600">Active</span>
-        </div>
-        <div className="bg-card rounded-lg border p-2 flex items-center gap-2">
-          <Shield className="h-3.5 w-3.5 text-red-400" />
-          <p className="text-xs text-muted-foreground">0 flagged portfolio items</p>
-        </div>
-      </div>
-    ),
-  },
-  {
-    title: "Scholarships & Mentors",
-    subtitle: "Plan for the Future",
-    description: "Scholarship planning, essay builder, strengths inventory, and mentor connections.",
-    icon: <Award className="h-10 w-10" />,
-    color: "text-lys-red",
-    bgGradient: "from-lys-red/20 via-lys-yellow/5 to-transparent",
-    features: [
-      { icon: <DollarSign className="h-4 w-4" />, text: "Scholarship Finder" },
-      { icon: <Users className="h-4 w-4" />, text: "Mentor Matching" },
-    ],
-    visual: (
-      <div className="w-full max-w-xs mx-auto space-y-2">
+      <div className="w-full max-w-lg mx-auto grid grid-cols-3 gap-2.5">
         {[
-          { name: "STEM Leaders Fund", amt: "$5,000", deadline: "Mar 2026" },
-          { name: "First-Gen Scholars", amt: "$10,000", deadline: "Apr 2026" },
-          { name: "Trade Skills Award", amt: "$3,000", deadline: "May 2026" },
-        ].map((s) => (
-          <div key={s.name} className="bg-card rounded-lg border p-2 flex items-center justify-between">
-            <div>
-              <p className="text-sm font-oswald">{s.name}</p>
-              <p className="text-xs text-muted-foreground">Due {s.deadline}</p>
+          { label: "Assignments", icon: ClipboardList, color: "bg-lys-red/20 text-lys-red" },
+          { label: "Gradebook", icon: CheckCircle2, color: "bg-lys-teal/20 text-lys-teal" },
+          { label: "Parent Portal", icon: Heart, color: "bg-lys-yellow/20 text-lys-yellow" },
+          { label: "Scope & Sequence", icon: Compass, color: "bg-lys-teal/20 text-lys-teal" },
+          { label: "Collaboration", icon: Sparkles, color: "bg-lys-red/20 text-lys-red" },
+          { label: "Mentors", icon: GraduationCap, color: "bg-lys-yellow/20 text-lys-yellow" },
+        ].map((tool, i) => (
+          <motion.div
+            key={tool.label}
+            initial={{ opacity: 0, scale: 0.8 }}
+            animate={{ opacity: 1, scale: 1 }}
+            transition={{ delay: 0.15 + i * 0.08 }}
+            className="bg-card rounded-xl border p-3 flex flex-col items-center gap-1.5 shadow-sm"
+          >
+            <div className={`w-10 h-10 rounded-lg ${tool.color} flex items-center justify-center`}>
+              <tool.icon className="h-5 w-5" />
             </div>
-            <Badge className="bg-lys-yellow/10 text-lys-yellow border-lys-yellow/20 text-xs">{s.amt}</Badge>
-          </div>
+            <span className="text-[11px] font-oswald text-center">{tool.label}</span>
+          </motion.div>
         ))}
       </div>
     ),
   },
   {
-    title: "LYS Marketplace",
-    subtitle: "eBooks, Courses & Educator Tools",
-    description: "Browse and save educator resources — lesson plan packs, mini-courses, guides, and more — with category filters, wishlisting, and one-click access.",
-    icon: <ShoppingBag className="h-10 w-10" />,
-    color: "text-lys-teal",
-    bgGradient: "from-lys-teal/20 via-lys-yellow/5 to-transparent",
-    features: [
-      { icon: <Bookmark className="h-4 w-4" />, text: "Personal Wishlist" },
-      { icon: <Star className="h-4 w-4" />, text: "Category Filters" },
-      { icon: <ShoppingBag className="h-4 w-4" />, text: "Free & Paid Items" },
-    ],
+    id: "schools",
+    duration: 10000,
+    narration:
+      "Built for schools too — single campuses, full districts, and multi-state charter networks all run on LYS.",
+    eyebrow: "For Schools, Districts & Networks",
+    title: "Scales from one campus to a national network.",
+    body: "Multi-tenant architecture supports single-campus charters, traditional ISDs, and multi-state CMOs/EMOs like KIPP and IDEA.",
+    accent: "text-lys-yellow",
+    accentBg: "bg-lys-yellow",
+    bg: "from-lys-yellow/20 via-lys-teal/10 to-background",
     visual: (
-      <div className="w-full max-w-xs mx-auto space-y-2">
-        <div className="flex flex-wrap gap-1 mb-1">
-          {["All", "Lesson Plans", "SEL", "STEM"].map((cat, i) => (
-            <span key={cat} className={`text-[10px] font-oswald px-2 py-0.5 rounded-full border ${i === 0 ? "bg-lys-teal text-white border-lys-teal" : "text-muted-foreground border-border"}`}>{cat}</span>
-          ))}
-        </div>
+      <div className="w-full max-w-md mx-auto space-y-2">
         {[
-          { title: "Growth Mindset Toolkit", type: "Resource Pack", price: "Free", wishlisted: true },
-          { title: "Career Readiness eBook", type: "eBook", price: "$12.99", wishlisted: false },
-          { title: "SEL Lesson Bundle", type: "Mini Course", price: "$29.99", wishlisted: false },
-        ].map((item) => (
-          <div key={item.title} className="bg-card rounded-lg border p-2 flex items-center justify-between">
-            <div className="flex-1 min-w-0">
-              <p className="text-xs font-oswald truncate">{item.title}</p>
-              <Badge variant="secondary" className="text-[10px]">{item.type}</Badge>
-            </div>
-            <div className="flex items-center gap-1.5 shrink-0 ml-2">
-              <span className={`text-xs font-oswald ${item.price === "Free" ? "text-green-600" : "text-lys-yellow"}`}>{item.price}</span>
-              {item.wishlisted
-                ? <BookmarkCheck className="h-3.5 w-3.5 text-lys-yellow" />
-                : <Bookmark className="h-3.5 w-3.5 text-muted-foreground" />}
-            </div>
-          </div>
-        ))}
-      </div>
-    ),
-  },
-  {
-    title: "Professional Development",
-    subtitle: "Courses + Curated Live Articles",
-    description: "AI-recommended courses, certification tracking, and a live feed of curated educator articles pulled from the Content Hub RSS engine.",
-    icon: <Star className="h-10 w-10" />,
-    color: "text-lys-teal",
-    bgGradient: "from-lys-teal/20 via-lys-teal/5 to-transparent",
-    features: [
-      { icon: <Brain className="h-4 w-4" />, text: "AI Recommendations" },
-      { icon: <Rss className="h-4 w-4" />, text: "Live RSS Articles" },
-      { icon: <Award className="h-4 w-4" />, text: "Cert Tracking" },
-    ],
-    visual: (
-      <div className="w-full max-w-xs mx-auto space-y-2">
-        <div className="bg-card rounded-lg border p-2">
-          <p className="text-[10px] text-muted-foreground mb-1.5 font-oswald">LYS Courses</p>
-          {[
-            { course: "AI in the Classroom", hours: "6 hrs", status: "Complete" },
-            { course: "SEL Strategies", hours: "3 hrs", status: "In Progress" },
-          ].map((c) => (
-            <div key={c.course} className="flex items-center justify-between text-xs py-0.5">
-              <span className="font-roboto">{c.course}</span>
-              <Badge variant="secondary" className="text-[10px]">{c.status}</Badge>
-            </div>
-          ))}
-        </div>
-        <div className="bg-card rounded-lg border p-2">
-          <div className="flex items-center gap-1 mb-1.5">
-            <Rss className="h-3 w-3 text-lys-yellow" />
-            <p className="text-[10px] font-oswald text-muted-foreground">Curated Articles</p>
-          </div>
-          {["Edu-Steps: Vision to Reality", "Dealing with Pressure in Teaching"].map((a) => (
-            <div key={a} className="flex items-center gap-1.5 text-xs py-0.5">
-              <div className="w-1 h-1 rounded-full bg-lys-yellow shrink-0" />
-              <span className="text-muted-foreground truncate">{a}</span>
-            </div>
-          ))}
-        </div>
-      </div>
-    ),
-  },
-  {
-    title: "Multi-Tenant Security",
-    subtitle: "7-Role RBAC & COPPA",
-    description: "7-role hierarchy with support for ISDs, charter networks (CMO/EMO), and single-campus charters. PII protection, audit logging, and self-service org admin.",
-    icon: <Shield className="h-10 w-10" />,
-    color: "text-lys-yellow",
-    bgGradient: "from-lys-yellow/20 via-lys-red/5 to-transparent",
-    features: [
-      { icon: <Lock className="h-4 w-4" />, text: "Zero-Trust" },
-      { icon: <Shield className="h-4 w-4" />, text: "COPPA Compliant" },
-    ],
-    visual: (
-      <div className="w-full max-w-xs mx-auto">
-        <div className="bg-card rounded-lg border p-3 space-y-1.5">
-          {[
-            { role: "System Admin", color: "bg-red-500" },
-            { role: "Site Admin", color: "bg-orange-500" },
-            { role: "Network / ISD Admin", color: "bg-amber-500" },
-            { role: "Campus Admin", color: "bg-yellow-500" },
-            { role: "Educator", color: "bg-emerald-500" },
-            { role: "Parent", color: "bg-teal-500" },
-            { role: "Student", color: "bg-blue-500" },
-          ].map((r, i) => (
-            <div key={r.role} className="flex items-center gap-2">
-              <div className={`w-2 h-2 rounded-full ${r.color}`} />
-              <span className="text-xs font-roboto flex-1">{r.role}</span>
-              <div className="h-1 rounded-full bg-muted" style={{ width: `${((7 - i) / 7) * 100}%`, minWidth: "16px" }}>
-                <div className={`h-full rounded-full ${r.color}`} />
-              </div>
-            </div>
-          ))}
-        </div>
-      </div>
-    ),
-  },
-  {
-    title: "Three Client Structures",
-    subtitle: "Charter, ISD & Network",
-    description: "LYS supports Single-Campus Charters, Traditional ISDs, and Multi-State Charter Networks (CMO/EMO) — each with tailored tiers and admin tools.",
-    icon: <Building2 className="h-10 w-10" />,
-    color: "text-lys-teal",
-    bgGradient: "from-lys-teal/20 via-lys-yellow/5 to-transparent",
-    features: [
-      { icon: <Layers className="h-4 w-4" />, text: "Flexible Hierarchy" },
-      { icon: <Globe className="h-4 w-4" />, text: "Multi-State Support" },
-    ],
-    visual: (
-      <div className="w-full max-w-xs mx-auto space-y-2">
-        {[
-          { type: "Single-Campus Charter", tier: `Campus — $${PLAN_PRICES.campus}/mo + $${SEAT_PRICES.campus}/seat (${SEAT_MINIMUMS.campus} min)`, desc: "Independent school, full customization", color: "bg-lys-yellow" },
-          { type: "Traditional ISD", tier: `Enterprise — $${PLAN_PRICES.enterprise}/mo + $${SEAT_PRICES.enterprise}/seat (${SEAT_MINIMUMS.enterprise} min)`, desc: "Multi-campus district, elected board", color: "bg-lys-teal" },
-          { type: "Charter Network (CMO/EMO)", tier: `Enterprise — $${PLAN_PRICES.enterprise}/mo + $${SEAT_PRICES.enterprise}/seat (${SEAT_MINIMUMS.enterprise} min)`, desc: "Multi-state HQ with master dashboard", color: "bg-lys-red" },
-        ].map((s) => (
-          <div key={s.type} className="bg-card rounded-lg border p-2 flex items-center gap-2">
-            <div className={`w-2 h-full min-h-[2rem] rounded-full ${s.color}`} />
-            <div className="flex-1 min-w-0">
-              <p className="text-sm font-oswald">{s.type}</p>
-              <p className="text-[10px] text-muted-foreground truncate">{s.desc}</p>
-            </div>
-            <Badge variant="secondary" className="text-[10px] shrink-0">{s.tier}</Badge>
-          </div>
-        ))}
-      </div>
-    ),
-  },
-  {
-    title: "Org Admin Self-Service",
-    subtitle: "Campus, ISD & Charter Network Management",
-    description: "Manage members, roles, invitations, and org settings for campuses, ISDs, and charter networks without needing system admin help.",
-    icon: <Layers className="h-10 w-10" />,
-    color: "text-lys-teal",
-    bgGradient: "from-lys-teal/20 via-lys-yellow/5 to-transparent",
-    features: [
-      { icon: <Users className="h-4 w-4" />, text: "Member Management" },
-      { icon: <Shield className="h-4 w-4" />, text: "Role Assignment" },
-    ],
-    visual: (
-      <div className="w-full max-w-xs mx-auto">
-        <div className="bg-card rounded-lg border p-3 space-y-2">
-          <div className="flex items-center justify-between text-xs">
-            <span className="font-oswald">KIPP Charter Network</span>
-            <Badge variant="secondary" className="text-[10px]">CMO</Badge>
-          </div>
-          {[
-            { action: "New campus added: KIPP Austin", time: "2m ago" },
-            { action: "Role changed: Mr. Chen \u2192 Campus Admin", time: "1h ago" },
-            { action: "Per-state compliance updated (TX)", time: "3h ago" },
-          ].map((a) => (
-            <div key={a.action} className="flex items-center gap-2 text-xs">
-              <CheckCircle2 className="h-3 w-3 text-green-500 shrink-0" />
-              <span className="text-muted-foreground truncate">{a.action}</span>
-            </div>
-          ))}
-        </div>
-      </div>
-    ),
-  },
-  {
-    title: "SIS Integration",
-    subtitle: "Clever Live · 5 More Coming Soon",
-    description: "Sync students and classes with Clever today. PowerSchool, Canvas LMS, Infinite Campus, Skyward, and OneRoster integrations are in development.",
-    icon: <Globe className="h-10 w-10" />,
-    color: "text-lys-red",
-    bgGradient: "from-lys-red/20 via-lys-teal/5 to-transparent",
-    features: [
-      { icon: <CheckCircle2 className="h-4 w-4" />, text: "Clever — Live Now" },
-      { icon: <Layers className="h-4 w-4" />, text: "5 More Coming Soon" },
-    ],
-    visual: (
-      <div className="w-full max-w-xs mx-auto">
-        <div className="bg-card rounded-lg border p-3 space-y-2">
-          <div className="flex items-center gap-2">
-            <div className="bg-muted/50 rounded p-1.5 flex-1 text-center border border-green-500/30">
-              <p className="text-[10px] font-oswald text-green-600">✓ Clever</p>
-            </div>
-          </div>
-          <div className="grid grid-cols-3 gap-1.5">
-            {["PowerSchool", "Canvas", "Infinite Campus", "Skyward", "OneRoster"].map((p) => (
-              <div key={p} className="bg-muted/30 rounded p-1 text-center border border-amber-500/20">
-                <p className="text-[9px] font-oswald text-muted-foreground">{p}</p>
-                <p className="text-[8px] text-amber-500">Soon</p>
-              </div>
-            ))}
-          </div>
-        </div>
-      </div>
-    ),
-  },
-  {
-    title: "Help Desk",
-    subtitle: "40+ Knowledge Articles",
-    description: "Searchable help with troubleshooting guides, admin docs, and developer reference.",
-    icon: <HelpCircle className="h-10 w-10" />,
-    color: "text-lys-yellow",
-    bgGradient: "from-lys-yellow/20 via-lys-yellow/5 to-transparent",
-    features: [
-      { icon: <BookOpen className="h-4 w-4" />, text: "Searchable KB" },
-      { icon: <FileText className="h-4 w-4" />, text: "Admin Guides" },
-    ],
-    visual: (
-      <div className="w-full max-w-xs mx-auto space-y-2">
-        {["How do I create an AI lesson plan?", "Managing campus members", "Setting up SIS integration"].map((q) => (
-          <div key={q} className="bg-card rounded-lg border p-2 flex items-center gap-2">
-            <HelpCircle className="h-3 w-3 text-muted-foreground shrink-0" />
-            <span className="text-xs font-roboto">{q}</span>
-            <ChevronRight className="h-3 w-3 text-muted-foreground ml-auto shrink-0" />
-          </div>
-        ))}
-      </div>
-    ),
-  },
-  {
-    title: "Global Pricing",
-    subtitle: "Equitable Access Worldwide",
-    description: "Country Affordability Index ensures fair pricing based on local purchasing power.",
-    icon: <DollarSign className="h-10 w-10" />,
-    color: "text-lys-teal",
-    bgGradient: "from-lys-teal/20 via-lys-red/5 to-transparent",
-    features: [
-      { icon: <Globe className="h-4 w-4" />, text: "190+ Countries" },
-      { icon: <DollarSign className="h-4 w-4" />, text: "Purchasing Power Pricing" },
-    ],
-    visual: (
-      <div className="w-full max-w-xs mx-auto">
-        <div className="bg-card rounded-lg border p-3 space-y-2">
-          {[
-            { country: "United States", price: `$${PLAN_PRICES.pro}/mo`, idx: "1.00" },
-            { country: "Brazil", price: `$${(PLAN_PRICES.pro * 0.35).toFixed(2)}/mo`, idx: "0.35" },
-            { country: "India", price: `$${(PLAN_PRICES.pro * 0.20).toFixed(2)}/mo`, idx: "0.20" },
-          ].map((c) => (
-            <div key={c.country} className="flex items-center justify-between text-xs">
-              <span className="font-roboto">{c.country}</span>
-              <div className="flex items-center gap-2">
-                <span className="text-muted-foreground">CAI: {c.idx}</span>
-                <Badge variant="secondary" className="text-[10px]">{c.price}</Badge>
-              </div>
-            </div>
-          ))}
-        </div>
-      </div>
-    ),
-  },
-  {
-    title: "Start Your Journey",
-    subtitle: "Join 10,000+ Educators",
-    description: "Free to start. AI lessons, 40+ careers, and student success tracking — all in one platform.",
-    icon: <GraduationCap className="h-10 w-10" />,
-    color: "text-lys-red",
-    bgGradient: "from-lys-red/20 via-lys-yellow/10 to-lys-teal/20",
-    features: [
-      { icon: <Sparkles className="h-4 w-4" />, text: "Free AI Tools" },
-      { icon: <Briefcase className="h-4 w-4" />, text: "40+ Careers" },
-      { icon: <GraduationCap className="h-4 w-4" />, text: "Success Tracking" },
-    ],
-    visual: (
-      <div className="flex items-center justify-center gap-4">
-        {[
-          { val: "10K+", label: "Educators", color: "text-lys-red" },
-          { val: "40+", label: "Careers", color: "text-lys-teal" },
-          { val: "50", label: "States", color: "text-lys-yellow" },
+          { type: "Single-Campus Charter", tier: "Campus tier", icon: Building2, color: "text-lys-yellow", barColor: "bg-lys-yellow" },
+          { type: "Traditional ISD", tier: "Enterprise tier", icon: Building2, color: "text-lys-teal", barColor: "bg-lys-teal" },
+          { type: "Multi-State Charter Network", tier: "Enterprise tier", icon: Globe, color: "text-lys-red", barColor: "bg-lys-red" },
         ].map((s, i) => (
-          <div key={s.label} className="text-center animate-fade-up" style={{ animationDelay: `${i * 0.1}s` }}>
-            <div className={`text-2xl font-bold font-oswald ${s.color}`}>{s.val}</div>
-            <div className="text-xs text-muted-foreground">{s.label}</div>
-          </div>
+          <motion.div
+            key={s.type}
+            initial={{ opacity: 0, x: -20 }}
+            animate={{ opacity: 1, x: 0 }}
+            transition={{ delay: 0.2 + i * 0.15 }}
+            className="bg-card rounded-xl border p-3 flex items-center gap-3 shadow-sm"
+          >
+            <div className={`w-1.5 self-stretch rounded-full ${s.barColor}`} />
+            <s.icon className={`h-5 w-5 ${s.color} flex-shrink-0`} />
+            <div className="flex-1 min-w-0">
+              <div className="text-sm font-oswald truncate">{s.type}</div>
+              <div className="text-[11px] text-muted-foreground font-roboto">{s.tier}</div>
+            </div>
+          </motion.div>
         ))}
+      </div>
+    ),
+  },
+  {
+    id: "pricing",
+    duration: 10000,
+    narration:
+      "Simple, equitable pricing. Free to start. Pro for individuals. Campus and Enterprise plans for teams — with global income-adjusted pricing.",
+    eyebrow: "Simple, Equitable Pricing",
+    title: "Free to start. Built to scale.",
+    body: `Pro at $${PLAN_PRICES.pro}/mo. Campus from $${PLAN_PRICES.campus}/mo + $${SEAT_PRICES.campus}/seat. Enterprise from $${PLAN_PRICES.enterprise}/mo + $${SEAT_PRICES.enterprise}/seat.`,
+    accent: "text-lys-red",
+    accentBg: "bg-lys-red",
+    bg: "from-lys-red/20 via-lys-yellow/10 to-lys-teal/15",
+    visual: (
+      <div className="w-full max-w-2xl mx-auto grid grid-cols-1 sm:grid-cols-2 gap-3 items-center">
+        <motion.div
+          initial={{ opacity: 0, scale: 0.95 }}
+          animate={{ opacity: 1, scale: 1 }}
+          transition={{ delay: 0.2 }}
+          className="rounded-xl border overflow-hidden shadow-lg bg-card"
+        >
+          <img
+            src={pricingScreenshot}
+            alt="LYS pricing page"
+            className="w-full h-auto block"
+            data-testid="img-demo-pricing-screenshot"
+          />
+        </motion.div>
+        <div className="space-y-2">
+          {[
+            { name: "Free", price: "$0", note: `${FREE_LESSON_LIMIT} AI lessons/mo`, color: "border-l-muted" },
+            { name: "Pro", price: `$${PLAN_PRICES.pro}/mo`, note: "Unlimited, no ads", color: "border-l-lys-red" },
+            { name: "Campus", price: `$${PLAN_PRICES.campus}/mo + $${SEAT_PRICES.campus}/seat`, note: `${SEAT_MINIMUMS.campus} seat min`, color: "border-l-lys-teal" },
+            { name: "Enterprise", price: `$${PLAN_PRICES.enterprise}/mo + $${SEAT_PRICES.enterprise}/seat`, note: `${SEAT_MINIMUMS.enterprise} seat min`, color: "border-l-lys-yellow" },
+          ].map((tier, i) => (
+            <motion.div
+              key={tier.name}
+              initial={{ opacity: 0, x: 20 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ delay: 0.35 + i * 0.1 }}
+              className={`bg-card rounded-lg border border-l-4 ${tier.color} p-2.5`}
+            >
+              <div className="flex items-baseline justify-between gap-2">
+                <span className="font-oswald text-sm">{tier.name}</span>
+                <span className="font-oswald text-xs font-bold text-right">{tier.price}</span>
+              </div>
+              <div className="text-[10px] text-muted-foreground font-roboto">{tier.note}</div>
+            </motion.div>
+          ))}
+        </div>
+      </div>
+    ),
+  },
+  {
+    id: "cta",
+    duration: 8000,
+    narration:
+      "Start free today. Join 10,000-plus educators laddering students to success.",
+    eyebrow: "Start Your Journey",
+    title: "Free to start. No card required.",
+    body: "Join 10,000+ educators using LYS to ladder students from identity to action.",
+    accent: "text-lys-red",
+    accentBg: "bg-lys-red",
+    bg: "from-lys-red/30 via-lys-yellow/15 to-lys-teal/25",
+    visual: (
+      <div className="flex flex-col items-center gap-6">
+        <div className="flex items-center justify-center gap-8 sm:gap-12">
+          {[
+            { val: "10K+", label: "Educators", color: "text-lys-red" },
+            { val: "40+", label: "Careers", color: "text-lys-teal" },
+            { val: "50", label: "States", color: "text-lys-yellow" },
+          ].map((s, i) => (
+            <motion.div
+              key={s.label}
+              initial={{ opacity: 0, y: 20, scale: 0.8 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              transition={{ delay: 0.2 + i * 0.15, type: "spring", stiffness: 200 }}
+              className="text-center"
+            >
+              <div className={`text-4xl sm:text-5xl font-bold font-oswald ${s.color}`}>{s.val}</div>
+              <div className="text-xs text-muted-foreground font-roboto mt-1">{s.label}</div>
+            </motion.div>
+          ))}
+        </div>
+        <motion.div
+          initial={{ opacity: 0, y: 16 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.7 }}
+        >
+          <Button
+            size="lg"
+            className="bg-lys-red hover:bg-lys-red/90 text-white font-oswald text-base px-8 shadow-lg"
+            onClick={() => {
+              window.location.href = "/api/login";
+            }}
+            data-testid="button-demo-cta-start"
+          >
+            <Sparkles className="h-4 w-4 mr-2" />
+            Start Free Today
+          </Button>
+        </motion.div>
       </div>
     ),
   },
 ];
 
-const SLIDE_DURATION = 4000;
+const TOTAL_MS = slides.reduce((sum, s) => sum + s.duration, 0);
+const TICK_MS = 50;
 
 interface DemoVideoModalProps {
   open: boolean;
@@ -767,156 +399,241 @@ interface DemoVideoModalProps {
 export function DemoVideoModal({ open, onOpenChange }: DemoVideoModalProps) {
   const [currentSlide, setCurrentSlide] = useState(0);
   const [isPlaying, setIsPlaying] = useState(true);
-  const [slideProgress, setSlideProgress] = useState(0);
+  const [slideElapsed, setSlideElapsed] = useState(0);
+  const [audioOn, setAudioOn] = useState(false);
+  const lastNarratedRef = useRef<number>(-1);
 
-  const totalSlides = slides.length;
   const slide = slides[currentSlide];
+  const totalSlides = slides.length;
 
-  const goToSlide = useCallback((index: number) => {
-    setCurrentSlide(index);
-    setSlideProgress(0);
+  const stopSpeech = useCallback(() => {
+    if (typeof window !== "undefined" && "speechSynthesis" in window) {
+      window.speechSynthesis.cancel();
+    }
   }, []);
+
+  const speak = useCallback((text: string) => {
+    if (typeof window === "undefined" || !("speechSynthesis" in window)) return;
+    window.speechSynthesis.cancel();
+    const utt = new SpeechSynthesisUtterance(text);
+    utt.rate = 1.05;
+    utt.pitch = 1.0;
+    utt.volume = 1.0;
+    window.speechSynthesis.speak(utt);
+  }, []);
+
+  const goToSlide = useCallback(
+    (index: number) => {
+      stopSpeech();
+      lastNarratedRef.current = -1;
+      setCurrentSlide(index);
+      setSlideElapsed(0);
+    },
+    [stopSpeech],
+  );
 
   const nextSlide = useCallback(() => {
     if (currentSlide < totalSlides - 1) {
       goToSlide(currentSlide + 1);
     } else {
+      stopSpeech();
       setIsPlaying(false);
-      setSlideProgress(100);
     }
-  }, [currentSlide, totalSlides, goToSlide]);
+  }, [currentSlide, totalSlides, goToSlide, stopSpeech]);
 
   const prevSlide = useCallback(() => {
-    if (currentSlide > 0) {
-      goToSlide(currentSlide - 1);
-    }
+    if (currentSlide > 0) goToSlide(currentSlide - 1);
   }, [currentSlide, goToSlide]);
 
+  // Reset on close
   useEffect(() => {
     if (!open) {
+      stopSpeech();
       setCurrentSlide(0);
-      setSlideProgress(0);
+      setSlideElapsed(0);
       setIsPlaying(true);
-      return;
+      lastNarratedRef.current = -1;
     }
-  }, [open]);
+  }, [open, stopSpeech]);
 
+  // Unconditional speech cleanup on unmount
+  useEffect(() => {
+    return () => {
+      if (typeof window !== "undefined" && "speechSynthesis" in window) {
+        window.speechSynthesis.cancel();
+      }
+    };
+  }, []);
+
+  // Tick timer — pure increment; auto-advance is handled in a separate effect
   useEffect(() => {
     if (!isPlaying || !open) return;
-
     const interval = setInterval(() => {
-      setSlideProgress((prev) => {
-        if (prev >= 100) {
-          nextSlide();
-          return 0;
-        }
-        return prev + 100 / (SLIDE_DURATION / 100);
-      });
-    }, 100);
-
+      setSlideElapsed((prev) => prev + TICK_MS);
+    }, TICK_MS);
     return () => clearInterval(interval);
-  }, [isPlaying, open, nextSlide]);
+  }, [isPlaying, open]);
 
-  const totalDuration = totalSlides * SLIDE_DURATION;
-  const overallProgress =
-    ((currentSlide * SLIDE_DURATION + (slideProgress / 100) * SLIDE_DURATION) / totalDuration) * 100;
+  // Auto-advance when current slide's elapsed reaches its duration
+  useEffect(() => {
+    if (!isPlaying || !open) return;
+    if (slideElapsed < slide.duration) return;
+    nextSlide();
+  }, [slideElapsed, slide.duration, isPlaying, open, nextSlide]);
 
-  const elapsed = Math.floor(overallProgress * (totalDuration / 100000));
-  const totalSec = Math.floor(totalDuration / 1000);
-  const formatTime = (s: number) => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
+  // Trigger narration when slide changes (only if audio is on and playing)
+  useEffect(() => {
+    if (!open || !audioOn || !isPlaying) return;
+    if (lastNarratedRef.current === currentSlide) return;
+    lastNarratedRef.current = currentSlide;
+    speak(slide.narration);
+  }, [currentSlide, open, audioOn, isPlaying, slide.narration, speak]);
+
+  // Stop speech on pause / audio off
+  useEffect(() => {
+    if (!isPlaying || !audioOn) stopSpeech();
+  }, [isPlaying, audioOn, stopSpeech]);
+
+  const elapsedMs =
+    slides.slice(0, currentSlide).reduce((s, x) => s + x.duration, 0) + slideElapsed;
+  const overallProgress = (elapsedMs / TOTAL_MS) * 100;
+  const formatTime = (ms: number) => {
+    const s = Math.floor(ms / 1000);
+    return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
+  };
+
+  const toggleAudio = () => {
+    if (audioOn) {
+      stopSpeech();
+      setAudioOn(false);
+    } else {
+      // Mark current slide as already narrated so the effect doesn't double-fire,
+      // then speak immediately if currently playing.
+      lastNarratedRef.current = currentSlide;
+      setAudioOn(true);
+      if (isPlaying) speak(slide.narration);
+    }
+  };
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl p-0 gap-0 overflow-hidden [&>button]:hidden" data-testid="demo-video-modal" aria-describedby={undefined}>
-        <VisuallyHidden><DialogTitle>LYS Platform Demo</DialogTitle></VisuallyHidden>
+      <DialogContent
+        className="max-w-3xl p-0 gap-0 overflow-hidden [&>button]:hidden border-0 sm:rounded-2xl"
+        data-testid="demo-video-modal"
+        aria-describedby={undefined}
+      >
+        <VisuallyHidden>
+          <DialogTitle>LYS Platform Demo</DialogTitle>
+        </VisuallyHidden>
+
         <div className="relative">
+          {/* Top progress bar */}
           <div className="h-1 bg-muted">
-            <div
-              className="h-full bg-lys-red transition-all duration-100"
-              style={{ width: `${overallProgress}%` }}
+            <motion.div
+              className={`h-full ${slide.accentBg}`}
+              animate={{ width: `${overallProgress}%` }}
+              transition={{ duration: 0.05, ease: "linear" }}
             />
           </div>
 
-          <div className="flex items-center gap-0.5 px-3 py-1.5 bg-muted/50">
-            {slides.map((_, i) => (
+          {/* Per-slide indicators */}
+          <div className="flex items-center gap-1 px-4 py-2 bg-muted/40">
+            {slides.map((s, i) => (
               <button
-                key={i}
+                key={s.id}
                 onClick={() => goToSlide(i)}
-                className="flex-1 h-1 rounded-full transition-all cursor-pointer"
-                style={{
-                  backgroundColor:
-                    i < currentSlide
-                      ? "hsl(var(--lys-red))"
-                      : i === currentSlide
-                        ? "hsl(var(--lys-yellow))"
-                        : "hsl(var(--muted))",
-                  opacity: i <= currentSlide ? 1 : 0.4,
-                }}
+                className="flex-1 h-1 rounded-full overflow-hidden bg-muted-foreground/20 cursor-pointer"
                 data-testid={`demo-slide-indicator-${i}`}
-              />
+                aria-label={`Go to slide ${i + 1}`}
+              >
+                <div
+                  className={`h-full ${slide.accentBg} transition-all duration-100`}
+                  style={{
+                    width:
+                      i < currentSlide ? "100%" : i === currentSlide ? `${(slideElapsed / s.duration) * 100}%` : "0%",
+                  }}
+                />
+              </button>
             ))}
           </div>
 
-          <div
-            className={`bg-gradient-to-br ${slide.bgGradient} min-h-[380px] flex flex-col`}
-            key={currentSlide}
-          >
-            <div className="flex-1 p-5 sm:p-6 flex flex-col">
-              <div className="flex items-start justify-between mb-3">
-                <div className="flex items-center gap-3">
-                  <div className={`${slide.color}`}>{slide.icon}</div>
-                  <div>
-                    <h2 className="font-marker text-lg sm:text-xl">{slide.title}</h2>
-                    <p className="font-oswald text-xs text-muted-foreground">{slide.subtitle}</p>
-                  </div>
-                </div>
+          {/* Slide stage */}
+          <div className="relative min-h-[440px] sm:min-h-[480px] overflow-hidden">
+            <AnimatePresence mode="wait">
+              <motion.div
+                key={slide.id}
+                initial={{ opacity: 0, scale: 1.04 }}
+                animate={{ opacity: 1, scale: 1 }}
+                exit={{ opacity: 0, scale: 0.98 }}
+                transition={{ duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
+                className={`absolute inset-0 bg-gradient-to-br ${slide.bg} flex flex-col`}
+              >
+                {/* Close button */}
                 <Button
                   variant="ghost"
                   size="icon"
-                  className="h-8 w-8 rounded-full"
+                  className="absolute top-3 right-3 h-8 w-8 rounded-full bg-card/60 backdrop-blur z-10 hover-elevate"
                   onClick={() => onOpenChange(false)}
                   data-testid="demo-close-button"
+                  aria-label="Close demo"
                 >
                   <X className="h-4 w-4" />
                 </Button>
-              </div>
 
-              <p className="font-roboto text-sm text-muted-foreground mb-4 max-w-md leading-relaxed animate-fade-in">
-                {slide.description}
-              </p>
-
-              <div className="flex flex-wrap gap-2 mb-4">
-                {slide.features.map((f, i) => (
-                  <div
-                    key={i}
-                    className="flex items-center gap-1.5 bg-card/60 backdrop-blur rounded-full px-2.5 py-1 border text-xs font-roboto animate-fade-up"
-                    style={{ animationDelay: `${i * 0.1}s` }}
+                <div className="flex-1 px-6 sm:px-10 py-8 sm:py-10 flex flex-col">
+                  {/* Header */}
+                  <motion.div
+                    initial={{ opacity: 0, y: -8 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: 0.05 }}
+                    className="mb-5 sm:mb-6"
                   >
-                    {f.icon}
-                    {f.text}
-                  </div>
-                ))}
-              </div>
+                    <div className={`text-xs sm:text-sm font-oswald uppercase tracking-wider ${slide.accent} mb-2`}>
+                      {slide.eyebrow}
+                    </div>
+                    <h2 className="font-marker text-2xl sm:text-4xl leading-tight mb-2">
+                      {slide.title}
+                    </h2>
+                    <p className="font-roboto text-sm sm:text-base text-muted-foreground max-w-xl leading-relaxed">
+                      {slide.body}
+                    </p>
+                  </motion.div>
 
-              <div className="flex-1 flex items-center justify-center animate-fade-in" style={{ animationDelay: "0.2s" }}>
-                {slide.visual}
-              </div>
-            </div>
+                  {/* Visual */}
+                  <div className="flex-1 flex items-center justify-center">
+                    {slide.visual}
+                  </div>
+                </div>
+              </motion.div>
+            </AnimatePresence>
           </div>
 
+          {/* Controls bar */}
           <div className="flex items-center justify-between px-4 py-2.5 bg-card border-t">
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-1">
               <Button
                 variant="ghost"
                 size="icon"
-                className="h-8 w-8"
+                className="h-8 w-8 hover-elevate"
                 onClick={() => setIsPlaying(!isPlaying)}
                 data-testid="demo-play-pause"
+                aria-label={isPlaying ? "Pause" : "Play"}
               >
                 {isPlaying ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4" />}
               </Button>
-              <span className="text-xs text-muted-foreground font-roboto tabular-nums">
-                {formatTime(elapsed)} / {formatTime(totalSec)}
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-8 w-8 hover-elevate"
+                onClick={toggleAudio}
+                data-testid="demo-audio-toggle"
+                aria-label={audioOn ? "Turn narration off" : "Turn narration on"}
+                title={audioOn ? "Turn narration off" : "Turn narration on"}
+              >
+                {audioOn ? <Volume2 className="h-4 w-4" /> : <VolumeX className="h-4 w-4" />}
+              </Button>
+              <span className="text-xs text-muted-foreground font-roboto tabular-nums ml-2">
+                {formatTime(elapsedMs)} / {formatTime(TOTAL_MS)}
               </span>
             </div>
 
@@ -924,23 +641,25 @@ export function DemoVideoModal({ open, onOpenChange }: DemoVideoModalProps) {
               <Button
                 variant="ghost"
                 size="icon"
-                className="h-8 w-8"
+                className="h-8 w-8 hover-elevate"
                 onClick={prevSlide}
                 disabled={currentSlide === 0}
                 data-testid="demo-prev-slide"
+                aria-label="Previous slide"
               >
                 <ChevronLeft className="h-4 w-4" />
               </Button>
-              <span className="text-xs text-muted-foreground font-roboto min-w-[3rem] text-center">
+              <span className="text-xs text-muted-foreground font-roboto min-w-[3rem] text-center tabular-nums">
                 {currentSlide + 1} / {totalSlides}
               </span>
               <Button
                 variant="ghost"
                 size="icon"
-                className="h-8 w-8"
+                className="h-8 w-8 hover-elevate"
                 onClick={nextSlide}
-                disabled={currentSlide === totalSlides - 1}
+                disabled={currentSlide === totalSlides - 1 && !isPlaying}
                 data-testid="demo-next-slide"
+                aria-label="Next slide"
               >
                 <ChevronRight className="h-4 w-4" />
               </Button>
