@@ -142,8 +142,8 @@ INSTRUCTIONAL INPUT — must be split into Asynchronous and Synchronous, each co
   M  = Modeling — "I do"
   GP = Guided Practice — "We do"
 
-LESSON CLOSE — answer the essential question, then connect it to ALL 7 life domains (none are optional): ${LYS_DOMAINS.join(", ")}.
-Each domain reflection MUST be 1–3 sentences, addressed to the student in SECOND PERSON ("you", "your"), and ask at least one open question per domain when natural ("Have you considered…?", "Can you think of a time when…?").
+LESSON CLOSE — answer the essential question, then connect it to the life domains that genuinely fit the topic, drawn from: ${LYS_DOMAINS.join(", ")}. You do NOT need to cover all seven — choose the dimensions where the connection is real, and skip the ones that would feel forced.
+Each included reflection should be 1–3 sentences, addressed to the student in SECOND PERSON ("you", "your"), and ask at least one open question when natural ("Have you considered…?", "Can you think of a time when…?").
 
 VOICE RULES (from real LYS exemplars):
 - Warm, conversational, second-person.

@@ -189,7 +189,7 @@ The LYS methodology uses the "Be-Know-Do" framework to develop the whole student
 Create engaging, student-centered lessons that incorporate all three aspects while emphasizing the primary focus.
 The lesson should be warm, encouraging, and focused on student growth.
 Always connect the lesson to real-world applications in the Lesson Close section.
-ALWAYS include ALL 7 life dimensions in the Lesson Close: Educational, Social, Cultural, Financial, Health, Vocational, and Spiritual.
+Include life-dimension reflections in the Lesson Close as relevant — drawn from Educational, Social, Cultural, Financial, Health, Vocational, and Spiritual. Use the dimensions that genuinely connect to the topic; you may skip those that don't fit.
 
 ${AI_LESSON_RUBRIC_PROMPT}
 
@@ -199,7 +199,7 @@ QUALITY CHECK BEFORE OUTPUT:
 3. Is BE-KNOW-DO methodology FULLY integrated (not just mentioned)?
 4. Are there MULTIPLE resources with CLEAR guidance on access and application?
 5. Does the lesson have differentiation for diverse learners?
-6. Does the Lesson Close address ALL 7 life dimensions?
+6. Does the Lesson Close address the life dimensions that are genuinely relevant to this topic?
 
 IMPORTANT: Respond ONLY with a valid JSON object, no additional text.${africanInSystem}`;
 
@@ -255,7 +255,7 @@ Generate a complete LYS lesson plan in JSON format. Include:
 6. Resources with URLs where applicable
 7. Materials list
 8. Assessment strategy
-9. Lesson Close with life application connections to ALL SEVEN dimensions (educational, social, cultural, financial, health, vocational, spiritual) — none are optional
+9. Lesson Close with life application connections drawn from the 7 dimensions (educational, social, cultural, financial, health, vocational, spiritual) — include the ones genuinely relevant to the topic; you may skip dimensions that don't naturally fit
 
 JSON structure:
 {
