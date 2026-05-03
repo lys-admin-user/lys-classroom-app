@@ -1,0 +1,12 @@
+🏗️ The Strategic Blueprint: "The Foundation" Widget1. The UX/UI Architecture (The CMO & HR Lens)The footer will feature a "Core Identity" Hub. Instead of six different links, it’s a single, elegant entry point that expands into a multi-tabbed "Experience Center."The Entry Point (Footer): A clean, stylized section labeled [ Our Foundation: 65% Explored ].The Experience: Clicking this triggers a full-height side drawer (non-intrusive to the main workflow) with a "Story Mode" navigation.2. The Module Breakdown (The Content Schema)We will organize this into a "Golden Thread" sequence that HR and Marketing co-authored:ModuleTitleContent TypeThe "Why" (HR/CMO)01The Mission60s Founder VideoWhy we exist beyond profit.02The VisionInteractive TimelineWhere the platform will be in 2030.03Our Values"Values in Action" QuizReal-world scenarios (e.g., Integrity vs. Speed).04The BrandVisual Style GuideHow we speak and look globally.05The StrategyThe "North Star" MetricHow we plan to win the market this year.06The GoalsReal-time OKR TrackerOur current quarterly targets.💻 The Technical Specification (The CIO’s Implementation Plan)A. State-Driven EngagementTo ensure employees actually know the company, the CIO will implement a Knowledge Persistence Layer.Data Model: Each "Foundation" element is a boolean flag in the user’s meta_data table (e.g., has_viewed_mission: true).Gamification API: As they complete each section, it triggers a congratulations event, firing a celebratory animation (Lottie file) in the UI.B. The Developer’s "Ticket"JSON{
+  "component": "FoundationDrawer",
+  "props": {
+    "persistence": "localStorage + PostgreSQL",
+    "tracking": ["view_duration", "quiz_score", "click_thru"],
+    "styling": {
+      "transition": "slide-in 300ms ease-out",
+      "backdrop": "blur(4px)"
+    }
+  }
+}
+⚖️ The Guardrails (Best Practices)HR’s "Culture First" Rule: This shouldn't feel like a legal disclaimer. We use High-Fidelity Assets (quality video, clean typography) to show that leadership cares about the mission.CIO’s "Performance" Rule: The "Foundation" assets (videos/high-res images) must be lazy-loaded via CDN. We don't want the Mission video to slow down the CMO's marketing dashboard load time.CMO’s "Alignment" Rule: Use the exact same design tokens (colors, spacing) as the external brand. The employee's internal experience must mirror the student's external experience.
