@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { pgTable, text, varchar, integer, boolean, jsonb, timestamp, real } from "drizzle-orm/pg-core";
+import { pgTable, text, varchar, integer, boolean, jsonb, timestamp, real, index } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 import { isAfricanCountry } from "./africaContext";
@@ -3500,6 +3500,46 @@ export const freeTrials = pgTable("free_trials", {
 export const insertFreeTrialSchema = createInsertSchema(freeTrials).omit({ id: true, createdAt: true, updatedAt: true });
 export type InsertFreeTrial = z.infer<typeof insertFreeTrialSchema>;
 export type FreeTrial = typeof freeTrials.$inferSelect;
+
+// ----- Needs Analyzer (4-question funnel) ------------------------------------
+// Captures the segment, pain, urgency, and desired outcome of every visitor
+// who completes (or partially completes) the on-site Needs Analyzer. Anonymous
+// responses are keyed by `sessionId` (a uuid stored in the visitor's
+// localStorage); after they sign up, the onboarding flow calls a bind endpoint
+// that fills in `userId` and `convertedAt`, so we can measure which segments
+// convert best in the Exec KPIs tab.
+export const needsAnalyzerResponses = pgTable(
+  "needs_analyzer_responses",
+  {
+    id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+    sessionId: varchar("session_id").notNull(),
+    userId: varchar("user_id"),
+    identity: varchar("identity").notNull(),
+    corePain: text("core_pain"),
+    urgency: varchar("urgency"),
+    desiredOutcome: text("desired_outcome"),
+    ctaShown: varchar("cta_shown"),
+    ctaClicked: varchar("cta_clicked"),
+    ctaClickedAt: timestamp("cta_clicked_at"),
+    convertedAt: timestamp("converted_at"),
+    ipAddress: varchar("ip_address"),
+    createdAt: timestamp("created_at").defaultNow(),
+  },
+  (t) => ({
+    sessionIdx: index("needs_analyzer_session_id_idx").on(t.sessionId),
+    identityIdx: index("needs_analyzer_identity_idx").on(t.identity),
+  }),
+);
+export const insertNeedsAnalyzerResponseSchema = createInsertSchema(needsAnalyzerResponses).omit({
+  id: true,
+  userId: true,
+  ctaClickedAt: true,
+  convertedAt: true,
+  ipAddress: true,
+  createdAt: true,
+});
+export type InsertNeedsAnalyzerResponse = z.infer<typeof insertNeedsAnalyzerResponseSchema>;
+export type NeedsAnalyzerResponse = typeof needsAnalyzerResponses.$inferSelect;
 
 // RSS Feeds (System-level content ingestion)
 export type RssFeedType = "podcast" | "blog";

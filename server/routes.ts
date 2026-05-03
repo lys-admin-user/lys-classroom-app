@@ -47,6 +47,7 @@ import {
   organizationMemberships as orgMembershipsTable,
   freeTrials,
   guestLessonGenerations,
+  needsAnalyzerResponses,
   hasRolePrivilege,
   scholarshipApplications,
   knowResources,
@@ -8233,6 +8234,36 @@ export async function registerRoutes(
       const guestActiveLast7Days = guestsNeverStartedTrial.filter(g => g.lastSeen > sevenDaysAgo).length;
       const guestActiveLast30Days = guestsNeverStartedTrial.filter(g => g.lastSeen > thirtyDaysAgo).length;
 
+      // ----- Needs Analyzer segment funnel ---------------------------------
+      // Per identity: how many took the analyzer, how many clicked the CTA,
+      // and how many ultimately created an account (convertedAt is filled by
+      // the bind endpoint when onboarding completes). This tells the exec
+      // team which segments engage and which ones actually convert.
+      const allAnalyzer = await db.select().from(needsAnalyzerResponses);
+      // De-dupe by sessionId — same anonymous visitor can answer multiple
+      // times; we count each unique session once and prefer the latest.
+      const latestBySession = new Map<string, typeof allAnalyzer[number]>();
+      for (const r of allAnalyzer) {
+        const prev = latestBySession.get(r.sessionId);
+        if (!prev || (r.createdAt && prev.createdAt && new Date(r.createdAt) > new Date(prev.createdAt))) {
+          latestBySession.set(r.sessionId, r);
+        }
+      }
+      const dedupedAnalyzer = Array.from(latestBySession.values());
+      const identities = ["student", "educator", "homeschool_parent", "campus_admin", "district_admin"] as const;
+      const segmentFunnel = identities.map(id => {
+        const rows = dedupedAnalyzer.filter(r => r.identity === id);
+        const ctaClicked = rows.filter(r => r.ctaClicked != null).length;
+        const converted = rows.filter(r => r.convertedAt != null).length;
+        return {
+          identity: id,
+          completed: rows.length,
+          ctaClicked,
+          converted,
+          conversionRatePercent: rows.length > 0 ? Number(((converted / rows.length) * 100).toFixed(1)) : 0,
+        };
+      });
+
       res.json({
         signupsByWeek,
         lessonsByWeek,
@@ -8258,10 +8289,140 @@ export async function registerRoutes(
           activeLast30Days: guestActiveLast30Days,
           top: recentGuests,
         },
+        segmentFunnel: {
+          totalCompleted: dedupedAnalyzer.length,
+          bySegment: segmentFunnel,
+        },
       });
     } catch (error) {
       console.error("Exec metrics error:", error);
       res.status(500).json({ error: "Failed to fetch exec metrics" });
+    }
+  });
+
+  // ===== Needs Analyzer (4-question funnel) =================================
+  // Anonymous visitors can submit; we key responses by a localStorage uuid
+  // (`sessionId`). After signup, the onboarding flow calls `/bind` to attach
+  // the response to the user account so we can measure segment conversion.
+  //
+  // These endpoints are intentionally unauthenticated (the funnel runs before
+  // signup) so we validate input strictly and parse Content-Type ourselves
+  // because sendBeacon may post with `application/json` blob content.
+  const ANALYZER_IDENTITIES = [
+    "student",
+    "educator",
+    "homeschool_parent",
+    "campus_admin",
+    "district_admin",
+  ] as const;
+  const ANALYZER_URGENCIES = ["exploring", "looking", "ready_now"] as const;
+  const ANALYZER_CTAS = ["start_free", "try_sample", "book_demo"] as const;
+  const ANALYZER_SESSION_REGEX = /^[A-Za-z0-9_.-]{8,128}$/;
+  const analyzerSubmitSchema = z.object({
+    sessionId: z.string().regex(ANALYZER_SESSION_REGEX),
+    identity: z.enum(ANALYZER_IDENTITIES),
+    corePain: z.string().trim().max(500).optional().nullable(),
+    urgency: z.enum(ANALYZER_URGENCIES).optional().nullable(),
+    desiredOutcome: z.string().trim().max(500).optional().nullable(),
+    ctaShown: z.enum(ANALYZER_CTAS).optional().nullable(),
+  });
+  const analyzerCtaClickSchema = z.object({
+    sessionId: z.string().regex(ANALYZER_SESSION_REGEX),
+    ctaClicked: z.enum(ANALYZER_CTAS),
+  });
+  const analyzerBindSchema = z.object({
+    sessionId: z.string().regex(ANALYZER_SESSION_REGEX),
+  });
+
+  app.post("/api/needs-analyzer/submit", async (req: any, res) => {
+    try {
+      const parsed = analyzerSubmitSchema.safeParse(req.body);
+      if (!parsed.success) {
+        res.status(400).json({ error: "Invalid analyzer response" });
+        return;
+      }
+      // If this session already has a response, update the latest in place
+      // rather than creating duplicates (same visitor revising answers).
+      const existing = await db
+        .select()
+        .from(needsAnalyzerResponses)
+        .where(eq(needsAnalyzerResponses.sessionId, parsed.data.sessionId))
+        .orderBy(desc(needsAnalyzerResponses.createdAt))
+        .limit(1);
+      // Use req.ip only — never trust raw `x-forwarded-for` for attribution
+      // since it is trivially spoofable by anonymous clients. Behind Replit's
+      // proxy, Express is configured to populate req.ip from the trusted
+      // forwarded header.
+      const ipAddress = typeof req.ip === "string" && req.ip.length > 0 ? req.ip : null;
+      if (existing.length > 0) {
+        await db
+          .update(needsAnalyzerResponses)
+          .set({
+            identity: parsed.data.identity,
+            corePain: parsed.data.corePain ?? null,
+            urgency: parsed.data.urgency ?? null,
+            desiredOutcome: parsed.data.desiredOutcome ?? null,
+            ctaShown: parsed.data.ctaShown ?? null,
+            ipAddress,
+          })
+          .where(eq(needsAnalyzerResponses.id, existing[0].id));
+        res.json({ id: existing[0].id, updated: true });
+        return;
+      }
+      const [created] = await db
+        .insert(needsAnalyzerResponses)
+        .values({ ...parsed.data, ipAddress })
+        .returning();
+      res.json({ id: created.id, updated: false });
+    } catch (error) {
+      console.error("Needs analyzer submit error:", error);
+      res.status(500).json({ error: "Failed to save response" });
+    }
+  });
+
+  app.post("/api/needs-analyzer/cta-click", async (req: any, res) => {
+    try {
+      // sendBeacon posts as a blob with application/json content-type; Express
+      // body parsers should handle it, but if body is a Buffer/string we
+      // attempt one parse before validating.
+      let body = req.body;
+      if (typeof body === "string") {
+        try { body = JSON.parse(body); } catch { body = {}; }
+      } else if (body && typeof body === "object" && Buffer.isBuffer(body)) {
+        try { body = JSON.parse(body.toString("utf8")); } catch { body = {}; }
+      }
+      const parsed = analyzerCtaClickSchema.safeParse(body);
+      if (!parsed.success) {
+        res.status(400).json({ error: "Invalid CTA click payload" });
+        return;
+      }
+      await db
+        .update(needsAnalyzerResponses)
+        .set({ ctaClicked: parsed.data.ctaClicked, ctaClickedAt: new Date() })
+        .where(eq(needsAnalyzerResponses.sessionId, parsed.data.sessionId));
+      res.json({ ok: true });
+    } catch (error) {
+      console.error("Needs analyzer cta-click error:", error);
+      res.status(500).json({ error: "Failed to record CTA click" });
+    }
+  });
+
+  app.post("/api/needs-analyzer/bind", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user?.claims?.sub;
+      const parsed = analyzerBindSchema.safeParse(req.body);
+      if (!userId || !parsed.success) {
+        res.status(400).json({ error: "sessionId required and user must be authenticated" });
+        return;
+      }
+      await db
+        .update(needsAnalyzerResponses)
+        .set({ userId, convertedAt: new Date() })
+        .where(eq(needsAnalyzerResponses.sessionId, parsed.data.sessionId));
+      res.json({ ok: true });
+    } catch (error) {
+      console.error("Needs analyzer bind error:", error);
+      res.status(500).json({ error: "Failed to bind analyzer response" });
     }
   });
 

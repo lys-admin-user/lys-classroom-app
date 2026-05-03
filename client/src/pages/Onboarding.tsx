@@ -172,10 +172,24 @@ export default function Onboarding() {
 
   const completeMutation = useMutation({
     mutationFn: (data: any) => apiRequest("POST", "/api/onboarding/complete", data),
-    onSuccess: () => {
+    onSuccess: async () => {
       queryClient.invalidateQueries({ queryKey: ["/api/auth/user"] });
       toast({ title: "Welcome to LYS!", description: "Your personalized experience is ready." });
-      
+
+      // Bind any prior Needs Analyzer response (taken before signup) to this
+      // new user account so we can measure segment-level conversion in the
+      // Exec KPIs tab. Best-effort: failure here must not block onboarding.
+      try {
+        const sessionId = typeof window !== "undefined"
+          ? window.localStorage.getItem("lys_needs_analyzer_session_id")
+          : null;
+        if (sessionId) {
+          await apiRequest("POST", "/api/needs-analyzer/bind", { sessionId });
+        }
+      } catch {
+        /* non-fatal */
+      }
+
       const redirectPath = getRecommendedPath();
       setLocation(`${redirectPath}?tour=true&role=${encodeURIComponent(role)}&goal=${encodeURIComponent(primaryGoal)}`);
     },

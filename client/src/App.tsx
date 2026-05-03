@@ -7,6 +7,8 @@ import { SidebarProvider, SidebarInset, SidebarTrigger } from "@/components/ui/s
 import { AppSidebar } from "@/components/AppSidebar";
 import { Header } from "@/components/Header";
 import { Footer } from "@/components/Footer";
+import { NeedsAnalyzerModal } from "@/components/NeedsAnalyzerModal";
+import NeedsAnalyzerPage from "@/pages/NeedsAnalyzer";
 import { OnboardingReminderBanner } from "@/components/OnboardingReminderBanner";
 import { TrialBanner } from "@/components/TrialBanner";
 import { ImpersonationBanner } from "@/components/ImpersonationBanner";
@@ -273,6 +275,7 @@ function Router() {
       
       {/* Public exploration pages — no sign-in required */}
       <Route path="/" component={Dashboard} />
+      <Route path="/start" component={NeedsAnalyzerPage} />
       <Route path="/lesson-generator" component={LessonGenerator} />
       <Route path="/assessments" component={Assessments} />
       <Route path="/careers" component={Careers} />
@@ -398,6 +401,7 @@ function App() {
             <TourManager />
           </SidebarProvider>
         </OnboardingGuard>
+        <NeedsAnalyzerModal />
         <Toaster />
       </TooltipProvider>
     </QueryClientProvider>

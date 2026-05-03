@@ -283,6 +283,16 @@ export default function SystemAdminPage({ params }: { params?: { tab?: string } 
       activeLast30Days: number;
       top: { ipAddress: string; lessonCount: number; firstSeen: string; lastSeen: string; topics: string[] }[];
     };
+    segmentFunnel: {
+      totalCompleted: number;
+      bySegment: {
+        identity: string;
+        completed: number;
+        ctaClicked: number;
+        converted: number;
+        conversionRatePercent: number;
+      }[];
+    };
   }>({
     queryKey: ["/api/admin/exec-metrics"],
     enabled: adminCheck?.isSiteAdmin && activeTab === "exec",
@@ -3491,6 +3501,47 @@ export default function SystemAdminPage({ params }: { params?: { tab?: string } 
                     )}
                   </CardContent>
                 </Card>
+                <Card data-testid="card-segment-funnel" className="lg:col-span-2">
+                  <CardHeader>
+                    <CardTitle className="text-base font-oswald">
+                      Needs Analyzer &mdash; segment funnel
+                    </CardTitle>
+                    <CardDescription>
+                      Of the {execMetrics.segmentFunnel.totalCompleted} visitors who completed the on-site analyzer, this is who they said they were and how many converted to a signup.
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    {execMetrics.segmentFunnel.totalCompleted === 0 ? (
+                      <p className="text-sm text-muted-foreground">No analyzer responses yet. Visitors who complete the 4-question analyzer at /start will show up here.</p>
+                    ) : (
+                      <div className="overflow-x-auto">
+                        <table className="w-full text-sm">
+                          <thead>
+                            <tr className="text-xs text-muted-foreground border-b">
+                              <th className="text-left py-2 pr-4 font-medium">Segment</th>
+                              <th className="text-right py-2 px-2 font-medium">Completed</th>
+                              <th className="text-right py-2 px-2 font-medium">CTA clicks</th>
+                              <th className="text-right py-2 px-2 font-medium">Signed up</th>
+                              <th className="text-right py-2 pl-2 font-medium">Conversion</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {execMetrics.segmentFunnel.bySegment.map(s => (
+                              <tr key={s.identity} className="border-b last:border-0" data-testid={`row-funnel-${s.identity}`}>
+                                <td className="py-2 pr-4 font-medium capitalize">{s.identity.replace(/_/g, " ")}</td>
+                                <td className="py-2 px-2 text-right tabular-nums">{s.completed}</td>
+                                <td className="py-2 px-2 text-right tabular-nums">{s.ctaClicked}</td>
+                                <td className="py-2 px-2 text-right tabular-nums">{s.converted}</td>
+                                <td className="py-2 pl-2 text-right tabular-nums font-medium">{s.conversionRatePercent}%</td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+
                 <Card data-testid="card-unconverted-guests">
                   <CardHeader>
                     <CardTitle className="text-base font-oswald">

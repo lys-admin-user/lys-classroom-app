@@ -1,7 +1,7 @@
 import { Link, useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
 import { ThemeToggle } from "./ThemeToggle";
-import { LogIn, LogOut, Settings, CreditCard } from "lucide-react";
+import { LogIn, LogOut, Settings, CreditCard, Compass } from "lucide-react";
 import { useAuth } from "@/hooks/use-auth";
 import { SidebarTrigger, useSidebar } from "@/components/ui/sidebar";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -108,6 +108,20 @@ export function Header() {
       </Breadcrumb>
 
       <div className="ml-auto flex items-center gap-2">
+        {!isAuthenticated && (
+          <Button
+            asChild
+            variant="outline"
+            size="sm"
+            className="hidden sm:inline-flex font-roboto gap-1.5"
+            data-testid="button-find-your-fit"
+          >
+            <Link href="/start">
+              <Compass className="h-4 w-4" />
+              Find your fit
+            </Link>
+          </Button>
+        )}
         <ThemeToggle />
         
         {isLoading ? (
