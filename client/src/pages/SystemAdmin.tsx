@@ -5,6 +5,15 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import {
+  ResponsiveContainer as ExecResponsiveContainer,
+  BarChart as ExecBarChart,
+  Bar as ExecBar,
+  XAxis as ExecXAxis,
+  YAxis as ExecYAxis,
+  Tooltip as ExecTooltip,
+  CartesianGrid as ExecCartesianGrid,
+} from "recharts";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -256,6 +265,28 @@ export default function SystemAdminPage({ params }: { params?: { tab?: string } 
     queryKey: ["/api/admin/analytics"],
     enabled: adminCheck?.isSiteAdmin,
     refetchInterval: 30000,
+  });
+
+  const { data: execMetrics, isLoading: execMetricsLoading, error: execMetricsError } = useQuery<{
+    signupsByWeek: { weekStart: string; count: number }[];
+    lessonsByWeek: { weekStart: string; count: number }[];
+    conversion: { paidUsers: number; totalUsers: number; conversionRatePercent: number };
+    churn: { dormantPaid: number; eligiblePaid: number; churnRatePercent: number; windowDays: number };
+    unconvertedTrials: {
+      activeUnbound: number;
+      totalUnbound: number;
+      recent: { id: string; ipAddress: string; startedAt: string; expiresAt: string; hoursRemaining: number }[];
+    };
+    unconvertedGuests: {
+      uniqueIps: number;
+      activeLast7Days: number;
+      activeLast30Days: number;
+      top: { ipAddress: string; lessonCount: number; firstSeen: string; lastSeen: string; topics: string[] }[];
+    };
+  }>({
+    queryKey: ["/api/admin/exec-metrics"],
+    enabled: adminCheck?.isSiteAdmin && activeTab === "exec",
+    refetchInterval: 60000,
   });
 
   const { data: sitemap } = useQuery<Sitemap>({
@@ -943,6 +974,10 @@ export default function SystemAdminPage({ params }: { params?: { tab?: string } 
           <TabsTrigger value="trials" className="gap-2" data-testid="tab-trials">
             <Zap className="h-4 w-4" />
             <span className="hidden sm:inline">Trials</span>
+          </TabsTrigger>
+          <TabsTrigger value="exec" className="gap-2" data-testid="tab-exec">
+            <TrendingUp className="h-4 w-4" />
+            <span className="hidden sm:inline">Exec KPIs</span>
           </TabsTrigger>
         </TabsList>
 
@@ -3312,6 +3347,193 @@ export default function SystemAdminPage({ params }: { params?: { tab?: string } 
 
         <TabsContent value="trials" className="space-y-6">
           <TrialMonitoringTab />
+        </TabsContent>
+
+        <TabsContent value="exec" className="space-y-6" data-testid="content-exec">
+          {execMetricsError ? (
+            <div className="flex items-center justify-center py-12 text-destructive" data-testid="text-exec-error">
+              Couldn't load exec metrics. Please refresh.
+            </div>
+          ) : execMetricsLoading || !execMetrics ? (
+            <div className="flex items-center justify-center py-12 text-muted-foreground">
+              Loading exec metrics...
+            </div>
+          ) : (
+            <>
+              {/* KPI tiles */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                <Card data-testid="card-kpi-conversion">
+                  <CardHeader className="pb-2">
+                    <CardDescription>Free → paid conversion</CardDescription>
+                    <CardTitle className="text-3xl font-oswald">
+                      {execMetrics.conversion.conversionRatePercent}%
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="text-xs text-muted-foreground">
+                    {execMetrics.conversion.paidUsers} paid of {execMetrics.conversion.totalUsers} total users
+                  </CardContent>
+                </Card>
+                <Card data-testid="card-kpi-churn">
+                  <CardHeader className="pb-2">
+                    <CardDescription>Paid churn (last {execMetrics.churn.windowDays}d)</CardDescription>
+                    <CardTitle className="text-3xl font-oswald">
+                      {execMetrics.churn.churnRatePercent}%
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="text-xs text-muted-foreground">
+                    {execMetrics.churn.dormantPaid} dormant of {execMetrics.churn.eligiblePaid} paid accounts older than 60d
+                  </CardContent>
+                </Card>
+                <Card data-testid="card-kpi-active-trials">
+                  <CardHeader className="pb-2">
+                    <CardDescription>Active trials (not yet signed up)</CardDescription>
+                    <CardTitle className="text-3xl font-oswald">
+                      {execMetrics.unconvertedTrials.activeUnbound}
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="text-xs text-muted-foreground">
+                    {execMetrics.unconvertedTrials.totalUnbound} total unbound trials lifetime
+                  </CardContent>
+                </Card>
+                <Card data-testid="card-kpi-guest-funnel">
+                  <CardHeader className="pb-2">
+                    <CardDescription>Guests who haven't started a trial</CardDescription>
+                    <CardTitle className="text-3xl font-oswald">
+                      {execMetrics.unconvertedGuests.activeLast7Days}
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="text-xs text-muted-foreground">
+                    in last 7 days &middot; {execMetrics.unconvertedGuests.activeLast30Days} in last 30d
+                  </CardContent>
+                </Card>
+              </div>
+
+              {/* Weekly charts */}
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                <Card data-testid="card-chart-signups">
+                  <CardHeader>
+                    <CardTitle className="text-base font-oswald">Signups per week (last 12 weeks)</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div style={{ width: "100%", height: 220 }}>
+                      <ExecResponsiveContainer>
+                        <ExecBarChart data={execMetrics.signupsByWeek}>
+                          <ExecCartesianGrid strokeDasharray="3 3" opacity={0.2} />
+                          <ExecXAxis
+                            dataKey="weekStart"
+                            tick={{ fontSize: 10 }}
+                            tickFormatter={(v: string) => v.slice(5)}
+                          />
+                          <ExecYAxis tick={{ fontSize: 10 }} allowDecimals={false} />
+                          <ExecTooltip />
+                          <ExecBar dataKey="count" fill="hsl(var(--lys-teal))" radius={[3, 3, 0, 0]} />
+                        </ExecBarChart>
+                      </ExecResponsiveContainer>
+                    </div>
+                  </CardContent>
+                </Card>
+                <Card data-testid="card-chart-lessons">
+                  <CardHeader>
+                    <CardTitle className="text-base font-oswald">Lessons created per week (last 12 weeks)</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div style={{ width: "100%", height: 220 }}>
+                      <ExecResponsiveContainer>
+                        <ExecBarChart data={execMetrics.lessonsByWeek}>
+                          <ExecCartesianGrid strokeDasharray="3 3" opacity={0.2} />
+                          <ExecXAxis
+                            dataKey="weekStart"
+                            tick={{ fontSize: 10 }}
+                            tickFormatter={(v: string) => v.slice(5)}
+                          />
+                          <ExecYAxis tick={{ fontSize: 10 }} allowDecimals={false} />
+                          <ExecTooltip />
+                          <ExecBar dataKey="count" fill="hsl(var(--lys-yellow))" radius={[3, 3, 0, 0]} />
+                        </ExecBarChart>
+                      </ExecResponsiveContainer>
+                    </div>
+                  </CardContent>
+                </Card>
+              </div>
+
+              {/* Top-of-funnel: unconverted guests + active trials */}
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                <Card data-testid="card-active-trials">
+                  <CardHeader>
+                    <CardTitle className="text-base font-oswald">
+                      Active trials &mdash; not yet signed up
+                    </CardTitle>
+                    <CardDescription>
+                      Visitors who started a free trial but never created an account. Warmest leads in the funnel.
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    {execMetrics.unconvertedTrials.recent.length === 0 ? (
+                      <p className="text-sm text-muted-foreground">No active unbound trials right now.</p>
+                    ) : (
+                      <div className="space-y-2 max-h-80 overflow-y-auto">
+                        {execMetrics.unconvertedTrials.recent.map(t => (
+                          <div
+                            key={t.id}
+                            className="flex items-center justify-between text-sm border-b pb-2 last:border-0"
+                            data-testid={`row-trial-${t.id}`}
+                          >
+                            <div className="font-mono text-xs">{t.ipAddress}</div>
+                            <div className="text-xs text-muted-foreground">
+                              started {new Date(t.startedAt).toLocaleDateString()} &middot;{" "}
+                              <span className="font-medium text-foreground">
+                                {t.hoursRemaining}h left
+                              </span>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+                <Card data-testid="card-unconverted-guests">
+                  <CardHeader>
+                    <CardTitle className="text-base font-oswald">
+                      Anonymous guests &mdash; haven't even started a trial
+                    </CardTitle>
+                    <CardDescription>
+                      IPs that generated guest lessons in the last 30 days but never started a trial. Top-of-funnel signal.
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    {execMetrics.unconvertedGuests.top.length === 0 ? (
+                      <p className="text-sm text-muted-foreground">No unconverted guest activity in the last 30 days.</p>
+                    ) : (
+                      <div className="space-y-2 max-h-80 overflow-y-auto">
+                        {execMetrics.unconvertedGuests.top.map(g => (
+                          <div
+                            key={g.ipAddress}
+                            className="text-sm border-b pb-2 last:border-0"
+                            data-testid={`row-guest-${g.ipAddress}`}
+                          >
+                            <div className="flex items-center justify-between">
+                              <div className="font-mono text-xs">{g.ipAddress}</div>
+                              <Badge variant="secondary" className="text-xs">
+                                {g.lessonCount} lesson{g.lessonCount !== 1 ? "s" : ""}
+                              </Badge>
+                            </div>
+                            {g.topics.length > 0 && (
+                              <div className="text-xs text-muted-foreground mt-1 truncate">
+                                {g.topics.join(" · ")}
+                              </div>
+                            )}
+                            <div className="text-xs text-muted-foreground mt-0.5">
+                              last seen {new Date(g.lastSeen).toLocaleDateString()}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+              </div>
+            </>
+          )}
         </TabsContent>
       </Tabs>
 

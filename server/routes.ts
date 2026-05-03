@@ -46,6 +46,7 @@ import {
   userDataRegions as userDataRegionsTable,
   organizationMemberships as orgMembershipsTable,
   freeTrials,
+  guestLessonGenerations,
   hasRolePrivilege,
   scholarshipApplications,
   knowResources,
@@ -8083,6 +8084,184 @@ export async function registerRoutes(
     } catch (error) {
       console.error("Analytics error:", error);
       res.status(500).json({ error: "Failed to fetch analytics" });
+    }
+  });
+
+  // Exec KPIs — additive endpoint that powers the "Exec KPIs" tab on the
+  // System Admin page. Returns 12 weeks of signups + lessons, conversion and
+  // churn proxies, and visibility into the top-of-funnel: anonymous guests
+  // who generated lessons but never created an account, and trials that
+  // started but were never bound to a signup.
+  app.get("/api/admin/exec-metrics", isAuthenticated, isSiteAdmin, async (req: any, res) => {
+    try {
+      const now = new Date();
+      const msPerWeek = 7 * 24 * 60 * 60 * 1000;
+      const twelveWeeksAgo = new Date(now.getTime() - 12 * msPerWeek);
+      const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+      const sixtyDaysAgo = new Date(now.getTime() - 60 * 24 * 60 * 60 * 1000);
+      const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+
+      const [allUsers, allLessons, allTrials, allGuests] = await Promise.all([
+        db.select().from(users),
+        db.select().from(lessons),
+        db.select().from(freeTrials),
+        db.select().from(guestLessonGenerations),
+      ]);
+
+      // Weekly buckets: anchor each row at the Sunday on/before the timestamp,
+      // then group counts by that ISO date string. We seed all 12 weeks first
+      // so weeks with zero activity still appear in the chart.
+      const weekStartOf = (d: Date) => {
+        const c = new Date(d);
+        c.setHours(0, 0, 0, 0);
+        c.setDate(c.getDate() - c.getDay()); // Sunday
+        return c.toISOString().slice(0, 10);
+      };
+      const seedWeeks = (): Record<string, number> => {
+        const out: Record<string, number> = {};
+        for (let i = 11; i >= 0; i--) {
+          const d = new Date(now.getTime() - i * msPerWeek);
+          out[weekStartOf(d)] = 0;
+        }
+        return out;
+      };
+      const signupBuckets = seedWeeks();
+      for (const u of allUsers) {
+        if (!u.createdAt) continue;
+        const created = new Date(u.createdAt);
+        if (created < twelveWeeksAgo) continue;
+        const k = weekStartOf(created);
+        if (k in signupBuckets) signupBuckets[k] += 1;
+      }
+      const lessonBuckets = seedWeeks();
+      for (const l of allLessons) {
+        if (!l.createdAt) continue;
+        const created = new Date(l.createdAt);
+        if (created < twelveWeeksAgo) continue;
+        const k = weekStartOf(created);
+        if (k in lessonBuckets) lessonBuckets[k] += 1;
+      }
+      const signupsByWeek = Object.entries(signupBuckets).map(([weekStart, count]) => ({ weekStart, count }));
+      const lessonsByWeek = Object.entries(lessonBuckets).map(([weekStart, count]) => ({ weekStart, count }));
+
+      // Conversion = paid users / total users. Simple and stable; matches the
+      // headline number an exec wants to track week-over-week.
+      const paidTiers = new Set(["pro", "campus", "enterprise"]);
+      const paidUsers = allUsers.filter(u => paidTiers.has(u.tier || "free")).length;
+      const conversionRate = allUsers.length > 0 ? (paidUsers / allUsers.length) * 100 : 0;
+
+      // Churn proxy: paid users older than 60 days whose most recent saved
+      // lesson is more than 30 days old (or who have never saved one). We
+      // don't yet emit a "subscription_canceled" event, so this approximates
+      // dormant paid accounts. Update this when that event lands.
+      const lessonsByUser = new Map<string, Date>();
+      for (const l of allLessons) {
+        if (!l.createdAt || !l.userId) continue;
+        const prev = lessonsByUser.get(l.userId);
+        const cur = new Date(l.createdAt);
+        if (!prev || cur > prev) lessonsByUser.set(l.userId, cur);
+      }
+      const churnEligible = allUsers.filter(u =>
+        paidTiers.has(u.tier || "free") &&
+        u.createdAt && new Date(u.createdAt) < sixtyDaysAgo,
+      );
+      const churned = churnEligible.filter(u => {
+        const last = lessonsByUser.get(u.id);
+        return !last || last < thirtyDaysAgo;
+      }).length;
+      const churnRate = churnEligible.length > 0 ? (churned / churnEligible.length) * 100 : 0;
+
+      // ----- Top-of-funnel: who has NOT signed up yet? --------------------
+      // (1) Free trials that started but were never bound to a user account.
+      // These are the warmest leads — they completed an onboarding step.
+      const unboundTrials = allTrials.filter(t => t.userId == null);
+      const activeUnboundTrials = unboundTrials.filter(t =>
+        t.isActive && new Date(t.trialEndDate) > now,
+      );
+      const recentUnboundTrials = activeUnboundTrials
+        .slice()
+        .sort((a, b) => new Date(b.trialStartDate).getTime() - new Date(a.trialStartDate).getTime())
+        .slice(0, 25)
+        .map(t => {
+          const msLeft = new Date(t.trialEndDate).getTime() - now.getTime();
+          const hoursLeft = Math.max(0, Math.round(msLeft / (60 * 60 * 1000)));
+          return {
+            id: t.id,
+            ipAddress: t.ipAddress,
+            startedAt: t.trialStartDate,
+            expiresAt: t.trialEndDate,
+            hoursRemaining: hoursLeft,
+          };
+        });
+
+      // (2) Anonymous guests who generated a lesson but never even started a
+      // trial. Group by IP, count attempts, and surface the most engaged.
+      const guestByIp = new Map<string, { ip: string; lessonCount: number; firstSeen: Date; lastSeen: Date; topics: string[] }>();
+      for (const g of allGuests) {
+        if (!g.ipAddress || !g.createdAt) continue;
+        const created = new Date(g.createdAt);
+        const cur = guestByIp.get(g.ipAddress);
+        if (cur) {
+          cur.lessonCount += 1;
+          if (created < cur.firstSeen) cur.firstSeen = created;
+          if (created > cur.lastSeen) cur.lastSeen = created;
+          if (g.topic && cur.topics.length < 3 && !cur.topics.includes(g.topic)) cur.topics.push(g.topic);
+        } else {
+          guestByIp.set(g.ipAddress, {
+            ip: g.ipAddress,
+            lessonCount: 1,
+            firstSeen: created,
+            lastSeen: created,
+            topics: g.topic ? [g.topic] : [],
+          });
+        }
+      }
+      const trialIpSet = new Set(allTrials.map(t => t.ipAddress));
+      const guestsNeverStartedTrial = Array.from(guestByIp.values()).filter(g => !trialIpSet.has(g.ip));
+      const recentGuests = guestsNeverStartedTrial
+        .filter(g => g.lastSeen > thirtyDaysAgo)
+        .sort((a, b) => b.lessonCount - a.lessonCount)
+        .slice(0, 25)
+        .map(g => ({
+          ipAddress: g.ip,
+          lessonCount: g.lessonCount,
+          firstSeen: g.firstSeen,
+          lastSeen: g.lastSeen,
+          topics: g.topics,
+        }));
+
+      const guestActiveLast7Days = guestsNeverStartedTrial.filter(g => g.lastSeen > sevenDaysAgo).length;
+      const guestActiveLast30Days = guestsNeverStartedTrial.filter(g => g.lastSeen > thirtyDaysAgo).length;
+
+      res.json({
+        signupsByWeek,
+        lessonsByWeek,
+        conversion: {
+          paidUsers,
+          totalUsers: allUsers.length,
+          conversionRatePercent: Number(conversionRate.toFixed(1)),
+        },
+        churn: {
+          dormantPaid: churned,
+          eligiblePaid: churnEligible.length,
+          churnRatePercent: Number(churnRate.toFixed(1)),
+          windowDays: 30,
+        },
+        unconvertedTrials: {
+          activeUnbound: activeUnboundTrials.length,
+          totalUnbound: unboundTrials.length,
+          recent: recentUnboundTrials,
+        },
+        unconvertedGuests: {
+          uniqueIps: guestsNeverStartedTrial.length,
+          activeLast7Days: guestActiveLast7Days,
+          activeLast30Days: guestActiveLast30Days,
+          top: recentGuests,
+        },
+      });
+    } catch (error) {
+      console.error("Exec metrics error:", error);
+      res.status(500).json({ error: "Failed to fetch exec metrics" });
     }
   });
 

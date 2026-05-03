@@ -2,6 +2,7 @@ import OpenAI from "openai";
 import type { Lesson } from "@shared/schema";
 import { randomUUID } from "crypto";
 import { buildAfricanPromptAddendum } from "@shared/africaContext";
+import { sanitizePromptText, stripPII } from "./services/piiSanitizer";
 
 const openai = process.env.OPENAI_API_KEY 
   ? new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
@@ -560,8 +561,20 @@ export async function generateAssignment(request: GenerateAssignmentRequest): Pr
     return generateMockAssignment(request);
   }
 
+  // FERPA / privacy: scrub student PII (names, IDs, emails, phones, addresses,
+  // DOBs) from the free-text accommodation notes BEFORE they reach the LLM.
+  // The fixed-vocabulary `accommodationTypes` list is already safe (controlled
+  // checkboxes, no free text), but `accommodationNotes` is a textarea where
+  // teachers commonly paste student names and IEP details.
+  const sanitizedAccommodationNotes = request.accommodationNotes
+    ? sanitizePromptText(request.accommodationNotes)
+    : "";
+  if (request.accommodationNotes && sanitizedAccommodationNotes !== request.accommodationNotes) {
+    const detected = stripPII(request.accommodationNotes).detectedPII.map(p => p.type).join(", ");
+    console.log(`[PII] Redacted from accommodation notes before LLM call: ${detected}`);
+  }
   const accommodationContext = request.accommodationTypes && request.accommodationTypes.length > 0
-    ? `\n\nIMPORTANT ACCOMMODATION REQUIREMENTS:\n${request.accommodationTypes.map(t => `- ${accommodationGuidelines[t] || t}`).join('\n')}\n${request.accommodationNotes ? `Additional notes: ${request.accommodationNotes}` : ""}`
+    ? `\n\nIMPORTANT ACCOMMODATION REQUIREMENTS:\n${request.accommodationTypes.map(t => `- ${accommodationGuidelines[t] || t}`).join('\n')}\n${sanitizedAccommodationNotes ? `Additional notes: ${sanitizedAccommodationNotes}` : ""}`
     : "";
 
   // African / WAEC context — empty string for non-African countries (no behavior change).

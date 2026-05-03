@@ -19,6 +19,8 @@ Preferred communication style: Simple, everyday language.
 -   **Data Layer**: PostgreSQL database managed by Drizzle ORM.
 -   **Authentication**: Replit Auth with `express-session` and PostgreSQL for session storage.
 -   **Security**: Comprehensive measures including input validation, ownership checks, PII stripping, content filtering, audit logging, and a parental consent (COPPA) system. A Zero-Trust Data Governance model is implemented with 7 rules focusing on data immutability, communication safety, tenant scoping, data residency, and fraud protection.
+-   **FERPA Pre-LLM Sanitization** (`server/services/piiSanitizer.ts`): Strips emails, phones, SSNs, student IDs, addresses, DOBs, and student names from free-text fields before they're sent to OpenAI. Wired into both `server/openai.ts` (lesson topic/course/unit) and `server/assignmentGenerator.ts` (accommodationNotes). The accommodation-notes textarea on the Assignments page shows a visible FERPA-safe notice. Name detection uses capitalized-token heuristics with case-sensitive name patterns + case-insensitive prefix words to avoid false positives on academic content.
+-   **Exec KPIs Tab** (System Admin): New `/api/admin/exec-metrics` endpoint + "Exec KPIs" tab showing 12-week signup and lesson-creation trends, free→paid conversion rate, paid-churn proxy (60d-old paid accounts dormant 30d), active unbound trials (warm leads), and unconverted guest IPs (top-of-funnel that haven't even started a trial).
 -   **Monorepo Structure**: Organized into `/client`, `/server`, and `/shared`.
 -   **AI Integration**: Utilizes OpenAI API for AI-driven features.
 -   **Real-Time Collaboration**: WebSocket server for live features like cursor positions, presence, and chat.

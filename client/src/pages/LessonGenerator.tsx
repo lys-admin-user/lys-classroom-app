@@ -1748,16 +1748,22 @@ ${addedResources.length > 0 ? addedResources.map(r => `- ${r.title}: ${r.url}`).
                                         </div>
                                       )}
                                       {generatedLesson.standards && (
-                                        <div className="flex items-start gap-2">
+                                        <div className="flex items-start gap-2" data-testid="text-standards-alignment">
                                           <GraduationCap className="h-3.5 w-3.5 text-lys-teal flex-shrink-0 mt-0.5" />
-                                          <p className="text-xs font-roboto text-muted-foreground">
+                                          <p className="text-xs font-roboto text-foreground leading-relaxed">
+                                            <span className="text-muted-foreground">Aligned to </span>
                                             {typeof generatedLesson.standards === "string" ? (
-                                              <span className="font-medium text-foreground">{generatedLesson.standards}</span>
+                                              <span className="font-medium">{generatedLesson.standards}</span>
                                             ) : (
                                               <>
-                                                <span className="font-medium text-foreground">{generatedLesson.standards.standardsName}</span>
+                                                <span className="font-medium">{generatedLesson.standards.standardsName}</span>
                                                 {generatedLesson.standards.codes?.length > 0 && (
-                                                  <>{' '}&mdash; {generatedLesson.standards.codes.map((c: any) => c.code).join(', ')}</>
+                                                  <span className="text-muted-foreground">
+                                                    {' '}&mdash;{' '}
+                                                    <span className="font-medium text-foreground">
+                                                      {generatedLesson.standards.codes.map((c: any) => c.code).join(', ')}
+                                                    </span>
+                                                  </span>
                                                 )}
                                               </>
                                             )}

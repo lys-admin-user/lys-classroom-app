@@ -857,13 +857,24 @@ export default function Assignments() {
                       </div>
                     )}
                     {selectedAccommodations.length > 0 && (
-                      <Textarea
-                        placeholder="Additional accommodation notes..."
-                        value={accommodationNotes}
-                        onChange={(e) => setAccommodationNotes(e.target.value)}
-                        className="mt-2"
-                        data-testid="textarea-accommodation-notes"
-                      />
+                      <>
+                        <Textarea
+                          placeholder="Additional accommodation notes (e.g., 'reads at 4th-grade level, prefers visual aids')..."
+                          value={accommodationNotes}
+                          onChange={(e) => setAccommodationNotes(e.target.value)}
+                          className="mt-2"
+                          data-testid="textarea-accommodation-notes"
+                        />
+                        <p
+                          className="mt-1.5 text-xs text-muted-foreground flex items-start gap-1.5 font-roboto"
+                          data-testid="text-pii-notice"
+                        >
+                          <Lock className="h-3 w-3 mt-0.5 flex-shrink-0 text-lys-teal" />
+                          <span>
+                            <span className="font-medium">FERPA-safe:</span> student names, IDs, emails, phone numbers, addresses, and dates of birth are automatically removed before this is sent to the AI. Describe needs, not identities.
+                          </span>
+                        </p>
+                      </>
                     )}
                   </div>
                 </CardContent>
