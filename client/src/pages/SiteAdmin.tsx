@@ -1286,6 +1286,7 @@ export default function SiteAdminPage() {
                               <SelectContent>
                                 <SelectItem value="student">Student</SelectItem>
                                 <SelectItem value="educator">Educator</SelectItem>
+                                <SelectItem value="staff">Staff (LYS internal)</SelectItem>
                                 <SelectItem value="homeschool_parent">Homeschool Parent</SelectItem>
                                 <SelectItem value="campus_admin">Campus Admin</SelectItem>
                               </SelectContent>

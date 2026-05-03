@@ -10,8 +10,9 @@ import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
+import { Switch } from "@/components/ui/switch";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Sparkles, Save, Users, AlertCircle } from "lucide-react";
+import { Sparkles, Save, Users, AlertCircle, Eye, EyeOff } from "lucide-react";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import type { FoundationModule } from "@shared/schema";
@@ -152,6 +153,7 @@ function ModuleEditor({ module, toast }: { module: FoundationModule; toast: Retu
   const [subtitle, setSubtitle] = useState(module.subtitle || "");
   const [videoUrl, setVideoUrl] = useState(module.videoUrl || "");
   const [body, setBody] = useState(module.body || "");
+  const [isPublished, setIsPublished] = useState(module.isPublished);
   const [dirty, setDirty] = useState(false);
 
   useEffect(() => {
@@ -159,6 +161,7 @@ function ModuleEditor({ module, toast }: { module: FoundationModule; toast: Retu
     setSubtitle(module.subtitle || "");
     setVideoUrl(module.videoUrl || "");
     setBody(module.body || "");
+    setIsPublished(module.isPublished);
     setDirty(false);
   }, [module.id, module.updatedAt]);
 
@@ -169,6 +172,7 @@ function ModuleEditor({ module, toast }: { module: FoundationModule; toast: Retu
         subtitle: subtitle || null,
         videoUrl: videoUrl || null,
         body,
+        isPublished,
       });
       return res.json();
     },
@@ -189,9 +193,12 @@ function ModuleEditor({ module, toast }: { module: FoundationModule; toast: Retu
       <CardHeader>
         <div className="flex items-start justify-between gap-3">
           <div>
-            <CardTitle className="text-lg">
-              <Badge variant="outline" className="mr-2 text-[10px]">{String(module.order).padStart(2, "0")}</Badge>
-              {module.title}
+            <CardTitle className="text-lg flex items-center gap-2">
+              <Badge variant="outline" className="text-[10px]">{String(module.order).padStart(2, "0")}</Badge>
+              <span>{module.title}</span>
+              {!isPublished && (
+                <Badge variant="secondary" className="text-[10px]" data-testid={`badge-draft-${module.slug}`}>Draft</Badge>
+              )}
             </CardTitle>
             <CardDescription className="text-xs mt-1">slug: <code>{module.slug}</code> · type: <code>{module.contentType}</code></CardDescription>
           </div>
@@ -207,6 +214,26 @@ function ModuleEditor({ module, toast }: { module: FoundationModule; toast: Retu
         </div>
       </CardHeader>
       <CardContent className="space-y-3">
+        <div className="flex items-center justify-between rounded-md border p-2.5 bg-muted/30">
+          <div className="flex items-center gap-2 text-sm">
+            {isPublished ? <Eye className="h-4 w-4 text-green-600" /> : <EyeOff className="h-4 w-4 text-muted-foreground" />}
+            <div>
+              <div className="font-medium">
+                {isPublished ? "Published" : "Draft (hidden from staff)"}
+              </div>
+              <div className="text-xs text-muted-foreground">
+                {isPublished
+                  ? "This module is visible to staff in the Foundation widget."
+                  : "Only admins see this module. Staff won't see it in the widget."}
+              </div>
+            </div>
+          </div>
+          <Switch
+            checked={isPublished}
+            onCheckedChange={(v) => onChange(setIsPublished)(v)}
+            data-testid={`switch-published-${module.slug}`}
+          />
+        </div>
         <div>
           <Label className="text-xs">Title</Label>
           <Input value={title} onChange={(e) => onChange(setTitle)(e.target.value)} data-testid={`input-title-${module.slug}`} />

@@ -149,7 +149,7 @@ const updatePreferencesSchema = z.object({
 });
 
 const completeOnboardingSchema = z.object({
-  role: z.enum(["student", "educator", "campus_admin", "district_admin", "site_admin", "system_admin", "homeschool_parent"]).optional(),
+  role: z.enum(["student", "educator", "staff", "campus_admin", "district_admin", "site_admin", "system_admin", "homeschool_parent"]).optional(),
   preferences: z.object({
     language: z.string().optional(),
     country: z.string().optional(),
@@ -168,7 +168,7 @@ const completeOnboardingSchema = z.object({
 });
 
 const updateRoleSchema = z.object({
-  role: z.enum(["student", "educator", "homeschool_parent", "campus_admin", "district_admin", "site_admin", "system_admin"]),
+  role: z.enum(["student", "educator", "staff", "homeschool_parent", "campus_admin", "district_admin", "site_admin", "system_admin"]),
 });
 
 async function syncScopeStandardsToProfile(scopeId: string, userId: string) {
@@ -12625,7 +12625,7 @@ export async function registerRoutes(
       }
       
       // Parents see their own comments + educator comments
-      if (userRole === "parent") {
+      if (userRole === "homeschool_parent") {
         const filteredComments = allComments.filter(
           c => c.authorId === userId || c.authorRole === "educator" || c.authorRole === "campus_admin"
         );
@@ -12674,7 +12674,7 @@ export async function registerRoutes(
       }
       
       // Parents see their own + educator comments
-      if (userRole === "parent") {
+      if (userRole === "homeschool_parent") {
         const filteredComments = allComments.filter(
           c => c.authorId === userId || c.authorRole === "educator" || c.authorRole === "campus_admin"
         );
@@ -12716,7 +12716,7 @@ export async function registerRoutes(
       // Only student (owner), parents linked to student, and educators can comment
       const isOwner = actualPortfolio.userId === userId;
       const isEducator = userRole === "educator" || userRole === "campus_admin";
-      const isParent = userRole === "parent";
+      const isParent = userRole === "homeschool_parent";
       
       if (!isOwner && !isEducator && !isParent) {
         res.status(403).json({ error: "You do not have permission to comment on this portfolio" });
@@ -14447,7 +14447,7 @@ export async function registerRoutes(
         res.status(400).json({ error: "Invalid organization role" });
         return;
       }
-      const allowedPlatformRoles = ["student", "educator", "homeschool_parent", "campus_admin"];
+      const allowedPlatformRoles = ["student", "educator", "staff", "homeschool_parent", "campus_admin"];
       if (platformRole && !allowedPlatformRoles.includes(platformRole)) {
         res.status(403).json({ error: "Cannot assign site_admin, district_admin, or system_admin roles. Contact system admin." });
         return;

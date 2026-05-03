@@ -4483,8 +4483,10 @@ export class DatabaseStorage implements IStorage {
   }
 
   async updateFoundationModule(slug: string, updates: Partial<InsertFoundationModule>): Promise<FoundationModule | undefined> {
+    // Cast to any to bypass Drizzle's PgUpdateSetSource narrowing on enum-typed columns
+    // (`contentType` is a string-literal union; the partial-input shape widens it to string).
     const [updated] = await db.update(foundationModules)
-      .set({ ...updates, updatedAt: new Date() })
+      .set({ ...updates, updatedAt: new Date() } as any)
       .where(eq(foundationModules.slug, slug))
       .returning();
     return updated || undefined;
