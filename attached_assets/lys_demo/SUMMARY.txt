@@ -1,0 +1,19 @@
+LYS PROMPT INTEGRATION — BEFORE vs AFTER
+==========================================
+Sample request: Photosynthesis (Science 7, Grade 7, 60 minutes, BKD focus = know)
+LYS reference corpus version: 968e9b7dcb18
+
+BEFORE prompt size: 997 chars
+AFTER  prompt size: 6320 chars
+Net added by LYS canon: 5323 chars (~1331 tokens)
+
+What's NEW in the AFTER prompt (literal additions the model now sees):
+1. A real LaToya Washington Distinguished-rated lesson exemplar (7.11A Dichotomous Keys) — trimmed to ~3.5KB — showing the exact structural pattern, BKD tagline phrasing, and 7-domain Lesson Close voice the model should mirror.
+2. The Be/Know/Do trait/strategy/action vocabulary (e.g., "Curiosity, Resilience, Humility…", "Asking for help, Self-advocacy…", "Skill development, Independence…").
+3. The explicit Async vs Sync split with AS/M/GP definitions.
+4. All 7 life domains pinned as MANDATORY for the Lesson Close (was "as relevant").
+5. Voice rules: warm, second-person, real-life tie-back, name the trait/action/next-step.
+
+See:
+  attached_assets/lys_demo/prompt_BEFORE.txt — what the model used to see
+  attached_assets/lys_demo/prompt_AFTER.txt  — what the model sees now

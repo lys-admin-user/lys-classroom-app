@@ -1,0 +1,20 @@
+uploads = []
+generated = []
+
+[[outputs]]
+id = "LUrm8WLT6s7_4Fm6j_fjR"
+uri = "file://attached_assets/lys_demo/SUMMARY.txt"
+type = "text"
+title = "LYS Prompt Integration — Summary"
+
+[[outputs]]
+id = "w8q-XFq8kYRSprGsfRJEy"
+uri = "file://attached_assets/lys_demo/prompt_BEFORE.txt"
+type = "text"
+title = "BEFORE — what the AI used to see"
+
+[[outputs]]
+id = "Rlxaju7iZVInkg4HD652n"
+uri = "file://attached_assets/lys_demo/prompt_AFTER.txt"
+type = "text"
+title = "AFTER — what the AI sees now (with LYS canon)"

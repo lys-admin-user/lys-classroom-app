@@ -1,0 +1,24 @@
+Create a complete lesson plan with these specifications:
+- Topic: Photosynthesis
+- Course: Science 7
+- Unit: Organisms and Environments
+- Grade Level: 7
+- Primary Focus: KNOW (Resources, knowledge, and how to access them)
+- Duration: 60 minutes
+Standards system: Texas TEKS (United States — Science).
+
+[no LYS canonical reference block]
+[no master-lesson examples on file for Science 7]
+
+Generate a complete LYS lesson plan in JSON format. Include:
+1. A compelling title
+2. 2-3 essential questions that tie to real-world application
+3. LYS Methodology section with specific BE/KNOW/DO applications for this lesson
+4. Clear learning objectives aligned to the standards
+5. Instructional phases: Anticipatory Set, Modeling (I Do), Guided Practice (We Do), Independent Practice
+6. Resources with URLs where applicable
+7. Materials list
+8. Assessment strategy
+9. Lesson Close with life application connections (educational, social, vocational, financial, spiritual as relevant)
+
+[…JSON schema follows…]
