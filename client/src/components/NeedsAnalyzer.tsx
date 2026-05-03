@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
-import { ArrowRight, Check, Sparkles } from "lucide-react";
+import { ArrowLeft, ArrowRight, Check, RotateCcw, Sparkles } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 import {
   SEGMENTS,
@@ -105,13 +105,40 @@ export function NeedsAnalyzer({ onComplete, className }: NeedsAnalyzerProps) {
     submitResponse({ identity, corePain, urgency: urg, desiredOutcome: outcome }).catch(() => {});
   };
 
+  const goBack = () => {
+    if (step === "result") { setStep(4); return; }
+    if (typeof step === "number" && step > 1) setStep((step - 1) as Step);
+  };
+
+  const startOver = () => {
+    setIdentity(null);
+    setCorePain("");
+    setUrgency(null);
+    setDesiredOutcome("");
+    clearAnalyzerDraft();
+    setStep(1);
+  };
+
   return (
     <div className={className} data-testid="needs-analyzer">
       {/* Step header */}
       {step !== "result" && (
         <div className="mb-4">
           <div className="flex items-center justify-between text-xs text-muted-foreground mb-2 font-roboto">
-            <span data-testid="text-step-counter">Question {Number(step)} of {totalSteps}</span>
+            <div className="flex items-center gap-2">
+              {Number(step) > 1 && (
+                <button
+                  type="button"
+                  onClick={goBack}
+                  className="inline-flex items-center gap-1 hover:text-foreground transition-colors"
+                  data-testid="button-analyzer-back"
+                >
+                  <ArrowLeft className="h-3 w-3" />
+                  Back
+                </button>
+              )}
+              <span data-testid="text-step-counter">Question {Number(step)} of {totalSteps}</span>
+            </div>
             <span>About 60 seconds total</span>
           </div>
           <Progress value={progressValue} className="h-1.5" />
@@ -271,6 +298,17 @@ export function NeedsAnalyzer({ onComplete, className }: NeedsAnalyzerProps) {
                 <Check className="h-3 w-3 inline mr-1" />
                 One next step. No menus. No confusion.
               </p>
+              <div className="text-center mt-3">
+                <button
+                  type="button"
+                  onClick={startOver}
+                  className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors font-roboto"
+                  data-testid="button-analyzer-start-over"
+                >
+                  <RotateCcw className="h-3 w-3" />
+                  Not quite right? Start over
+                </button>
+              </div>
             </div>
           </CardContent>
         </Card>

@@ -595,7 +595,7 @@ ${addedResources.length > 0 ? addedResources.map(r => `- ${r.title}: ${r.url}`).
                 AI Lesson Generator
               </h1>
               <p className="font-roboto text-muted-foreground">
-                Create standards-aligned lessons using the LYS Be-Know-Do methodology
+                A usable, standards-aligned lesson plan in under five minutes — built on the Be-Know-Do framework.
               </p>
             </div>
           </div>
@@ -980,7 +980,7 @@ ${addedResources.length > 0 ? addedResources.map(r => `- ${r.title}: ${r.url}`).
                   </div>
                 </div>
 
-                {isAuthenticated && usageData && !usageData.unlimited && usageData.remaining > 0 && (
+                {isAuthenticated && usageData && !usageData.unlimited && (usageData.remaining ?? 0) > 0 && (
                   <div className="flex items-center justify-between p-3 bg-muted rounded-md">
                     <div className="flex items-center gap-2">
                       <Sparkles className="h-4 w-4 text-lys-yellow" />
@@ -2042,9 +2042,9 @@ ${addedResources.length > 0 ? addedResources.map(r => `- ${r.title}: ${r.url}`).
                     <div className="w-20 h-20 rounded-full bg-muted/50 flex items-center justify-center mb-4">
                       <Sparkles className="h-10 w-10 text-muted-foreground/50" />
                     </div>
-                    <h3 className="font-oswald text-lg text-muted-foreground">Your first amazing lesson is just a click away</h3>
+                    <h3 className="font-oswald text-lg text-muted-foreground">Your lesson plan will appear here</h3>
                     <p className="text-sm text-muted-foreground/70 font-roboto mt-2 max-w-sm">
-                      Fill in the details on the left and click "Generate Lesson Plan" to create a standards-aligned LYS lesson
+                      Fill in the details on the left, then hit Generate.
                     </p>
                   </div>
                 )}

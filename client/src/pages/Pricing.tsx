@@ -466,7 +466,7 @@ export default function Pricing() {
             Choose Your Path to Success
           </h1>
           <p className="text-base md:text-lg text-muted-foreground max-w-2xl mx-auto">
-            Whether you're a student discovering your future or an educator shaping the next generation, 
+            From students and families to classrooms, campuses, and districts — 
             LYS has the tools you need to succeed.
           </p>
           <div className="mt-4 inline-flex items-center gap-2 bg-lys-yellow/10 border border-lys-yellow/30 rounded-full px-5 py-2 text-sm font-roboto">

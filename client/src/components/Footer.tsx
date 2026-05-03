@@ -18,8 +18,8 @@ export function Footer() {
               <span className="font-marker text-3xl text-lys-yellow">S</span>
             </div>
             <p className="font-roboto text-white/80 text-sm leading-relaxed mb-4">
-              Empowering students to discover their purpose and pursue it with passion. 
-              We Be, Know, Do — Thinking Globally, Acting Locally.
+              A proven pathway from potential to purpose — for students, families, and the
+              educators who guide them.
             </p>
             <div className="flex items-center gap-3">
               <a

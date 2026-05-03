@@ -324,9 +324,9 @@ export default function Onboarding() {
             <span className="font-marker text-3xl text-lys-red">LYS</span>
             <Sparkles className="h-6 w-6 text-lys-yellow" />
           </div>
-          <CardTitle className="font-oswald text-2xl">Welcome! Let's personalize your experience</CardTitle>
+          <CardTitle className="font-oswald text-2xl">Welcome — let's tailor LYS to you</CardTitle>
           <CardDescription>
-            Answer a few questions so we can guide you to the features that matter most
+            A few quick questions so we can put the right tools in front of you.
           </CardDescription>
           <Progress value={progress} className="mt-4" />
           <div className="flex justify-between text-xs text-muted-foreground mt-2">

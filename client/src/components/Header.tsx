@@ -113,12 +113,12 @@ export function Header() {
             asChild
             variant="outline"
             size="sm"
-            className="hidden sm:inline-flex font-roboto gap-1.5"
+            className="font-roboto gap-1.5"
             data-testid="button-find-your-fit"
           >
-            <Link href="/start">
+            <Link href="/start" aria-label="Find your fit">
               <Compass className="h-4 w-4" />
-              Find your fit
+              <span className="hidden sm:inline">Find your fit</span>
             </Link>
           </Button>
         )}
