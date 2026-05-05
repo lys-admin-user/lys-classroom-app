@@ -11,6 +11,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { Switch } from "@/components/ui/switch";
 import { Slider } from "@/components/ui/slider";
 import { useToast } from "@/hooks/use-toast";
@@ -2227,6 +2229,8 @@ export default function SiteAdminPage() {
               </Card>
               {/* Lesson Cache Management */}
               <LessonCacheSection isSiteAdmin={adminCheck?.isSiteAdmin} />
+              {/* Bricks/BKD: LYS Canon CRUD + top exemplars (gated by new_lesson_retrieval flag) */}
+              <LysCanonAdminSection isSiteAdmin={adminCheck?.isSiteAdmin} />
             </>
           )}
         </TabsContent>
@@ -3073,6 +3077,306 @@ function LessonCacheSection({ isSiteAdmin }: { isSiteAdmin?: boolean }) {
             )}
           </div>
         ) : null}
+      </CardContent>
+    </Card>
+  );
+}
+
+function LysCanonAdminSection({ isSiteAdmin }: { isSiteAdmin?: boolean }) {
+  const { toast } = useToast();
+  type CanonEntry = {
+    id: string;
+    kind: string;
+    subject: string | null;
+    gradeBand: string | null;
+    topic: string | null;
+    title: string;
+    body: string;
+    sortOrder: number | null;
+    isActive: boolean | null;
+  };
+  type TopExemplar = { masterLessonId: string; uses: number; avgScore: number };
+
+  const [filterSubject, setFilterSubject] = useState<string>("all");
+  const [creating, setCreating] = useState(false);
+  const [draft, setDraft] = useState({
+    kind: "exemplar",
+    subject: "_global",
+    gradeBand: "",
+    topic: "",
+    title: "",
+    body: "",
+  });
+
+  const { data: entries = [], isLoading } = useQuery<CanonEntry[]>({
+    queryKey: ["/api/admin/canon-entries", filterSubject],
+    queryFn: async () => {
+      const url = filterSubject === "all"
+        ? "/api/admin/canon-entries"
+        : `/api/admin/canon-entries?subject=${encodeURIComponent(filterSubject)}`;
+      const res = await fetch(url, { credentials: "include" });
+      if (!res.ok) throw new Error("Failed to load canon entries");
+      return res.json();
+    },
+    enabled: !!isSiteAdmin,
+  });
+
+  const { data: topExemplars = [] } = useQuery<TopExemplar[]>({
+    queryKey: ["/api/admin/lesson-attribution/top"],
+    enabled: !!isSiteAdmin,
+  });
+
+  const createMutation = useMutation({
+    mutationFn: async (payload: typeof draft) => {
+      const res = await apiRequest("POST", "/api/admin/canon-entries", payload);
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/canon-entries"] });
+      toast({ title: "Canon entry created", description: "Subject version bumped — affected caches will regenerate." });
+      setCreating(false);
+      setDraft({ kind: "exemplar", subject: "_global", gradeBand: "", topic: "", title: "", body: "" });
+    },
+    onError: () => toast({ title: "Create failed", variant: "destructive" }),
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: async (id: string) => {
+      const res = await apiRequest("DELETE", `/api/admin/canon-entries/${id}`);
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/canon-entries"] });
+      toast({ title: "Canon entry removed" });
+    },
+  });
+
+  const toggleActiveMutation = useMutation({
+    mutationFn: async ({ id, isActive }: { id: string; isActive: boolean }) => {
+      const res = await apiRequest("PATCH", `/api/admin/canon-entries/${id}`, { isActive });
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/canon-entries"] });
+    },
+  });
+
+  const subjectOptions = [
+    { value: "all", label: "All subjects" },
+    { value: "_global", label: "Global (all subjects)" },
+    { value: "math", label: "Math" },
+    { value: "ela", label: "ELA" },
+    { value: "science", label: "Science" },
+    { value: "social_studies", label: "Social Studies" },
+  ];
+  const kindOptions = ["exemplar", "vocab", "domain", "accommodation"];
+
+  return (
+    <Card data-testid="card-lys-canon-admin">
+      <CardHeader>
+        <div className="flex items-center justify-between gap-4 flex-wrap">
+          <div>
+            <CardTitle className="flex items-center gap-2">
+              <Brain className="h-5 w-5 text-lys-yellow" />
+              LYS Canon (Bricks/BKD reference)
+            </CardTitle>
+            <CardDescription>
+              Manage the canonical exemplars, vocabulary, and accommodations the AI lesson generator pulls from. Edits auto-bump the subject's cache version.
+            </CardDescription>
+          </div>
+          <div className="flex items-center gap-2 flex-wrap">
+            <Select value={filterSubject} onValueChange={setFilterSubject}>
+              <SelectTrigger className="w-44" data-testid="select-canon-subject-filter">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {subjectOptions.map(o => (
+                  <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setCreating(v => !v)}
+              data-testid="button-toggle-create-canon"
+            >
+              <Plus className="h-4 w-4 mr-1" />
+              {creating ? "Cancel" : "New entry"}
+            </Button>
+          </div>
+        </div>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        <Alert>
+          <AlertCircle className="h-4 w-4" />
+          <AlertDescription className="text-xs">
+            Active only when the <code className="font-mono">new_lesson_retrieval</code> feature flag is on. With the flag off, the legacy hardcoded reference is used and these edits are inert. Toggle the flag from the <strong>Feature Flags</strong> tab.
+          </AlertDescription>
+        </Alert>
+
+        {creating && (
+          <div className="border rounded-md p-4 space-y-3 bg-muted/30">
+            <div className="grid gap-3 grid-cols-1 md:grid-cols-3">
+              <div>
+                <Label className="text-xs">Kind</Label>
+                <Select value={draft.kind} onValueChange={(v) => setDraft({ ...draft, kind: v })}>
+                  <SelectTrigger data-testid="select-canon-kind"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    {kindOptions.map(k => <SelectItem key={k} value={k}>{k}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label className="text-xs">Subject</Label>
+                <Select value={draft.subject} onValueChange={(v) => setDraft({ ...draft, subject: v })}>
+                  <SelectTrigger data-testid="select-canon-subject"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    {subjectOptions.filter(o => o.value !== "all").map(o => (
+                      <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label className="text-xs">Grade band (optional)</Label>
+                <Input
+                  value={draft.gradeBand}
+                  onChange={(e) => setDraft({ ...draft, gradeBand: e.target.value })}
+                  placeholder="e.g. 6-8"
+                  data-testid="input-canon-grade-band"
+                />
+              </div>
+            </div>
+            <div>
+              <Label className="text-xs">Title</Label>
+              <Input
+                value={draft.title}
+                onChange={(e) => setDraft({ ...draft, title: e.target.value })}
+                placeholder="Short, descriptive title"
+                data-testid="input-canon-title"
+              />
+            </div>
+            <div>
+              <Label className="text-xs">Body</Label>
+              <Textarea
+                value={draft.body}
+                onChange={(e) => setDraft({ ...draft, body: e.target.value })}
+                rows={5}
+                placeholder="The reference text the AI will see in the prompt block."
+                data-testid="textarea-canon-body"
+              />
+            </div>
+            <div className="flex justify-end">
+              <Button
+                onClick={() => createMutation.mutate(draft)}
+                disabled={createMutation.isPending || !draft.title || !draft.body}
+                data-testid="button-create-canon"
+              >
+                {createMutation.isPending ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <Save className="h-4 w-4 mr-1" />}
+                Save entry
+              </Button>
+            </div>
+          </div>
+        )}
+
+        {isLoading ? (
+          <div className="h-24 bg-muted animate-pulse rounded" />
+        ) : entries.length === 0 ? (
+          <p className="text-sm text-muted-foreground text-center py-4">
+            No canon entries for this filter. The hardcoded reference auto-seeds on first boot — try the "All subjects" filter.
+          </p>
+        ) : (
+          <ScrollArea className="h-72">
+            <div className="space-y-2">
+              {entries.map(entry => (
+                <div
+                  key={entry.id}
+                  className="flex items-start justify-between gap-3 p-3 rounded-md border"
+                  data-testid={`canon-entry-${entry.id}`}
+                >
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap mb-1">
+                      <Badge variant="secondary">{entry.kind}</Badge>
+                      {entry.subject && <Badge variant="outline">{entry.subject}</Badge>}
+                      {entry.gradeBand && <Badge variant="outline">{entry.gradeBand}</Badge>}
+                      {!entry.isActive && <Badge variant="destructive">inactive</Badge>}
+                    </div>
+                    <p className="text-sm font-medium truncate" data-testid={`text-canon-title-${entry.id}`}>{entry.title}</p>
+                    <p className="text-xs text-muted-foreground line-clamp-2">{entry.body}</p>
+                  </div>
+                  <div className="flex items-center gap-1 shrink-0">
+                    <Button
+                      size="icon"
+                      variant="ghost"
+                      onClick={() => toggleActiveMutation.mutate({ id: entry.id, isActive: !entry.isActive })}
+                      data-testid={`button-toggle-canon-${entry.id}`}
+                      title={entry.isActive ? "Deactivate" : "Activate"}
+                    >
+                      <ToggleLeft className="h-4 w-4" />
+                    </Button>
+                    <AlertDialog>
+                      <AlertDialogTrigger asChild>
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          className="text-destructive"
+                          data-testid={`button-delete-canon-${entry.id}`}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </AlertDialogTrigger>
+                      <AlertDialogContent data-testid={`dialog-confirm-delete-canon-${entry.id}`}>
+                        <AlertDialogHeader>
+                          <AlertDialogTitle>Remove canon entry?</AlertDialogTitle>
+                          <AlertDialogDescription>
+                            This deletes <span className="font-medium">{entry.title}</span> from the LYS canon and bumps the
+                            {entry.subject ? ` "${entry.subject}"` : " global"} subject version, which will invalidate matching cached lessons. This cannot be undone.
+                          </AlertDialogDescription>
+                        </AlertDialogHeader>
+                        <AlertDialogFooter>
+                          <AlertDialogCancel data-testid={`button-cancel-delete-canon-${entry.id}`}>Cancel</AlertDialogCancel>
+                          <AlertDialogAction
+                            className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                            onClick={() => deleteMutation.mutate(entry.id)}
+                            data-testid={`button-confirm-delete-canon-${entry.id}`}
+                          >
+                            Delete entry
+                          </AlertDialogAction>
+                        </AlertDialogFooter>
+                      </AlertDialogContent>
+                    </AlertDialog>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </ScrollArea>
+        )}
+
+        {topExemplars.length > 0 && (
+          <div className="border-t pt-4">
+            <div className="flex items-center gap-2 mb-2">
+              <TrendingUp className="h-4 w-4 text-lys-yellow" />
+              <h4 className="text-sm font-medium">Top exemplars by attribution</h4>
+            </div>
+            <p className="text-xs text-muted-foreground mb-2">Master lessons most frequently used as exemplars, ranked by average final rubric score.</p>
+            <div className="space-y-1">
+              {topExemplars.slice(0, 10).map(ex => (
+                <div
+                  key={ex.masterLessonId}
+                  className="flex items-center justify-between text-xs p-2 rounded bg-muted/30"
+                  data-testid={`exemplar-${ex.masterLessonId}`}
+                >
+                  <code className="font-mono truncate">{ex.masterLessonId}</code>
+                  <div className="flex items-center gap-3 shrink-0">
+                    <span className="text-muted-foreground">{ex.uses} uses</span>
+                    <Badge variant="secondary">avg {Math.round(ex.avgScore)}%</Badge>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
       </CardContent>
     </Card>
   );

@@ -607,6 +607,47 @@ const requireSystemAdmin = requireRole("system_admin");`,
           ],
         },
       },
+      {
+        heading: "Bricks/BKD Retrieval Upgrade (feature-flagged)",
+        body: "Gated behind the `new_lesson_retrieval` feature flag (OFF by default). When enabled, the lesson generator uses semantic exemplar retrieval instead of the legacy SQL filter, plus a DB-backed LYS canon. With the flag off, behavior is byte-identical to the legacy path.",
+        items: [
+          "Embeddings: text-embedding-3-small, stored as jsonb number[] arrays on master_lessons (whole-lesson) and master_lesson_sections (per-section). Lazy-embedded on first retrieval — no upfront batch cost.",
+          "Score-weighted: only master_lessons with qualityScore ≥ 85 are eligible exemplars.",
+          "Highlight reel: cosine ranks per-section snippets by section type (anticipatorySet, modeling, etc.) and assembles a curated reference block — instead of pasting whole exemplar lessons.",
+          "DB-backed canon: lys_canon_entries table replaces the hardcoded reference. Auto-migrated from server/lysReference.ts on first boot; the file remains the in-process fallback if DB read fails.",
+          "Per-subject versioning: subject_canon_versions table — admin canon writes bump the version for that subject only, so cache keys invalidate per-subject (math/ela/science/social_studies/_global).",
+          "Attribution: lesson_generation_attribution row written for every generation — records which exemplars + section IDs + canon entries fed the prompt and the final rubric score, for offline correlation.",
+          "Edit feedback: lesson_edit_signals captures per-section diffs between generated and saved lesson plans. Default-on for individuals; opt-in per org via lesson_ai_org_settings.",
+          "Cache key: now `lys:...:${retrievalMode}:sv${subjectVersion}` — flag-on and flag-off generations live in separate cache namespaces, and per-subject canon edits invalidate only the affected subject's keys.",
+        ],
+      },
+      {
+        heading: "Bricks/BKD Files & Endpoints",
+        body: "Where the new retrieval system lives in the codebase, and how to operate it.",
+        code: `// Services
+server/services/embeddingService.ts        // OpenAI embed + cosine + lazy embed
+server/services/lessonRetrievalService.ts  // Semantic top-K + highlight reel
+server/services/lysCanonService.ts         // DB canon + seed + per-subject bump
+server/services/lessonEditCaptureService.ts// Per-section diff + org opt-out
+
+// Storage (prototype-augmentation pattern)
+server/storage/lessonAi.ts                 // 16 methods on DatabaseStorage
+
+// Wiring
+server/openai.ts                           // Flag check + cache key + attribution
+server/routes/lessons.ts                   // /api/lessons/save fires capture
+server/index.ts::initLessonAiSubsystem()   // Boot: vector ext, seed canon + flag
+
+// Admin endpoints (isAuthenticated + isSiteAdmin)
+GET    /api/admin/canon-entries
+POST   /api/admin/canon-entries           // auto-bumps subject version
+PATCH  /api/admin/canon-entries/:id       // auto-bumps subject version
+DELETE /api/admin/canon-entries/:id       // auto-bumps subject version
+GET    /api/admin/lesson-attribution/top
+PATCH  /api/admin/orgs/:orgId/ai-training // editCaptureEnabled per org`,
+        language: "typescript",
+        warning: "Toggle the `new_lesson_retrieval` feature flag from Site Admin → Feature Flags. Leave it OFF until you've populated master_lessons with qualityScore≥85 exemplars; otherwise retrieval will fall back to legacy.",
+      },
     ],
   },
   {

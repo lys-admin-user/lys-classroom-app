@@ -165,3 +165,27 @@ Before opening a PR for a new feature, confirm:
 - [ ] All forms use `zodResolver` with a shared schema (Rule 5)
 - [ ] Tenant ID is included in every query that touches multi-tenant data
 - [ ] No new parent-related table without checking `docs/parent-feature.md` first
+- [ ] If the feature changes prompt/cache behavior, gate it behind a `feature_flags` row (default off) and include the flag name + retrieval mode in the cache key (see Rule 9)
+
+---
+
+## 9. Feature-Flagged Risky Changes
+
+Anything that changes how prompts are assembled, what gets sent to OpenAI, or how cached responses are keyed must ship behind a feature flag. The legacy path stays the default until an admin toggles the flag from Site Admin → Feature Flags.
+
+### The pattern (canonical example: Bricks/BKD retrieval)
+
+1. **Schema-additive only.** Add new columns/tables; never drop or repurpose existing ones in the same release.
+2. **Flag row.** Seed `feature_flags` with `isEnabled: false` at boot (idempotent; create-if-missing).
+3. **Read flag with TTL cache.** A 60s in-process cache is enough; do not call the DB on every request.
+4. **Branch at the call site, not deep in helpers.** The legacy code path must remain reachable and unchanged.
+5. **Cache key includes mode + version.** `lys:...:${retrievalMode}:sv${subjectVersion}` — flag-on and flag-off generations live in separate namespaces, so toggling the flag never serves the wrong shape.
+6. **Per-resource versioning beats global cache busts.** When admins edit a subject's canon, bump only that subject's version row.
+7. **Attribution + non-fatal writes.** Side-effect inserts (attribution, edit signals) wrap in try/catch and log warnings — they never break the user's request.
+8. **Idempotent boot wiring.** `CREATE EXTENSION IF NOT EXISTS`, `seed-if-empty`, `create-flag-if-missing`. Second boot must be a no-op.
+
+### Files to read for the reference implementation
+- `server/services/{embeddingService,lessonRetrievalService,lysCanonService,lessonEditCaptureService}.ts`
+- `server/openai.ts` — flag check, cache key, attribution
+- `server/index.ts::initLessonAiSubsystem` — boot wiring
+- `server/storage/lessonAi.ts` — prototype-augmentation pattern (also see Rule 7)

@@ -1229,6 +1229,39 @@ const helpArticles: HelpArticle[] = [
     ],
     relatedArticles: ["marketplace-browse", "marketplace-claim-free"],
   },
+  {
+    id: "lesson-edit-feedback",
+    title: "How Your Lesson Edits Help Improve the AI",
+    category: "ai-features",
+    tags: ["lesson", "edit", "feedback", "AI", "training", "privacy", "opt-out", "bricks", "BKD"],
+    severity: "info",
+    symptom: "You want to know what happens when you edit a lesson plan the AI generated for you, or whether your edits are used for training.",
+    explanation: "When you save a lesson plan after editing the AI-generated draft, LYS records a per-section diff (a small note of what you changed) as a quality signal. This helps the system learn which generated lessons need the most teacher correction. Only the changed text is captured — never your name, your students' names, or anything personally identifying (PII is stripped before AI ever sees it). Edit capture is on by default for individuals; if your campus or district has opted out, no signals are recorded for any educator in your organization.",
+    steps: [
+      "This is on by default and runs invisibly in the background — no action needed",
+      "Personal information is never captured (PII stripping happens before any AI contact)",
+      "If you want your organization opted out entirely, ask your campus/site admin to disable 'AI training' under Site Admin → Org Settings",
+      "Site admins: PATCH /api/admin/orgs/:orgId/ai-training with { editCaptureEnabled: false } turns it off campus-wide",
+      "Edits to a brand-new lesson (not started from an AI draft) are never captured",
+    ],
+    relatedArticles: ["ai-pii-stripped", "ai-lesson-fail"],
+  },
+  {
+    id: "lesson-cache-version",
+    title: "Why a Generated Lesson Looks Different From Last Time",
+    category: "ai-features",
+    tags: ["lesson", "cache", "version", "canon", "regenerate", "different", "subject"],
+    severity: "info",
+    symptom: "You generated a lesson plan with the same topic, grade, and BKD focus as before, but the result is noticeably different.",
+    explanation: "LYS caches generated lesson plans so identical requests return instantly without re-paying the AI cost. Each cache entry is keyed by your inputs plus the version of the LYS canon for that subject. When a site admin updates the canon for a subject (Math, ELA, Science, Social Studies), the version bumps and cached lessons for that subject are bypassed in favor of fresh generations that incorporate the new guidance. This is by design — it means you always get the latest pedagogy.",
+    steps: [
+      "If you want a different result for the same inputs, change the topic wording slightly or pick a different BKD focus",
+      "Site admins can clear the entire cache from Site Admin → Performance → Lesson Plan Cache",
+      "Site admins editing the LYS canon (Site Admin → Performance → LYS Canon) automatically bump the affected subject's version",
+      "Caches for math, ELA, science, social studies, and the global canon are tracked separately — bumping one doesn't invalidate the others",
+    ],
+    relatedArticles: ["ai-lesson-fail", "lesson-quality-low"],
+  },
 ];
 
 const categories = [
@@ -1269,6 +1302,8 @@ const quickLinks = [
   { label: "Save a scholarship?", articleId: "scholarship-save-planner", icon: Bookmark },
   { label: "Auto-scrape scholarships?", articleId: "scholarship-auto-scraper", icon: Bot },
   { label: "Student assignments?", articleId: "student-assignments-view", icon: ClipboardList },
+  { label: "Edits help the AI?", articleId: "lesson-edit-feedback", icon: Sparkles },
+  { label: "Lesson came back different?", articleId: "lesson-cache-version", icon: BookOpen },
 ];
 
 export default function HelpDesk() {
