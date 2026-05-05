@@ -1,12 +1,29 @@
-// Barrel for the storage layer.
+// Barrel for the storage layer. Composed from per-domain modules.
 //
-// Historically the entire implementation lived in server/storage.ts.
-// It was moved to server/storage/database.ts as part of Task #2 to enable
-// per-domain splits over time without breaking imports. Every existing
-// `import { storage } from "./storage"` and `import { storage } from "../storage"`
-// continues to resolve through this barrel unchanged.
+// History: this file used to re-export from a monolithic server/storage.ts
+// (then briefly server/storage/database.ts). It now imports the per-domain
+// modules for their side effects (each one augments DatabaseStorage.prototype
+// via Object.assign), then exports the same `storage` instance everyone
+// already imports as `{ storage } from "./storage"`.
+import { DatabaseStorage } from "./_base";
+import "./admin";
+import "./org";
+import "./student";
+import "./curriculum";
+import "./parent";
+import "./lessons";
+import "./classroom";
+import "./careers";
+import "./integrations";
+import "./portfolio";
+import "./marketplace";
+import "./collaboration";
+import "./payments";
+import "./account";
+import "./analytics";
+import "./misc";
+
 export {
-  storage,
   DatabaseStorage,
   type IStorage,
   type EducatorPerformanceMetric,
@@ -15,4 +32,6 @@ export {
   type SystemWideStats,
   type MatriculationStats,
   type AchievementStats,
-} from "./database";
+} from "./_base";
+
+export const storage = new DatabaseStorage();

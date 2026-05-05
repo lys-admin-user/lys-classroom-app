@@ -1,78 +1,11 @@
 import type { Express } from "express";
-import { createServer, type Server } from "http";
 import { storage } from "../storage";
-import { generateLessonPlan } from "../openai";
-import { detectAfricanCountryFromText } from "@shared/africaContext";
-import { calculateLessonQualityScore, getQualityLevel } from "../lessonQualityScorer";
-import { parseDocument } from "../documentParser";
-import { 
-  generateLessonRequestSchema, 
-  insertScopeSequenceSchema, 
-  insertSequenceUnitSchema, 
-  insertScopeChangeRequestSchema, 
-  insertKnowResourceSchema,
-  users,
-  sessions,
-  lessonPlanCache,
-  insertFeatureFlagSchema, 
-  insertEmailTemplateSchema, 
-  insertStudentJourneyEntrySchema,
-  type Lesson, 
-  type Goal,
-  type User,
-  type UserRole,
-  lessons,
-  goals,
-  educatorProfiles,
-  userPreferences,
-  educatorAffiliates,
-  referralEvents,
-  standardsJurisdictions,
-  authorities as authoritiesTable,
-  pricingTiers,
-  lessonGenerations,
-  selfDiscoveryResults,
-  studentJourneyEntries,
-  studentJourneyProgress,
-  savedCareers,
-  scopeSequences,
-  assignments,
-  contentReviewQueue as contentReviewQueueTable,
-  parentalConsents as parentalConsentsTable,
-  auditLogs as auditLogsTable,
-  successMarks as successMarksTable,
-  safetyVault as safetyVaultTable,
-  fraudStrikes as fraudStrikesTable,
-  userDataRegions as userDataRegionsTable,
-  organizationMemberships as orgMembershipsTable,
-  freeTrials,
-  guestLessonGenerations,
-  needsAnalyzerResponses,
-  hasRolePrivilege,
-  scholarshipApplications,
-  knowResources,
-  scholarshipSyncLog,
-  savedScholarships,
-} from "@shared/schema";
+import { parentalConsents as parentalConsentsTable } from "@shared/schema";
 import { z } from "zod";
-import { setupAuth, registerAuthRoutes, isAuthenticated } from "../replit_integrations/auth";
-import { randomUUID } from "crypto";
+import { isAuthenticated } from "../replit_integrations/auth";
 import multer from "multer";
-import { syncJurisdictionsFromCSP, syncStandardSetFromCSP, getSyncStatus, fetchCSPJurisdictions, syncAllStandardsFromCSP, getImportProgress } from "../services/cspService";
-import { extractStandardsFromText, processPdfImport, checkSourceForChanges } from "../services/llmExtractionService";
-import { syncBlsData, getLastSyncStatus, getSyncHistory, startBlsScheduler, getSchedulerStatus } from "../services/blsService";
-import { createPaypalOrder, capturePaypalOrder, loadPaypalDefault, isPayPalConfigured } from "../paypal";
-import { getUncachableStripeClient } from "../stripeClient";
-import * as hubspotService from "../services/hubspotService";
-import * as wordpressService from "../services/wordpressService";
-import { fetchAndProcessFeed, fetchAllActiveFeeds, startRssFeedScheduler } from "../services/rssFeedService";
-import { startScholarshipScheduler, runScholarshipSync, detectSeasonFromDeadline } from "../services/scholarshipService";
-import { insertRssFeedSchema } from "@shared/schema";
 import { db } from "../db";
-import { logAuditEvent, getAuditLogs, getClientIP } from "../services/auditLog";
-import { filterChatMessage } from "../services/contentFilter";
-import { eq, desc, and, sql as drizzleSql, count, inArray, lte, gte } from "drizzle-orm";
-
+import { eq, and, count } from "drizzle-orm";
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 10 * 1024 * 1024 } });
 
 const saveLessonSchema = z.object({
