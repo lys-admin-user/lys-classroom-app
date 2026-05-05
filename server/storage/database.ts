@@ -349,7 +349,7 @@ import {
   type RssContentStatus,
   type RssPlacement,
 } from "@shared/schema";
-import { db } from "./db";
+import { db } from "../db";
 import { eq, desc, and, asc, gte, sql, or, inArray } from "drizzle-orm";
 import { randomUUID } from "crypto";
 
@@ -6395,7 +6395,7 @@ export class DatabaseStorage implements IStorage {
   }
 
   async verifyKnowResource(id: string, userId: string): Promise<KnowResource | undefined> {
-    const { computeBkdAlignment, parseNextDeadline } = await import("./lib/bkdAlignment");
+    const { computeBkdAlignment, parseNextDeadline } = await import("../lib/bkdAlignment");
     const [existing] = await db.select().from(knowResources).where(eq(knowResources.id, id));
     if (!existing) return undefined;
 
