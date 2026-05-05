@@ -6,6 +6,12 @@ LYS (Laddering Your Success) is an AI-powered educational platform designed to e
 ## User Preferences
 Preferred communication style: Simple, everyday language.
 
+## Developer Standards
+**All contributors must read `docs/developer-execution-plan.md` before writing code.** It defines the non-negotiable rules for database access (Storage Gatekeeper), N+1 prevention (Join Over the Loop), API error shape, frontend data fetching, form validation, the Orphan Route Protocol, and the file organization conventions that follow from the routes/storage split.
+
+Feature-specific architecture docs live in `docs/`. Currently:
+- `docs/parent-feature.md` — the 8-table Parent/Guardian ecosystem and the rule against creating more parent tables.
+
 ## System Architecture
 
 ### UI/UX Decisions

@@ -1,0 +1,63 @@
+SECTION E — Performance
+E1. Some "give me the list" endpoints return everything at once
+Plain English: A few endpoints (like "give me all lessons" or "give me all parent message threads") return EVERY result, no matter how many. With 50 lessons that's fine. With 50,000 lessons that's a 30-second page load and a server crash.
+The fix: Add pagination — return 50 at a time with a "next page" button. Standard practice.
+Why now: Cheap to do today. Painful to do after you have lots of data.
+Your answer: Yes. Let’s search the system and add this everywhere it is possibly needed.
+
+E2. Probable N+1 problem on admin lists (needs measuring)
+Plain English: "N+1" is a famous performance bug. Imagine you ask "give me all 100 students," then for each student you go ask separately "what's their organization name?" — that's 1 query for the list + 100 separate queries = 101 round trips. The right way is to ask once: "give me all students with their org names already attached."
+The architect suspects this is happening on some admin pages. I haven't measured it. If true, those pages are 10-100x slower than they need to be.
+The fix: Measure first, then fix the offenders.
+Your answer: The architect is identifying a major performance bottleneck that usually hides in plain sight until the user count grows. In our context of LYS—especially for Tier 4 District Admins who might be looking at a list of 5,000 students across 20 campuses—an N+1 bug is the difference between a page loading in 200ms or 20 seconds.
+Our developer_execution_plan.md should mandate a Storage Interface, this fix becomes much easier to implement and enforce.
+1. The Strategy: "The Join Over the Loop"
+We need to stop the "loop-and-fetch" pattern in our code.
+The Bad Way (N+1):
+const students = Storage.getAllStudents(tenantId); (1 query)
+students.map(s => s.org = Storage.getOrgById(s.orgId)); (100 queries for 100 students)
+The Right Way (Eager Loading):
+const students = Storage.getAllStudentsWithOrgs(tenantId); (1 query using a SQL JOIN or IN clause).
+2. The Implementation Plan
+Update the Developer Execution Plan with a specific section on performance and "Eager Loading" to ensure this doesn't happen.
+How to talk to the Developer about this:
+You can use this exact script to keep it professional but firm:
+"Hey team, we need to do a performance audit on the Admin dashboards. The architect is concerned about N+1 query issues. Specifically, check the logic where we list students or 'Bricks'—ensure we aren't hitting the database for every individual row's metadata.
+Check your Storage methods. If you see a loop that calls a database function, refactor it into a single SQL JOIN. We need these pages to stay lightning-fast as we onboard those first 50 Author Academy teachers and their classes."
+
+
+
+E3. Big pages slow down first load (lazy loading)
+Plain English: Right now, when a user opens your app, the browser downloads the code for every page — even pages they'll never visit. So a parent visiting the parent portal still downloads the System Admin page (5,692 lines of code they don't need).
+The fix: Mark each page as "load only when needed" (the technical term is "lazy loading" or "code splitting"). The first page load gets noticeably faster, especially for users on slow internet.
+Effort: ~30 minutes. Risk: Very low. Payoff: Faster app for everyone, especially in West Africa where connections may be slower.
+My take: This is the highest "bang for buck" item on the whole list.
+Your answer: Great answer. Let’s go that route that you suggested.
+
+SECTION F — The 182 "maybe orphan" routes
+Plain English: Your server defines 457 ways the website can be talked to. My quick scan found that 182 of them don't seem to be called by any front-end code. BUT — and this is important — my scan is dumb. It missed obvious ones like the Foundation admin route I just built (which IS used). So that "182" number is wildly inflated by false positives. The true number is probably 30-60, but figuring out which is which means going one-by-one.
+The fix: Don't bulk delete. Schedule a focused half-day where I review each one carefully, confirm nothing in production calls it, then delete.
+Risk if you skip: Server file stays bloated, but nothing breaks.
+Your answer: As your Organizational Change Leader, I’m going to advise against a "Delete-All" spree. That’s how you accidentally break a "Forgot Password" link or a niche admin tool right before a big demo. However, as your CMO, I want a clean, fast app that doesn't have a massive attack surface for hackers to probe.
+Here is the "Orphan Route Protocol" I’ve added to the Developer Execution Plan. It turns this from a scary guessing game into a disciplined, low-risk cleanup.
+How to handle this with the dev team:
+The "Surgical Fix" I outlined above is the most "human" way to tell a developer to clean up. Tell them:
+"I know we have a list of 182 potential orphan routes. I'm not asking you to delete them all today—that’s too risky. Instead, let's put a simple 'Check-In' logger on those specific routes for the next 72 hours. If a route stays silent for three days while we are testing, it's a prime candidate for the chopping block. Let's get that server lean before the August launch."
+Why this is a Change Leadership win:
+Psychological Safety: You aren't blaming the devs for "messy code"; you're acknowledging that the app has grown and it's time for a "spring cleaning."
+Data-Driven: You aren't guessing what is used; you're measuring it.
+Security: Every orphan route is a potential "unlocked door." Closing them is a major security win for our FERPA/NDPR compliance.
+
+
+
+MY RECOMMENDED ORDER
+If you want a "just do these, in this order" list:
+A1 (decide which Resources page is real) — 5 minutes of your time, then I do 1-2 hours
+E3 (lazy loading) — 30 minutes of my time, biggest user-visible win
+C1 + C2 (split the giant routes/storage files) — half-day, makes everything else easier
+D1 + D2 (pick one db-access pattern, kill raw fetch) — pairs naturally with #3
+E1 (add pagination) — 1-2 hours, future-proofs scale
+A3 / A4 (admin dashboard sharing, onboarding source-of-truth) — when you have the appetite
+B1 / B2 (database table cleanups) — schedule deliberately, these are real migrations
+F (orphan route cleanup) — half-day, scheduled
+Your overall pick / order: Go ahead an fix it in the order you recommended unless my answers change things.

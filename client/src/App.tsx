@@ -3,76 +3,88 @@ import { queryClient } from "./lib/queryClient";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
-import { SidebarProvider, SidebarInset, SidebarTrigger } from "@/components/ui/sidebar";
+import { SidebarProvider, SidebarInset } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/AppSidebar";
 import { Header } from "@/components/Header";
 import { Footer } from "@/components/Footer";
 import { NeedsAnalyzerModal } from "@/components/NeedsAnalyzerModal";
-import NeedsAnalyzerPage from "@/pages/NeedsAnalyzer";
 import { OnboardingReminderBanner } from "@/components/OnboardingReminderBanner";
 import { TrialBanner } from "@/components/TrialBanner";
 import { ImpersonationBanner } from "@/components/ImpersonationBanner";
 import { OnboardingTour } from "@/components/OnboardingTour";
 import { useAuth } from "@/hooks/use-auth";
-import { useEffect, useState } from "react";
+import { useEffect, useState, lazy, Suspense } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
-import { LogIn, Sparkles, X } from "lucide-react";
+import { LogIn, Sparkles } from "lucide-react";
+
+// Eager — homepage and tiny wrappers needed on first paint
 import Dashboard from "@/pages/Dashboard";
-import LessonGenerator from "@/pages/LessonGenerator";
-import Assessments from "@/pages/Assessments";
-import Careers from "@/pages/Careers";
-import ActionPlans from "@/pages/ActionPlans";
-import Resources from "@/pages/Resources";
-import MyLessons from "@/pages/MyLessons";
-import Settings from "@/pages/Settings";
-import SharedLesson from "@/pages/SharedLesson";
-import Analytics from "@/pages/Analytics";
-import ScopeSequence from "@/pages/ScopeSequence";
-import ScopeEditor from "@/pages/ScopeEditor";
-import SelfDiscovery from "@/pages/SelfDiscovery";
-import EducatorInfluence from "@/pages/EducatorInfluence";
-import StandardsAdmin from "@/pages/StandardsAdmin";
-import AdminFoundation from "@/pages/AdminFoundation";
-import Pricing from "@/pages/Pricing";
-import Onboarding from "@/pages/Onboarding";
-import Assignments from "@/pages/Assignments";
-import Collaboration from "@/pages/Collaboration";
-import ResourceLibrary from "@/pages/ResourceLibrary";
-import SiteAdmin from "@/pages/SiteAdmin";
-import SystemAdmin from "@/pages/SystemAdmin";
-import ParentPortal from "@/pages/ParentPortal";
-import ParentConnect from "@/pages/ParentConnect";
-import Milestones from "@/pages/Milestones";
-import Classroom from "@/pages/Classroom";
-import ProfessionalDevelopment from "@/pages/ProfessionalDevelopment";
-import StudentJourney from "@/pages/StudentJourney";
-import StudentDashboard from "@/pages/StudentDashboard";
-import MyJourney from "@/pages/MyJourney";
-import PortfolioBuilder from "@/pages/PortfolioBuilder";
-import PortfolioView from "@/pages/PortfolioView";
-import SISIntegration from "@/pages/SISIntegration";
-import TransferApprovals from "@/pages/TransferApprovals";
-import Gradebook from "@/pages/Gradebook";
-import LessonAuthoring from "@/pages/LessonAuthoring";
-import KnowResourcesAdmin from "@/pages/KnowResourcesAdmin";
-import MatriculationAchievementAdmin from "@/pages/MatriculationAchievementAdmin";
-import AlignmentDashboard from "@/pages/AlignmentDashboard";
-import ScholarshipPlanner from "@/pages/ScholarshipPlanner";
-import EssayBuilder from "@/pages/EssayBuilder";
-import CampusActivities from "@/pages/CampusActivities";
-import StrengthsInventory from "@/pages/StrengthsInventory";
-import MentorConnect from "@/pages/MentorConnect";
-import DistrictAdmin from "@/pages/DistrictAdmin";
-import HelpDesk from "@/pages/HelpDesk";
-import DevDocs from "@/pages/DevDocs";
+import NeedsAnalyzerPage from "@/pages/NeedsAnalyzer";
 import NotFound from "@/pages/not-found";
-import { EmbedRouter } from "@/pages/EmbedRouter";
+
+// Lazy — every other page is fetched on demand
+const LessonGenerator = lazy(() => import("@/pages/LessonGenerator"));
+const Assessments = lazy(() => import("@/pages/Assessments"));
+const Careers = lazy(() => import("@/pages/Careers"));
+const ActionPlans = lazy(() => import("@/pages/ActionPlans"));
+const Resources = lazy(() => import("@/pages/Resources"));
+const MyLessons = lazy(() => import("@/pages/MyLessons"));
+const Settings = lazy(() => import("@/pages/Settings"));
+const SharedLesson = lazy(() => import("@/pages/SharedLesson"));
+const Analytics = lazy(() => import("@/pages/Analytics"));
+const ScopeSequence = lazy(() => import("@/pages/ScopeSequence"));
+const ScopeEditor = lazy(() => import("@/pages/ScopeEditor"));
+const SelfDiscovery = lazy(() => import("@/pages/SelfDiscovery"));
+const EducatorInfluence = lazy(() => import("@/pages/EducatorInfluence"));
+const StandardsAdmin = lazy(() => import("@/pages/StandardsAdmin"));
+const AdminFoundation = lazy(() => import("@/pages/AdminFoundation"));
+const Pricing = lazy(() => import("@/pages/Pricing"));
+const Onboarding = lazy(() => import("@/pages/Onboarding"));
+const Assignments = lazy(() => import("@/pages/Assignments"));
+const Collaboration = lazy(() => import("@/pages/Collaboration"));
+const ResourceLibrary = lazy(() => import("@/pages/ResourceLibrary"));
+const SiteAdmin = lazy(() => import("@/pages/SiteAdmin"));
+const SystemAdmin = lazy(() => import("@/pages/SystemAdmin"));
+const ParentPortal = lazy(() => import("@/pages/ParentPortal"));
+const ParentConnect = lazy(() => import("@/pages/ParentConnect"));
+const Milestones = lazy(() => import("@/pages/Milestones"));
+const Classroom = lazy(() => import("@/pages/Classroom"));
+const ProfessionalDevelopment = lazy(() => import("@/pages/ProfessionalDevelopment"));
+const StudentJourney = lazy(() => import("@/pages/StudentJourney"));
+const StudentDashboard = lazy(() => import("@/pages/StudentDashboard"));
+const MyJourney = lazy(() => import("@/pages/MyJourney"));
+const PortfolioBuilder = lazy(() => import("@/pages/PortfolioBuilder"));
+const PortfolioView = lazy(() => import("@/pages/PortfolioView"));
+const SISIntegration = lazy(() => import("@/pages/SISIntegration"));
+const TransferApprovals = lazy(() => import("@/pages/TransferApprovals"));
+const Gradebook = lazy(() => import("@/pages/Gradebook"));
+const LessonAuthoring = lazy(() => import("@/pages/LessonAuthoring"));
+const KnowResourcesAdmin = lazy(() => import("@/pages/KnowResourcesAdmin"));
+const MatriculationAchievementAdmin = lazy(() => import("@/pages/MatriculationAchievementAdmin"));
+const AlignmentDashboard = lazy(() => import("@/pages/AlignmentDashboard"));
+const ScholarshipPlanner = lazy(() => import("@/pages/ScholarshipPlanner"));
+const EssayBuilder = lazy(() => import("@/pages/EssayBuilder"));
+const CampusActivities = lazy(() => import("@/pages/CampusActivities"));
+const StrengthsInventory = lazy(() => import("@/pages/StrengthsInventory"));
+const MentorConnect = lazy(() => import("@/pages/MentorConnect"));
+const DistrictAdmin = lazy(() => import("@/pages/DistrictAdmin"));
+const HelpDesk = lazy(() => import("@/pages/HelpDesk"));
+const DevDocs = lazy(() => import("@/pages/DevDocs"));
+const EmbedRouter = lazy(() => import("@/pages/EmbedRouter").then(m => ({ default: m.EmbedRouter })));
 
 const EXEMPT_PATHS = ["/onboarding", "/pricing", "/shared", "/p/", "/embed/"];
 const MAX_ONBOARDING_SKIPS = 3;
 const SESSION_PROMPT_KEY = "lys_onboarding_prompted";
+
+function PageLoader() {
+  return (
+    <div className="flex items-center justify-center min-h-[60vh]" data-testid="page-loader">
+      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" />
+    </div>
+  );
+}
 
 function OnboardingGuard({ children }: { children: React.ReactNode }) {
   const { user, isAuthenticated, isLoading } = useAuth();
@@ -230,7 +242,6 @@ function withAuth(Component: React.ComponentType<any>) {
   };
 }
 
-const AuthDashboard = withAuth(Dashboard);
 const AuthLessonGenerator = withAuth(LessonGenerator);
 const AuthActionPlans = withAuth(ActionPlans);
 const AuthMyLessons = withAuth(MyLessons);
@@ -264,7 +275,6 @@ const AuthScholarshipPlanner = withAuth(ScholarshipPlanner);
 const AuthEssayBuilder = withAuth(EssayBuilder);
 const AuthCampusActivities = withAuth(CampusActivities);
 const AuthStrengthsInventory = withAuth(StrengthsInventory);
-const AuthMentorConnect = withAuth(MentorConnect);
 const AuthDistrictAdmin = withAuth(DistrictAdmin);
 const AuthStandardsAdmin = withAuth(StandardsAdmin);
 const AuthOnboarding = withAuth(Onboarding);
@@ -272,68 +282,70 @@ const AuthDevDocs = withAuth(DevDocs);
 
 function Router() {
   return (
-    <Switch>
-      <Route path="/embed/:rest*" component={EmbedRouter} />
-      
-      {/* Public exploration pages — no sign-in required */}
-      <Route path="/" component={Dashboard} />
-      <Route path="/start" component={NeedsAnalyzerPage} />
-      <Route path="/lesson-generator" component={LessonGenerator} />
-      <Route path="/assessments" component={Assessments} />
-      <Route path="/careers" component={Careers} />
-      <Route path="/resources" component={Resources} />
-      <Route path="/self-discovery" component={SelfDiscovery} />
-      <Route path="/mentor-connect" component={MentorConnect} />
-      <Route path="/shared/:shareId" component={SharedLesson} />
-      <Route path="/pricing" component={Pricing} />
-      <Route path="/help" component={HelpDesk} />
-      <Route path="/p/:slug" component={PortfolioView} />
+    <Suspense fallback={<PageLoader />}>
+      <Switch>
+        <Route path="/embed/:rest*" component={EmbedRouter} />
+        
+        {/* Public exploration pages — no sign-in required */}
+        <Route path="/" component={Dashboard} />
+        <Route path="/start" component={NeedsAnalyzerPage} />
+        <Route path="/lesson-generator" component={LessonGenerator} />
+        <Route path="/assessments" component={Assessments} />
+        <Route path="/careers" component={Careers} />
+        <Route path="/resources" component={Resources} />
+        <Route path="/self-discovery" component={SelfDiscovery} />
+        <Route path="/mentor-connect" component={MentorConnect} />
+        <Route path="/shared/:shareId" component={SharedLesson} />
+        <Route path="/pricing" component={Pricing} />
+        <Route path="/help" component={HelpDesk} />
+        <Route path="/p/:slug" component={PortfolioView} />
 
-      {/* Personal-data pages that need a signed-in account */}
-      <Route path="/action-plans" component={AuthActionPlans} />
-      <Route path="/strengths-inventory" component={AuthStrengthsInventory} />
-      <Route path="/scholarship-planner" component={AuthScholarshipPlanner} />
-      <Route path="/onboarding" component={AuthOnboarding} />
+        {/* Personal-data pages that need a signed-in account */}
+        <Route path="/action-plans" component={AuthActionPlans} />
+        <Route path="/strengths-inventory" component={AuthStrengthsInventory} />
+        <Route path="/scholarship-planner" component={AuthScholarshipPlanner} />
+        <Route path="/onboarding" component={AuthOnboarding} />
 
-      {/* Account-required pages — personal data or admin tools */}
-      <Route path="/my-lessons" component={AuthMyLessons} />
-      <Route path="/settings" component={AuthSettings} />
-      <Route path="/sis-integration" component={AuthSISIntegration} />
-      <Route path="/analytics" component={AuthAnalytics} />
-      <Route path="/scope-sequence" component={AuthScopeSequence} />
-      <Route path="/scope/:id" component={AuthScopeEditor} />
-      <Route path="/educator-influence" component={AuthEducatorInfluence} />
-      <Route path="/admin/standards" component={AuthStandardsAdmin} />
-      <Route path="/admin/foundation" component={AuthAdminFoundation} />
-      <Route path="/assignments" component={AuthAssignments} />
-      <Route path="/collaboration" component={AuthCollaboration} />
-      <Route path="/collaboration/:id" component={AuthCollaboration} />
-      <Route path="/resource-library" component={AuthResourceLibrary} />
-      <Route path="/admin" component={AuthSiteAdmin} />
-      <Route path="/system-admin/:tab" component={AuthSystemAdmin} />
-      <Route path="/system-admin" component={AuthSystemAdmin} />
-      <Route path="/parent-portal" component={AuthParentPortal} />
-      <Route path="/parent-connect" component={ParentConnect} />
-      <Route path="/milestones" component={AuthMilestones} />
-      <Route path="/classroom" component={AuthClassroom} />
-      <Route path="/student-journey/:studentId" component={AuthStudentJourney} />
-      <Route path="/student-dashboard/:studentId" component={AuthStudentDashboard} />
-      <Route path="/my-journey" component={AuthMyJourney} />
-      <Route path="/professional-development" component={AuthProfessionalDevelopment} />
-      <Route path="/portfolio" component={AuthPortfolioBuilder} />
-      <Route path="/transfer-approvals" component={AuthTransferApprovals} />
-      <Route path="/gradebook" component={AuthGradebook} />
-      <Route path="/lesson-authoring" component={AuthLessonAuthoring} />
-      <Route path="/admin/know-resources" component={AuthKnowResourcesAdmin} />
-      <Route path="/admin/matriculation" component={AuthMatriculationAdmin} />
-      <Route path="/alignment-dashboard" component={AuthAlignmentDashboard} />
-      <Route path="/essay-builder" component={AuthEssayBuilder} />
-      <Route path="/campus-activities" component={AuthCampusActivities} />
-      <Route path="/district-admin" component={AuthDistrictAdmin} />
-      <Route path="/district-admin/campuses" component={AuthDistrictAdmin} />
-      <Route path="/dev-docs" component={AuthDevDocs} />
-      <Route component={NotFound} />
-    </Switch>
+        {/* Account-required pages — personal data or admin tools */}
+        <Route path="/my-lessons" component={AuthMyLessons} />
+        <Route path="/settings" component={AuthSettings} />
+        <Route path="/sis-integration" component={AuthSISIntegration} />
+        <Route path="/analytics" component={AuthAnalytics} />
+        <Route path="/scope-sequence" component={AuthScopeSequence} />
+        <Route path="/scope/:id" component={AuthScopeEditor} />
+        <Route path="/educator-influence" component={AuthEducatorInfluence} />
+        <Route path="/admin/standards" component={AuthStandardsAdmin} />
+        <Route path="/admin/foundation" component={AuthAdminFoundation} />
+        <Route path="/assignments" component={AuthAssignments} />
+        <Route path="/collaboration" component={AuthCollaboration} />
+        <Route path="/collaboration/:id" component={AuthCollaboration} />
+        <Route path="/resource-library" component={AuthResourceLibrary} />
+        <Route path="/admin" component={AuthSiteAdmin} />
+        <Route path="/system-admin/:tab" component={AuthSystemAdmin} />
+        <Route path="/system-admin" component={AuthSystemAdmin} />
+        <Route path="/parent-portal" component={AuthParentPortal} />
+        <Route path="/parent-connect" component={ParentConnect} />
+        <Route path="/milestones" component={AuthMilestones} />
+        <Route path="/classroom" component={AuthClassroom} />
+        <Route path="/student-journey/:studentId" component={AuthStudentJourney} />
+        <Route path="/student-dashboard/:studentId" component={AuthStudentDashboard} />
+        <Route path="/my-journey" component={AuthMyJourney} />
+        <Route path="/professional-development" component={AuthProfessionalDevelopment} />
+        <Route path="/portfolio" component={AuthPortfolioBuilder} />
+        <Route path="/transfer-approvals" component={AuthTransferApprovals} />
+        <Route path="/gradebook" component={AuthGradebook} />
+        <Route path="/lesson-authoring" component={AuthLessonAuthoring} />
+        <Route path="/admin/know-resources" component={AuthKnowResourcesAdmin} />
+        <Route path="/admin/matriculation" component={AuthMatriculationAdmin} />
+        <Route path="/alignment-dashboard" component={AuthAlignmentDashboard} />
+        <Route path="/essay-builder" component={AuthEssayBuilder} />
+        <Route path="/campus-activities" component={AuthCampusActivities} />
+        <Route path="/district-admin" component={AuthDistrictAdmin} />
+        <Route path="/district-admin/campuses" component={AuthDistrictAdmin} />
+        <Route path="/dev-docs" component={AuthDevDocs} />
+        <Route component={NotFound} />
+      </Switch>
+    </Suspense>
   );
 }
 
