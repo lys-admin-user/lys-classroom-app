@@ -10,8 +10,10 @@ import { eq, sql } from "drizzle-orm";
 import { sanitizePromptText } from "./services/piiSanitizer";
 import { isAfricanCountry, buildAfricanPromptAddendum } from "@shared/africaContext";
 import { buildLysCanonPromptBlock, LYS_REF_VERSION } from "./lysReference";
+import { buildCanonBlock, normalizeSubject as normalizeSubjectFromCanon } from "./services/lysCanonService";
+import { retrieveExamples } from "./services/lessonRetrievalService";
 
-function generateCacheKey(request: GenerateLessonRequest): string {
+function generateCacheKey(request: GenerateLessonRequest, subjectVersion: number = 1, retrievalMode: string = "legacy"): string {
   const normalizedParts = [
     request.topic.toLowerCase().trim(),
     (request.course || "").toLowerCase().trim(),
@@ -23,11 +25,25 @@ function generateCacheKey(request: GenerateLessonRequest): string {
     // Country + language influence the African context block, so cache must vary by them.
     (request.standards?.country || "").toLowerCase().trim(),
     (request.language || "").toLowerCase().trim(),
-    // LYS reference corpus version — bumping this invalidates all prior
-    // cached lessons so the new canon takes effect immediately.
-    `lys:${LYS_REF_VERSION}`,
+    // Per-subject canon version (replaces the global LYS_REF_VERSION). Bumping
+    // a single subject's canon now invalidates only that subject's cache.
+    `lys:${LYS_REF_VERSION}:${retrievalMode}:sv${subjectVersion}`,
   ];
   return crypto.createHash("sha256").update(normalizedParts.join("|")).digest("hex");
+}
+
+// Cached feature-flag check (60s TTL). Avoids hammering DB on every generation.
+let _flagCache: { value: boolean; at: number } | null = null;
+async function isNewRetrievalEnabled(): Promise<boolean> {
+  if (_flagCache && Date.now() - _flagCache.at < 60_000) return _flagCache.value;
+  try {
+    const flag = await storage.getFeatureFlagByName("new_lesson_retrieval");
+    const value = !!flag?.isEnabled;
+    _flagCache = { value, at: Date.now() };
+    return value;
+  } catch {
+    return false;
+  }
 }
 
 async function getCachedLesson(cacheKey: string): Promise<any | null> {
@@ -152,7 +168,15 @@ export async function generateLessonPlan(request: GenerateLessonRequest): Promis
     return generateMockLessonPlan(request);
   }
 
-  const cacheKey = generateCacheKey(request);
+  const useNewRetrievalEarly = await isNewRetrievalEnabled();
+  const subjectEarly = request.course || request.topic;
+  let earlySubjectVersion = 1;
+  if (useNewRetrievalEarly) {
+    try {
+      earlySubjectVersion = await storage.getSubjectCanonVersion(normalizeSubjectKey(subjectEarly));
+    } catch { /* default 1 */ }
+  }
+  const cacheKey = generateCacheKey(request, earlySubjectVersion, useNewRetrievalEarly ? "semantic" : "legacy");
   const cached = await getCachedLesson(cacheKey);
   if (cached) {
     console.log(`Cache HIT for lesson: "${request.topic}" [${request.gradeLevel}/${request.bkdFocus}]`);
@@ -203,15 +227,38 @@ QUALITY CHECK BEFORE OUTPUT:
 
 IMPORTANT: Respond ONLY with a valid JSON object, no additional text.${africanInSystem}`;
 
-  // Get master lesson examples for AI guidance
+  // Get master lesson examples for AI guidance.
+  // When the `new_lesson_retrieval` feature flag is on, use the new semantic
+  // retrieval service (embeddings + score-weighted + per-section highlights)
+  // and the DB-backed canon. When off, fall back to the legacy SQL filter +
+  // hardcoded canon path. Attribution is recorded for both modes.
   const subject = request.course || request.topic;
-  const masterExamples = await getMasterLessonExamples(subject, request.gradeLevel);
+  const useNewRetrieval = await isNewRetrievalEnabled();
+  let masterExamples = "";
+  let attributionData: { masterLessonIds: string[]; sectionIds: string[]; canonEntryIds: string[]; mode: string } = {
+    masterLessonIds: [], sectionIds: [], canonEntryIds: [], mode: "legacy",
+  };
+  let lysCanon = "";
+  let subjectVersion = 1;
 
-  // LYS canonical reference distilled from real teacher exemplars
-  // (cheat sheet, rubric, template, and Distinguished-rated finished lessons
-  // across Science, ELA, and Social Studies — grades 6–8). See
-  // server/reference/lys/README.md for sources.
-  const lysCanon = buildLysCanonPromptBlock(subject, request.gradeLevel, request.topic);
+  if (useNewRetrieval) {
+    const [retrieval, canon] = await Promise.all([
+      retrieveExamples({ topic: request.topic, subject, gradeLevel: request.gradeLevel, bkdFocus: request.bkdFocus }),
+      buildCanonBlock(subject, request.gradeLevel, request.topic),
+    ]);
+    masterExamples = retrieval.block;
+    lysCanon = canon.block;
+    subjectVersion = canon.subjectVersion;
+    attributionData = {
+      masterLessonIds: retrieval.attribution.masterLessonIds,
+      sectionIds: retrieval.attribution.sectionIds,
+      canonEntryIds: canon.entryIds,
+      mode: retrieval.attribution.mode,
+    };
+  } else {
+    masterExamples = await getMasterLessonExamples(subject, request.gradeLevel);
+    lysCanon = buildLysCanonPromptBlock(subject, request.gradeLevel, request.topic);
+  }
 
   let rssSupplementalSection = "";
   try {
@@ -358,16 +405,52 @@ You MUST address these gaps to achieve Distinguished level (90%+).`;
         
         if (retryQuality.percentage > qualityResult.percentage) {
           await saveLessonToCache(request, cacheKey, improvedLesson);
+          await recordAttribution(cacheKey, improvedLesson, request, attributionData, retryQuality.percentage);
           return { ...improvedLesson, cacheHit: false };
         }
       }
     }
     
     await saveLessonToCache(request, cacheKey, generatedLesson);
+    await recordAttribution(cacheKey, generatedLesson, request, attributionData, qualityResult.percentage);
     return { ...generatedLesson, cacheHit: false };
   } catch (error) {
     console.error("Error generating lesson plan:", error);
     return generateMockLessonPlan(request);
+  }
+}
+
+function normalizeSubjectKey(subject: string | undefined): string {
+  // Delegates to the canonical normalizer in lysCanonService so admin canon
+  // CRUD, generation cache keys, and version bumps all agree on the same key.
+  const key = normalizeSubjectFromCanon(subject);
+  return key || "_global";
+}
+
+async function recordAttribution(
+  cacheKey: string,
+  lesson: any,
+  request: GenerateLessonRequest,
+  attribution: { masterLessonIds: string[]; sectionIds: string[]; canonEntryIds: string[]; mode: string },
+  finalScore: number,
+): Promise<void> {
+  try {
+    await storage.createLessonAttribution({
+      cacheKey,
+      lessonId: lesson?.id ?? null,
+      userId: null,
+      topic: request.topic,
+      subject: normalizeSubjectKey(request.course || request.topic),
+      gradeLevel: request.gradeLevel,
+      bkdFocus: request.bkdFocus,
+      masterLessonIds: attribution.masterLessonIds,
+      sectionIds: attribution.sectionIds,
+      canonEntryIds: attribution.canonEntryIds,
+      finalScore,
+      retrievalMode: attribution.mode,
+    });
+  } catch (err) {
+    console.warn("[openai] attribution insert failed (non-fatal):", (err as Error).message);
   }
 }
 

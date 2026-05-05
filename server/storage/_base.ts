@@ -4167,6 +4167,27 @@ export class DatabaseStorage {
 // Interface declaration merging: gives the class every method signature that
 // is attached at runtime (via Object.assign in the per-domain modules).
 export interface DatabaseStorage extends IStorage {
+  // ----- Bricks/BKD lesson AI improvements -----
+  setMasterLessonEmbedding(id: string, embedding: number[]): Promise<void>;
+  getMasterLessonsForRetrieval(filters: { subject?: string; minScore?: number; limit?: number }): Promise<import("@shared/schema").MasterLesson[]>;
+  createMasterLessonSection(section: import("@shared/schema").InsertMasterLessonSection): Promise<import("@shared/schema").MasterLessonSection>;
+  getMasterLessonSections(masterLessonId: string): Promise<import("@shared/schema").MasterLessonSection[]>;
+  setMasterLessonSectionEmbedding(id: string, embedding: number[]): Promise<void>;
+  getMasterLessonSectionsByType(sectionType: string, masterLessonIds: string[]): Promise<import("@shared/schema").MasterLessonSection[]>;
+  listLysCanonEntries(filters?: { subject?: string; kind?: string; isActive?: boolean }): Promise<import("@shared/schema").LysCanonEntry[]>;
+  createLysCanonEntry(entry: import("@shared/schema").InsertLysCanonEntry): Promise<import("@shared/schema").LysCanonEntry>;
+  updateLysCanonEntry(id: string, updates: Partial<import("@shared/schema").InsertLysCanonEntry>): Promise<import("@shared/schema").LysCanonEntry | undefined>;
+  deleteLysCanonEntry(id: string): Promise<boolean>;
+  getSubjectCanonVersion(subject: string): Promise<number>;
+  bumpSubjectCanonVersion(subject: string): Promise<number>;
+  createLessonAttribution(attr: Omit<import("@shared/schema").LessonGenerationAttribution, "id" | "createdAt">): Promise<import("@shared/schema").LessonGenerationAttribution>;
+  updateLessonAttributionScore(cacheKey: string, finalScore: number): Promise<void>;
+  listTopExemplars(limit?: number): Promise<Array<{ masterLessonId: string; uses: number; avgScore: number }>>;
+  createLessonEditSignal(signal: Omit<import("@shared/schema").LessonEditSignal, "id" | "createdAt">): Promise<import("@shared/schema").LessonEditSignal>;
+  listLessonEditSignals(lessonId: string): Promise<import("@shared/schema").LessonEditSignal[]>;
+  getLessonAiOrgSettings(orgId: string): Promise<import("@shared/schema").LessonAiOrgSettings | undefined>;
+  upsertLessonAiOrgSettings(orgId: string, editCaptureEnabled: boolean): Promise<import("@shared/schema").LessonAiOrgSettings>;
+
   calculateLetterGrade(percentage: number): string;
   getCollaborationSessions(userId: string): Promise<CollaborationSession[]>;
   getActiveCollaborationSessions(userId: string): Promise<CollaborationSession[]>;

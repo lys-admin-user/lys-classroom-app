@@ -22,6 +22,7 @@ import "./payments";
 import "./account";
 import "./analytics";
 import "./misc";
+import "./lessonAi";
 
 export {
   DatabaseStorage,

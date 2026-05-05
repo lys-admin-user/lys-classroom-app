@@ -200,9 +200,37 @@ async function scheduleWeeklyScholarshipVerification() {
   log("Weekly scholarship verification scheduled (every 7 days)", "scheduler");
 }
 
+async function initLessonAiSubsystem(): Promise<void> {
+  // Idempotent boot wiring for the Bricks/BKD lesson AI improvements:
+  //  1. Ensure the `vector` extension exists (no-op if already installed; we
+  //     currently store embeddings as jsonb arrays so this is precautionary).
+  //  2. Migrate the hardcoded LYS canon into the DB on first boot.
+  //  3. Seed the `new_lesson_retrieval` feature flag in the disabled state so
+  //     the legacy retrieval path stays the default until an admin toggles it.
+  try {
+    const { db } = await import("./db");
+    const { sql } = await import("drizzle-orm");
+    try { await db.execute(sql`CREATE EXTENSION IF NOT EXISTS vector`); } catch { /* permission or unavailable; safe to ignore */ }
+    const { seedCanonFromHardcodedIfEmpty } = await import("./services/lysCanonService");
+    await seedCanonFromHardcodedIfEmpty();
+    const { storage } = await import("./storage");
+    const existing = await storage.getFeatureFlagByName("new_lesson_retrieval");
+    if (!existing) {
+      await storage.createFeatureFlag({
+        name: "new_lesson_retrieval",
+        description: "Enable semantic retrieval, per-section highlight reel, and DB-backed canon for AI lesson generation",
+        isEnabled: false,
+      } as any);
+    }
+  } catch (err) {
+    console.warn("[lesson-ai] boot init skipped:", (err as Error).message);
+  }
+}
+
 (async () => {
   await initStripe();
   await registerRoutes(httpServer, app);
+  await initLessonAiSubsystem();
   scheduleWeeklyScholarshipVerification().catch((err) =>
     log(`Failed to schedule verification job: ${err?.message || err}`, "scheduler"),
   );

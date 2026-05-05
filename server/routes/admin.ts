@@ -3662,4 +3662,84 @@ export function registerAdminRoutes(app: Express): void {
       res.status(500).json({ error: "Failed to fetch sync history" });
     }
   });
+
+  // ===== Bricks/BKD lesson AI improvements =====
+  // LYS canon entries CRUD (DB-backed canonical reference). Bumps subject
+  // version on any write so cache keys invalidate per-subject.
+  app.get("/api/admin/canon-entries", isAuthenticated, isSiteAdmin, async (req: any, res) => {
+    try {
+      const { subject, kind, isActive } = req.query as any;
+      const entries = await storage.listLysCanonEntries({
+        subject: subject || undefined,
+        kind: kind || undefined,
+        isActive: isActive === undefined ? undefined : isActive === "true",
+      });
+      res.json(entries);
+    } catch (e) {
+      res.status(500).json({ error: "Failed to list canon entries" });
+    }
+  });
+
+  app.post("/api/admin/canon-entries", isAuthenticated, isSiteAdmin, async (req: any, res) => {
+    try {
+      const { normalizeSubject } = await import("../services/lysCanonService");
+      // Normalize subject before persistence so admin writes and generation
+      // cache keys agree on the canonical key (e.g. "Math" -> "math").
+      const payload = { ...req.body, subject: normalizeSubject(req.body?.subject) || "_global" };
+      const created = await storage.createLysCanonEntry(payload);
+      if (created.subject) await storage.bumpSubjectCanonVersion(created.subject);
+      res.json(created);
+    } catch (e) {
+      res.status(400).json({ error: "Failed to create canon entry", details: (e as Error).message });
+    }
+  });
+
+  app.patch("/api/admin/canon-entries/:id", isAuthenticated, isSiteAdmin, async (req: any, res) => {
+    try {
+      const { normalizeSubject } = await import("../services/lysCanonService");
+      const payload = req.body?.subject !== undefined
+        ? { ...req.body, subject: normalizeSubject(req.body.subject) || "_global" }
+        : req.body;
+      const updated = await storage.updateLysCanonEntry(req.params.id, payload);
+      if (updated?.subject) await storage.bumpSubjectCanonVersion(updated.subject);
+      res.json(updated);
+    } catch (e) {
+      res.status(400).json({ error: "Failed to update canon entry" });
+    }
+  });
+
+  app.delete("/api/admin/canon-entries/:id", isAuthenticated, isSiteAdmin, async (req: any, res) => {
+    try {
+      const { normalizeSubject } = await import("../services/lysCanonService");
+      const existing = await storage.listLysCanonEntries();
+      const target = existing.find(e => e.id === req.params.id);
+      const ok = await storage.deleteLysCanonEntry(req.params.id);
+      if (ok && target?.subject) await storage.bumpSubjectCanonVersion(normalizeSubject(target.subject) || "_global");
+      res.json({ success: ok });
+    } catch (e) {
+      res.status(500).json({ error: "Failed to delete canon entry" });
+    }
+  });
+
+  // Top exemplars by attribution / score correlation.
+  app.get("/api/admin/lesson-attribution/top", isAuthenticated, isSiteAdmin, async (req: any, res) => {
+    try {
+      const limit = Number(req.query.limit) || 20;
+      const top = await storage.listTopExemplars(limit);
+      res.json(top);
+    } catch (e) {
+      res.status(500).json({ error: "Failed to load top exemplars" });
+    }
+  });
+
+  // Per-org opt-in/out of teacher edit capture as a training signal.
+  app.patch("/api/admin/orgs/:orgId/ai-training", isAuthenticated, isSiteAdmin, async (req: any, res) => {
+    try {
+      const enabled = Boolean(req.body?.editCaptureEnabled);
+      const updated = await storage.upsertLessonAiOrgSettings(req.params.orgId, enabled);
+      res.json(updated);
+    } catch (e) {
+      res.status(400).json({ error: "Failed to update org AI training settings" });
+    }
+  });
 }

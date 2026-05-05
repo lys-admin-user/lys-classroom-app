@@ -3044,11 +3044,13 @@ export const masterLessons = pgTable("master_lessons", {
   reviewedBy: varchar("reviewed_by"), // Site admin who approved
   reviewedAt: timestamp("reviewed_at"),
   reviewNotes: text("review_notes"),
+  embedding: jsonb("embedding").$type<number[]>(), // text-embedding-3-small (1536 dims) for semantic retrieval
+  embeddedAt: timestamp("embedded_at"),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
 
-export const insertMasterLessonSchema = createInsertSchema(masterLessons).omit({ id: true, createdAt: true, updatedAt: true, qualityScore: true, usageCount: true, reviewedAt: true });
+export const insertMasterLessonSchema = createInsertSchema(masterLessons).omit({ id: true, createdAt: true, updatedAt: true, qualityScore: true, usageCount: true, reviewedAt: true, embedding: true, embeddedAt: true });
 export type InsertMasterLesson = z.infer<typeof insertMasterLessonSchema>;
 export type MasterLesson = typeof masterLessons.$inferSelect;
 
@@ -3750,3 +3752,100 @@ export const insertFoundationProgressSchema = createInsertSchema(foundationProgr
 export type InsertFoundationProgress = z.infer<typeof insertFoundationProgressSchema>;
 export type FoundationProgress = typeof foundationProgress.$inferSelect;
 
+
+// ===== Bricks/BKD Lesson AI Improvements =====
+
+// Per-section embeddings on master lessons (objectives, essentialQuestions, activities, close, etc.)
+export const masterLessonSections = pgTable("master_lesson_sections", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  masterLessonId: varchar("master_lesson_id").notNull(),
+  sectionType: varchar("section_type").notNull(), // objectives | essential_questions | activities | bkd_be | bkd_know | bkd_do | resources | close
+  content: text("content").notNull(),
+  embedding: jsonb("embedding").$type<number[]>(),
+  embeddedAt: timestamp("embedded_at"),
+  createdAt: timestamp("created_at").defaultNow(),
+}, (table) => [
+  index("idx_mls_master_lesson").on(table.masterLessonId),
+  index("idx_mls_section_type").on(table.sectionType),
+]);
+export const insertMasterLessonSectionSchema = createInsertSchema(masterLessonSections).omit({ id: true, createdAt: true, embedding: true, embeddedAt: true });
+export type InsertMasterLessonSection = z.infer<typeof insertMasterLessonSectionSchema>;
+export type MasterLessonSection = typeof masterLessonSections.$inferSelect;
+
+// LYS Canon entries — DB-backed replacement for hardcoded lysReference.ts content
+export const lysCanonEntries = pgTable("lys_canon_entries", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  kind: varchar("kind").notNull(), // exemplar | vocab | domain | accommodation
+  subject: varchar("subject"), // null = applies to all subjects
+  gradeBand: varchar("grade_band"), // e.g. "6-8"; null = all grades
+  topicHint: text("topic_hint"), // optional matching keyword
+  title: text("title").notNull(),
+  body: text("body").notNull(),
+  sortOrder: integer("sort_order").default(0),
+  isActive: boolean("is_active").notNull().default(true),
+  source: varchar("source").default("hardcoded_migration"), // hardcoded_migration | admin_created
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+}, (table) => [
+  index("idx_canon_kind").on(table.kind),
+  index("idx_canon_subject").on(table.subject),
+]);
+export const insertLysCanonEntrySchema = createInsertSchema(lysCanonEntries).omit({ id: true, createdAt: true, updatedAt: true });
+export type InsertLysCanonEntry = z.infer<typeof insertLysCanonEntrySchema>;
+export type LysCanonEntry = typeof lysCanonEntries.$inferSelect;
+
+// Per-subject canon version stamps for granular cache invalidation (#7)
+export const subjectCanonVersions = pgTable("subject_canon_versions", {
+  subject: varchar("subject").primaryKey(),
+  version: integer("version").notNull().default(1),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+export type SubjectCanonVersion = typeof subjectCanonVersions.$inferSelect;
+
+// Attribution: which exemplars/sections/canon entries fed a given generation,
+// and what score the result earned. Used to learn which references work.
+export const lessonGenerationAttribution = pgTable("lesson_generation_attribution", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  cacheKey: varchar("cache_key"),
+  lessonId: varchar("lesson_id"),
+  userId: varchar("user_id"),
+  topic: text("topic"),
+  subject: varchar("subject"),
+  gradeLevel: varchar("grade_level"),
+  bkdFocus: varchar("bkd_focus"),
+  masterLessonIds: jsonb("master_lesson_ids").$type<string[]>().default([]),
+  sectionIds: jsonb("section_ids").$type<string[]>().default([]),
+  canonEntryIds: jsonb("canon_entry_ids").$type<string[]>().default([]),
+  finalScore: integer("final_score"), // 0-100
+  retrievalMode: varchar("retrieval_mode").default("legacy"), // legacy | semantic
+  createdAt: timestamp("created_at").defaultNow(),
+}, (table) => [
+  index("idx_lga_cache_key").on(table.cacheKey),
+  index("idx_lga_lesson").on(table.lessonId),
+]);
+export type LessonGenerationAttribution = typeof lessonGenerationAttribution.$inferSelect;
+
+// Edit signals: diff between AI-generated lesson and what teacher actually saved.
+// Per-section breakdown lets us learn which parts teachers consistently rewrite.
+export const lessonEditSignals = pgTable("lesson_edit_signals", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  lessonId: varchar("lesson_id").notNull(),
+  userId: varchar("user_id").notNull(),
+  orgId: varchar("org_id"),
+  sectionEdits: jsonb("section_edits").$type<Record<string, { before: string; after: string; charsChanged: number }>>(),
+  totalCharsChanged: integer("total_chars_changed").default(0),
+  createdAt: timestamp("created_at").defaultNow(),
+}, (table) => [
+  index("idx_les_lesson").on(table.lessonId),
+  index("idx_les_user").on(table.userId),
+]);
+export type LessonEditSignal = typeof lessonEditSignals.$inferSelect;
+
+// Org-level opt-out for AI training capture. Default-on for individuals (no row);
+// orgs explicitly toggle via this table.
+export const lessonAiOrgSettings = pgTable("lesson_ai_org_settings", {
+  orgId: varchar("org_id").primaryKey(),
+  editCaptureEnabled: boolean("edit_capture_enabled").notNull().default(true),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+export type LessonAiOrgSettings = typeof lessonAiOrgSettings.$inferSelect;

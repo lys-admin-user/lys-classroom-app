@@ -415,6 +415,26 @@ export function registerLessonsRoutes(app: Express): void {
         userId,
       });
       res.json(lesson);
+
+      // Capture edit signal: diff what AI generated vs what teacher saved.
+      // Fire-and-forget; failures must not impact the save response.
+      (async () => {
+        try {
+          const generatedSnapshot = (req.body as any)?.__generatedSnapshot;
+          if (!generatedSnapshot) return;
+          const { captureEdit } = await import("../services/lessonEditCaptureService");
+          const orgId = (req.user?.claims as any)?.org_id ?? null;
+          await captureEdit({
+            lessonId: lesson.id,
+            userId,
+            generatedPlan: generatedSnapshot,
+            savedPlan: validated,
+            orgId,
+          });
+        } catch (e) {
+          console.warn("[lessons.save] edit capture skipped:", (e as Error).message);
+        }
+      })();
     } catch (error) {
       if (error instanceof z.ZodError) {
         res.status(400).json({ error: "Invalid lesson data", details: error.errors });
