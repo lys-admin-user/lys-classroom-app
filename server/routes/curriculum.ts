@@ -724,7 +724,7 @@ export function registerCurriculumRoutes(app: Express): void {
           const scholarshipFields: string[] = (r.careerFields || []).map((f: string) => f.toLowerCase());
           if (scholarshipFields.length > 0 && userCareerCategories.size > 0) {
             const hasFieldMatch = scholarshipFields.some((f: string) =>
-              [...userCareerCategories].some((uc) => f.includes(uc) || uc.includes(f))
+              Array.from(userCareerCategories).some((uc) => f.includes(uc) || uc.includes(f))
             );
             if (hasFieldMatch) { score += 30; reasons.push("Matches your career interests"); }
           } else if (scholarshipFields.length === 0) {
