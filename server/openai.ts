@@ -14,6 +14,8 @@ import { buildCanonBlock, normalizeSubject as normalizeSubjectFromCanon } from "
 import { retrieveExamples } from "./services/lessonRetrievalService";
 import { buildVoiceBlock } from "./services/voiceProfileService";
 import { critiqueAndMaybeRewrite } from "./services/voiceCriticService";
+import { resolveFallbackLesson } from "./services/fallbackResolver";
+import { startThinkingTicker, type StreamEmit } from "./services/generationStream";
 
 function generateCacheKey(request: GenerateLessonRequest, subjectVersion: number = 1, retrievalMode: string = "legacy"): string {
   const normalizedParts = [
@@ -165,9 +167,10 @@ const bkdDescriptions = {
   do: "Action & Impact - Focus on taking concrete steps, building habits, and making measurable progress. Execute with excellence.",
 };
 
-export async function generateLessonPlan(request: GenerateLessonRequest): Promise<GeneratedLessonPlan & { cacheHit?: boolean }> {
+export async function generateLessonPlan(request: GenerateLessonRequest): Promise<GeneratedLessonPlan & { cacheHit?: boolean; fallbackSource?: "cache" | "exemplar"; warning?: string }> {
   if (!openai) {
-    return generateMockLessonPlan(request);
+    const fb = await resolveFallbackLesson(request);
+    return fb.content as any;
   }
 
   const useNewRetrievalEarly = await isNewRetrievalEnabled();
@@ -449,8 +452,41 @@ You MUST address these gaps to achieve Distinguished level (90%+).`;
     return { ...finalLesson, cacheHit: false };
   } catch (error) {
     console.error("Error generating lesson plan:", error);
-    return generateMockLessonPlan(request);
+    const fb = await resolveFallbackLesson(request);
+    return fb.content as any;
   }
+}
+
+// Streaming wrapper around generateLessonPlan that emits SSE-style phase
+// events + a rotating "thinking ticker" so the UI can show a branded
+// anticipation countdown. Returns the final generated lesson; the route
+// layer handles writing SSE frames.
+export async function generateLessonPlanStreaming(
+  request: GenerateLessonRequest,
+  emit: StreamEmit,
+): Promise<any> {
+  emit({ type: "phase", data: "studying" });
+  await sleep(150);
+  emit({ type: "phase", data: "channeling-voice" });
+  await sleep(150);
+  emit({ type: "phase", data: "drafting" });
+  const stopTicker = startThinkingTicker(emit, "lesson");
+  let result: any;
+  try {
+    result = await generateLessonPlan(request);
+  } catch (err) {
+    stopTicker();
+    throw err;
+  }
+  stopTicker();
+  emit({ type: "phase", data: "polishing" });
+  await sleep(120);
+  emit({ type: "phase", data: "done" });
+  return result;
+}
+
+function sleep(ms: number) {
+  return new Promise((r) => setTimeout(r, ms));
 }
 
 function normalizeSubjectKey(subject: string | undefined): string {

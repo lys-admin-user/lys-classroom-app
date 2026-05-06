@@ -1,7 +1,8 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "../storage";
-import { generateLessonPlan } from "../openai";
+import { generateLessonPlan, generateLessonPlanStreaming } from "../openai";
+import { setupSSE, makeEmitter } from "../services/generationStream";
 import { detectAfricanCountryFromText } from "@shared/africaContext";
 import { calculateLessonQualityScore, getQualityLevel } from "../lessonQualityScorer";
 import { parseDocument } from "../documentParser";
@@ -379,6 +380,103 @@ export function registerLessonsRoutes(app: Express): void {
   });
 
 
+  // Streaming variant — same auth + tier checks as /api/lessons/generate, but
+  // pushes Server-Sent Events (phase / delta / done / error) so the UI can
+  // render the GenerationCountdown experience.
+  app.post("/api/lessons/generate-stream", isAuthenticated, async (req: any, res) => {
+    const userId = req.user?.claims?.sub;
+    let validated: z.infer<typeof generateLessonRequestSchema>;
+    try {
+      validated = generateLessonRequestSchema.parse(req.body);
+    } catch (err) {
+      if (err instanceof z.ZodError) {
+        return res.status(400).json({ error: "Invalid request data", details: err.errors });
+      }
+      return res.status(400).json({ error: "Invalid request" });
+    }
+
+    try {
+      const user = await storage.getUser(userId);
+      const topicCheck = filterChatMessage(validated.topic, user?.role || "student");
+      if (topicCheck.autoBlock) {
+        return res.status(400).json({ error: "Content not allowed", flagged: true });
+      }
+      if (topicCheck.requiresReview) {
+        await db.insert(contentReviewQueueTable).values({
+          contentType: "lesson_topic",
+          sourceUserId: userId,
+          sourceUserRole: user?.role || "unknown",
+          content: validated.topic,
+          flaggedKeywords: topicCheck.matchedKeywords,
+          severity: topicCheck.severity,
+          status: "pending_review",
+        });
+      }
+
+      const { checkFraudStrikes } = await import("../services/dataGovernance");
+      const fraudCheck = await checkFraudStrikes(userId);
+      if (fraudCheck.blocked) {
+        return res.status(403).json({
+          error: "AI features are temporarily disabled due to location verification required.",
+          reason: "fraud_strikes_exceeded",
+        });
+      }
+
+      const tier = await storage.getUserTier(userId);
+      let hasActiveTrial = false;
+      if (tier === "free") {
+        const userTrial = await storage.getActiveTrialByUserId(userId);
+        hasActiveTrial = !!userTrial;
+      }
+      if (tier === "free" && !hasActiveTrial) {
+        const { success, currentCount } = await storage.tryReserveLessonGeneration(userId, 5, validated.topic);
+        if (!success) {
+          return res.status(403).json({
+            error: "Monthly limit reached",
+            message: "Free accounts can generate up to 5 lessons per month.",
+            monthlyCount: currentCount,
+            limit: 5,
+            requiredTier: "pro",
+          });
+        }
+      } else {
+        await storage.logLessonGeneration(userId, validated.topic);
+      }
+
+      await logAuditEvent({
+        userId,
+        action: "lesson_generate_stream",
+        category: "ai_usage",
+        severity: "info",
+        details: { topic: validated.topic, gradeLevel: validated.gradeLevel },
+        ipAddress: getClientIP(req),
+      });
+
+      setupSSE(res);
+      const emit = makeEmitter(res);
+      try {
+        const result = await generateLessonPlanStreaming(validated, emit);
+        emit({ type: "done", data: result });
+      } catch (err: any) {
+        emit({
+          type: "error",
+          data: { message: err?.message || "Generation failed", hint: err?.hint },
+        });
+      } finally {
+        res.end();
+      }
+    } catch (error: any) {
+      // Pre-stream error — respond JSON normally.
+      console.error("Lesson stream setup error:", error);
+      if (!res.headersSent) {
+        res.status(500).json({ error: error?.message || "Failed to start generation" });
+      } else {
+        res.end();
+      }
+    }
+  });
+
+
   // Saved Lessons - requires authentication
   app.get("/api/lessons", isAuthenticated, async (req: any, res) => {
     try {
@@ -711,6 +809,54 @@ export function registerLessonsRoutes(app: Express): void {
     } catch (error) {
       console.error("Generate assignment error:", error);
       res.status(500).json({ error: "Failed to generate assignment" });
+    }
+  });
+
+
+  // Streaming variant — same auth + tier checks, SSE phase/delta/done/error.
+  app.post("/api/assignments/generate-stream", isAuthenticated, requirePaidTier, async (req: any, res) => {
+    try {
+      const userId = req.user?.claims?.sub;
+      const { lessonId, assignmentType, questionCount, difficulty, includeBeKnowDo, accommodationTypes, accommodationNotes, projectTemplate, country, language } = req.body;
+
+      const lesson = await storage.getLesson(lessonId);
+      if (!lesson) return res.status(404).json({ error: "Lesson not found" });
+      if (lesson.userId !== userId) {
+        return res.status(403).json({ error: "You can only generate assignments from your own lessons" });
+      }
+
+      const resolvedCountry = country || detectAfricanCountryFromText(lesson.standards) || undefined;
+
+      const { generateAssignmentStreaming } = await import("../assignmentGenerator");
+
+      setupSSE(res);
+      const emit = makeEmitter(res);
+      try {
+        const result = await generateAssignmentStreaming(
+          {
+            lesson,
+            assignmentType: assignmentType || "quiz",
+            questionCount: questionCount || 5,
+            difficulty: difficulty || "medium",
+            includeBeKnowDo: includeBeKnowDo !== false,
+            accommodationTypes,
+            accommodationNotes,
+            projectTemplate: projectTemplate || "community_consultant",
+            country: resolvedCountry,
+            language,
+          },
+          emit,
+        );
+        emit({ type: "done", data: result });
+      } catch (err: any) {
+        emit({ type: "error", data: { message: err?.message || "Generation failed", hint: err?.hint } });
+      } finally {
+        res.end();
+      }
+    } catch (error: any) {
+      console.error("Assignment stream setup error:", error);
+      if (!res.headersSent) res.status(500).json({ error: error?.message || "Failed to start generation" });
+      else res.end();
     }
   });
 

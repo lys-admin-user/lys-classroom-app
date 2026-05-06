@@ -3853,10 +3853,15 @@ export const assignmentGenerationAttribution = pgTable("assignment_generation_at
   voiceCritique: jsonb("voice_critique").$type<{ tellsDetected?: string[]; notes?: string }>(),
   rewritten: boolean("rewritten").default(false),
   retrievalMode: varchar("retrieval_mode").default("legacy"),
+  // Full GeneratedAssignment JSON cached for resilience fallback. When OpenAI
+  // is unreachable, the most-recent matching attribution can be served as
+  // "closest cached generation" instead of a typo-laden mock.
+  generatedContent: jsonb("generated_content").$type<any>(),
   createdAt: timestamp("created_at").defaultNow(),
 }, (table) => [
   index("idx_aga_assignment").on(table.assignmentId),
   index("idx_aga_lesson").on(table.lessonId),
+  index("idx_aga_topic_grade_type").on(table.topic, table.gradeLevel, table.assignmentType),
 ]);
 export type AssignmentGenerationAttribution = typeof assignmentGenerationAttribution.$inferSelect;
 

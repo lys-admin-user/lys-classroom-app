@@ -8,6 +8,8 @@ import { storage } from "./storage";
 import { buildVoiceBlock } from "./services/voiceProfileService";
 import { critiqueAndMaybeRewrite } from "./services/voiceCriticService";
 import { normalizeSubject as normalizeSubjectFromCanon } from "./services/lysCanonService";
+import { resolveFallbackAssignment } from "./services/fallbackResolver";
+import { startThinkingTicker, type StreamEmit } from "./services/generationStream";
 
 let _asgnFlagCache: { value: boolean; at: number } | null = null;
 async function isVoiceInfusionEnabled(): Promise<boolean> {
@@ -574,9 +576,10 @@ function generateProjectFromTemplate(
   };
 }
 
-export async function generateAssignment(request: GenerateAssignmentRequest): Promise<GeneratedAssignment> {
+export async function generateAssignment(request: GenerateAssignmentRequest): Promise<GeneratedAssignment & { fallbackSource?: "cache" | "exemplar"; warning?: string }> {
   if (!openai) {
-    return generateMockAssignment(request);
+    const fb = await resolveFallbackAssignment(request);
+    return fb.content as any;
   }
 
   // FERPA / privacy: scrub student PII (names, IDs, emails, phones, addresses,
@@ -859,6 +862,9 @@ Create a ${request.assignmentType} that directly assesses mastery of the above o
         voiceCritique: { tellsDetected: voiceMeta.tellsDetected, notes: voiceMeta.notes },
         rewritten: voiceMeta.rewritten,
         retrievalMode: useVoice ? "semantic" : "legacy",
+        // Cache the full assignment for resilience fallback when OpenAI is
+        // later unreachable.
+        generatedContent: assignmentResult,
       });
     } catch (err) {
       console.warn("[assignmentGenerator] attribution insert failed (non-fatal):", (err as Error).message);
@@ -867,8 +873,34 @@ Create a ${request.assignmentType} that directly assesses mastery of the above o
     return assignmentResult;
   } catch (error) {
     console.error("AI assignment generation error:", error);
-    return generateMockAssignment(request);
+    const fb = await resolveFallbackAssignment(request);
+    return fb.content as any;
   }
+}
+
+// Streaming wrapper — see generationStream.ts and openai.ts:generateLessonPlanStreaming.
+export async function generateAssignmentStreaming(
+  request: GenerateAssignmentRequest,
+  emit: StreamEmit,
+): Promise<any> {
+  emit({ type: "phase", data: "studying" });
+  await new Promise((r) => setTimeout(r, 120));
+  emit({ type: "phase", data: "channeling-voice" });
+  await new Promise((r) => setTimeout(r, 120));
+  emit({ type: "phase", data: "drafting" });
+  const stopTicker = startThinkingTicker(emit, "assignment");
+  let result: any;
+  try {
+    result = await generateAssignment(request);
+  } catch (err) {
+    stopTicker();
+    throw err;
+  }
+  stopTicker();
+  emit({ type: "phase", data: "polishing" });
+  await new Promise((r) => setTimeout(r, 100));
+  emit({ type: "phase", data: "done" });
+  return result;
 }
 
 function extractWorksheetMetadata(lesson: Lesson): WorksheetMetadata {

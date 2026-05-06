@@ -14,6 +14,8 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Sparkles, Clock, Target, BookOpen, Users, Loader2, Copy, Download, Heart, Compass, Save, Check, GraduationCap, FileText, Globe, MapPin, Lightbulb, Play, UserCheck, Settings, Printer, LayoutList, AlertCircle, ExternalLink, Plus, X, Search, Library, ClipboardList, PenLine, MessageSquare, Brain, ChevronRight, Award, ChevronDown, ChevronUp, Trash2, Eye } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
+import { streamGeneration } from "@/lib/streamGeneration";
+import { GenerationCountdown, type GenerationPhase, type FallbackSource } from "@/components/GenerationCountdown";
 import { useAuth } from "@/hooks/use-auth";
 import { useTier } from "@/hooks/use-tier";
 import { useTrial } from "@/hooks/use-trial";
@@ -45,6 +47,16 @@ export default function LessonGenerator() {
   const { showAds, requiresScopeSequence, tier } = useTier();
   const { canStartTrial } = useTrial();
   const [, setLocation] = useLocation();
+  // Streaming/anticipation state for the GenerationCountdown UI.
+  const [lessonStreamPhase, setLessonStreamPhase] = useState<GenerationPhase>("studying");
+  const [lessonStreamDeltaTail, setLessonStreamDeltaTail] = useState("");
+  const [lessonStreamFallbackSource, setLessonStreamFallbackSource] = useState<FallbackSource>(null);
+  const [lessonStreamFallbackWarning, setLessonStreamFallbackWarning] = useState<string | null>(null);
+  const [assignmentStreamPhase, setAssignmentStreamPhase] = useState<GenerationPhase>("studying");
+  const [assignmentStreamDeltaTail, setAssignmentStreamDeltaTail] = useState("");
+  const [assignmentStreamFallbackSource, setAssignmentStreamFallbackSource] = useState<FallbackSource>(null);
+  const [assignmentStreamFallbackWarning, setAssignmentStreamFallbackWarning] = useState<string | null>(null);
+
   const [topic, setTopic] = useState("");
   const [course, setCourse] = useState("");
   const [unit, setUnit] = useState("");
@@ -303,8 +315,7 @@ export default function LessonGenerator() {
   const generateMutation = useMutation({
     mutationFn: async () => {
       const stateData = states.find(s => s.abbreviation === selectedState);
-      const endpoint = isAuthenticated ? "/api/lessons/generate" : "/api/lessons/generate-guest";
-      const response = await apiRequest("POST", endpoint, {
+      const body = {
         topic,
         course,
         unit,
@@ -321,8 +332,33 @@ export default function LessonGenerator() {
         lessonPart,
         // Optional bilingual language for African countries; ignored server-side otherwise.
         language: isAfrican ? selectedLanguage || undefined : undefined,
-      });
-      return await response.json() as LessonPlan;
+      };
+
+      // Reset streaming state for this run
+      setLessonStreamPhase("studying");
+      setLessonStreamDeltaTail("");
+      setLessonStreamFallbackSource(null);
+      setLessonStreamFallbackWarning(null);
+
+      if (!isAuthenticated) {
+        // Guest path stays on the legacy non-streaming endpoint (no SSE for guests).
+        const response = await apiRequest("POST", "/api/lessons/generate-guest", body);
+        return await response.json() as LessonPlan;
+      }
+
+      const result = await streamGeneration<LessonPlan & { fallbackSource?: "cache" | "exemplar"; warning?: string }>(
+        "/api/lessons/generate-stream",
+        body,
+        (evt) => {
+          if (evt.type === "phase") setLessonStreamPhase(evt.data as GenerationPhase);
+          else if (evt.type === "delta") setLessonStreamDeltaTail((prev) => (prev + (evt.data ?? "")).slice(-300));
+        },
+      );
+      if (result.fallbackSource) {
+        setLessonStreamFallbackSource(result.fallbackSource);
+        setLessonStreamFallbackWarning(result.warning ?? null);
+      }
+      return result;
     },
     onSuccess: (data) => {
       setGeneratedLesson(data);
@@ -433,22 +469,37 @@ export default function LessonGenerator() {
     },
   });
 
-  // Assignment generation mutation
+  // Assignment generation mutation (streaming)
   const assignmentMutation = useMutation({
     mutationFn: async () => {
       if (!savedLessonId) throw new Error("No saved lesson");
-      const response = await apiRequest("POST", "/api/assignments/generate", {
-        lessonId: savedLessonId,
-        assignmentType,
-        questionCount: assignmentQuestionCount,
-        difficulty: assignmentDifficulty,
-        includeBeKnowDo: true,
-        // Carry African / WAEC context through to the assignment generator
-        // so questions stay culturally and exam-aligned. No-op for non-African.
-        country: isAfrican ? selectedCountry : undefined,
-        language: isAfrican ? selectedLanguage || undefined : undefined,
-      });
-      return await response.json();
+      setAssignmentStreamPhase("studying");
+      setAssignmentStreamDeltaTail("");
+      setAssignmentStreamFallbackSource(null);
+      setAssignmentStreamFallbackWarning(null);
+      const result = await streamGeneration<any>(
+        "/api/assignments/generate-stream",
+        {
+          lessonId: savedLessonId,
+          assignmentType,
+          questionCount: assignmentQuestionCount,
+          difficulty: assignmentDifficulty,
+          includeBeKnowDo: true,
+          // Carry African / WAEC context through to the assignment generator
+          // so questions stay culturally and exam-aligned. No-op for non-African.
+          country: isAfrican ? selectedCountry : undefined,
+          language: isAfrican ? selectedLanguage || undefined : undefined,
+        },
+        (evt) => {
+          if (evt.type === "phase") setAssignmentStreamPhase(evt.data as GenerationPhase);
+          else if (evt.type === "delta") setAssignmentStreamDeltaTail((prev) => (prev + (evt.data ?? "")).slice(-300));
+        },
+      );
+      if (result?.fallbackSource) {
+        setAssignmentStreamFallbackSource(result.fallbackSource);
+        setAssignmentStreamFallbackWarning(result.warning ?? null);
+      }
+      return result;
     },
     onSuccess: (data: any) => {
       setGeneratedAssignment(data);
@@ -1196,17 +1247,13 @@ ${addedResources.length > 0 ? addedResources.map(r => `- ${r.title}: ${r.url}`).
               </CardHeader>
               <CardContent className="p-0">
                 {generateMutation.isPending ? (
-                  <div className="flex flex-col items-center justify-center py-20 text-center">
-                    <div className="relative">
-                      <div className="w-16 h-16 rounded-full bg-lys-red/10 flex items-center justify-center animate-pulse">
-                        <Sparkles className="h-8 w-8 text-lys-red" />
-                      </div>
-                      <div className="absolute inset-0 rounded-full border-2 border-lys-red/30 animate-ping"></div>
-                    </div>
-                    <p className="mt-6 font-oswald text-lg">Crafting your personalized lesson plan...</p>
-                    <p className="text-sm text-muted-foreground font-roboto mt-2">
-                      This usually takes about 10-15 seconds
-                    </p>
+                  <div className="p-6">
+                    <GenerationCountdown
+                      phase={lessonStreamPhase}
+                      deltaTail={lessonStreamDeltaTail}
+                      fallbackSource={lessonStreamFallbackSource}
+                      fallbackWarning={lessonStreamFallbackWarning}
+                    />
                   </div>
                 ) : generatedLesson ? (
                   <ScrollArea className="h-[700px]">
@@ -1881,6 +1928,16 @@ ${addedResources.length > 0 ? addedResources.map(r => `- ${r.title}: ${r.url}`).
                                     </>
                                   )}
                                 </Button>
+                                {assignmentMutation.isPending && (
+                                  <div className="mt-4">
+                                    <GenerationCountdown
+                                      phase={assignmentStreamPhase}
+                                      deltaTail={assignmentStreamDeltaTail}
+                                      fallbackSource={assignmentStreamFallbackSource}
+                                      fallbackWarning={assignmentStreamFallbackWarning}
+                                    />
+                                  </div>
+                                )}
                               </div>
                             </div>
                           ) : (
