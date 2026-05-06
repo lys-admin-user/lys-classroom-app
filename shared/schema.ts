@@ -3,6 +3,7 @@ import { pgTable, text, varchar, integer, boolean, jsonb, timestamp, real, index
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 import { isAfricanCountry } from "./africaContext";
+import { hasOnlyGenericFallback } from "./standards";
 
 // Re-export auth schema (users and sessions tables)
 export * from "./models/auth";
@@ -413,10 +414,11 @@ export const generateLessonRequestSchema = z.object({
   language: z.string().optional(),
 }).superRefine((data, ctx) => {
   // Preserve the original "at least one standard code is required" contract for
-  // NON-African countries (US/CCSS/etc). African countries are exempted because
+  // countries whose system DOES expose per-outcome codes (US/CCSS/etc).
+  // African + international developing-nation curricula are exempted because
   // most national curricula don't expose a public per-outcome code system —
-  // the AI infers outcomes from the African context block instead.
-  if (!isAfricanCountry(data.standards.country) && data.standards.codes.length === 0) {
+  // the AI infers outcomes from the country/grade context instead.
+  if (!hasOnlyGenericFallback(data.standards.country) && !isAfricanCountry(data.standards.country) && data.standards.codes.length === 0) {
     ctx.addIssue({
       code: z.ZodIssueCode.custom,
       path: ["standards", "codes"],

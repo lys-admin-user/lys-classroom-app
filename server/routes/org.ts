@@ -432,21 +432,27 @@ export function registerOrgRoutes(app: Express): void {
         jurisdiction = await storage.getJurisdictionByAbbr(country, stateAbbr);
       }
       
-      // If no CSP jurisdiction found, try fallback standards
-      if (!jurisdiction) {
-        const { getSubjects } = await import("@shared/standards");
-        const fallbackSubjects = getSubjects(country, stateAbbr);
-        if (fallbackSubjects.length > 0) {
-          res.json(fallbackSubjects.map(s => ({ subject: s.subject, source: 'fallback' })));
-          return;
-        }
-        res.json([]);
+      // Try CSP first if a jurisdiction exists with actual standard sets.
+      const sets = jurisdiction ? await storage.getStandardSets(jurisdiction.id) : [];
+      if (jurisdiction && sets.length > 0) {
+        const subjects = Array.from(new Set(sets.map(s => s.subject)));
+        res.json(subjects.map(subject => ({ subject, source: 'csp' })));
         return;
       }
-      
-      const sets = await storage.getStandardSets(jurisdiction.id);
-      const subjects = Array.from(new Set(sets.map(s => s.subject)));
-      res.json(subjects.map(subject => ({ subject, source: 'csp' })));
+
+      // Otherwise fall back to the static curriculum file. This covers two cases:
+      //   (a) jurisdiction missing entirely (no DB row), and
+      //   (b) jurisdiction seeded but no standard sets attached — common for
+      //       Nigerian/Philippine/etc. regions where CSP doesn't actually publish
+      //       per-outcome curricula. Without this, those users see an empty
+      //       subjects dropdown and a dead-end UI.
+      const { getSubjects } = await import("@shared/standards");
+      const fallbackSubjects = getSubjects(country, stateAbbr);
+      if (fallbackSubjects.length > 0) {
+        res.json(fallbackSubjects.map(s => ({ subject: s.subject, source: 'fallback' })));
+        return;
+      }
+      res.json([]);
     } catch (error) {
       console.error("Get subjects error:", error);
       res.status(500).json({ error: "Failed to get subjects" });
@@ -472,23 +478,22 @@ export function registerOrgRoutes(app: Express): void {
         jurisdiction = await storage.getJurisdictionByAbbr(country, stateAbbr);
       }
       
-      // If no CSP jurisdiction found, try fallback standards
-      if (!jurisdiction) {
+      // If no CSP jurisdiction found OR jurisdiction has no standard sets,
+      // fall through to the static curriculum file (mirrors the subjects route).
+      const sets = jurisdiction ? await storage.getStandardSets(jurisdiction.id) : [];
+      if (!jurisdiction || sets.length === 0) {
         const { getStandardCodes } = await import("@shared/standards");
         const fallbackCodes = getStandardCodes(country, stateAbbr, subject);
-        if (fallbackCodes.length > 0) {
-          res.json(fallbackCodes.map(s => ({
-            code: s.code,
-            description: s.description,
-            source: 'fallback',
-          })));
-          return;
-        }
-        res.json([]);
+        // Always respond — many international curricula intentionally have no
+        // per-outcome codes; the lesson generator handles empty arrays.
+        res.json(fallbackCodes.map(s => ({
+          code: s.code,
+          description: s.description,
+          source: 'fallback',
+        })));
         return;
       }
-      
-      const sets = await storage.getStandardSets(jurisdiction.id);
+
       const subjectSet = sets.find(s => s.subject === subject);
       if (!subjectSet) {
         // Try fallback for missing subjects in CSP

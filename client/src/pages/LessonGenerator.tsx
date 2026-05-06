@@ -551,7 +551,12 @@ export default function LessonGenerator() {
       });
       return;
     }
-    if (!isAfrican && selectedStandardCodes.length === 0) {
+    // Require code selection only when the system actually offers codes for
+    // this subject. African + international developing-nation curricula
+    // typically expose no per-outcome codes (standardCodes is empty); in that
+    // case the AI infers outcomes from the topic + grade + country context.
+    const codesAreAvailable = standardCodes.length > 0;
+    if (!isAfrican && codesAreAvailable && selectedStandardCodes.length === 0) {
       toast({
         title: "Standards Required",
         description: "Please select your educational standards. This ensures your lesson meets legal requirements.",
