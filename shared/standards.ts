@@ -340,6 +340,17 @@ export function getStates(country: string): StateStandards[] {
   return countryData?.states || [];
 }
 
+// Generic K-12 grade list used as a safe default for any country that has no
+// curated grade structure of its own. The lesson generator's grade dropdown
+// is governed separately (see defaultGradeLevels / getAfricanProfile in
+// LessonGenerator), so this list only affects per-subject grade tagging.
+const GENERIC_K12_GRADES = ["K","1","2","3","4","5","6","7","8","9","10","11","12"];
+
+// Countries whose static `educationalStandards` entries actually carry
+// per-outcome standard codes. Everything else falls through to a generic
+// subjects list and the AI infers outcomes from topic + grade + country.
+const CODE_RICH_COUNTRIES: Set<string> = new Set(["United States", "Common Core (Multi-State)"]);
+
 export function getSubjects(country: string, stateAbbr: string): SubjectStandards[] {
   // 1. Exact state-abbreviation match (US, Common Core, the static "NAT"
   //    entries for African / international developing nations).
@@ -351,18 +362,21 @@ export function getSubjects(country: string, stateAbbr: string): SubjectStandard
   //    but the African core subject set is identical regardless of region.
   if (AFRICAN_COUNTRY_NAMES.has(country)) {
     const entry = AFRICAN_COUNTRIES_DATA.find(c => c.name === country);
-    return africanCoreSubjects(entry?.grades ?? []);
+    return africanCoreSubjects(entry?.grades ?? GENERIC_K12_GRADES);
   }
 
-  // 3. Generic international fallback — any country present in the developing-
-  //    nations list returns the international core subject set, again ignoring
-  //    state abbreviation since the curriculum is national.
+  // 3. Curated international developing-nation fallback — uses the country's
+  //    own grade structure when known.
   if (INTERNATIONAL_DEVELOPING_NATION_NAMES.has(country)) {
     const entry = INTERNATIONAL_DEVELOPING_NATIONS.find(c => c.name === country);
-    return internationalCoreSubjects(entry?.grades ?? []);
+    return internationalCoreSubjects(entry?.grades ?? GENERIC_K12_GRADES);
   }
 
-  return [];
+  // 4. Universal last-resort fallback — every other country (UK, Canada,
+  //    Germany, Japan, Australia, UAE, etc.) gets the international core
+  //    subject set with generic K-12 grade tagging. This guarantees the
+  //    subjects dropdown is never empty, regardless of CSP coverage.
+  return internationalCoreSubjects(GENERIC_K12_GRADES);
 }
 
 export function getStandardCodes(country: string, stateAbbr: string, subject: string): StandardCode[] {
@@ -377,10 +391,11 @@ export function getStandardsName(country: string, stateAbbr: string): string {
 
 /**
  * Returns true when the country has no per-outcome standard codes available
- * (African + international developing nations). The lesson-generator UI uses
- * this to skip its "you must pick specific standard codes" gate, since the AI
- * infers outcomes from the topic + grade + country context instead.
+ * — i.e. anything that isn't the US or the Common Core multi-state entry.
+ * The lesson-generator UI and the server-side Zod schema use this to skip
+ * the "you must pick specific standard codes" gate; the AI infers outcomes
+ * from topic + grade + country context instead.
  */
 export function hasOnlyGenericFallback(country: string): boolean {
-  return AFRICAN_COUNTRY_NAMES.has(country) || INTERNATIONAL_DEVELOPING_NATION_NAMES.has(country);
+  return !CODE_RICH_COUNTRIES.has(country);
 }
