@@ -12,6 +12,8 @@ import { isAfricanCountry, buildAfricanPromptAddendum } from "@shared/africaCont
 import { buildLysCanonPromptBlock, LYS_REF_VERSION } from "./lysReference";
 import { buildCanonBlock, normalizeSubject as normalizeSubjectFromCanon } from "./services/lysCanonService";
 import { retrieveExamples } from "./services/lessonRetrievalService";
+import { buildVoiceBlock } from "./services/voiceProfileService";
+import { critiqueAndMaybeRewrite } from "./services/voiceCriticService";
 
 function generateCacheKey(request: GenerateLessonRequest, subjectVersion: number = 1, retrievalMode: string = "legacy"): string {
   const normalizedParts = [
@@ -239,15 +241,20 @@ IMPORTANT: Respond ONLY with a valid JSON object, no additional text.${africanIn
     masterLessonIds: [], sectionIds: [], canonEntryIds: [], mode: "legacy",
   };
   let lysCanon = "";
+  let voiceBlock = "";
+  let voiceSnippetIds: string[] = [];
   let subjectVersion = 1;
 
   if (useNewRetrieval) {
-    const [retrieval, canon] = await Promise.all([
+    const [retrieval, canon, voice] = await Promise.all([
       retrieveExamples({ topic: request.topic, subject, gradeLevel: request.gradeLevel, bkdFocus: request.bkdFocus }),
       buildCanonBlock(subject, request.gradeLevel, request.topic),
+      buildVoiceBlock({ topic: request.topic, subject, gradeLevel: request.gradeLevel, mode: "lesson" }),
     ]);
     masterExamples = retrieval.block;
     lysCanon = canon.block;
+    voiceBlock = voice.block;
+    voiceSnippetIds = voice.snippetIds;
     subjectVersion = canon.subjectVersion;
     attributionData = {
       masterLessonIds: retrieval.attribution.masterLessonIds,
@@ -291,6 +298,7 @@ ${safeUnit ? `- Unit: ${safeUnit}` : ""}
 ${request.lessonPart ? `- Lesson Part: ${request.lessonPart}` : ""}
 ${standardsInfo}${africanContext}
 ${lysCanon}
+${voiceBlock}
 ${masterExamples}${rssSupplementalSection}
 
 Generate a complete LYS lesson plan in JSON format. Include:
@@ -404,16 +412,41 @@ You MUST address these gaps to achieve Distinguished level (90%+).`;
         console.log(`Retry lesson quality: ${retryQuality.percentage}% (${getQualityLevel(retryQuality.percentage)})`);
         
         if (retryQuality.percentage > qualityResult.percentage) {
-          await saveLessonToCache(request, cacheKey, improvedLesson);
-          await recordAttribution(cacheKey, improvedLesson, request, attributionData, retryQuality.percentage);
-          return { ...improvedLesson, cacheHit: false };
+          let retryVoiceMeta: { voiceScore: number | null; tellsDetected: string[]; rewritten: boolean; notes?: string } = {
+            voiceScore: null, tellsDetected: [], rewritten: false,
+          };
+          let finalRetry = improvedLesson;
+          if (useNewRetrieval) {
+            const critic = await critiqueAndMaybeRewrite(improvedLesson, {
+              topic: request.topic, subject, gradeLevel: request.gradeLevel, mode: "lesson",
+            });
+            finalRetry = critic.finalContent;
+            retryVoiceMeta = { voiceScore: critic.voiceScore, tellsDetected: critic.tellsDetected, rewritten: critic.rewritten, notes: critic.notes };
+          }
+          await saveLessonToCache(request, cacheKey, finalRetry);
+          await recordAttribution(cacheKey, finalRetry, request, attributionData, retryQuality.percentage, retryVoiceMeta, voiceSnippetIds);
+          return { ...finalRetry, cacheHit: false };
         }
       }
     }
     
-    await saveLessonToCache(request, cacheKey, generatedLesson);
-    await recordAttribution(cacheKey, generatedLesson, request, attributionData, qualityResult.percentage);
-    return { ...generatedLesson, cacheHit: false };
+    // Voice critic post-pass (only when new retrieval flag is on; runs on the
+    // accepted lesson regardless of which generation path produced it).
+    let voiceMeta: { voiceScore: number | null; tellsDetected: string[]; rewritten: boolean; notes?: string } = {
+      voiceScore: null, tellsDetected: [], rewritten: false,
+    };
+    let finalLesson = generatedLesson;
+    if (useNewRetrieval) {
+      const critic = await critiqueAndMaybeRewrite(generatedLesson, {
+        topic: request.topic, subject, gradeLevel: request.gradeLevel, mode: "lesson",
+      });
+      finalLesson = critic.finalContent;
+      voiceMeta = { voiceScore: critic.voiceScore, tellsDetected: critic.tellsDetected, rewritten: critic.rewritten, notes: critic.notes };
+    }
+
+    await saveLessonToCache(request, cacheKey, finalLesson);
+    await recordAttribution(cacheKey, finalLesson, request, attributionData, qualityResult.percentage, voiceMeta, voiceSnippetIds);
+    return { ...finalLesson, cacheHit: false };
   } catch (error) {
     console.error("Error generating lesson plan:", error);
     return generateMockLessonPlan(request);
@@ -433,6 +466,8 @@ async function recordAttribution(
   request: GenerateLessonRequest,
   attribution: { masterLessonIds: string[]; sectionIds: string[]; canonEntryIds: string[]; mode: string },
   finalScore: number,
+  voiceMeta: { voiceScore: number | null; tellsDetected: string[]; rewritten: boolean; notes?: string } = { voiceScore: null, tellsDetected: [], rewritten: false },
+  voiceSnippetIds: string[] = [],
 ): Promise<void> {
   try {
     await storage.createLessonAttribution({
@@ -448,6 +483,10 @@ async function recordAttribution(
       canonEntryIds: attribution.canonEntryIds,
       finalScore,
       retrievalMode: attribution.mode,
+      voiceScore: voiceMeta.voiceScore,
+      voiceCritique: { tellsDetected: voiceMeta.tellsDetected, notes: voiceMeta.notes },
+      rewritten: voiceMeta.rewritten,
+      voiceSnippetIds,
     });
   } catch (err) {
     console.warn("[openai] attribution insert failed (non-fatal):", (err as Error).message);

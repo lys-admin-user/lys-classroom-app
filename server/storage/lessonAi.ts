@@ -17,12 +17,14 @@ import {
   lessonGenerationAttribution,
   lessonEditSignals,
   lessonAiOrgSettings,
+  assignmentGenerationAttribution,
   type MasterLesson,
   type MasterLessonSection,
   type InsertMasterLessonSection,
   type LysCanonEntry,
   type InsertLysCanonEntry,
   type LessonGenerationAttribution,
+  type AssignmentGenerationAttribution,
   type LessonEditSignal,
   type LessonAiOrgSettings,
 } from "@shared/schema";
@@ -105,6 +107,33 @@ const lessonAiMethods: ThisType<DatabaseStorage> = {
     return res.length > 0;
   },
 
+  async setLysCanonEntryEmbedding(id: string, embedding: number[]): Promise<void> {
+    await db.update(lysCanonEntries)
+      .set({ embedding, embeddedAt: new Date() })
+      .where(eq(lysCanonEntries.id, id));
+  },
+
+  // ----- assignment_generation_attribution -----
+  async createAssignmentAttribution(attr: Omit<AssignmentGenerationAttribution, "id" | "createdAt">): Promise<AssignmentGenerationAttribution> {
+    const [row] = await db.insert(assignmentGenerationAttribution).values(attr).returning();
+    return row;
+  },
+
+  async listTopAssignmentExemplars(limit: number = 20): Promise<Array<{ canonEntryId: string; uses: number; avgVoiceScore: number }>> {
+    const rows = await db.execute(sql`
+      SELECT entry_id AS "canonEntryId",
+             COUNT(*)::int AS uses,
+             COALESCE(AVG(voice_score), 0)::int AS "avgVoiceScore"
+      FROM assignment_generation_attribution,
+           jsonb_array_elements_text(canon_entry_ids) AS entry_id
+      WHERE voice_score IS NOT NULL
+      GROUP BY entry_id
+      ORDER BY "avgVoiceScore" DESC, uses DESC
+      LIMIT ${limit}
+    `);
+    return (rows as any).rows ?? [];
+  },
+
   // ----- subject_canon_versions -----
   async getSubjectCanonVersion(subject: string): Promise<number> {
     const [row] = await db.select().from(subjectCanonVersions).where(eq(subjectCanonVersions.subject, subject));
@@ -132,11 +161,13 @@ const lessonAiMethods: ThisType<DatabaseStorage> = {
       .where(eq(lessonGenerationAttribution.cacheKey, cacheKey));
   },
 
-  async listTopExemplars(limit: number = 20): Promise<Array<{ masterLessonId: string; uses: number; avgScore: number }>> {
+  async listTopExemplars(limit: number = 20): Promise<Array<{ masterLessonId: string; uses: number; avgScore: number; avgVoiceScore: number | null; rewriteRate: number }>> {
     const rows = await db.execute(sql`
       SELECT exemplar_id AS "masterLessonId",
              COUNT(*)::int AS uses,
-             COALESCE(AVG(final_score), 0)::int AS "avgScore"
+             COALESCE(AVG(final_score), 0)::int AS "avgScore",
+             CASE WHEN COUNT(voice_score) > 0 THEN ROUND(AVG(voice_score))::int ELSE NULL END AS "avgVoiceScore",
+             COALESCE(SUM(CASE WHEN rewritten THEN 1 ELSE 0 END)::float / NULLIF(COUNT(*), 0), 0)::float AS "rewriteRate"
       FROM lesson_generation_attribution,
            jsonb_array_elements_text(master_lesson_ids) AS exemplar_id
       WHERE final_score IS NOT NULL

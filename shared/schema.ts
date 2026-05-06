@@ -3772,10 +3772,13 @@ export const insertMasterLessonSectionSchema = createInsertSchema(masterLessonSe
 export type InsertMasterLessonSection = z.infer<typeof insertMasterLessonSectionSchema>;
 export type MasterLessonSection = typeof masterLessonSections.$inferSelect;
 
-// LYS Canon entries — DB-backed replacement for hardcoded lysReference.ts content
+// LYS Canon entries — DB-backed replacement for hardcoded lysReference.ts content.
+// Also holds voice/style entries seeded from server/reference/lys/*.txt that the
+// voiceProfileService retrieves via cosine similarity to infuse Master Teacher
+// tone into both lesson and assignment generation.
 export const lysCanonEntries = pgTable("lys_canon_entries", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  kind: varchar("kind").notNull(), // exemplar | vocab | domain | accommodation
+  kind: varchar("kind").notNull(), // exemplar | vocab | domain | accommodation | voice | exemplar_full
   subject: varchar("subject"), // null = applies to all subjects
   gradeBand: varchar("grade_band"), // e.g. "6-8"; null = all grades
   topicHint: text("topic_hint"), // optional matching keyword
@@ -3783,14 +3786,16 @@ export const lysCanonEntries = pgTable("lys_canon_entries", {
   body: text("body").notNull(),
   sortOrder: integer("sort_order").default(0),
   isActive: boolean("is_active").notNull().default(true),
-  source: varchar("source").default("hardcoded_migration"), // hardcoded_migration | admin_created
+  source: varchar("source").default("hardcoded_migration"), // hardcoded_migration | admin_created | lys_voice_corpus
+  embedding: jsonb("embedding").$type<number[]>(), // lazily populated by voiceProfileService
+  embeddedAt: timestamp("embedded_at"),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 }, (table) => [
   index("idx_canon_kind").on(table.kind),
   index("idx_canon_subject").on(table.subject),
 ]);
-export const insertLysCanonEntrySchema = createInsertSchema(lysCanonEntries).omit({ id: true, createdAt: true, updatedAt: true });
+export const insertLysCanonEntrySchema = createInsertSchema(lysCanonEntries).omit({ id: true, createdAt: true, updatedAt: true, embedding: true, embeddedAt: true });
 export type InsertLysCanonEntry = z.infer<typeof insertLysCanonEntrySchema>;
 export type LysCanonEntry = typeof lysCanonEntries.$inferSelect;
 
@@ -3818,12 +3823,42 @@ export const lessonGenerationAttribution = pgTable("lesson_generation_attributio
   canonEntryIds: jsonb("canon_entry_ids").$type<string[]>().default([]),
   finalScore: integer("final_score"), // 0-100
   retrievalMode: varchar("retrieval_mode").default("legacy"), // legacy | semantic
+  // Voice critic post-pass results (only populated when new_lesson_retrieval flag on)
+  voiceScore: integer("voice_score"), // 0-100 from voiceCriticService; null = critic skipped
+  voiceCritique: jsonb("voice_critique").$type<{ tellsDetected?: string[]; notes?: string }>(),
+  rewritten: boolean("rewritten").default(false), // true if critic rewrote below threshold
+  voiceSnippetIds: jsonb("voice_snippet_ids").$type<string[]>().default([]),
   createdAt: timestamp("created_at").defaultNow(),
 }, (table) => [
   index("idx_lga_cache_key").on(table.cacheKey),
   index("idx_lga_lesson").on(table.lessonId),
 ]);
 export type LessonGenerationAttribution = typeof lessonGenerationAttribution.$inferSelect;
+
+// Mirror of lesson attribution for the assignment generator. Lighter — assignments
+// don't carry the same per-section richness, but we still track which voice
+// snippets / canon entries fed each generation and the voice critic verdict.
+export const assignmentGenerationAttribution = pgTable("assignment_generation_attribution", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  assignmentId: varchar("assignment_id"),
+  lessonId: varchar("lesson_id"),
+  userId: varchar("user_id"),
+  topic: text("topic"),
+  subject: varchar("subject"),
+  gradeLevel: varchar("grade_level"),
+  assignmentType: varchar("assignment_type"),
+  canonEntryIds: jsonb("canon_entry_ids").$type<string[]>().default([]),
+  voiceSnippetIds: jsonb("voice_snippet_ids").$type<string[]>().default([]),
+  voiceScore: integer("voice_score"),
+  voiceCritique: jsonb("voice_critique").$type<{ tellsDetected?: string[]; notes?: string }>(),
+  rewritten: boolean("rewritten").default(false),
+  retrievalMode: varchar("retrieval_mode").default("legacy"),
+  createdAt: timestamp("created_at").defaultNow(),
+}, (table) => [
+  index("idx_aga_assignment").on(table.assignmentId),
+  index("idx_aga_lesson").on(table.lessonId),
+]);
+export type AssignmentGenerationAttribution = typeof assignmentGenerationAttribution.$inferSelect;
 
 // Edit signals: diff between AI-generated lesson and what teacher actually saved.
 // Per-section breakdown lets us learn which parts teachers consistently rewrite.

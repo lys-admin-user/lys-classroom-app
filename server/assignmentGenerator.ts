@@ -4,6 +4,23 @@ import { randomUUID } from "crypto";
 import { buildAfricanPromptAddendum } from "@shared/africaContext";
 import { sanitizePromptText, stripPII } from "./services/piiSanitizer";
 import { LYS_ACCOMMODATIONS, LYS_BKD_VOCAB, LYS_DOMAINS } from "./lysReference";
+import { storage } from "./storage";
+import { buildVoiceBlock } from "./services/voiceProfileService";
+import { critiqueAndMaybeRewrite } from "./services/voiceCriticService";
+import { normalizeSubject as normalizeSubjectFromCanon } from "./services/lysCanonService";
+
+let _asgnFlagCache: { value: boolean; at: number } | null = null;
+async function isVoiceInfusionEnabled(): Promise<boolean> {
+  if (_asgnFlagCache && Date.now() - _asgnFlagCache.at < 60_000) return _asgnFlagCache.value;
+  try {
+    const flag = await storage.getFeatureFlagByName("new_lesson_retrieval");
+    const value = !!flag?.isEnabled;
+    _asgnFlagCache = { value, at: Date.now() };
+    return value;
+  } catch {
+    return false;
+  }
+}
 
 const openai = process.env.OPENAI_API_KEY 
   ? new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
@@ -588,6 +605,29 @@ export async function generateAssignment(request: GenerateAssignmentRequest): Pr
     ? `\n\nWhen the user prompt below contains an "AFRICAN CONTEXT" block, you MUST follow every requirement in that block — WAEC exam framing, dual-path bridge (WAEC outcome + global digital portfolio piece), African case studies (NOT silicon valley defaults), BE-pillar emphasis to fill the WAEC "character" gap, and bilingual output formatting if requested. Treat it as overriding any default Western framing.`
     : "";
 
+  // Voice infusion (gated by new_lesson_retrieval flag — same flag as lesson generator).
+  // Subject derives from the lesson's canonical subject column, falling back to topic
+  // so retrieval/normalization match what the lesson generator uses.
+  const useVoice = await isVoiceInfusionEnabled();
+  const lessonSubject = (request.lesson as any).subject || request.lesson.topic || "";
+  const subjectKey = normalizeSubjectFromCanon(lessonSubject) || "_global";
+  let voiceBlockText = "";
+  let voiceSnippetIds: string[] = [];
+  if (useVoice) {
+    try {
+      const v = await buildVoiceBlock({
+        topic: request.lesson.topic || request.lesson.title || "",
+        subject: lessonSubject,
+        gradeLevel: request.lesson.gradeLevel || "",
+        mode: "assignment",
+      });
+      voiceBlockText = v.block;
+      voiceSnippetIds = v.snippetIds;
+    } catch {
+      /* non-fatal */
+    }
+  }
+
   // Get differentiation config based on difficulty level
   const differentiationLevel = request.difficulty === "easy" ? "scaffolded" 
     : request.difficulty === "hard" ? "enrichment" 
@@ -629,6 +669,7 @@ ${LYS_ACCOMMODATIONS.map(a => `- ${a}`).join("\n")}
 
 ${request.includeBeKnowDo ? "Include questions from ALL three pillars (BE, KNOW, DO) with clear balance." : "Focus primarily on KNOW and DO questions."}
 ${accommodationContext}
+${voiceBlockText}
 
 DISTINGUISHED-LEVEL QUALITY STANDARDS:
 [x] Every question directly ties to a lesson objective or essential question
@@ -769,7 +810,7 @@ Create a ${request.assignmentType} that directly assesses mastery of the above o
       };
     });
 
-    return {
+    let assignmentResult: GeneratedAssignment = {
       title: parsed.title || `${request.lesson.title} - ${request.assignmentType.charAt(0).toUpperCase() + request.assignmentType.slice(1)}`,
       description: parsed.description || `A ${request.assignmentType} based on the lesson: ${request.lesson.title}`,
       instructions: parsed.instructions || getDefaultInstructions(request.assignmentType),
@@ -781,6 +822,49 @@ Create a ${request.assignmentType} that directly assesses mastery of the above o
       worksheet: extractWorksheetMetadata(request.lesson),
       accommodationChecklist: getDefaultAccommodationChecklist(request.accommodationTypes),
     };
+
+    // Voice critic post-pass + attribution (only when flag on)
+    let voiceMeta: { voiceScore: number | null; tellsDetected: string[]; rewritten: boolean; notes?: string } = {
+      voiceScore: null, tellsDetected: [], rewritten: false,
+    };
+    if (useVoice) {
+      try {
+        const critic = await critiqueAndMaybeRewrite(assignmentResult, {
+          topic: request.lesson.topic || request.lesson.title || "",
+          subject: lessonSubject,
+          gradeLevel: request.lesson.gradeLevel || "",
+          mode: "assignment",
+        });
+        if (critic.rewritten && critic.finalContent) {
+          assignmentResult = critic.finalContent;
+        }
+        voiceMeta = { voiceScore: critic.voiceScore, tellsDetected: critic.tellsDetected, rewritten: critic.rewritten, notes: critic.notes };
+      } catch {
+        /* non-fatal */
+      }
+    }
+
+    try {
+      await storage.createAssignmentAttribution({
+        assignmentId: null,
+        lessonId: (request.lesson as any).id ?? null,
+        userId: null,
+        topic: request.lesson.topic || null,
+        subject: subjectKey,
+        gradeLevel: request.lesson.gradeLevel || null,
+        assignmentType: request.assignmentType,
+        canonEntryIds: [],
+        voiceSnippetIds,
+        voiceScore: voiceMeta.voiceScore,
+        voiceCritique: { tellsDetected: voiceMeta.tellsDetected, notes: voiceMeta.notes },
+        rewritten: voiceMeta.rewritten,
+        retrievalMode: useVoice ? "semantic" : "legacy",
+      });
+    } catch (err) {
+      console.warn("[assignmentGenerator] attribution insert failed (non-fatal):", (err as Error).message);
+    }
+
+    return assignmentResult;
   } catch (error) {
     console.error("AI assignment generation error:", error);
     return generateMockAssignment(request);

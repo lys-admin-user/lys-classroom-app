@@ -3095,7 +3095,7 @@ function LysCanonAdminSection({ isSiteAdmin }: { isSiteAdmin?: boolean }) {
     sortOrder: number | null;
     isActive: boolean | null;
   };
-  type TopExemplar = { masterLessonId: string; uses: number; avgScore: number };
+  type TopExemplar = { masterLessonId: string; uses: number; avgScore: number; avgVoiceScore: number | null; rewriteRate: number };
 
   const [filterSubject, setFilterSubject] = useState<string>("all");
   const [creating, setCreating] = useState(false);
@@ -3359,7 +3359,7 @@ function LysCanonAdminSection({ isSiteAdmin }: { isSiteAdmin?: boolean }) {
               <TrendingUp className="h-4 w-4 text-lys-yellow" />
               <h4 className="text-sm font-medium">Top exemplars by attribution</h4>
             </div>
-            <p className="text-xs text-muted-foreground mb-2">Master lessons most frequently used as exemplars, ranked by average final rubric score.</p>
+            <p className="text-xs text-muted-foreground mb-2">Master lessons most frequently used as exemplars, ranked by average final rubric score. Voice = Master Teacher voice critic score (when active).</p>
             <div className="space-y-1">
               {topExemplars.slice(0, 10).map(ex => (
                 <div
@@ -3371,9 +3371,28 @@ function LysCanonAdminSection({ isSiteAdmin }: { isSiteAdmin?: boolean }) {
                   <div className="flex items-center gap-3 shrink-0">
                     <span className="text-muted-foreground">{ex.uses} uses</span>
                     <Badge variant="secondary">avg {Math.round(ex.avgScore)}%</Badge>
+                    {ex.avgVoiceScore !== null && (
+                      <Badge
+                        variant={ex.avgVoiceScore >= 80 ? "default" : "outline"}
+                        data-testid={`badge-voice-${ex.masterLessonId}`}
+                      >
+                        voice {ex.avgVoiceScore}
+                      </Badge>
+                    )}
+                    {ex.rewriteRate > 0 && (
+                      <span className="text-muted-foreground" data-testid={`text-rewrite-rate-${ex.masterLessonId}`}>
+                        {Math.round(ex.rewriteRate * 100)}% rewritten
+                      </span>
+                    )}
                   </div>
                 </div>
               ))}
+            </div>
+            <div className="mt-3 p-2 rounded bg-muted/20 text-xs flex items-center gap-2" data-testid="indicator-voice-rubric">
+              <Brain className="h-3 w-3 text-lys-yellow" />
+              <span className="text-muted-foreground">
+                LYS Master Teacher voice rubric active when <code className="font-mono">new_lesson_retrieval</code> flag is on. Critic threshold: 80 (override via <code className="font-mono">VOICE_CRITIC_THRESHOLD</code>). Rewrites trigger below threshold.
+              </span>
             </div>
           </div>
         )}

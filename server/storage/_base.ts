@@ -4178,11 +4178,14 @@ export interface DatabaseStorage extends IStorage {
   createLysCanonEntry(entry: import("@shared/schema").InsertLysCanonEntry): Promise<import("@shared/schema").LysCanonEntry>;
   updateLysCanonEntry(id: string, updates: Partial<import("@shared/schema").InsertLysCanonEntry>): Promise<import("@shared/schema").LysCanonEntry | undefined>;
   deleteLysCanonEntry(id: string): Promise<boolean>;
+  setLysCanonEntryEmbedding(id: string, embedding: number[]): Promise<void>;
+  createAssignmentAttribution(attr: Omit<import("@shared/schema").AssignmentGenerationAttribution, "id" | "createdAt">): Promise<import("@shared/schema").AssignmentGenerationAttribution>;
+  listTopAssignmentExemplars(limit?: number): Promise<Array<{ canonEntryId: string; uses: number; avgVoiceScore: number }>>;
   getSubjectCanonVersion(subject: string): Promise<number>;
   bumpSubjectCanonVersion(subject: string): Promise<number>;
   createLessonAttribution(attr: Omit<import("@shared/schema").LessonGenerationAttribution, "id" | "createdAt">): Promise<import("@shared/schema").LessonGenerationAttribution>;
   updateLessonAttributionScore(cacheKey: string, finalScore: number): Promise<void>;
-  listTopExemplars(limit?: number): Promise<Array<{ masterLessonId: string; uses: number; avgScore: number }>>;
+  listTopExemplars(limit?: number): Promise<Array<{ masterLessonId: string; uses: number; avgScore: number; avgVoiceScore: number | null; rewriteRate: number }>>;
   createLessonEditSignal(signal: Omit<import("@shared/schema").LessonEditSignal, "id" | "createdAt">): Promise<import("@shared/schema").LessonEditSignal>;
   listLessonEditSignals(lessonId: string): Promise<import("@shared/schema").LessonEditSignal[]>;
   getLessonAiOrgSettings(orgId: string): Promise<import("@shared/schema").LessonAiOrgSettings | undefined>;

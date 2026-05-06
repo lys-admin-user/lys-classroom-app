@@ -9,7 +9,7 @@ import {
   LYS_DOMAINS,
   LYS_ACCOMMODATIONS,
 } from "../lysReference";
-import type { LysCanonEntry } from "@shared/schema";
+import type { LysCanonEntry, InsertLysCanonEntry } from "@shared/schema";
 
 let seedAttempted = false;
 
@@ -20,7 +20,7 @@ export async function seedCanonFromHardcodedIfEmpty(): Promise<void> {
     const existing = await storage.listLysCanonEntries();
     if (existing.length > 0) return;
 
-    const seeds: Array<Omit<LysCanonEntry, "id" | "createdAt" | "updatedAt">> = [];
+    const seeds: InsertLysCanonEntry[] = [];
 
     // Vocab entries — one per BKD axis
     seeds.push({
@@ -110,6 +110,77 @@ export async function seedCanonFromHardcodedIfEmpty(): Promise<void> {
     console.log(`[lysCanonService] seeded ${seeds.length} canon entries from hardcoded reference`);
   } catch (err) {
     console.warn("[lysCanonService] seed failed (non-fatal):", (err as Error).message);
+  }
+}
+
+// Idempotently seeds the LYS reference text files (voice_master_teacher.txt
+// + exemplar_*.txt) as canon entries with kind=voice / exemplar_full so the
+// voiceProfileService can semantically retrieve from them. Skips files
+// already present (matched by title).
+export async function seedVoiceCorpusFromFiles(): Promise<void> {
+  try {
+    const fs = await import("node:fs/promises");
+    const path = await import("node:path");
+    const dir = path.resolve(process.cwd(), "server/reference/lys");
+    let files: string[] = [];
+    try {
+      files = await fs.readdir(dir);
+    } catch {
+      console.warn("[lysCanonService] voice corpus dir not found, skipping seed");
+      return;
+    }
+
+    const existing = await storage.listLysCanonEntries();
+    const existingTitles = new Set(existing.map((e) => e.title));
+    let added = 0;
+
+    for (const file of files) {
+      if (!file.endsWith(".txt")) continue;
+      const isVoice = file === "voice_master_teacher.txt";
+      const isExemplar = file.startsWith("exemplar_");
+      if (!isVoice && !isExemplar) continue;
+
+      const title = file.replace(/\.txt$/, "");
+      if (existingTitles.has(title)) continue;
+
+      let body = "";
+      try {
+        body = await fs.readFile(path.join(dir, file), "utf-8");
+      } catch {
+        continue;
+      }
+      if (!body.trim()) continue;
+
+      // Parse subject + grade from exemplar filename: exemplar_<subject>_<grade>[_<topic>].txt
+      let subject: string | null = null;
+      let gradeBand: string | null = null;
+      if (isExemplar) {
+        const m = file.match(/^exemplar_([a-z_]+?)_(\d+)(?:_.*)?\.txt$/);
+        if (m) {
+          subject = m[1].includes("social") ? "social_studies" : m[1];
+          gradeBand = m[2];
+        }
+      }
+
+      await storage.createLysCanonEntry({
+        kind: isVoice ? "voice" : "exemplar_full",
+        subject,
+        gradeBand,
+        topicHint: null,
+        title,
+        body,
+        sortOrder: isVoice ? 0 : 10,
+        isActive: true,
+        source: "lys_voice_corpus",
+      });
+      added++;
+    }
+
+    if (added > 0) {
+      console.log(`[lysCanonService] seeded ${added} voice/exemplar entries from server/reference/lys/`);
+    }
+  } catch (err) {
+    console.warn("[lysCanonService] voice corpus seed failed (non-fatal):", (err as Error).message);
   }
 }
 

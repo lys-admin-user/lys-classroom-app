@@ -211,8 +211,9 @@ async function initLessonAiSubsystem(): Promise<void> {
     const { db } = await import("./db");
     const { sql } = await import("drizzle-orm");
     try { await db.execute(sql`CREATE EXTENSION IF NOT EXISTS vector`); } catch { /* permission or unavailable; safe to ignore */ }
-    const { seedCanonFromHardcodedIfEmpty } = await import("./services/lysCanonService");
+    const { seedCanonFromHardcodedIfEmpty, seedVoiceCorpusFromFiles } = await import("./services/lysCanonService");
     await seedCanonFromHardcodedIfEmpty();
+    await seedVoiceCorpusFromFiles();
     const { storage } = await import("./storage");
     const existing = await storage.getFeatureFlagByName("new_lesson_retrieval");
     if (!existing) {

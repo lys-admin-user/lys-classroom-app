@@ -23,7 +23,8 @@ _Populate as you build_
 -   **PII Sanitization Logic**: `server/services/piiSanitizer.ts`
 -   **OpenAI Integration**: `server/openai.ts`, `server/assignmentGenerator.ts`
 -   **AI Lesson Plan Storage**: `server/storage/lessonAi.ts`
--   **LYS Reference Corpus**: `server/reference/lys/` (text files), `server/reference/lys/embedded.ts` (embedded output), `server/lysReference.ts` (API)
+-   **LYS Reference Corpus**: `server/reference/lys/` (text files including `voice_master_teacher.txt` + `exemplar_*.txt`), `server/reference/lys/embedded.ts` (embedded output), `server/lysReference.ts` (API)
+-   **Voice Infusion**: `server/services/voiceProfileService.ts`, `server/services/voiceCriticService.ts`
 -   **Scholarship Scraper**: `server/scholarshipScraper/`
 -   **Database Schema**: Refer to Drizzle ORM schema files.
 
@@ -32,6 +33,7 @@ _Populate as you build_
 -   **Zero-Trust Data Governance**: Implemented with 7 rules for data immutability, communication safety, tenant scoping, data residency, and fraud protection.
 -   **FERPA Pre-LLM Sanitization**: Free-text fields are stripped of PII before OpenAI processing using a dedicated service (`server/services/piiSanitizer.ts`).
 -   **AI Lesson Plan Semantic Retrieval**: Gated by `new_lesson_retrieval` feature flag, uses OpenAI embeddings (cosine-ranked) for more relevant exemplar selection.
+-   **LYS Master Teacher Voice Infusion**: Gated by the same `new_lesson_retrieval` flag. `voiceProfileService` injects a static rubric + cosine-retrieved snippets from `lys_canon_entries` (kinds `voice` / `exemplar_full`, seeded from `server/reference/lys/`) into both lesson and assignment prompts. After generation, `voiceCriticService` (gpt-4o-mini) scores the output 0-100 and rewrites if below `VOICE_CRITIC_THRESHOLD` (default 80). Results land in `lesson_generation_attribution` and `assignment_generation_attribution` for the admin Performance panel.
 -   **Multi-Tenancy with Hierarchical Access**: Supports complex organizational structures (School, District, Charter Network) with cascading resources and settings.
 -   **Monorepo for Cohesion**: Organized into `/client`, `/server`, and `/shared` to manage related services and frontend.
 
