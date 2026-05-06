@@ -54,6 +54,7 @@ Preferred communication style: Simple, everyday language.
 
 ## Gotchas
 
+-   **OpenAI Credentials**: Replit's managed OpenAI integration provisions `AI_INTEGRATIONS_OPENAI_API_KEY` / `AI_INTEGRATIONS_OPENAI_BASE_URL`. `server/bootstrap-env.ts` (imported first in `server/index.ts`) bridges these to `OPENAI_API_KEY` / `OPENAI_BASE_URL` so existing OpenAI clients work unchanged. If both are missing, generators silently fall back to a typo-laden mock template — always confirm the integration is connected.
 -   **`new_lesson_retrieval` Feature Flag**: AI lesson plan semantic retrieval is OFF by default.
 -   **SIS Integration**: Only Clever is fully integrated and live; others are "Coming Soon".
 -   **LYS Canon Refresh**: After editing/adding `.txt` files in `server/reference/lys/`, run `node scripts/regen_lys_embedded.mjs` to refresh the corpus.
