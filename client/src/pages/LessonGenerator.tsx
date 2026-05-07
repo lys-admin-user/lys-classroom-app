@@ -83,6 +83,14 @@ export default function LessonGenerator() {
     [africanProfile],
   );
   
+  // Active org-uploaded alignment docs (YAG / scope-and-sequence) the teacher
+  // hasn't opted out of. Fetched once user picks a subject/grade so the lesson
+  // can be aligned to school curriculum.
+  const { data: alignmentDocs = [] } = useQuery<Array<{ id: string; title: string; excerpt: string; docType: string; subject: string | null }>>({
+    queryKey: ["/api/curriculum-library/active-alignment-docs", selectedSubject, gradeLevel],
+    enabled: !!selectedSubject,
+  });
+
   const [generatedLesson, setGeneratedLesson] = useState<LessonPlan | null>(null);
   const [isSaved, setIsSaved] = useState(false);
   const [savedLessonId, setSavedLessonId] = useState<string | null>(null);
@@ -332,6 +340,10 @@ export default function LessonGenerator() {
         lessonPart,
         // Optional bilingual language for African countries; ignored server-side otherwise.
         language: isAfrican ? selectedLanguage || undefined : undefined,
+        // Org-uploaded curriculum context to honor pacing & sequencing
+        alignmentContext: alignmentDocs.length > 0
+          ? alignmentDocs.map((d) => ({ sourceTitle: d.title, sourceDocId: d.id, excerpt: d.excerpt }))
+          : undefined,
       };
 
       // Reset streaming state for this run
@@ -853,6 +865,21 @@ ${addedResources.length > 0 ? addedResources.map(r => `- ${r.title}: ${r.url}`).
                           <span>{selectedSubject}</span>
                         </>
                       )}
+                    </div>
+                  )}
+
+                  {alignmentDocs.length > 0 && (
+                    <div className="rounded-md border border-lys-blue/30 bg-lys-blue/5 p-3" data-testid="banner-alignment-docs">
+                      <div className="flex items-start gap-2">
+                        <BookOpen className="h-4 w-4 text-lys-blue mt-0.5 flex-shrink-0" />
+                        <div className="text-xs">
+                          <p className="font-semibold text-lys-blue">Aligning to your school's curriculum</p>
+                          <p className="text-muted-foreground mt-0.5">
+                            This lesson will follow {alignmentDocs.length === 1 ? "the document" : `${alignmentDocs.length} documents`} uploaded by your admin:{" "}
+                            {alignmentDocs.map((d) => d.title).join(", ")}.
+                          </p>
+                        </div>
+                      </div>
                     </div>
                   )}
 

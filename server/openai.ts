@@ -99,7 +99,7 @@ async function saveLessonToCache(request: GenerateLessonRequest, cacheKey: strin
   }
 }
 
-const openai = process.env.OPENAI_API_KEY 
+export const openai = process.env.OPENAI_API_KEY 
   ? new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
   : null;
 
@@ -206,6 +206,20 @@ export async function generateLessonPlan(request: GenerateLessonRequest): Promis
     ? `\n\nWhen the user prompt below contains an "AFRICAN CONTEXT" block, you MUST follow every requirement in that block (WAEC framing, dual-path bridge, African case studies, BE pillar emphasis, facilitator pedagogy, bilingual output if requested). Treat it as overriding any default Western framing.`
     : "";
 
+  // Inject org-uploaded curriculum alignment context (YAG / scope-and-sequence
+  // excerpts the school has uploaded). Treated as authoritative pacing /
+  // sequencing guidance the AI MUST honor.
+  const alignment = (request as any).alignmentContext as Array<{ sourceTitle: string; sourceDocId: string; excerpt: string }> | undefined;
+  const alignmentBlock = alignment && alignment.length > 0
+    ? `\n\nORG CURRICULUM ALIGNMENT (authoritative — the lesson MUST fit within this school's curriculum):\n` +
+      alignment
+        .map((a) => `--- From "${a.sourceTitle}" ---\n${a.excerpt.slice(0, 6000)}`)
+        .join("\n\n")
+    : "";
+  const alignmentInSystem = alignment && alignment.length > 0
+    ? `\n\nWhen the user prompt below contains an "ORG CURRICULUM ALIGNMENT" block, you MUST honor the pacing, terminology, unit titles, and standards specified there. Cite the source document title in the standards section of the lesson.`
+    : "";
+
   const systemPrompt = `You are a master educator creating DISTINGUISHED-level lesson plans for the LYS (Laddering Your Success) platform.
 
 QUALITY MANDATE: Every lesson you generate MUST score at the DISTINGUISHED level (90%+ quality score) on the LYS Rubric. Do not generate Accomplished, Acceptable, or Needs Improvement lessons. Only Distinguished quality is acceptable.
@@ -230,7 +244,7 @@ QUALITY CHECK BEFORE OUTPUT:
 5. Does the lesson have differentiation for diverse learners?
 6. Does the Lesson Close address the life dimensions that are genuinely relevant to this topic?
 
-IMPORTANT: Respond ONLY with a valid JSON object, no additional text.${africanInSystem}`;
+IMPORTANT: Respond ONLY with a valid JSON object, no additional text.${africanInSystem}${alignmentInSystem}`;
 
   // Get master lesson examples for AI guidance.
   // When the `new_lesson_retrieval` feature flag is on, use the new semantic
@@ -299,7 +313,7 @@ ${safeUnit ? `- Unit: ${safeUnit}` : ""}
 - Primary Focus: ${request.bkdFocus.toUpperCase()} (${bkdDescriptions[request.bkdFocus]})
 - Duration: ${request.duration}
 ${request.lessonPart ? `- Lesson Part: ${request.lessonPart}` : ""}
-${standardsInfo}${africanContext}
+${standardsInfo}${africanContext}${alignmentBlock}
 ${lysCanon}
 ${voiceBlock}
 ${masterExamples}${rssSupplementalSection}

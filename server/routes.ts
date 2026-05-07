@@ -154,6 +154,7 @@ import { registerAdminRoutes } from "./routes/admin";
 import { registerOrgRoutes } from "./routes/org";
 import { registerStudentRoutes } from "./routes/student";
 import { registerCurriculumRoutes } from "./routes/curriculum";
+import { registerCurriculumLibraryRoutes } from "./routes/curriculumLibrary";
 import { registerParentRoutes } from "./routes/parent";
 import { registerLessonsRoutes } from "./routes/lessons";
 import { registerClassroomRoutes } from "./routes/classroom";
@@ -211,6 +212,7 @@ export async function registerRoutes(
   registerOrgRoutes(app);
   registerStudentRoutes(app);
   registerCurriculumRoutes(app);
+  registerCurriculumLibraryRoutes(app);
   registerParentRoutes(app);
   registerLessonsRoutes(app);
   registerClassroomRoutes(app);

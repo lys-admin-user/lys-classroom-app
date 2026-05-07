@@ -412,6 +412,17 @@ export const generateLessonRequestSchema = z.object({
   // African / WAEC support — optional bilingual local-language code or name
   // (e.g., "yo", "Yoruba"). Ignored for non-African countries.
   language: z.string().optional(),
+  // Org-uploaded curriculum context (YAG / scope-and-sequence excerpts) that
+  // the lesson should align to. Populated by the client from the Curriculum
+  // Library when the user has not opted out.
+  alignmentContext: z
+    .object({
+      sourceTitle: z.string(),
+      sourceDocId: z.string(),
+      excerpt: z.string().max(20000),
+    })
+    .array()
+    .optional(),
 }).superRefine((data, ctx) => {
   // Preserve the original "at least one standard code is required" contract for
   // countries whose system DOES expose per-outcome codes (US/CCSS/etc).
@@ -3891,3 +3902,185 @@ export const lessonAiOrgSettings = pgTable("lesson_ai_org_settings", {
   updatedAt: timestamp("updated_at").defaultNow(),
 });
 export type LessonAiOrgSettings = typeof lessonAiOrgSettings.$inferSelect;
+
+// ============================================================================
+// CURRICULUM DOCUMENT LIBRARY (Campus / Enterprise)
+// Customer-uploaded scope-and-sequence, YAG, and pre-written lessons.
+// ============================================================================
+
+export const curriculumDocuments = pgTable("curriculum_documents", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  // Ownership
+  uploadedByUserId: varchar("uploaded_by_user_id").notNull(),
+  uploaderRole: text("uploader_role").notNull(), // "admin" | "teacher"
+  organizationId: varchar("organization_id"), // org scope; null = personal/teacher-only
+  // Doc identity
+  docType: text("doc_type").notNull(), // "scope_sequence" | "yag" | "lesson"
+  title: text("title").notNull(),
+  subject: text("subject"),
+  gradeLevels: jsonb("grade_levels").$type<string[]>().default([]),
+  country: text("country"),
+  state: text("state"),
+  schoolYear: text("school_year"),
+  // File
+  originalFilename: text("original_filename").notNull(),
+  mimeType: text("mime_type"),
+  fileSizeBytes: integer("file_size_bytes"),
+  // Extracted content (text only — no blob storage)
+  extractedText: text("extracted_text"),
+  // Extraction lifecycle
+  extractionStatus: text("extraction_status").notNull().default("pending"),
+  // "pending" | "processing" | "extracted" | "failed" | "skipped"
+  extractionError: text("extraction_error"),
+  standardsExtractedCount: integer("standards_extracted_count").default(0),
+  // Linked artifacts created during extraction
+  linkedLessonId: varchar("linked_lesson_id"), // for docType=lesson, pointer into the lessons table
+  // Visibility / lifecycle
+  isActive: boolean("is_active").notNull().default(true),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+}, (table) => [
+  index("idx_curriculum_docs_org").on(table.organizationId),
+  index("idx_curriculum_docs_user").on(table.uploadedByUserId),
+  index("idx_curriculum_docs_type_subject").on(table.docType, table.subject),
+]);
+export const insertCurriculumDocumentSchema = createInsertSchema(curriculumDocuments).omit({
+  id: true, createdAt: true, updatedAt: true,
+  extractionStatus: true, extractionError: true, standardsExtractedCount: true,
+  extractedText: true, linkedLessonId: true,
+});
+export type InsertCurriculumDocument = z.infer<typeof insertCurriculumDocumentSchema>;
+export type CurriculumDocument = typeof curriculumDocuments.$inferSelect;
+
+// Org-level admin toggle: do teachers in this org get to upload their own curriculum docs?
+export const orgCurriculumSettings = pgTable("org_curriculum_settings", {
+  organizationId: varchar("organization_id").primaryKey(),
+  allowTeacherUploads: boolean("allow_teacher_uploads").notNull().default(true),
+  updatedAt: timestamp("updated_at").defaultNow(),
+  updatedByUserId: varchar("updated_by_user_id"),
+});
+export type OrgCurriculumSettings = typeof orgCurriculumSettings.$inferSelect;
+
+// Per-(user, doc) opt-out of auto-aligned admin-uploaded YAG / scope-sequence.
+// When present, the doc will not be injected into that user's lesson generations.
+export const userCurriculumOptOuts = pgTable("user_curriculum_opt_outs", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull(),
+  curriculumDocumentId: varchar("curriculum_document_id").notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+}, (table) => [
+  index("idx_user_curriculum_opt_outs_user").on(table.userId),
+]);
+export type UserCurriculumOptOut = typeof userCurriculumOptOuts.$inferSelect;
+
+// Org-private extracted standards. Result of AI extraction over a customer-uploaded doc.
+// NEVER pooled into the public standards database — visible only to the uploading org.
+export const orgExtractedStandards = pgTable("org_extracted_standards", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  curriculumDocumentId: varchar("curriculum_document_id").notNull(),
+  organizationId: varchar("organization_id").notNull(),
+  code: text("code").notNull(),
+  description: text("description").notNull(),
+  subject: text("subject"),
+  gradeLevel: text("grade_level"),
+  strand: text("strand"),
+  createdAt: timestamp("created_at").defaultNow(),
+}, (table) => [
+  index("idx_org_extracted_std_doc").on(table.curriculumDocumentId),
+  index("idx_org_extracted_std_org_subj_grade").on(table.organizationId, table.subject, table.gradeLevel),
+]);
+export type OrgExtractedStandard = typeof orgExtractedStandards.$inferSelect;
+
+// ============================================================================
+// PUBLIC STANDARDS INGESTION (Global Sweep — admin-approved)
+// ============================================================================
+
+// Customer-driven request for a country / state's standards to be ingested
+export const standardsIngestionRequests = pgTable("standards_ingestion_requests", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  country: text("country").notNull(),
+  state: text("state"),
+  requestedByUserId: varchar("requested_by_user_id").notNull(),
+  requesterRole: text("requester_role").notNull(),
+  requesterOrgId: varchar("requester_org_id"),
+  notes: text("notes"),
+  status: text("status").notNull().default("pending"),
+  // "pending" | "approved" | "in_progress" | "completed" | "rejected"
+  assignedToUserId: varchar("assigned_to_user_id"),
+  reviewedByUserId: varchar("reviewed_by_user_id"),
+  reviewedAt: timestamp("reviewed_at"),
+  reviewNotes: text("review_notes"),
+  createdAt: timestamp("created_at").defaultNow(),
+}, (table) => [
+  index("idx_standards_ing_req_country").on(table.country, table.state),
+  index("idx_standards_ing_req_status").on(table.status),
+]);
+export type StandardsIngestionRequest = typeof standardsIngestionRequests.$inferSelect;
+
+// Per-country source registry — what the annual sweep / on-demand sync targets.
+// Seeded with 8 well-documented countries; system_admin can add more.
+export const standardsSourceRegistry = pgTable("standards_source_registry", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  country: text("country").notNull(),
+  state: text("state"),
+  sourceName: text("source_name").notNull(), // e.g. "DepEd K-12"
+  sourceUrl: text("source_url").notNull(),
+  sourceType: text("source_type").notNull().default("html"), // "html" | "pdf"
+  subject: text("subject"),
+  gradeLevels: jsonb("grade_levels").$type<string[]>().default([]),
+  notes: text("notes"),
+  isActive: boolean("is_active").notNull().default(true),
+  lastSyncedAt: timestamp("last_synced_at"),
+  lastSyncStatus: text("last_sync_status"),
+  createdAt: timestamp("created_at").defaultNow(),
+}, (table) => [
+  index("idx_standards_src_country").on(table.country, table.state),
+]);
+export type StandardsSourceRegistry = typeof standardsSourceRegistry.$inferSelect;
+
+// Pending public standards extracted from a sync run; system_admin approves before they go live
+export const pendingPublicStandards = pgTable("pending_public_standards", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  ingestionRequestId: varchar("ingestion_request_id"),
+  sourceRegistryId: varchar("source_registry_id"),
+  syncRunId: varchar("sync_run_id"),
+  country: text("country").notNull(),
+  state: text("state"),
+  subject: text("subject"),
+  gradeLevel: text("grade_level"),
+  code: text("code"),
+  description: text("description").notNull(),
+  strand: text("strand"),
+  sourceUrl: text("source_url"),
+  confidenceScore: integer("confidence_score").default(0), // 0-100
+  status: text("status").notNull().default("pending_review"),
+  // "pending_review" | "approved" | "rejected"
+  reviewedByUserId: varchar("reviewed_by_user_id"),
+  reviewedAt: timestamp("reviewed_at"),
+  publishedStandardId: varchar("published_standard_id"),
+  createdAt: timestamp("created_at").defaultNow(),
+}, (table) => [
+  index("idx_pending_pub_std_status").on(table.status),
+  index("idx_pending_pub_std_country").on(table.country, table.state),
+  index("idx_pending_pub_std_run").on(table.syncRunId),
+]);
+export type PendingPublicStandard = typeof pendingPublicStandards.$inferSelect;
+
+// One row per sync run for audit / annual sweep tracking
+export const publicStandardsSyncRuns = pgTable("public_standards_sync_runs", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  triggerType: text("trigger_type").notNull(), // "manual" | "request" | "annual_sweep"
+  triggeredByUserId: varchar("triggered_by_user_id"),
+  ingestionRequestId: varchar("ingestion_request_id"),
+  country: text("country"),
+  state: text("state"),
+  status: text("status").notNull().default("running"),
+  // "running" | "completed" | "failed"
+  sourcesAttempted: integer("sources_attempted").default(0),
+  sourcesSucceeded: integer("sources_succeeded").default(0),
+  pendingCreated: integer("pending_created").default(0),
+  errorMessage: text("error_message"),
+  startedAt: timestamp("started_at").defaultNow(),
+  completedAt: timestamp("completed_at"),
+});
+export type PublicStandardsSyncRun = typeof publicStandardsSyncRuns.$inferSelect;

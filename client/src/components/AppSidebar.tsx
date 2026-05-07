@@ -51,6 +51,7 @@ import {
   UserPlus,
   HelpCircle,
   Wand2,
+  Globe,
 } from "lucide-react";
 
 function hasMinRole(userRole: string, minRole: UserRole): boolean {
@@ -121,6 +122,7 @@ const navigationGroups: NavGroup[] = [
     items: [
       { title: "AI Lesson Generator", url: "/lesson-generator", icon: Sparkles, requiresAuth: true },
       { title: "My Lessons", url: "/my-lessons", icon: BookOpen, requiresAuth: true },
+      { title: "Curriculum Library", url: "/curriculum-library", icon: Folder, requiresAuth: true },
       { title: "Scope & Sequence", url: "/scope-sequence", icon: Map, requiresAuth: true },
       { title: "Gradebook", url: "/gradebook", icon: ClipboardList, requiresAuth: true },
       { title: "Resource Library", url: "/resource-library", icon: Folder, requiresAuth: true },
@@ -130,9 +132,11 @@ const navigationGroups: NavGroup[] = [
     label: "Educator Tools",
     minRole: "educator",
     items: [
+      { title: "Standards Ingestion", url: "/admin/standards-ingestion", icon: Globe, requiresAuth: true, exactRole: "system_admin" },
       { title: "AI Lesson Generator", url: "/lesson-generator", icon: Sparkles, requiresAuth: true },
       { title: "AI Assignment Generator", url: "/assignments", icon: Wand2, requiresAuth: true },
       { title: "My Lessons", url: "/my-lessons", icon: BookOpen, requiresAuth: true },
+      { title: "Curriculum Library", url: "/curriculum-library", icon: Folder, requiresAuth: true },
       { title: "Assessments", url: "/assessments", icon: FileText, requiresAuth: true },
       { title: "Scope & Sequence", url: "/scope-sequence", icon: Map, requiresAuth: true },
       { title: "Classroom", url: "/classroom", icon: School, requiresAuth: true },
