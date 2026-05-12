@@ -1,9 +1,6 @@
-import fs from "fs";
-import path from "path";
 import { storage } from "../storage";
 import type { InsertInstitution } from "@shared/schema";
-
-const SEED_PATH = path.join(import.meta.dirname, "institutionSeed.json");
+import seedRows from "./institutionSeed.json";
 
 type SeedRow = {
   ipedsId: string;
@@ -19,8 +16,7 @@ export async function seedInstitutionsFromJsonIfEmpty(): Promise<{ seeded: numbe
   const existing = await storage.listInstitutions({ limit: 1 });
   if (existing.length > 0) return { seeded: 0, skipped: true };
 
-  const raw = fs.readFileSync(SEED_PATH, "utf-8");
-  const rows: SeedRow[] = JSON.parse(raw);
+  const rows: SeedRow[] = seedRows as SeedRow[];
   const seen = new Set<string>();
   let seeded = 0;
   for (const row of rows) {
