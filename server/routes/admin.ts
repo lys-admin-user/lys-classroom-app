@@ -2667,7 +2667,25 @@ export function registerAdminRoutes(app: Express): void {
     try {
       const { id } = req.params;
       const { tier, role, email, firstName, lastName, stripeCustomerId, stripeSubscriptionId, subscriptionStatus } = req.body;
-      
+
+      // Privilege guard: load requester's authoritative role from DB, then
+      // (a) block any modification to a user whose role is >= requester, and
+      // (b) block assigning a new role >= requester. This prevents lateral
+      // takeover (editing an equal/higher admin) and vertical escalation.
+      const requesterId = req.user?.claims?.sub;
+      const requesterUser = requesterId ? await storage.getUser(requesterId) : undefined;
+      const requesterRole = requesterUser?.role as any;
+      if (!requesterRole) {
+        return res.status(403).json({ error: "Unable to verify requester role." });
+      }
+      const target = await storage.getUser(id);
+      if (target?.role && !hasRolePrivilege(requesterRole, target.role as any)) {
+        return res.status(403).json({ error: "Cannot modify a user with equal or higher role than yours." });
+      }
+      if (role && !hasRolePrivilege(requesterRole, role)) {
+        return res.status(403).json({ error: "Cannot assign a role equal to or higher than your own." });
+      }
+
       const updates: Partial<User> = {};
       if (tier) updates.tier = tier;
       if (role) updates.role = role;
@@ -2725,6 +2743,18 @@ export function registerAdminRoutes(app: Express): void {
       if (role && !validRoles.includes(role)) {
         res.status(400).json({ error: "Invalid role" });
         return;
+      }
+
+      // Prevent privilege escalation when creating users: requester cannot
+      // create a user with a role equal to or higher than their own.
+      if (role) {
+        const requesterId = req.user?.claims?.sub;
+        const requesterUser = requesterId ? await storage.getUser(requesterId) : undefined;
+        const requesterRole = requesterUser?.role as any;
+        if (!requesterRole || !hasRolePrivilege(requesterRole, role)) {
+          res.status(403).json({ error: "Cannot create a user with a role equal to or higher than your own." });
+          return;
+        }
       }
 
       const validTiers = ["free", "pro", "campus", "enterprise"];

@@ -183,13 +183,28 @@ export async function deleteCurriculumDocument(
 ): Promise<boolean> {
   const doc = await getCurriculumDocument(id);
   if (!doc) return false;
-  // Only the uploader, or any admin with rights to that org, can delete.
-  if (doc.uploadedByUserId !== userId && !isAdmin) return false;
+  // Uploader can always delete their own. Admins must additionally be a
+  // member of the document's organization to prevent cross-org deletion.
+  if (doc.uploadedByUserId !== userId) {
+    if (!isAdmin) return false;
+    if (doc.organizationId) {
+      const memberOrgIds = await getUserOrganizationIds(userId);
+      if (!memberOrgIds.includes(doc.organizationId)) return false;
+    }
+  }
   await db
     .update(curriculumDocuments)
     .set({ isActive: false, updatedAt: new Date() })
     .where(eq(curriculumDocuments.id, id));
   return true;
+}
+
+async function getUserOrganizationIds(userId: string): Promise<string[]> {
+  const rows = await db
+    .select({ organizationId: organizationMemberships.organizationId })
+    .from(organizationMemberships)
+    .where(eq(organizationMemberships.userId, userId));
+  return rows.map((r) => r.organizationId);
 }
 
 export async function updateExtractionStatus(

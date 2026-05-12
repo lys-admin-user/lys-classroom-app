@@ -1,20 +1,42 @@
 import OpenAI from "openai";
 
-const openai = process.env.OPENAI_API_KEY
-  ? new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
-  : null;
+const directKey = process.env.OPENAI_DIRECT_API_KEY;
+const embeddingsClient: OpenAI | null = directKey
+  ? new OpenAI({ apiKey: directKey })
+  : process.env.OPENAI_API_KEY
+    ? new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
+    : null;
+const usingProxiedClient = !directKey && !!process.env.OPENAI_BASE_URL;
 
 const MODEL = "text-embedding-3-small";
 export const EMBEDDING_DIMS = 1536;
 
+let embeddingsDisabled = false;
+let warnedDisabled = false;
+
 export async function embedText(text: string): Promise<number[] | null> {
-  if (!openai || !text || text.trim().length === 0) return null;
+  if (embeddingsDisabled) return null;
+  if (!embeddingsClient || !text || text.trim().length === 0) return null;
   try {
     const trimmed = text.length > 8000 ? text.slice(0, 8000) : text;
-    const res = await openai.embeddings.create({ model: MODEL, input: trimmed });
+    const res = await embeddingsClient.embeddings.create({ model: MODEL, input: trimmed });
     return res.data[0]?.embedding ?? null;
   } catch (err) {
-    console.warn("[embeddingService] embedText failed:", (err as Error).message);
+    const msg = (err as Error).message || "";
+    if (msg.includes("not supported") || msg.includes("404")) {
+      embeddingsDisabled = true;
+      if (!warnedDisabled) {
+        warnedDisabled = true;
+        console.warn(
+          "[embeddingService] Embeddings endpoint not supported by current OpenAI base URL" +
+          (usingProxiedClient ? " (Replit AI integration)." : ".") +
+          " Semantic retrieval will be skipped." +
+          " Set OPENAI_DIRECT_API_KEY (a direct OpenAI key) to enable.",
+        );
+      }
+      return null;
+    }
+    console.warn("[embeddingService] embedText failed:", msg);
     return null;
   }
 }

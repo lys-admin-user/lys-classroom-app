@@ -379,11 +379,16 @@ JSON structure:
     });
 
     const content = response.choices[0].message.content;
-    if (!content) {
+    if (!content || !content.trim()) {
       throw new Error("No content received from OpenAI");
     }
 
-    const lessonPlan = JSON.parse(content);
+    let lessonPlan: any;
+    try {
+      lessonPlan = JSON.parse(content);
+    } catch (parseErr) {
+      throw new Error(`OpenAI returned invalid JSON: ${(parseErr as Error).message}`);
+    }
     const generatedLesson = {
       id: crypto.randomUUID(),
       ...lessonPlan,
@@ -417,8 +422,14 @@ You MUST address these gaps to achieve Distinguished level (90%+).`;
       });
 
       const retryContent = retryResponse.choices[0].message.content;
-      if (retryContent) {
-        const retryPlan = JSON.parse(retryContent);
+      if (retryContent && retryContent.trim()) {
+        let retryPlan: any;
+        try {
+          retryPlan = JSON.parse(retryContent);
+        } catch {
+          retryPlan = null;
+        }
+        if (retryPlan) {
         const improvedLesson = {
           id: crypto.randomUUID(),
           ...retryPlan,
@@ -443,6 +454,7 @@ You MUST address these gaps to achieve Distinguished level (90%+).`;
           await saveLessonToCache(request, cacheKey, finalRetry);
           await recordAttribution(cacheKey, finalRetry, request, attributionData, retryQuality.percentage, retryVoiceMeta, voiceSnippetIds);
           return { ...finalRetry, cacheHit: false };
+        }
         }
       }
     }
