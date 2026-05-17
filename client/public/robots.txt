@@ -1,0 +1,10 @@
+User-agent: *
+Allow: /
+Disallow: /api/
+Disallow: /admin
+Disallow: /system-admin
+Disallow: /settings
+Disallow: /parent-portal
+Disallow: /parent-connect
+
+Sitemap: https://ladderingyoursuccess.com/sitemap.xml

@@ -57,6 +57,17 @@ app.use(
   }),
 );
 
+// SEO: explicitly mark production responses as indexable so any upstream
+// proxy default (e.g. Replit dev preview's X-Robots-Tag: noindex) is
+// overridden on the published app. Dev/preview is left alone so it stays
+// out of search results.
+app.use((req, res, next) => {
+  if (process.env.REPLIT_DEPLOYMENT === "1" && !req.path.startsWith("/api")) {
+    res.setHeader("X-Robots-Tag", "index, follow");
+  }
+  next();
+});
+
 const apiLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
   max: 200,
