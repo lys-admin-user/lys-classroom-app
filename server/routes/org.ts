@@ -348,15 +348,30 @@ export function registerOrgRoutes(app: Express): void {
   });
 
 
-  // Public API to get standards for lesson planning (used by frontend)
+  // Public API to get standards for lesson planning (used by frontend).
+  // Unions the DB jurisdictions with the static curriculum file so the
+  // dropdown is never empty even if seeding hasn't run in this environment
+  // (e.g. fresh production deploy). Sorted alphabetically for stable UX.
   app.get("/api/standards/countries", async (req, res) => {
     try {
-      const jurisdictions = await storage.getJurisdictions();
-      const countries = Array.from(new Set(jurisdictions.map(j => j.country)));
-      res.json(countries);
+      const [jurisdictions, { getCountries }] = await Promise.all([
+        storage.getJurisdictions().catch(() => [] as any[]),
+        import("@shared/standards"),
+      ]);
+      const fromDb = jurisdictions.map((j: any) => j.country);
+      const fromStatic = getCountries();
+      const merged = Array.from(new Set([...fromDb, ...fromStatic])).sort((a, b) =>
+        a.localeCompare(b),
+      );
+      res.json(merged);
     } catch (error) {
       console.error("Get countries error:", error);
-      res.status(500).json({ error: "Failed to get countries" });
+      try {
+        const { getCountries } = await import("@shared/standards");
+        res.json(getCountries().sort((a, b) => a.localeCompare(b)));
+      } catch {
+        res.status(500).json({ error: "Failed to get countries" });
+      }
     }
   });
 
@@ -403,12 +418,30 @@ export function registerOrgRoutes(app: Express): void {
         return;
       }
       
-      res.json(jurisdictions.map(j => ({
+      // Non-US: merge CSP database with the static curriculum file so the
+      // dropdown is never empty in environments where seeding hasn't run.
+      const cspNames = new Set(jurisdictions.map(j => j.name));
+      const result: { state: string; abbreviation: string; standardsName: string; source: 'csp' | 'fallback' }[] = jurisdictions.map(j => ({
         state: j.name,
         abbreviation: j.abbreviation,
         standardsName: j.standardsName,
         source: 'csp' as const,
-      })));
+      }));
+      try {
+        const { getStates } = await import("@shared/standards");
+        for (const fb of getStates(country)) {
+          if (!cspNames.has(fb.state)) {
+            result.push({
+              state: fb.state,
+              abbreviation: fb.abbreviation,
+              standardsName: fb.standardsName,
+              source: 'fallback' as const,
+            });
+          }
+        }
+      } catch {}
+      result.sort((a, b) => a.state.localeCompare(b.state));
+      res.json(result);
     } catch (error) {
       console.error("Get states error:", error);
       res.status(500).json({ error: "Failed to get states" });
