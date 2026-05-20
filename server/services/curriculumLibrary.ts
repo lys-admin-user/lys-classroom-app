@@ -90,25 +90,23 @@ export async function getUploadPermission(
   if (userRole === "district_admin" || userRole === "campus_admin") {
     return { canUpload: true, canUploadAsAdmin: true };
   }
-  // Teachers / homeschool / staff can upload as personal docs
-  // when they have no org context, or when org settings allow
+  // Locked product decision (May 2026): curriculum-document uploads are
+  // an admin-only operation. Educators (and homeschool / staff) can still
+  // *request* new public standards via the RequestStandardsCard, but they
+  // cannot push docs into the library themselves — that prevents low-quality
+  // or untagged uploads from polluting AI alignment. The previous per-org
+  // `allowTeacherUploads` flag is now ignored at the permission layer (kept
+  // on the org settings record for backward-compat with old admin UIs).
   if (
     userRole === "educator" ||
     userRole === "homeschool_parent" ||
     userRole === "staff"
   ) {
-    if (!organizationId) {
-      return { canUpload: true, canUploadAsAdmin: false };
-    }
-    const settings = await getOrgCurriculumSettings(organizationId);
-    if (settings.allowTeacherUploads) {
-      return { canUpload: true, canUploadAsAdmin: false };
-    }
     return {
       canUpload: false,
       canUploadAsAdmin: false,
       reason:
-        "Your school admin has disabled teacher uploads. Contact them if you need access.",
+        "Curriculum uploads are managed by your school administrator. Use the 'Request public standards' form below to ask for a new curriculum.",
     };
   }
   return {

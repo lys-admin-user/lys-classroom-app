@@ -947,6 +947,45 @@ ${addedResources.length > 0 ? addedResources.map(r => `- ${r.title}: ${r.url}`).
                     </div>
                   )}
 
+                  {/* Track B #15 — Empty-state CTA. When the teacher has
+                      picked country/state/subject but the cascade returned
+                      zero codes, give them a one-click path to request the
+                      curriculum instead of a silent dead-end. We only show
+                      it after a subject is chosen (otherwise it's expected
+                      to be empty) and only for solo educators (admins use
+                      the dedicated ingestion dashboard). */}
+                  {selectedSubject && standardCodes.length === 0 && showStandardSources && (
+                    <div
+                      className="rounded-md border border-dashed border-lys-yellow/50 bg-lys-yellow/5 p-4 text-sm"
+                      data-testid="empty-state-no-codes"
+                    >
+                      <p className="font-semibold mb-1">No standard codes available for this subject yet.</p>
+                      <p className="text-muted-foreground mb-3">
+                        You can still generate a lesson — we'll align it to grade-level outcomes from your country's curriculum. Want us to add code-level standards for {selectedCountry}?
+                      </p>
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="outline"
+                        data-testid="button-request-curriculum"
+                        onClick={async () => {
+                          try {
+                            await apiRequest("POST", "/api/standards-ingestion/requests", {
+                              country: selectedCountry,
+                              state: selectedState || undefined,
+                              notes: `Requested from lesson generator: ${selectedSubject}${gradeLevel ? ` / ${gradeLevel}` : ""}`,
+                            });
+                            toast({ title: "Request sent", description: "A system administrator will review your request." });
+                          } catch (err: any) {
+                            toast({ title: "Request failed", description: err.message, variant: "destructive" });
+                          }
+                        }}
+                      >
+                        Request this curriculum
+                      </Button>
+                    </div>
+                  )}
+
                   {standardCodes.length > 0 && (
                     <div className="space-y-2">
                       <Label className="font-roboto text-sm text-muted-foreground">

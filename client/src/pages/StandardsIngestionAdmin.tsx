@@ -11,7 +11,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/use-auth";
-import { Loader2, Globe, RefreshCw, CheckCircle2, XCircle, Plus, Inbox } from "lucide-react";
+import { Loader2, Globe, RefreshCw, CheckCircle2, XCircle, Plus, Inbox, TrendingDown, History, ExternalLink } from "lucide-react";
 
 export default function StandardsIngestionAdmin() {
   const { user } = useAuth();
@@ -31,10 +31,14 @@ export default function StandardsIngestionAdmin() {
           <TabsTrigger value="pending" data-testid="tab-pending"><Inbox className="h-4 w-4 mr-1" />Pending review</TabsTrigger>
           <TabsTrigger value="requests" data-testid="tab-requests">Customer requests</TabsTrigger>
           <TabsTrigger value="sources" data-testid="tab-sources"><Globe className="h-4 w-4 mr-1" />Sources</TabsTrigger>
+          <TabsTrigger value="gaps" data-testid="tab-gaps"><TrendingDown className="h-4 w-4 mr-1" />Coverage gaps</TabsTrigger>
+          <TabsTrigger value="runs" data-testid="tab-runs"><History className="h-4 w-4 mr-1" />Sync history</TabsTrigger>
         </TabsList>
         <TabsContent value="pending"><PendingReview /></TabsContent>
         <TabsContent value="requests"><CustomerRequests /></TabsContent>
         <TabsContent value="sources"><SourcesPanel /></TabsContent>
+        <TabsContent value="gaps"><CoverageGaps /></TabsContent>
+        <TabsContent value="runs"><SyncHistory /></TabsContent>
       </Tabs>
     </div>
   );
@@ -207,7 +211,7 @@ function SourcesPanel() {
         </CardContent>
       </Card>
 
-      {isLoading ? <div className="text-center text-muted-foreground py-6">Loading…</div> : sources.map((s: any) => (
+      {isLoading ? <div className="text-center text-muted-foreground py-6" data-testid="text-sources-loading">Loading…</div> : sources.map((s: any) => (
         <Card key={s.id} data-testid={`card-source-${s.id}`}>
           <CardContent className="p-3 flex items-center gap-3">
             <div className="flex-1 min-w-0">
@@ -221,6 +225,101 @@ function SourcesPanel() {
             <Button size="sm" variant="outline" onClick={() => sync.mutate(s.id)} disabled={sync.isPending} data-testid={`button-sync-source-${s.id}`}>
               {sync.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : "Sync now"}
             </Button>
+          </CardContent>
+        </Card>
+      ))}
+    </div>
+  );
+}
+
+// === Track B #2 + #3 ===
+
+function CoverageGaps() {
+  const { data: gaps = [], isLoading } = useQuery<any[]>({
+    queryKey: ["/api/standards-ingestion/coverage-gaps"],
+  });
+  if (isLoading) return <div className="py-8 text-center text-muted-foreground" data-testid="text-gaps-loading">Loading…</div>;
+  if (gaps.length === 0)
+    return (
+      <Card className="mt-4">
+        <CardContent className="py-12 text-center text-muted-foreground" data-testid="text-no-gaps">
+          No coverage gaps in the last 12 months — every teacher request matched a real standard set.
+        </CardContent>
+      </Card>
+    );
+  return (
+    <div className="mt-4 space-y-2">
+      <p className="text-sm text-muted-foreground">
+        Top {gaps.length} (country, state, subject) combinations where teachers hit our fallback path in the last 12 months. Highest counts = biggest unmet demand.
+      </p>
+      {gaps.map((g: any, i: number) => (
+        <Card key={`${g.country}-${g.state}-${g.subject}-${i}`} data-testid={`card-gap-${i}`}>
+          <CardContent className="p-3 flex items-center gap-3">
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center gap-2 flex-wrap">
+                <Badge variant="outline">{g.country}{g.state ? `/${g.state}` : ""}</Badge>
+                <span className="font-semibold" data-testid={`text-gap-subject-${i}`}>{g.subject || "(no subject)"}</span>
+                <Badge variant="secondary" className="text-[10px]">{g.fallbackKind}</Badge>
+              </div>
+              <p className="text-xs text-muted-foreground mt-1">
+                Last seen: {g.lastSeen ? new Date(g.lastSeen).toLocaleDateString() : "—"}
+              </p>
+            </div>
+            <div className="text-right">
+              <div className="text-2xl font-bold text-lys-teal" data-testid={`text-gap-count-${i}`}>{g.missCount}</div>
+              <div className="text-[10px] text-muted-foreground uppercase">misses</div>
+            </div>
+          </CardContent>
+        </Card>
+      ))}
+    </div>
+  );
+}
+
+function SyncHistory() {
+  const { data: runs = [], isLoading } = useQuery<any[]>({
+    queryKey: ["/api/standards-ingestion/runs"],
+  });
+  if (isLoading) return <div className="py-8 text-center text-muted-foreground" data-testid="text-runs-loading">Loading…</div>;
+  if (runs.length === 0)
+    return (
+      <Card className="mt-4">
+        <CardContent className="py-12 text-center text-muted-foreground" data-testid="text-no-runs">
+          No sync runs yet. Run a sync from the Sources tab to get started.
+        </CardContent>
+      </Card>
+    );
+  const statusColor = (s: string) =>
+    s === "completed" ? "bg-green-100 text-green-800" : s === "failed" ? "bg-red-100 text-red-800" : "bg-amber-100 text-amber-800";
+  return (
+    <div className="mt-4 space-y-2">
+      <p className="text-sm text-muted-foreground">{runs.length} most recent runs.</p>
+      {runs.map((r: any) => (
+        <Card key={r.id} data-testid={`card-run-${r.id}`}>
+          <CardContent className="p-3">
+            <div className="flex items-center gap-2 flex-wrap">
+              <Badge className={statusColor(r.status)} data-testid={`badge-run-status-${r.id}`}>{r.status}</Badge>
+              <Badge variant="outline">{r.triggerType}</Badge>
+              {r.country && <span className="text-sm font-semibold">{r.country}{r.state ? ` / ${r.state}` : ""}</span>}
+              <span className="text-xs text-muted-foreground ml-auto">
+                {r.startedAt ? new Date(r.startedAt).toLocaleString() : "—"}
+              </span>
+            </div>
+            <div className="flex items-center gap-4 mt-2 text-xs text-muted-foreground">
+              <span>Sources: <strong className="text-foreground">{r.sourcesSucceeded ?? 0}</strong>/{r.sourcesAttempted ?? 0}</span>
+              <span>Pending created: <strong className="text-foreground">{r.pendingCreated ?? 0}</strong></span>
+              <span data-testid={`text-run-rejected-${r.id}`}>
+                Verbatim rejected:{" "}
+                <strong className={(r.verbatimRejected ?? 0) > 0 ? "text-amber-700" : "text-foreground"}>
+                  {r.verbatimRejected ?? 0}
+                </strong>
+              </span>
+            </div>
+            {r.errorMessage && (
+              <p className="text-xs text-red-700 mt-1" data-testid={`text-run-error-${r.id}`}>
+                <ExternalLink className="h-3 w-3 inline mr-1" />{r.errorMessage}
+              </p>
+            )}
           </CardContent>
         </Card>
       ))}

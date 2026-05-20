@@ -59,8 +59,12 @@ import {
   startAnnualSweepScheduler,
 } from "../services/publicStandardsIngestion";
 import { db } from "../db";
-import { eq } from "drizzle-orm";
-import { standardsSourceRegistry } from "@shared/schema";
+import { eq, sql, desc, and, gte } from "drizzle-orm";
+import {
+  standardsSourceRegistry,
+  standardsFallbackMisses,
+  publicStandardsSyncRuns,
+} from "@shared/schema";
 
 const upload = multer({
   storage: multer.memoryStorage(),
@@ -408,12 +412,11 @@ export function registerCurriculumLibraryRoutes(app: Express): void {
     async (req: any, res) => {
       const user = await requireUser(req, res);
       if (!user) return;
-      // Per product decision: admins-only trigger (system_admin can act for unaffiliated users)
-      if (!ADMIN_ROLES.has(user.role)) {
-        return res.status(403).json({
-          error: "Only campus / district / system admins can request standards ingestion",
-        });
-      }
+      // Updated product decision (May 2026): any authenticated user can
+      // submit a standards-ingestion REQUEST (admins still process them on
+      // the ingestion dashboard). This is what backs the RequestStandardsCard
+      // in CurriculumLibrary and the "Request this curriculum" empty-state
+      // CTA in LessonGenerator — without it educators would hit 403.
       const body = z
         .object({
           country: z.string().min(1),
@@ -580,6 +583,68 @@ export function registerCurriculumLibraryRoutes(app: Express): void {
       const { ids } = z.object({ ids: z.array(z.string()).min(1) }).parse(req.body);
       const result = await rejectPendingStandards(ids, user.id);
       res.json(result);
+    },
+  );
+
+  // Track B #2 — Coverage gaps. Returns the top (country, state, subject)
+  // groupings from the trailing 12 months of fallback misses, so admins
+  // can prioritize ingestion effort by actual teacher demand. Limit 50.
+  app.get(
+    "/api/standards-ingestion/coverage-gaps",
+    isAuthenticated,
+    async (req: any, res) => {
+      const user = await requireUser(req, res);
+      if (!user) return;
+      if (!SYS_ADMIN_ROLES.has(user.role)) {
+        return res.status(403).json({ error: "System admin required" });
+      }
+      const since = new Date(Date.now() - 365 * 24 * 60 * 60 * 1000);
+      const rows = await db
+        .select({
+          country: standardsFallbackMisses.country,
+          state: standardsFallbackMisses.state,
+          subject: standardsFallbackMisses.subject,
+          fallbackKind: standardsFallbackMisses.fallbackKind,
+          missCount: sql<number>`count(*)::int`,
+          lastSeen: sql<Date>`max(${standardsFallbackMisses.createdAt})`,
+        })
+        .from(standardsFallbackMisses)
+        .where(gte(standardsFallbackMisses.createdAt, since))
+        .groupBy(
+          standardsFallbackMisses.country,
+          standardsFallbackMisses.state,
+          standardsFallbackMisses.subject,
+          standardsFallbackMisses.fallbackKind,
+        )
+        .orderBy(desc(sql`count(*)`))
+        .limit(50);
+      res.json(rows);
+    },
+  );
+
+  // Track B #3 — Sync run history with verbatim-rejected counts so admins
+  // can spot sources whose AI suggestions get filtered out a lot (= the
+  // source HTML is hard to parse or the model is hallucinating against it).
+  app.get(
+    "/api/standards-ingestion/runs",
+    isAuthenticated,
+    async (req: any, res) => {
+      const user = await requireUser(req, res);
+      if (!user) return;
+      if (!SYS_ADMIN_ROLES.has(user.role)) {
+        return res.status(403).json({ error: "System admin required" });
+      }
+      const limit = Math.min(Number(req.query.limit) || 50, 200);
+      const rows = await db
+        .select()
+        .from(publicStandardsSyncRuns)
+        .where(
+          // Hide the marker rows the year-lock writes — admins don't care.
+          sql`${publicStandardsSyncRuns.triggerType} <> 'annual_cleanup_marker'`,
+        )
+        .orderBy(desc(publicStandardsSyncRuns.startedAt))
+        .limit(limit);
+      res.json(rows);
     },
   );
 }

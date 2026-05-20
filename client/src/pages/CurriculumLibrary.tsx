@@ -136,7 +136,10 @@ export default function CurriculumLibrary() {
         <AdminOrgSettings orgId={perm.orgIds[0]} />
       )}
 
-      {perm?.isAdmin && (
+      {/* Locked product decision: the request-standards flow is open to all
+          authenticated users (educators included). Only the curriculum
+          *upload* path is admin-gated above. */}
+      {perm && (
         <div className="mt-6">
           <RequestStandardsCard isSystemAdmin={perm.isSystemAdmin} />
         </div>
@@ -362,25 +365,12 @@ function AdminOrgSettings({ orgId }: { orgId: string }) {
       toast({ title: "Setting updated" });
     },
   });
-  return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="text-base">School settings</CardTitle>
-        <CardDescription>Control who in your school can upload curriculum documents.</CardDescription>
-      </CardHeader>
-      <CardContent className="flex items-center justify-between">
-        <div>
-          <Label className="font-medium">Allow teachers to upload</Label>
-          <p className="text-sm text-muted-foreground">When off, only admins can upload curriculum docs for this school.</p>
-        </div>
-        <Switch
-          checked={settings?.allowTeacherUploads ?? true}
-          onCheckedChange={(v) => mutation.mutate(v)}
-          data-testid="switch-allow-teacher-uploads"
-        />
-      </CardContent>
-    </Card>
-  );
+  // Per the May 2026 policy change, curriculum uploads are admin-only
+  // platform-wide and the `allowTeacherUploads` org flag is no longer
+  // honored at the permission layer. We hide the toggle to avoid
+  // misleading admins. (The DB field is preserved for backward-compat.)
+  void settings; void mutation;
+  return null;
 }
 
 function RequestStandardsCard({ isSystemAdmin }: { isSystemAdmin: boolean }) {

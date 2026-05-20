@@ -4108,6 +4108,15 @@ export const standardsFallbackMisses = pgTable("standards_fallback_misses", {
 }, (table) => [
   index("idx_standards_fb_country").on(table.country, table.state),
   index("idx_standards_fb_created").on(table.createdAt),
+  // Composite for the admin "coverage gaps" dashboard query — groups by
+  // (country, state, subject) and filters by createdAt for the trailing
+  // 12-month window. Without this, the dashboard scans the whole table.
+  index("idx_standards_fb_gap").on(
+    table.country,
+    table.state,
+    table.subject,
+    table.createdAt,
+  ),
 ]);
 export type StandardsFallbackMiss = typeof standardsFallbackMisses.$inferSelect;
 
@@ -4132,5 +4141,9 @@ export const publicStandardsSyncRuns = pgTable("public_standards_sync_runs", {
   errorMessage: text("error_message"),
   startedAt: timestamp("started_at").defaultNow(),
   completedAt: timestamp("completed_at"),
-});
+}, (table) => [
+  // Used by `hasCleanupRunThisYear` (annual cleanup year-lock) and by the
+  // admin "Sync history" tab which lists most recent runs per trigger.
+  index("idx_pssr_trigger_started").on(table.triggerType, table.startedAt),
+]);
 export type PublicStandardsSyncRun = typeof publicStandardsSyncRuns.$inferSelect;

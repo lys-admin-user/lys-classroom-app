@@ -11,7 +11,6 @@
 // canonical USPS code AND whose name matches a known state. Other rows are
 // left alone (and reported as warnings so an admin can investigate).
 
-import "dotenv/config";
 import { db } from "../server/db";
 import { standardsJurisdictions } from "../shared/schema";
 import { US_STATES } from "../server/routes/_helpers";
