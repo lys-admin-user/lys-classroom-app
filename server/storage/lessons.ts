@@ -466,38 +466,128 @@ const lessonsMethods: ThisType<DatabaseStorage> = {
   },
 
 
-  async countGuestGenerations(ipAddress: string): Promise<number> {
-    const result = await db.select({ count: sql<number>`count(*)` })
-      .from(guestLessonGenerations)
-      .where(eq(guestLessonGenerations.ipAddress, ipAddress));
-    return Number(result[0]?.count || 0);
+  // Count guest generations under this guest's identity. Only rows with a
+  // real topic (NOT NULL) count — handoff marker rows are excluded so a
+  // pre-generation signup doesn't burn quota. Rows are matched on EITHER
+  // guestId OR ipAddress so a forged/rotated cookie still hits the IP
+  // ceiling, and claimed rows are excluded so a converted user doesn't
+  // permanently lose quota on shared networks.
+  async countGuestGenerations(guestKey: { guestId?: string; ipAddress: string }): Promise<number> {
+    const { guestId, ipAddress } = guestKey;
+    const result = await db.execute(sql`
+      SELECT COUNT(*)::int AS cnt FROM guest_lesson_generations
+      WHERE claimed_by_user_id IS NULL
+        AND topic IS NOT NULL
+        AND (
+          ${guestId ? sql`guest_id = ${guestId}` : sql`false`}
+          OR ip_address = ${ipAddress}
+        )
+    `);
+    return Number((result.rows[0] as any)?.cnt || 0);
   },
 
 
-  async tryReserveGuestLessonGeneration(ipAddress: string, limit: number, topic?: string): Promise<{ success: boolean; currentCount: number }> {
+  // Race-safe reservation. A Postgres transactional advisory lock keyed on
+  // the guestId (or IP hash when no cookie) serializes concurrent generate
+  // attempts from the same identity so the count-then-insert cannot exceed
+  // `limit` under burst traffic. The lock is auto-released at commit/rollback.
+  async tryReserveGuestLessonGeneration(
+    guestKey: { guestId?: string; ipAddress: string },
+    limit: number,
+    topic?: string,
+  ): Promise<{ success: boolean; currentCount: number }> {
+    const { guestId, ipAddress } = guestKey;
+    const lockKey = guestId || `ip:${ipAddress}`;
+    return await db.transaction(async (tx) => {
+      await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtextextended(${lockKey}, 0))`);
+      const result = await tx.execute(sql`
+        WITH current_count AS (
+          SELECT COUNT(*) as cnt FROM guest_lesson_generations
+          WHERE claimed_by_user_id IS NULL
+            AND topic IS NOT NULL
+            AND (
+              ${guestId ? sql`guest_id = ${guestId}` : sql`false`}
+              OR ip_address = ${ipAddress}
+            )
+        ),
+        inserted AS (
+          INSERT INTO guest_lesson_generations (id, guest_id, ip_address, topic, created_at)
+          SELECT gen_random_uuid(), ${guestId ?? null}, ${ipAddress}, ${topic ?? null}, NOW()
+          WHERE (SELECT cnt FROM current_count) < ${limit} AND ${topic ?? null}::text IS NOT NULL
+          RETURNING 1
+        )
+        SELECT
+          (SELECT cnt FROM current_count)::int as current_count,
+          (SELECT COUNT(*) FROM inserted)::int as inserted_count
+      `);
+      const row = result.rows[0] as any;
+      const currentCount = Number(row?.current_count || 0);
+      const insertedCount = Number(row?.inserted_count || 0);
+      return { success: insertedCount > 0, currentCount };
+    });
+  },
+
+
+  // Persist the guest's in-flight form values and most recently generated
+  // lesson against their guestId so we can rehydrate after they sign up.
+  // Stored on the most recent quota row for that guest; if none exists (the
+  // user clicked "Sign Up" before generating anything), we insert a marker
+  // row with no topic that does NOT count against the quota — it's claimed
+  // immediately on signup.
+  async saveGuestHandoff(
+    guestKey: { guestId?: string; ipAddress: string },
+    formContext: any,
+    lastLessonContent: any,
+  ): Promise<void> {
+    const { guestId, ipAddress } = guestKey;
+    if (!guestId) return;
+    const formJson = formContext ? JSON.stringify(formContext) : null;
+    const lessonJson = lastLessonContent ? JSON.stringify(lastLessonContent) : null;
     const result = await db.execute(sql`
-      WITH current_count AS (
-        SELECT COUNT(*) as cnt FROM guest_lesson_generations 
-        WHERE ip_address = ${ipAddress}
-      ),
-      inserted AS (
-        INSERT INTO guest_lesson_generations (id, ip_address, topic, created_at)
-        SELECT gen_random_uuid(), ${ipAddress}, ${topic}, NOW()
-        WHERE (SELECT cnt FROM current_count) < ${limit}
-        RETURNING 1
+      UPDATE guest_lesson_generations
+      SET form_context = COALESCE(${formJson}::jsonb, form_context),
+          last_lesson_content = COALESCE(${lessonJson}::jsonb, last_lesson_content)
+      WHERE id = (
+        SELECT id FROM guest_lesson_generations
+        WHERE guest_id = ${guestId} AND claimed_by_user_id IS NULL
+        ORDER BY created_at DESC LIMIT 1
       )
-      SELECT 
-        (SELECT cnt FROM current_count)::int as current_count,
-        (SELECT COUNT(*) FROM inserted)::int as inserted_count
+      RETURNING id
     `);
-    
-    const row = result.rows[0] as any;
-    const currentCount = Number(row?.current_count || 0);
-    const insertedCount = Number(row?.inserted_count || 0);
-    
+    if (result.rows.length === 0) {
+      await db.execute(sql`
+        INSERT INTO guest_lesson_generations
+          (id, guest_id, ip_address, topic, form_context, last_lesson_content, created_at, claimed_by_user_id, claimed_at)
+        VALUES
+          (gen_random_uuid(), ${guestId}, ${ipAddress}, NULL,
+           ${formJson}::jsonb, ${lessonJson}::jsonb, NOW(), NULL, NULL)
+      `);
+    }
+  },
+
+
+  // Atomically mark all of a guest's rows as claimed by the given user and
+  // return the most recent form_context + last_lesson_content for rehydration.
+  async claimGuestHandoff(
+    guestId: string,
+    userId: string,
+  ): Promise<{ formContext: any; lastLessonContent: any } | null> {
+    const latest = await db.execute(sql`
+      SELECT form_context, last_lesson_content
+      FROM guest_lesson_generations
+      WHERE guest_id = ${guestId} AND claimed_by_user_id IS NULL
+      ORDER BY created_at DESC LIMIT 1
+    `);
+    await db.execute(sql`
+      UPDATE guest_lesson_generations
+      SET claimed_by_user_id = ${userId}, claimed_at = NOW()
+      WHERE guest_id = ${guestId} AND claimed_by_user_id IS NULL
+    `);
+    const row = latest.rows[0] as any;
+    if (!row) return null;
     return {
-      success: insertedCount > 0,
-      currentCount: currentCount
+      formContext: row.form_context ?? null,
+      lastLessonContent: row.last_lesson_content ?? null,
     };
   },
 

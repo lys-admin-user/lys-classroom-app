@@ -6,6 +6,8 @@ import { createServer } from "http";
 import { setupCollaborationWebSocket } from "./collaboration";
 import helmet from "helmet";
 import rateLimit from "express-rate-limit";
+import cookieParser from "cookie-parser";
+import { randomUUID } from "node:crypto";
 import { WebhookHandlers } from "./webhookHandlers";
 import { getStripeSync } from "./stripeClient";
 import { readdirSync, statSync } from "node:fs";
@@ -65,6 +67,42 @@ app.use((req, res, next) => {
   if (process.env.REPLIT_DEPLOYMENT === "1" && !req.path.startsWith("/api")) {
     res.setHeader("X-Robots-Tag", "index, follow");
   }
+  next();
+});
+
+// Cookie parsing + guest identity. Every unauthenticated visitor gets a
+// stable httpOnly `lys_guest_id` UUID cookie so guest quotas, handoff state,
+// and post-signup state restoration can survive page reloads. The cookie is
+// SameSite=Lax / 90 days, mirrors the secure flag of the deployment, and
+// `req.guestId` is exposed for route handlers regardless of auth state.
+// Sign the guest cookie with the same SESSION_SECRET used by auth so the
+// guestId can't be forged by a scripted client to rotate around the quota.
+// Only signedCookies are trusted; unsigned `lys_guest_id` values are ignored.
+if (!process.env.SESSION_SECRET) {
+  throw new Error("SESSION_SECRET is required for signed guest cookies.");
+}
+app.use(cookieParser(process.env.SESSION_SECRET));
+declare module "express-serve-static-core" {
+  interface Request {
+    guestId?: string;
+  }
+}
+app.use((req, res, next) => {
+  let guestId = req.signedCookies?.lys_guest_id as string | undefined | false;
+  // cookie-parser returns `false` for a tampered signed cookie — treat the
+  // same as missing and reissue a fresh one.
+  if (!guestId || typeof guestId !== "string" || !/^[0-9a-f-]{36}$/i.test(guestId)) {
+    guestId = randomUUID();
+    res.cookie("lys_guest_id", guestId, {
+      httpOnly: true,
+      signed: true,
+      sameSite: "lax",
+      secure: process.env.REPLIT_DEPLOYMENT === "1",
+      maxAge: 90 * 24 * 60 * 60 * 1000,
+      path: "/",
+    });
+  }
+  req.guestId = guestId as string;
   next();
 });
 

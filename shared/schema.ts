@@ -70,11 +70,20 @@ export const insertLessonGenerationSchema = createInsertSchema(lessonGenerations
 export type InsertLessonGeneration = z.infer<typeof insertLessonGenerationSchema>;
 export type LessonGeneration = typeof lessonGenerations.$inferSelect;
 
-// Guest Lesson Generation Tracking (for unauthenticated users, tracked by IP)
+// Guest Lesson Generation Tracking (for unauthenticated users).
+// Keyed primarily by `guestId` (UUID cookie); `ipAddress` retained as secondary
+// signal for fraud review. `formContext` + `lastLessonContent` carry guest
+// state across the signup handoff; `claimedByUserId` marks rows already
+// adopted by a registered account.
 export const guestLessonGenerations = pgTable("guest_lesson_generations", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  guestId: varchar("guest_id"),
   ipAddress: varchar("ip_address").notNull(),
   topic: text("topic"),
+  formContext: jsonb("form_context"),
+  lastLessonContent: jsonb("last_lesson_content"),
+  claimedByUserId: varchar("claimed_by_user_id"),
+  claimedAt: timestamp("claimed_at"),
   createdAt: timestamp("created_at").defaultNow(),
 });
 

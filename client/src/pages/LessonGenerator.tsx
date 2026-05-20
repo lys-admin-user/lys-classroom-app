@@ -30,6 +30,7 @@ import { educationalResourceProviders, getSearchUrl, type EducationalResourcePro
 import { Link, useLocation, useSearch } from "wouter";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { GuestSignupModal } from "@/components/GuestSignupModal";
 
 const defaultGradeLevels = [
   "Elementary (K-2)",
@@ -120,8 +121,14 @@ export default function LessonGenerator() {
   const [selectedResourceCategory, setSelectedResourceCategory] = useState<"all" | "oer" | "government" | "video" | "interactive" | "textbooks">("all");
   const [myLessonsOpen, setMyLessonsOpen] = useState(false);
 
+  // Guest signup modal — opened either proactively from the inline soft
+  // paywall card or reactively when the server returns requiresSignup.
+  const [guestModalOpen, setGuestModalOpen] = useState(false);
+  const [guestModalHardWall, setGuestModalHardWall] = useState(false);
+
   const search = useSearch();
   const viewLessonId = new URLSearchParams(search).get("view");
+  const shouldRestoreGuestState = new URLSearchParams(search).has("restore");
 
   const { data: viewLessonData, isLoading: viewLessonLoading } = useQuery<Lesson>({
     queryKey: ["/api/lessons", viewLessonId],
@@ -179,7 +186,54 @@ export default function LessonGenerator() {
   const educatorProfile = profileData?.profile;
   const hasProfile = !!educatorProfile && !!educatorProfile.country && !!educatorProfile.state;
 
+  // Post-signup rehydration. When a guest signs up via the GuestSignupModal
+  // we redirect back here with ?restore=1; once auth is settled, claim the
+  // handoff row so the form values + last generated lesson are restored and
+  // the user lands exactly where they left off.
   useEffect(() => {
+    if (!shouldRestoreGuestState || !isAuthenticated) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await apiRequest("POST", "/api/guest/claim", {});
+        const data = await res.json();
+        if (cancelled || !data?.claimed) return;
+        const fc = data.formContext || {};
+        if (fc.topic) setTopic(fc.topic);
+        if (fc.selectedCountry) setSelectedCountry(fc.selectedCountry);
+        if (fc.selectedState) setSelectedState(fc.selectedState);
+        if (fc.selectedSubject) setSelectedSubject(fc.selectedSubject);
+        if (fc.gradeLevel) setGradeLevel(fc.gradeLevel);
+        if (fc.bkdFocus) setBkdFocus(fc.bkdFocus);
+        if (fc.duration) setDuration(fc.duration);
+        if (fc.unit) setUnit(fc.unit);
+        if (fc.lessonPart) setLessonPart(fc.lessonPart);
+        if (data.lastLessonContent) {
+          setGeneratedLesson(data.lastLessonContent as LessonPlan);
+          if (data.savedLessonId) {
+            setIsSaved(true);
+            setSavedLessonId(data.savedLessonId);
+            queryClient.invalidateQueries({ queryKey: ["/api/lessons"] });
+          }
+        }
+        toast({
+          title: "Welcome back!",
+          description: data.lastLessonContent
+            ? "Your lesson is saved to your library. Pick up where you left off."
+            : "We restored your form. Generate when you're ready.",
+        });
+        // Drop the ?restore=1 marker so a manual refresh doesn't re-trigger.
+        setLocation("/lesson-generator", { replace: true });
+      } catch {
+        /* claim is best-effort */
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [shouldRestoreGuestState, isAuthenticated]);
+
+  useEffect(() => {
+    // Don't overwrite values we just restored from a guest handoff.
+    if (shouldRestoreGuestState) return;
     if (educatorProfile && !profileApplied) {
       if (educatorProfile.country) setSelectedCountry(resolveCountryName(educatorProfile.country));
       if (educatorProfile.state) setSelectedState(educatorProfile.state);
@@ -352,14 +406,14 @@ export default function LessonGenerator() {
       setLessonStreamFallbackSource(null);
       setLessonStreamFallbackWarning(null);
 
-      if (!isAuthenticated) {
-        // Guest path stays on the legacy non-streaming endpoint (no SSE for guests).
-        const response = await apiRequest("POST", "/api/lessons/generate-guest", body);
-        return await response.json() as LessonPlan;
-      }
+      // Both guests and authed users get the same streaming countdown UX;
+      // the endpoint differs but the envelope is identical.
+      const endpoint = isAuthenticated
+        ? "/api/lessons/generate-stream"
+        : "/api/lessons/generate-guest-stream";
 
-      const result = await streamGeneration<LessonPlan & { fallbackSource?: "cache" | "exemplar"; warning?: string }>(
-        "/api/lessons/generate-stream",
+      const result = await streamGeneration<LessonPlan & { fallbackSource?: "cache" | "exemplar"; warning?: string; guestUsage?: { used: number; limit: number; remaining: number } }>(
+        endpoint,
         body,
         (evt) => {
           if (evt.type === "phase") setLessonStreamPhase(evt.data as GenerationPhase);
@@ -400,11 +454,10 @@ export default function LessonGenerator() {
     },
     onError: (error: any) => {
       if (error?.requiresSignup) {
-        toast({
-          title: "Free Lessons Used",
-          description: "Create a free account to continue generating lessons and save your work!",
-          variant: "destructive",
-        });
+        // Server confirmed the guest is out of free lessons. Open the
+        // signup modal with form values + last lesson preserved.
+        setGuestModalHardWall(true);
+        setGuestModalOpen(true);
       } else if (error?.requiredTier) {
         toast({
           title: "Monthly Limit Reached",
@@ -534,13 +587,11 @@ export default function LessonGenerator() {
   });
 
   const handleGenerate = () => {
-    if (!isAuthenticated) {
-      toast({
-        title: "Sign In Required",
-        description: "Please sign in to generate lessons.",
-        variant: "destructive",
-      });
-      setLocation("/api/login");
+    // Guests with quota left run through the same flow as authed users.
+    // Out-of-quota guests open the signup modal with state preserved.
+    if (!isAuthenticated && guestUsageData && guestUsageData.remaining <= 0) {
+      setGuestModalHardWall(true);
+      setGuestModalOpen(true);
       return;
     }
     if (!topic || !gradeLevel) {
@@ -1128,27 +1179,61 @@ ${addedResources.length > 0 ? addedResources.map(r => `- ${r.title}: ${r.url}`).
                   </div>
                 )}
 
-                {!isAuthenticated && guestUsageData && (
-                  <div className="flex items-center justify-between p-3 bg-muted rounded-md">
-                    <div className="flex items-center gap-2">
-                      <Sparkles className="h-4 w-4 text-lys-yellow" />
-                      <span className="text-sm font-roboto">
-                        {guestUsageData.remaining === 0 
-                          ? "Free lessons used" 
-                          : `${guestUsageData.remaining} of ${guestUsageData.limit} free lessons remaining`}
-                      </span>
-                    </div>
-                    <Link href="/api/login">
-                      <Button size="sm" variant="default" data-testid="button-signup-guest">
-                        {guestUsageData.remaining === 0 ? "Sign Up Free" : "Sign In"}
+                {!isAuthenticated && guestUsageData && (() => {
+                  const remaining = guestUsageData.remaining;
+                  const isWall = remaining <= 0;
+                  const isSoftPaywall = remaining > 0 && remaining <= 2;
+                  return (
+                    <div
+                      className={`flex items-center justify-between p-3 rounded-md ${
+                        isWall
+                          ? "bg-lys-red/10 border border-lys-red/30"
+                          : isSoftPaywall
+                          ? "bg-lys-yellow/10 border border-lys-yellow/30"
+                          : "bg-muted"
+                      }`}
+                      data-testid="banner-guest-usage"
+                    >
+                      <div className="flex items-center gap-2">
+                        <Sparkles
+                          className={`h-4 w-4 ${
+                            isWall ? "text-lys-red" : isSoftPaywall ? "text-lys-yellow" : "text-lys-yellow"
+                          }`}
+                        />
+                        <div className="flex flex-col">
+                          <span className="text-sm font-roboto" data-testid="text-guest-usage-remaining">
+                            {isWall
+                              ? "You've used all 5 free lessons"
+                              : remaining === 1
+                              ? "1 free lesson left"
+                              : `${remaining} of ${guestUsageData.limit} free lessons remaining`}
+                          </span>
+                          {isSoftPaywall && (
+                            <span className="text-xs font-roboto text-muted-foreground">
+                              Sign up free to keep going + save your work
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                      <Button
+                        size="sm"
+                        variant="default"
+                        onClick={() => {
+                          setGuestModalHardWall(isWall);
+                          setGuestModalOpen(true);
+                        }}
+                        className={isWall ? "bg-lys-red hover:bg-lys-red/90 text-white" : ""}
+                        data-testid="button-signup-guest"
+                      >
+                        {isWall ? "Sign Up Free" : "Sign Up"}
                       </Button>
-                    </Link>
-                  </div>
-                )}
+                    </div>
+                  );
+                })()}
 
                 <Button
                   onClick={handleGenerate}
-                  disabled={generateMutation.isPending || (isAuthenticated && usageData && usageData.remaining === 0) || (!isAuthenticated && guestUsageData && guestUsageData.remaining === 0)}
+                  disabled={generateMutation.isPending || (isAuthenticated && usageData && usageData.remaining === 0)}
                   className="w-full bg-lys-red hover:bg-lys-red/90 text-white font-oswald text-lg h-12 gap-2"
                   data-testid="button-generate-lesson"
                 >
@@ -2250,6 +2335,24 @@ ${addedResources.length > 0 ? addedResources.map(r => `- ${r.title}: ${r.url}`).
           </div>
         )}
       </div>
+
+      <GuestSignupModal
+        open={guestModalOpen}
+        onOpenChange={setGuestModalOpen}
+        hardWall={guestModalHardWall}
+        formContext={{
+          topic,
+          selectedCountry,
+          selectedState,
+          selectedSubject,
+          gradeLevel,
+          bkdFocus,
+          duration,
+          unit,
+          lessonPart,
+        }}
+        lastLessonContent={generatedLesson}
+      />
     </div>
   );
 }

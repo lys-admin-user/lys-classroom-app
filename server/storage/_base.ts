@@ -364,8 +364,10 @@ export interface IStorage {
   countMonthlyGenerations(userId: string): Promise<number>;
   logLessonGeneration(userId: string, topic?: string): Promise<void>;
   tryReserveLessonGeneration(userId: string, limit: number, topic?: string): Promise<{ success: boolean; currentCount: number }>;
-  countGuestGenerations(ipAddress: string): Promise<number>;
-  tryReserveGuestLessonGeneration(ipAddress: string, limit: number, topic?: string): Promise<{ success: boolean; currentCount: number }>;
+  countGuestGenerations(guestKey: { guestId?: string; ipAddress: string }): Promise<number>;
+  tryReserveGuestLessonGeneration(guestKey: { guestId?: string; ipAddress: string }, limit: number, topic?: string): Promise<{ success: boolean; currentCount: number }>;
+  saveGuestHandoff(guestKey: { guestId?: string; ipAddress: string }, formContext: any, lastLessonContent: any): Promise<void>;
+  claimGuestHandoff(guestId: string, userId: string): Promise<{ formContext: any; lastLessonContent: any } | null>;
   
   // Lesson Templates
   getLessonTemplates(userId: string): Promise<LessonTemplate[]>;

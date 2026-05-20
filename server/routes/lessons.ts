@@ -253,29 +253,38 @@ export function registerLessonsRoutes(app: Express): void {
   });
 
 
-  // Guest Lesson Generation - limited to 5 total per IP for unauthenticated users
+  // Guest Lesson Generation — limited to 5 total per guestId cookie (with
+  // IP fallback). Kept as a non-streaming JSON endpoint for compatibility
+  // with older clients; new code paths use /api/lessons/generate-guest-stream.
+  const GUEST_LESSON_LIMIT = 5;
+  const guestKeyFromReq = (req: any) => ({
+    guestId: req.guestId as string | undefined,
+    ipAddress: (req.ip || req.headers['x-forwarded-for'] || req.connection?.remoteAddress || 'unknown') as string,
+  });
+
   app.post("/api/lessons/generate-guest", async (req: any, res) => {
     try {
       const validated = generateLessonRequestSchema.parse(req.body);
-      const ipAddress = req.ip || req.headers['x-forwarded-for'] || req.connection.remoteAddress || 'unknown';
-      
-      // Check and reserve guest generation (5 total per IP)
-      const { success, currentCount } = await storage.tryReserveGuestLessonGeneration(ipAddress, 5, validated.topic);
+      const { success, currentCount } = await storage.tryReserveGuestLessonGeneration(
+        guestKeyFromReq(req),
+        GUEST_LESSON_LIMIT,
+        validated.topic,
+      );
       if (!success) {
-        res.status(403).json({ 
-          error: "Guest limit reached", 
+        res.status(403).json({
+          error: "Guest limit reached",
           message: "Create a free account to continue generating lessons.",
           guestCount: currentCount,
-          limit: 5,
-          requiresSignup: true
+          limit: GUEST_LESSON_LIMIT,
+          requiresSignup: true,
         });
         return;
       }
-      
+
       const generatedPlan = await generateLessonPlan(validated);
-      res.json({ 
-        ...generatedPlan, 
-        guestUsage: { used: currentCount + 1, limit: 5, remaining: 5 - currentCount - 1 }
+      res.json({
+        ...generatedPlan,
+        guestUsage: { used: currentCount + 1, limit: GUEST_LESSON_LIMIT, remaining: GUEST_LESSON_LIMIT - currentCount - 1 },
       });
     } catch (error) {
       if (error instanceof z.ZodError) {
@@ -288,14 +297,162 @@ export function registerLessonsRoutes(app: Express): void {
   });
 
 
+  // Streaming variant for guests — same SSE phase/delta/done envelope as the
+  // authed endpoint so the GenerationCountdown UI works identically. Quota
+  // check runs before opening the SSE stream so we can return a proper 403
+  // with `requiresSignup: true` instead of half-streaming.
+  app.post("/api/lessons/generate-guest-stream", async (req: any, res) => {
+    let validated: z.infer<typeof generateLessonRequestSchema>;
+    try {
+      validated = generateLessonRequestSchema.parse(req.body);
+    } catch (err) {
+      if (err instanceof z.ZodError) {
+        return res.status(400).json({ error: "Invalid request data", details: err.errors });
+      }
+      return res.status(400).json({ error: "Invalid request" });
+    }
+
+    try {
+      const { success, currentCount } = await storage.tryReserveGuestLessonGeneration(
+        guestKeyFromReq(req),
+        GUEST_LESSON_LIMIT,
+        validated.topic,
+      );
+      if (!success) {
+        return res.status(403).json({
+          error: "Guest limit reached",
+          message: "Create a free account to continue generating lessons.",
+          guestCount: currentCount,
+          limit: GUEST_LESSON_LIMIT,
+          requiresSignup: true,
+        });
+      }
+
+      setupSSE(res);
+      const emit = makeEmitter(res);
+      try {
+        const result = await generateLessonPlanStreaming(validated, emit);
+        emit({
+          type: "done",
+          data: {
+            ...result,
+            guestUsage: {
+              used: currentCount + 1,
+              limit: GUEST_LESSON_LIMIT,
+              remaining: GUEST_LESSON_LIMIT - currentCount - 1,
+            },
+          },
+        });
+      } catch (err: any) {
+        emit({
+          type: "error",
+          data: { message: err?.message || "Generation failed", hint: err?.hint },
+        });
+      } finally {
+        res.end();
+      }
+    } catch (error: any) {
+      console.error("Guest lesson stream setup error:", error);
+      if (!res.headersSent) {
+        res.status(500).json({ error: error?.message || "Failed to start generation" });
+      } else {
+        res.end();
+      }
+    }
+  });
+
+
   // Guest usage check endpoint
   app.get("/api/lessons/guest-usage", async (req: any, res) => {
     try {
-      const ipAddress = req.ip || req.headers['x-forwarded-for'] || req.connection.remoteAddress || 'unknown';
-      const count = await storage.countGuestGenerations(ipAddress);
-      res.json({ used: count, limit: 5, remaining: Math.max(0, 5 - count) });
+      const count = await storage.countGuestGenerations(guestKeyFromReq(req));
+      res.json({ used: count, limit: GUEST_LESSON_LIMIT, remaining: Math.max(0, GUEST_LESSON_LIMIT - count) });
     } catch (error) {
       res.status(500).json({ error: "Failed to check guest usage" });
+    }
+  });
+
+
+  // Stash a guest's in-flight form values + last generated lesson against
+  // their guestId cookie so we can rehydrate after they sign up. Called by
+  // the GuestSignupModal immediately before redirecting to /api/login.
+  app.post("/api/guest/handoff", async (req: any, res) => {
+    try {
+      const { formContext, lastLessonContent } = req.body || {};
+      await storage.saveGuestHandoff(guestKeyFromReq(req), formContext ?? null, lastLessonContent ?? null);
+      res.json({ ok: true });
+    } catch (error) {
+      console.error("Guest handoff error:", error);
+      res.status(500).json({ error: "Failed to save handoff state" });
+    }
+  });
+
+
+  // Called once on the lesson-generator page after a fresh signup. Reads the
+  // guestId cookie, marks all of that guest's rows as claimed by the newly
+  // authenticated user, seeds their EducatorProfile with country/state/subject
+  // (only when those fields aren't already set), drops the saved lesson into
+  // their library as a draft if present, and returns the original form
+  // values for client-side state restoration.
+  app.post("/api/guest/claim", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user?.claims?.sub;
+      const guestId = req.guestId as string | undefined;
+      if (!guestId) return res.json({ claimed: false });
+
+      const claimed = await storage.claimGuestHandoff(guestId, userId);
+      if (!claimed) return res.json({ claimed: false });
+
+      const { formContext, lastLessonContent } = claimed;
+
+      // Seed EducatorProfile non-destructively.
+      try {
+        const existing = await storage.getEducatorProfile(userId);
+        const patch: Record<string, any> = {};
+        if (formContext?.selectedCountry && !existing?.country) patch.country = formContext.selectedCountry;
+        if (formContext?.selectedState && !existing?.state) patch.state = formContext.selectedState;
+        if (formContext?.selectedSubject && !existing?.preferredSubject) patch.preferredSubject = formContext.selectedSubject;
+        if (Object.keys(patch).length > 0) {
+          if (existing) {
+            await storage.updateEducatorProfile(userId, patch);
+          } else {
+            await storage.createEducatorProfile({ userId, ...patch } as any);
+          }
+        }
+      } catch (e) {
+        // Profile seeding is best-effort — don't block claim on it.
+        console.warn("Guest claim: profile seed failed", e);
+      }
+
+      // Drop the last generated lesson into the user's library as a draft.
+      let savedLessonId: string | null = null;
+      if (lastLessonContent && typeof lastLessonContent === "object") {
+        try {
+          const lp = lastLessonContent as any;
+          const saved = await storage.createLesson({
+            userId,
+            title: lp.title || `Lesson: ${lp.topic || "Untitled"}`,
+            topic: lp.topic || formContext?.topic || "Untitled",
+            gradeLevel: lp.gradeLevel || formContext?.gradeLevel || "",
+            bkdFocus: lp.bkdFocus || formContext?.bkdFocus || "be",
+            standards: typeof lp.standards === "string" ? lp.standards : (lp.standards ? JSON.stringify(lp.standards) : ""),
+            duration: lp.duration || formContext?.duration || "45 minutes",
+            objectives: lp.objectives || [],
+            activities: lp.activities || [],
+            materials: lp.materials || [],
+            assessment: lp.assessment || "",
+            reflection: lp.reflection || "",
+          } as any);
+          savedLessonId = (saved as any)?.id ?? null;
+        } catch (e) {
+          console.warn("Guest claim: lesson seed failed", e);
+        }
+      }
+
+      res.json({ claimed: true, formContext, lastLessonContent, savedLessonId });
+    } catch (error) {
+      console.error("Guest claim error:", error);
+      res.status(500).json({ error: "Failed to claim guest state" });
     }
   });
 
