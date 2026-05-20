@@ -395,7 +395,48 @@ export function getStandardsName(country: string, stateAbbr: string): string {
  * The lesson-generator UI and the server-side Zod schema use this to skip
  * the "you must pick specific standard codes" gate; the AI infers outcomes
  * from topic + grade + country context instead.
+ *
+ * @deprecated Use `isCoverageOptionalCountry`. Kept temporarily so any
+ * external callers don't break during the standards-catalog refactor.
  */
 export function hasOnlyGenericFallback(country: string): boolean {
+  return isCoverageOptionalCountry(country);
+}
+
+/**
+ * Single canonical helper for the lesson-generator's "must teacher pick a
+ * standard code?" question. Returns true when the country's curriculum does
+ * NOT expose per-outcome codes — i.e. anything except the US states and
+ * Common Core. The runtime catalog (`server/services/standardsCatalog.ts`)
+ * is the source of truth at the row level via `coverage_mode`; this helper
+ * exists only because Zod schema validation runs without a DB connection.
+ *
+ * If you add a country to CSP with full per-outcome codes, also add it here
+ * so the front-end stops marking the standards-code field as optional.
+ */
+export function isCoverageOptionalCountry(country: string): boolean {
+  if (!country) return false;
   return !CODE_RICH_COUNTRIES.has(country);
+}
+
+/**
+ * Public-facing source classification used by the standards catalog. Maps
+ * the internal `source` column ('csp', 'case', 'manual', 'pdf_import') and
+ * the static-fallback path onto a three-tier badge a teacher can reason
+ * about: official ministry/consortium data, admin-curated entries, or the
+ * starter library when no real source is available yet.
+ */
+export type CatalogSourceTier = "official" | "curated" | "fallback";
+
+export function classifyDbSource(internalSource: string | null | undefined): CatalogSourceTier {
+  switch (internalSource) {
+    case "csp":
+    case "case":
+      return "official";
+    case "manual":
+    case "pdf_import":
+      return "curated";
+    default:
+      return "fallback";
+  }
 }

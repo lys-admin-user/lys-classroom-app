@@ -376,71 +376,16 @@ export function registerOrgRoutes(app: Express): void {
   });
 
 
+  // All four standards-cascade endpoints below delegate to
+  // `server/services/standardsCatalog.ts` — the single source of truth for
+  // the DB → static-file → generic-international fallback. See that module
+  // for the reasoning behind the US-by-name special case and the drift
+  // logging into `standards_fallback_misses`.
+
   app.get("/api/standards/states/:country", async (req, res) => {
     try {
-      const { country } = req.params;
-      const jurisdictions = await storage.getJurisdictions(country);
-      
-      // For US, merge CSP database with fallback standards
-      if (country === 'United States') {
-        // Filter CSP by state NAME to avoid conflicts with organizations
-        const cspStates = jurisdictions.filter(j => US_STATES[j.name] !== undefined);
-        const cspStateNames = new Set(cspStates.map(j => j.name));
-        
-        // Import fallback standards for states not in CSP
-        const { getStates } = await import("@shared/standards");
-        const fallbackStates = getStates(country);
-        
-        // Combine: CSP states + fallback states not already in CSP
-        // Note: jurisdictions with source='manual' should show as 'manual' not 'csp'
-        const result = cspStates.map(j => ({
-          state: j.name,
-          abbreviation: US_STATES[j.name] || j.abbreviation,
-          standardsName: j.standardsName,
-          source: (j.source === 'manual' ? 'manual' : 'csp') as 'csp' | 'manual' | 'fallback',
-        }));
-        
-        // Add fallback states that aren't in CSP
-        for (const fb of fallbackStates) {
-          if (!cspStateNames.has(fb.state)) {
-            result.push({
-              state: fb.state,
-              abbreviation: fb.abbreviation,
-              standardsName: fb.standardsName,
-              source: 'fallback' as const,
-            });
-          }
-        }
-        
-        // Sort alphabetically by state name
-        result.sort((a, b) => a.state.localeCompare(b.state));
-        res.json(result);
-        return;
-      }
-      
-      // Non-US: merge CSP database with the static curriculum file so the
-      // dropdown is never empty in environments where seeding hasn't run.
-      const cspNames = new Set(jurisdictions.map(j => j.name));
-      const result: { state: string; abbreviation: string; standardsName: string; source: 'csp' | 'fallback' }[] = jurisdictions.map(j => ({
-        state: j.name,
-        abbreviation: j.abbreviation,
-        standardsName: j.standardsName,
-        source: 'csp' as const,
-      }));
-      try {
-        const { getStates } = await import("@shared/standards");
-        for (const fb of getStates(country)) {
-          if (!cspNames.has(fb.state)) {
-            result.push({
-              state: fb.state,
-              abbreviation: fb.abbreviation,
-              standardsName: fb.standardsName,
-              source: 'fallback' as const,
-            });
-          }
-        }
-      } catch {}
-      result.sort((a, b) => a.state.localeCompare(b.state));
+      const { listStates } = await import("../services/standardsCatalog");
+      const result = await listStates(req.params.country);
       res.json(result);
     } catch (error) {
       console.error("Get states error:", error);
@@ -449,43 +394,12 @@ export function registerOrgRoutes(app: Express): void {
   });
 
 
-  app.get("/api/standards/subjects/:country/:stateAbbr", async (req, res) => {
+  app.get("/api/standards/subjects/:country/:stateAbbr", async (req: any, res) => {
     try {
-      const { country, stateAbbr } = req.params;
-      
-      // For US, look up by state name instead of abbreviation (database has wrong abbreviations)
-      let jurisdiction;
-      if (country === 'United States') {
-        const stateName = getStateNameFromAbbr(stateAbbr);
-        if (stateName) {
-          const jurisdictions = await storage.getJurisdictions(country);
-          jurisdiction = jurisdictions.find(j => j.name === stateName);
-        }
-      } else {
-        jurisdiction = await storage.getJurisdictionByAbbr(country, stateAbbr);
-      }
-      
-      // Try CSP first if a jurisdiction exists with actual standard sets.
-      const sets = jurisdiction ? await storage.getStandardSets(jurisdiction.id) : [];
-      if (jurisdiction && sets.length > 0) {
-        const subjects = Array.from(new Set(sets.map(s => s.subject)));
-        res.json(subjects.map(subject => ({ subject, source: 'csp' })));
-        return;
-      }
-
-      // Otherwise fall back to the static curriculum file. This covers two cases:
-      //   (a) jurisdiction missing entirely (no DB row), and
-      //   (b) jurisdiction seeded but no standard sets attached — common for
-      //       Nigerian/Philippine/etc. regions where CSP doesn't actually publish
-      //       per-outcome curricula. Without this, those users see an empty
-      //       subjects dropdown and a dead-end UI.
-      const { getSubjects } = await import("@shared/standards");
-      const fallbackSubjects = getSubjects(country, stateAbbr);
-      if (fallbackSubjects.length > 0) {
-        res.json(fallbackSubjects.map(s => ({ subject: s.subject, source: 'fallback' })));
-        return;
-      }
-      res.json([]);
+      const { listSubjects } = await import("../services/standardsCatalog");
+      const userId = req.user?.claims?.sub ?? null;
+      const result = await listSubjects(req.params.country, req.params.stateAbbr, { userId });
+      res.json(result);
     } catch (error) {
       console.error("Get subjects error:", error);
       res.status(500).json({ error: "Failed to get subjects" });
@@ -493,135 +407,34 @@ export function registerOrgRoutes(app: Express): void {
   });
 
 
-  app.get("/api/standards/codes/:country/:stateAbbr/:subject", async (req, res) => {
+  app.get("/api/standards/codes/:country/:stateAbbr/:subject", async (req: any, res) => {
     try {
+      const { listCodes } = await import("../services/standardsCatalog");
       const { country, stateAbbr, subject } = req.params;
-      const gradeLevels = req.query.gradeLevels as string | undefined;
-      const gradeLevelsArray = gradeLevels ? gradeLevels.split(',') : [];
-      
-      // For US, look up by state name instead of abbreviation (database has wrong abbreviations)
-      let jurisdiction;
-      if (country === 'United States') {
-        const stateName = getStateNameFromAbbr(stateAbbr);
-        if (stateName) {
-          const jurisdictions = await storage.getJurisdictions(country);
-          jurisdiction = jurisdictions.find(j => j.name === stateName);
-        }
-      } else {
-        jurisdiction = await storage.getJurisdictionByAbbr(country, stateAbbr);
-      }
-      
-      // If no CSP jurisdiction found OR jurisdiction has no standard sets,
-      // fall through to the static curriculum file (mirrors the subjects route).
-      const sets = jurisdiction ? await storage.getStandardSets(jurisdiction.id) : [];
-      if (!jurisdiction || sets.length === 0) {
-        const { getStandardCodes } = await import("@shared/standards");
-        const fallbackCodes = getStandardCodes(country, stateAbbr, subject);
-        // Always respond — many international curricula intentionally have no
-        // per-outcome codes; the lesson generator handles empty arrays.
-        res.json(fallbackCodes.map(s => ({
-          code: s.code,
-          description: s.description,
-          source: 'fallback',
-        })));
-        return;
-      }
-
-      const subjectSet = sets.find(s => s.subject === subject);
-      if (!subjectSet) {
-        // Try fallback for missing subjects in CSP
-        const { getStandardCodes } = await import("@shared/standards");
-        const fallbackCodes = getStandardCodes(country, stateAbbr, subject);
-        if (fallbackCodes.length > 0) {
-          res.json(fallbackCodes.map(s => ({
-            code: s.code,
-            description: s.description,
-            source: 'fallback',
-          })));
-          return;
-        }
-        res.json([]);
-        return;
-      }
-      
-      // Use grade level filtering if provided
-      const standards = gradeLevelsArray.length > 0
-        ? await storage.getEducationalStandardsByGradeLevels(subjectSet.id, gradeLevelsArray)
-        : await storage.getEducationalStandards(subjectSet.id);
-        
-      res.json(standards.map(s => ({
-        code: s.humanCoding,
-        description: s.statement,
-        gradeLevel: s.gradeLevel,
-        source: 'csp',
-      })));
+      const gradeLevelsParam = req.query.gradeLevels as string | undefined;
+      const gradeLevels = gradeLevelsParam ? gradeLevelsParam.split(',').filter(Boolean) : [];
+      const userId = req.user?.claims?.sub ?? null;
+      const result = await listCodes(country, stateAbbr, subject, { gradeLevels, userId });
+      res.json(result);
     } catch (error) {
       console.error("Get standard codes error:", error);
       res.status(500).json({ error: "Failed to get standard codes" });
     }
   });
 
-  
   // Get standards filtered by user's saved grade preferences
   app.get("/api/standards/my-codes/:country/:stateAbbr/:subject", isAuthenticated, async (req: any, res) => {
     try {
+      const { listCodes } = await import("../services/standardsCatalog");
       const { country, stateAbbr, subject } = req.params;
       const userId = req.user?.claims?.sub;
-      
-      // Get user preferences to find their grade levels
       const prefs = await storage.getUserPreferences(userId);
-      const gradeLevels = prefs?.gradeBands || prefs?.gradeLevels || [];
-      
-      // For US, look up by state name instead of abbreviation
-      let jurisdiction;
-      if (country === 'United States') {
-        const stateName = getStateNameFromAbbr(stateAbbr);
-        if (stateName) {
-          const jurisdictions = await storage.getJurisdictions(country);
-          jurisdiction = jurisdictions.find(j => j.name === stateName);
-        }
-      } else {
-        jurisdiction = await storage.getJurisdictionByAbbr(country, stateAbbr);
-      }
-      
-      if (!jurisdiction) {
-        const { getStandardCodes } = await import("@shared/standards");
-        const fallbackCodes = getStandardCodes(country, stateAbbr, subject);
-        res.json(fallbackCodes.map(s => ({
-          code: s.code,
-          description: s.description,
-          source: 'fallback',
-        })));
-        return;
-      }
-      
-      const sets = await storage.getStandardSets(jurisdiction.id);
-      const subjectSet = sets.find(s => s.subject === subject);
-      if (!subjectSet) {
-        const { getStandardCodes } = await import("@shared/standards");
-        const fallbackCodes = getStandardCodes(country, stateAbbr, subject);
-        res.json(fallbackCodes.map(s => ({
-          code: s.code,
-          description: s.description,
-          source: 'fallback',
-        })));
-        return;
-      }
-      
-      // Filter by user's grade preferences
-      const standards = (gradeLevels as string[]).length > 0
-        ? await storage.getEducationalStandardsByGradeLevels(subjectSet.id, gradeLevels as string[])
-        : await storage.getEducationalStandards(subjectSet.id);
-        
+      const gradeLevels = (prefs?.gradeBands || prefs?.gradeLevels || []) as string[];
+      const standards = await listCodes(country, stateAbbr, subject, { gradeLevels, userId });
       res.json({
-        standards: standards.map(s => ({
-          code: s.humanCoding,
-          description: s.statement,
-          gradeLevel: s.gradeLevel,
-          source: 'csp',
-        })),
+        standards,
         userGradeLevels: gradeLevels,
-        filteredByGrade: (gradeLevels as string[]).length > 0,
+        filteredByGrade: gradeLevels.length > 0,
       });
     } catch (error) {
       console.error("Get my standard codes error:", error);

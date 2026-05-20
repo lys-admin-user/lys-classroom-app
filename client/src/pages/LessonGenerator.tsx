@@ -44,7 +44,20 @@ const durations = ["30 minutes", "45 minutes", "60 minutes", "90 minutes", "1-2 
 
 export default function LessonGenerator() {
   const { toast } = useToast();
-  const { isAuthenticated } = useAuth();
+  const { isAuthenticated, user } = useAuth();
+  // Locked product decision (May 2026): source-tier badges on individual
+  // standard codes are visible to solo educators (so they can judge whether
+  // they're picking ministry-official codes or starter/curated entries),
+  // but HIDDEN from campus/district/site/system admins — those users live
+  // in a managed environment where ingestion is admin-driven and the badge
+  // adds noise rather than signal. Toggled by user role only; no per-org
+  // override yet (Track B will add a per-tenant flag).
+  const showStandardSources = !(
+    user?.role === "campus_admin" ||
+    user?.role === "district_admin" ||
+    user?.role === "site_admin" ||
+    user?.role === "system_admin"
+  );
   const { showAds, requiresScopeSequence, tier } = useTier();
   const { canStartTrial } = useTrial();
   const [, setLocation] = useLocation();
@@ -263,7 +276,7 @@ export default function LessonGenerator() {
   });
   const subjects = subjectsData || [];
 
-  const { data: standardCodesData } = useQuery<StandardCode[]>({
+  const { data: standardCodesData } = useQuery<(StandardCode & { source?: "official" | "curated" | "fallback"; sourceUrl?: string | null })[]>({
     queryKey: ["/api/standards/codes", selectedCountry, selectedState, selectedSubject],
     enabled: !!selectedCountry && !!selectedState && !!selectedSubject,
   });
@@ -956,6 +969,32 @@ ${addedResources.length > 0 ? addedResources.map(r => `- ${r.title}: ${r.url}`).
                               <label htmlFor={code.code} className="font-roboto text-sm cursor-pointer leading-relaxed flex-1">
                                 <span className="font-semibold text-lys-teal">{code.code}</span>
                                 <span className="text-muted-foreground ml-2">{code.description}</span>
+                                {showStandardSources && (code as any).source && (
+                                  <Badge
+                                    variant="outline"
+                                    className={`ml-2 text-[10px] font-roboto align-middle ${
+                                      (code as any).source === "official"
+                                        ? "border-lys-teal/40 text-lys-teal"
+                                        : (code as any).source === "curated"
+                                        ? "border-lys-yellow/50 text-lys-yellow"
+                                        : "border-muted-foreground/30 text-muted-foreground"
+                                    }`}
+                                    title={
+                                      (code as any).source === "official"
+                                        ? "Official ministry / standards-consortium source"
+                                        : (code as any).source === "curated"
+                                        ? "Admin-curated entry — not yet verified against an official ministry feed"
+                                        : "Starter library — used when no official source is available yet"
+                                    }
+                                    data-testid={`badge-source-${code.code}`}
+                                  >
+                                    {(code as any).source === "official"
+                                      ? "official"
+                                      : (code as any).source === "curated"
+                                      ? "curated"
+                                      : "starter"}
+                                  </Badge>
+                                )}
                               </label>
                             </div>
                           ))}

@@ -193,20 +193,108 @@ export async function addSource(input: {
 
 // -------------------- Sync pipeline --------------------
 
-const EXTRACTION_PROMPT = `You are an expert curriculum analyst. Given a country's official
-curriculum reference (URL + description), produce a representative sample
-of real, verifiable learning standards for that curriculum.
+// The previous version of this prompt asked the model to "produce" standards
+// given only a URL and a description, which is a hallucination-bait prompt:
+// the model wasn't shown the source page, so every "standard" was effectively
+// generated from training data with no provenance check. Now we ALWAYS fetch
+// the source page first, hand the model the actual text, and then enforce a
+// verbatim string-presence check on each returned code + description before
+// any row reaches the admin review queue. AI proposals stay AI proposals —
+// the admin still approves each row individually.
+const EXTRACTION_PROMPT = `You are an expert curriculum analyst. Given the
+fetched text of a country's official curriculum source page, EXTRACT learning
+standards that appear verbatim in the provided text.
 
 Rules:
 - Output ONLY JSON: { "standards": [...] }.
 - Each standard: { code, description, subject, gradeLevel, strand?, confidence }.
-- "code" must be the official code as published by that ministry.
-- "description" must be the actual statement of the standard.
+- "code" MUST appear verbatim in the provided text. If you cannot find an
+  exact code string, omit that standard entirely.
+- "description" MUST be quoted directly from the provided text (the first
+  40+ characters of the description will be string-matched against the
+  source text — paraphrased entries will be rejected).
 - "confidence" is 0-100 — your certainty that this exact standard exists in
-  the source. Mark anything you're inferring at <60.
-- Cover at least Mathematics, English/Language Arts, and Science across
-  primary and secondary grades. Aim for 30-80 standards per run.
-- DO NOT fabricate. If you don't know a real code, omit that standard.`;
+  the source as written. Below 60 will be hidden from default admin views.
+- Prefer fewer, higher-confidence standards over more, speculative ones.
+- DO NOT invent codes. DO NOT fabricate descriptions. DO NOT use prior
+  knowledge from outside the provided text.`;
+
+// Lightweight HTML → text. Good enough for verbatim string presence checks
+// — we don't need perfect rendering, just the original code/description
+// strings so the verifier can prove they came from the page rather than the
+// model's training data.
+function htmlToText(html: string): string {
+  return html
+    .replace(/<script[\s\S]*?<\/script>/gi, " ")
+    .replace(/<style[\s\S]*?<\/style>/gi, " ")
+    .replace(/<[^>]+>/g, " ")
+    .replace(/&nbsp;/g, " ")
+    .replace(/&amp;/g, "&")
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+const MAX_SOURCE_CHARS = 50_000;
+const FETCH_TIMEOUT_MS = 20_000;
+
+async function fetchSourceText(url: string): Promise<string> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
+  try {
+    const resp = await fetch(url, {
+      signal: controller.signal,
+      headers: { "User-Agent": "LYS-Standards-Ingestion/1.0 (educational)" },
+    });
+    if (!resp.ok) throw new Error(`fetch ${resp.status} ${resp.statusText}`);
+    const ctype = resp.headers.get("content-type") || "";
+    if (!ctype.includes("html") && !ctype.includes("text") && !ctype.includes("xml")) {
+      // PDFs and other binaries require a different extraction pipeline that
+      // we haven't built yet — fail loud rather than feeding garbage to the
+      // model. Admin can register a different source URL or add the rows
+      // manually.
+      throw new Error(`unsupported content-type for verbatim extraction: ${ctype}`);
+    }
+    const raw = await resp.text();
+    const text = htmlToText(raw);
+    return text.slice(0, MAX_SOURCE_CHARS);
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+/**
+ * Drop any AI-suggested standard whose code or first 40 chars of description
+ * doesn't appear (case-insensitively) in the fetched source text. This is
+ * the core anti-hallucination guard: even if the model invents a plausible
+ * code, it has to actually be on the page we fetched, or we reject it.
+ *
+ * Note we don't lowercase the whole source on each call — instead we lowercase
+ * once and let the V8 short-string search handle the per-item check.
+ */
+function filterVerbatimItems<T extends { code?: string | null; description?: string | null }>(
+  items: T[],
+  sourceText: string,
+): { kept: T[]; rejected: number } {
+  const haystack = sourceText.toLowerCase();
+  const kept: T[] = [];
+  let rejected = 0;
+  for (const item of items) {
+    const code = (item.code || "").trim().toLowerCase();
+    const descSnippet = (item.description || "").trim().slice(0, 40).toLowerCase();
+    const codeOk = code.length > 0 && haystack.includes(code);
+    const descOk = descSnippet.length >= 20 && haystack.includes(descSnippet);
+    if (codeOk && descOk) {
+      kept.push(item);
+    } else {
+      rejected += 1;
+    }
+  }
+  return { kept, rejected };
+}
 
 export async function runSyncForSource(
   source: StandardsSourceRegistry,
@@ -229,6 +317,18 @@ export async function runSyncForSource(
 
   try {
     if (!openai) throw new Error("OpenAI not configured");
+
+    // Step 1: actually fetch the source page so we have ground truth to
+    // verify AI output against. No verbatim source text = no extraction.
+    const sourceText = await fetchSourceText(source.sourceUrl);
+    if (sourceText.length < 200) {
+      throw new Error(`source text too short for extraction (${sourceText.length} chars)`);
+    }
+
+    // Step 2: ask the model to extract standards that literally appear in
+    // the fetched text. Output is treated as suggestions only — every row
+    // goes through the verbatim guard below before reaching the admin
+    // review queue, and admin still approves each row individually.
     const completion = await openai.chat.completions.create({
       model: "gpt-4o-mini",
       response_format: { type: "json_object" },
@@ -242,8 +342,12 @@ export async function runSyncForSource(
             `Source: ${source.sourceName}`,
             `URL: ${source.sourceUrl}`,
             source.notes ? `Notes: ${source.notes}` : null,
+            "",
+            "--- BEGIN SOURCE TEXT ---",
+            sourceText,
+            "--- END SOURCE TEXT ---",
           ]
-            .filter(Boolean)
+            .filter((v) => v !== null)
             .join("\n"),
         },
       ],
@@ -261,9 +365,14 @@ export async function runSyncForSource(
         confidence?: number;
       }>;
     };
-    const items = (parsed.standards || []).filter(
+    const candidates = (parsed.standards || []).filter(
       (s) => s && typeof s.description === "string" && s.description.length > 5,
     );
+
+    // Step 3: verbatim guard — drop anything the model couldn't actually
+    // ground in the fetched text. This is the deterministic check that
+    // turns the autonomous-extractor risk into an admin-suggestion flow.
+    const { kept: items, rejected: verbatimRejected } = filterVerbatimItems(candidates, sourceText);
 
     if (items.length > 0) {
       await db.insert(pendingPublicStandards).values(
@@ -291,6 +400,7 @@ export async function runSyncForSource(
         status: "completed",
         sourcesSucceeded: 1,
         pendingCreated: items.length,
+        verbatimRejected,
         completedAt: new Date(),
       })
       .where(eq(publicStandardsSyncRuns.id, run.id));
@@ -300,7 +410,7 @@ export async function runSyncForSource(
       .set({ lastSyncedAt: new Date(), lastSyncStatus: "ok" })
       .where(eq(standardsSourceRegistry.id, source.id));
 
-    return { ...run, status: "completed", sourcesSucceeded: 1, pendingCreated: items.length };
+    return { ...run, status: "completed", sourcesSucceeded: 1, pendingCreated: items.length, verbatimRejected };
   } catch (err: any) {
     const msg = err?.message || String(err);
     await db
@@ -482,33 +592,169 @@ export async function rejectPendingStandards(
   return { rejected: ids.length };
 }
 
-// -------------------- Annual sweep scheduler --------------------
+// -------------------- Annual cleanup scheduler --------------------
+//
+// Locked product decision (Track A, May 2026): the annual cleanup runs once
+// a year on July 1 (between US academic years, after most ministries
+// publish updates). The scheduler ticks daily and the body short-circuits
+// unless (a) today is July 1 in UTC AND (b) we haven't already run this
+// year's cleanup. Manual re-runs are still possible via the admin endpoint
+// that calls `runAnnualCleanup` directly.
+//
+// What the cleanup does:
+//   1. Sweep due sources (lastSyncedAt > ~300d ago) through `runSyncForSource`
+//      — this still emits admin-review pending rows; nothing auto-publishes.
+//   2. Backfill `coverage_mode` on any jurisdiction still on the column
+//      default, so the lesson generator can route teachers correctly.
+//   3. Aggregate the last 12 months of `standards_fallback_misses` so the
+//      admin dashboard can show "countries with most unmet teacher demand".
 
 let sweepIntervalHandle: NodeJS.Timeout | null = null;
-const ANNUAL_MS = 365 * 24 * 60 * 60 * 1000;
+const DAY_MS = 24 * 60 * 60 * 1000;
+const SOURCE_DUE_MS = 300 * DAY_MS; // ~10 months — gives mid-year ad-hoc syncs room
+
+export interface AnnualCleanupResult {
+  ranAt: string;
+  sourcesAttempted: number;
+  sourcesSucceeded: number;
+  pendingCreated: number;
+  verbatimRejected: number;
+  jurisdictionsBackfilled: number;
+  fallbackMissCount: number;
+  skipped?: "already_ran_this_year";
+}
+
+// DB-backed year lock. We use a sentinel row in `public_standards_sync_runs`
+// (triggerType "annual_cleanup_marker") instead of an in-memory flag so
+// restarts and any future multi-instance deployment can't double-trigger
+// the cleanup in the same year.
+async function hasCleanupRunThisYear(year: number): Promise<boolean> {
+  const yearStart = new Date(Date.UTC(year, 0, 1));
+  const [existing] = await db
+    .select({ id: publicStandardsSyncRuns.id })
+    .from(publicStandardsSyncRuns)
+    .where(
+      and(
+        eq(publicStandardsSyncRuns.triggerType, "annual_cleanup_marker"),
+        sql`${publicStandardsSyncRuns.startedAt} >= ${yearStart}`,
+      ),
+    )
+    .limit(1);
+  return !!existing;
+}
+
+async function insertCleanupMarker(triggeredByUserId: string): Promise<void> {
+  await db.insert(publicStandardsSyncRuns).values({
+    triggerType: "annual_cleanup_marker",
+    triggeredByUserId,
+    status: "completed",
+    sourcesAttempted: 0,
+    sourcesSucceeded: 0,
+    pendingCreated: 0,
+    completedAt: new Date(),
+  });
+}
+
+export async function runAnnualCleanup(
+  triggeredByUserId: string,
+  opts: { enforceYearLock?: boolean } = {},
+): Promise<AnnualCleanupResult> {
+  // Lazy-imported to avoid an import cycle between this service and the
+  // catalog (catalog imports from `../routes/_helpers`, which transitively
+  // pulls in route files that import this service).
+  const { backfillCoverageModes } = await import("./standardsCatalog");
+  const { standardsFallbackMisses } = await import("@shared/schema");
+
+  const year = new Date().getUTCFullYear();
+  if (opts.enforceYearLock && (await hasCleanupRunThisYear(year))) {
+    return {
+      ranAt: new Date().toISOString(),
+      sourcesAttempted: 0,
+      sourcesSucceeded: 0,
+      pendingCreated: 0,
+      verbatimRejected: 0,
+      jurisdictionsBackfilled: 0,
+      fallbackMissCount: 0,
+      skipped: "already_ran_this_year",
+    };
+  }
+
+  // Drop the marker BEFORE doing the work so a crash mid-cleanup can't cause
+  // an infinite retry loop. Subsequent ticks will see the marker and skip.
+  await insertCleanupMarker(triggeredByUserId);
+
+  const sources = await db
+    .select()
+    .from(standardsSourceRegistry)
+    .where(eq(standardsSourceRegistry.isActive, true));
+  const now = Date.now();
+  const due = sources.filter(
+    (s) => !s.lastSyncedAt || now - new Date(s.lastSyncedAt).getTime() > SOURCE_DUE_MS,
+  );
+
+  let succeeded = 0;
+  let pendingCreated = 0;
+  let verbatimRejected = 0;
+  for (const s of due) {
+    const run = await runSyncForSource(s, triggeredByUserId, "annual_sweep");
+    if (run.status === "completed") {
+      succeeded += 1;
+      pendingCreated += run.pendingCreated || 0;
+      verbatimRejected += (run as any).verbatimRejected || 0;
+    }
+  }
+
+  const { updated: jurisdictionsBackfilled } = await backfillCoverageModes();
+
+  const since = new Date(Date.now() - 365 * DAY_MS);
+  const [{ count: fallbackMissCount = 0 } = { count: 0 }] = await db
+    .select({ count: sql<number>`count(*)::int` })
+    .from(standardsFallbackMisses)
+    .where(sql`${standardsFallbackMisses.createdAt} >= ${since}`);
+
+  return {
+    ranAt: new Date().toISOString(),
+    sourcesAttempted: due.length,
+    sourcesSucceeded: succeeded,
+    pendingCreated,
+    verbatimRejected,
+    jurisdictionsBackfilled,
+    fallbackMissCount: Number(fallbackMissCount) || 0,
+  };
+}
+
+// Runs the cleanup if (a) today is on or after July 1 UTC, and (b) the
+// year-lock sentinel for the current year is absent. The "on or after"
+// (rather than "exactly on") condition is what keeps a server that starts
+// up on July 3 from missing the entire year. Safe to call from both the
+// daily tick AND from process startup.
+async function tickAnnualCleanup(): Promise<void> {
+  const today = new Date();
+  const onOrAfterJuly1 =
+    today.getUTCMonth() > 6 ||
+    (today.getUTCMonth() === 6 && today.getUTCDate() >= 1);
+  if (!onOrAfterJuly1) return;
+  const year = today.getUTCFullYear();
+  if (await hasCleanupRunThisYear(year)) return;
+  console.log(`[publicStandardsIngestion] July ${year} annual cleanup starting`);
+  const result = await runAnnualCleanup("system_annual_sweep", { enforceYearLock: true });
+  console.log(`[publicStandardsIngestion] annual cleanup complete:`, result);
+}
 
 export function startAnnualSweepScheduler(): void {
   if (sweepIntervalHandle) return;
-  // Schedule once per day; the sweep itself only runs sources whose
-  // lastSyncedAt is older than ~365 days.
-  const DAY_MS = 24 * 60 * 60 * 1000;
-  sweepIntervalHandle = setInterval(async () => {
-    try {
-      const sources = await db
-        .select()
-        .from(standardsSourceRegistry)
-        .where(eq(standardsSourceRegistry.isActive, true));
-      const now = Date.now();
-      const due = sources.filter(
-        (s) => !s.lastSyncedAt || now - new Date(s.lastSyncedAt).getTime() > ANNUAL_MS,
-      );
-      if (due.length === 0) return;
-      console.log(`[publicStandardsIngestion] annual sweep: ${due.length} sources due`);
-      for (const s of due) {
-        await runSyncForSource(s, "system_annual_sweep", "annual_sweep");
-      }
-    } catch (err) {
-      console.error("[publicStandardsIngestion] sweep error:", err);
-    }
+  // Immediate startup check — covers the case where the process starts up
+  // after July 1 has already passed and the cleanup hasn't run this year.
+  // Without this, a freshly-deployed server in July/August would otherwise
+  // wait until next July to do anything.
+  setTimeout(() => {
+    tickAnnualCleanup().catch((err) =>
+      console.error("[publicStandardsIngestion] startup tick error:", err),
+    );
+  }, 30_000); // small delay so DB & other services have settled
+  sweepIntervalHandle = setInterval(() => {
+    tickAnnualCleanup().catch((err) =>
+      console.error("[publicStandardsIngestion] daily tick error:", err),
+    );
   }, DAY_MS);
 }

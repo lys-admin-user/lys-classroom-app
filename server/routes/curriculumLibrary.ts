@@ -521,11 +521,17 @@ export function registerCurriculumLibraryRoutes(app: Express): void {
       if (!SYS_ADMIN_ROLES.has(user.role)) {
         return res.status(403).json({ error: "System admin required" });
       }
-      // Run async — don't make the user wait
-      runAnnualSweep(user.id).catch((err) =>
-        console.error("[publicStandardsIngestion] manual sweep failed:", err),
+      // Run async — don't make the user wait. Route to the new
+      // `runAnnualCleanup` so manual admin sweeps get the same coverage-mode
+      // backfill + fallback-miss aggregation as the July-1 cron, instead of
+      // the bare per-source loop from the old `runAnnualSweep` path.
+      const { runAnnualCleanup } = await import(
+        "../services/publicStandardsIngestion"
       );
-      res.json({ ok: true, message: "Annual sweep started in background" });
+      runAnnualCleanup(user.id).catch((err) =>
+        console.error("[publicStandardsIngestion] manual cleanup failed:", err),
+      );
+      res.json({ ok: true, message: "Annual cleanup started in background" });
     },
   );
 

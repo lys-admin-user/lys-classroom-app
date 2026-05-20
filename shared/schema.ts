@@ -2,8 +2,7 @@ import { sql } from "drizzle-orm";
 import { pgTable, text, varchar, integer, boolean, jsonb, timestamp, real, index, uniqueIndex } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
-import { isAfricanCountry } from "./africaContext";
-import { hasOnlyGenericFallback } from "./standards";
+import { isCoverageOptionalCountry } from "./standards";
 
 // Re-export auth schema (users and sessions tables)
 export * from "./models/auth";
@@ -438,7 +437,7 @@ export const generateLessonRequestSchema = z.object({
   // African + international developing-nation curricula are exempted because
   // most national curricula don't expose a public per-outcome code system —
   // the AI infers outcomes from the country/grade context instead.
-  if (!hasOnlyGenericFallback(data.standards.country) && !isAfricanCountry(data.standards.country) && data.standards.codes.length === 0) {
+  if (!isCoverageOptionalCountry(data.standards.country) && data.standards.codes.length === 0) {
     ctx.addIssue({
       code: z.ZodIssueCode.custom,
       path: ["standards", "codes"],
@@ -907,6 +906,19 @@ export const standardsJurisdictions = pgTable("standards_jurisdictions", {
   standardsName: text("standards_name").notNull(), // e.g., "TEKS", "CCSS"
   source: text("source").notNull(), // "csp", "case", "manual", "pdf_import"
   sourceUrl: text("source_url"),
+  // Coverage model for the lesson generator's runtime cascade:
+  //   "codes_required"  — jurisdiction publishes per-outcome codes that teachers
+  //                        must pick (US states with TEKS/CCSS, Common Core).
+  //   "outcomes_only"   — jurisdiction has a national curriculum but does NOT
+  //                        publish per-outcome codes (most African + developing
+  //                        nation curricula). Teacher picks a theme or types
+  //                        outcomes; AI uses country/grade/subject context.
+  //   "unmapped"        — jurisdiction exists but we have no curriculum data
+  //                        for it yet. Lessons are still generatable but get
+  //                        tagged "no curriculum alignment verified" and the
+  //                        request is logged to standards_fallback_misses for
+  //                        the annual cleanup pass to prioritize.
+  coverageMode: text("coverage_mode").notNull().default("codes_required"),
   lastSyncedAt: timestamp("last_synced_at"),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
@@ -4075,6 +4087,30 @@ export const pendingPublicStandards = pgTable("pending_public_standards", {
 ]);
 export type PendingPublicStandard = typeof pendingPublicStandards.$inferSelect;
 
+// Drift tracker: every time the standards-catalog runtime cascade falls back
+// past the live DB into the static curriculum file (or all the way to the
+// generic international subject list), we log a row here. The annual July 1
+// cleanup pass aggregates the last 12 months and surfaces the top countries
+// in the admin dashboard so ingestion effort can be prioritized by actual
+// teacher demand — not guesswork.
+export const standardsFallbackMisses = pgTable("standards_fallback_misses", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  country: text("country").notNull(),
+  state: text("state"),
+  subject: text("subject"),
+  gradeLevel: text("grade_level"),
+  // "static-curated-v1"   — served from the static curriculum file
+  // "international-generic" — served from the universal last-resort subject list
+  // "no-data"             — nothing in DB or static; user saw an empty result
+  fallbackKind: text("fallback_kind").notNull(),
+  userId: varchar("user_id"), // null for guest traffic
+  createdAt: timestamp("created_at").defaultNow(),
+}, (table) => [
+  index("idx_standards_fb_country").on(table.country, table.state),
+  index("idx_standards_fb_created").on(table.createdAt),
+]);
+export type StandardsFallbackMiss = typeof standardsFallbackMisses.$inferSelect;
+
 // One row per sync run for audit / annual sweep tracking
 export const publicStandardsSyncRuns = pgTable("public_standards_sync_runs", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
@@ -4088,6 +4124,11 @@ export const publicStandardsSyncRuns = pgTable("public_standards_sync_runs", {
   sourcesAttempted: integer("sources_attempted").default(0),
   sourcesSucceeded: integer("sources_succeeded").default(0),
   pendingCreated: integer("pending_created").default(0),
+  // Number of AI-suggested standards that failed the verbatim-in-source
+  // string check and were dropped before reaching the pending review queue.
+  // Surfaced in the admin dashboard so admins can see how much hallucination
+  // pressure each source produces.
+  verbatimRejected: integer("verbatim_rejected").default(0),
   errorMessage: text("error_message"),
   startedAt: timestamp("started_at").defaultNow(),
   completedAt: timestamp("completed_at"),
