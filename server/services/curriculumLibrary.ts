@@ -121,15 +121,49 @@ export async function getUploadPermission(
 export async function createCurriculumDocument(
   data: InsertCurriculumDocument,
   extractedText: string,
+  originalFileBytes?: Buffer,
 ): Promise<CurriculumDocument> {
   const [doc] = await db
     .insert(curriculumDocuments)
     .values({
       ...data,
       extractedText,
+      originalFileBytes: originalFileBytes ?? null,
       extractionStatus: data.docType === "lesson" ? "skipped" : "pending",
     })
     .returning();
+  // Task #6: record the creation event in the moderation audit trail so the
+  // sys-admin viewer can show the original upload alongside later transitions.
+  try {
+    const { writeAuditLog } = await import("./ingestionModeration");
+    await writeAuditLog({
+      entityType: "curriculum_doc",
+      entityId: doc.id,
+      action: "created",
+      actorUserId: data.uploadedByUserId,
+      details: {
+        docType: doc.docType,
+        title: doc.title,
+        uploaderRole: doc.uploaderRole,
+        organizationId: doc.organizationId,
+      },
+    });
+  } catch (err) {
+    console.error("[curriculumLibrary] audit-log create failed:", err);
+  }
+  // Never return the raw bytes to upload clients — moderation viewer uses
+  // a separate authenticated endpoint to fetch them.
+  return stripBytes(doc);
+}
+
+// Strip the raw file blob from general API responses — Task #6 stores
+// originalFileBytes for the moderation viewer but it must NEVER leak
+// through list/detail endpoints (could be up to 20MB per row).
+function stripBytes<T extends { originalFileBytes?: unknown }>(doc: T): T {
+  if (doc && "originalFileBytes" in doc) {
+    const { originalFileBytes: _omit, ...rest } = doc as any;
+    return rest as T;
+  }
   return doc;
 }
 
@@ -140,13 +174,13 @@ export async function getCurriculumDocument(
     .select()
     .from(curriculumDocuments)
     .where(eq(curriculumDocuments.id, id));
-  return doc;
+  return doc ? stripBytes(doc) : doc;
 }
 
 export async function listUserCurriculumDocuments(
   userId: string,
 ): Promise<CurriculumDocument[]> {
-  return await db
+  const rows = await db
     .select()
     .from(curriculumDocuments)
     .where(
@@ -156,13 +190,14 @@ export async function listUserCurriculumDocuments(
       ),
     )
     .orderBy(desc(curriculumDocuments.createdAt));
+  return rows.map(stripBytes);
 }
 
 export async function listOrgCurriculumDocuments(
   organizationIds: string[],
 ): Promise<CurriculumDocument[]> {
   if (organizationIds.length === 0) return [];
-  return await db
+  const rows = await db
     .select()
     .from(curriculumDocuments)
     .where(
@@ -172,6 +207,7 @@ export async function listOrgCurriculumDocuments(
       ),
     )
     .orderBy(desc(curriculumDocuments.createdAt));
+  return rows.map(stripBytes);
 }
 
 export async function deleteCurriculumDocument(
@@ -194,6 +230,18 @@ export async function deleteCurriculumDocument(
     .update(curriculumDocuments)
     .set({ isActive: false, updatedAt: new Date() })
     .where(eq(curriculumDocuments.id, id));
+  try {
+    const { writeAuditLog } = await import("./ingestionModeration");
+    await writeAuditLog({
+      entityType: "curriculum_doc",
+      entityId: id,
+      action: "edited",
+      actorUserId: userId,
+      details: { archived: true },
+    });
+  } catch (err) {
+    console.error("[curriculumLibrary] audit-log delete failed:", err);
+  }
   return true;
 }
 
@@ -224,11 +272,24 @@ export async function updateExtractionStatus(
 export async function attachLinkedLesson(
   id: string,
   lessonId: string,
+  actorUserId?: string,
 ): Promise<void> {
   await db
     .update(curriculumDocuments)
     .set({ linkedLessonId: lessonId, updatedAt: new Date() })
     .where(eq(curriculumDocuments.id, id));
+  try {
+    const { writeAuditLog } = await import("./ingestionModeration");
+    await writeAuditLog({
+      entityType: "curriculum_doc",
+      entityId: id,
+      action: "edited",
+      actorUserId: actorUserId ?? null,
+      details: { linkedLessonId: lessonId },
+    });
+  } catch (err) {
+    console.error("[curriculumLibrary] audit-log attach failed:", err);
+  }
 }
 
 // ----- Org-private extracted standards -----
@@ -315,10 +376,11 @@ export async function getActiveAlignmentDocsForUser(
       )!,
     );
   }
-  const docs = await db
+  const docsRaw = await db
     .select()
     .from(curriculumDocuments)
     .where(and(...conditions));
+  const docs = docsRaw.map(stripBytes);
 
   if (docs.length === 0) return [];
 

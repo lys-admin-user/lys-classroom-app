@@ -9,9 +9,11 @@ import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/use-auth";
-import { Loader2, Globe, RefreshCw, CheckCircle2, XCircle, Plus, Inbox, TrendingDown, History, ExternalLink } from "lucide-react";
+import { Loader2, Globe, RefreshCw, CheckCircle2, XCircle, Plus, Inbox, TrendingDown, History, ExternalLink, ShieldCheck, FileText, ChevronDown, ChevronUp } from "lucide-react";
 
 export default function StandardsIngestionAdmin() {
   const { user } = useAuth();
@@ -26,14 +28,16 @@ export default function StandardsIngestionAdmin() {
         Review customer requests, ingest real public standards from ministry sources, and approve them
         before they go live across LYS.
       </p>
-      <Tabs defaultValue="pending">
+      <Tabs defaultValue="moderation">
         <TabsList>
+          <TabsTrigger value="moderation" data-testid="tab-moderation"><ShieldCheck className="h-4 w-4 mr-1" />Moderation queue</TabsTrigger>
           <TabsTrigger value="pending" data-testid="tab-pending"><Inbox className="h-4 w-4 mr-1" />Pending review</TabsTrigger>
           <TabsTrigger value="requests" data-testid="tab-requests">Customer requests</TabsTrigger>
           <TabsTrigger value="sources" data-testid="tab-sources"><Globe className="h-4 w-4 mr-1" />Sources</TabsTrigger>
           <TabsTrigger value="gaps" data-testid="tab-gaps"><TrendingDown className="h-4 w-4 mr-1" />Coverage gaps</TabsTrigger>
           <TabsTrigger value="runs" data-testid="tab-runs"><History className="h-4 w-4 mr-1" />Sync history</TabsTrigger>
         </TabsList>
+        <TabsContent value="moderation"><ModerationQueue /></TabsContent>
         <TabsContent value="pending"><PendingReview /></TabsContent>
         <TabsContent value="requests"><CustomerRequests /></TabsContent>
         <TabsContent value="sources"><SourcesPanel /></TabsContent>
@@ -324,5 +328,394 @@ function SyncHistory() {
         </Card>
       ))}
     </div>
+  );
+}
+
+// ===== Task #6: Moderation queue =====
+
+type ModerationQueueItem = {
+  kind: "pending_standard" | "curriculum_doc";
+  id: string;
+  createdAt?: string;
+  // pending_standard fields
+  country?: string;
+  state?: string;
+  subject?: string;
+  gradeLevel?: string;
+  code?: string;
+  description?: string;
+  sourceName?: string;
+  sourceUrl?: string;
+  // curriculum_doc fields
+  title?: string;
+  docType?: string;
+  originalFilename?: string;
+  uploaderRole?: string;
+  organizationId?: string;
+  extractionStatus?: string;
+};
+
+function ModerationQueue() {
+  const { toast } = useToast();
+  const [kind, setKind] = useState<"all" | "pending_standard" | "curriculum_doc">("all");
+  const [selected, setSelected] = useState<Set<string>>(new Set()); // composite "kind:id"
+  const [activeItem, setActiveItem] = useState<ModerationQueueItem | null>(null);
+  const [rejectOpen, setRejectOpen] = useState(false);
+  const [rejectReason, setRejectReason] = useState("");
+  const [page, setPage] = useState(0);
+  const PAGE_SIZE = 50;
+
+  const { data, isLoading } = useQuery<{ items: ModerationQueueItem[]; total: number }>({
+    queryKey: ["/api/standards-ingestion/moderation-queue", kind, page],
+    queryFn: async () => {
+      const r = await fetch(
+        `/api/standards-ingestion/moderation-queue?kind=${kind}&limit=${PAGE_SIZE}&offset=${page * PAGE_SIZE}`,
+        { credentials: "include" },
+      );
+      if (!r.ok) throw new Error(await r.text());
+      return r.json();
+    },
+  });
+  const items = data?.items ?? [];
+  const total = data?.total ?? 0;
+  const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
+  const compositeKey = (i: ModerationQueueItem) => `${i.kind}:${i.id}`;
+
+  const invalidate = () => {
+    queryClient.invalidateQueries({ queryKey: ["/api/standards-ingestion/moderation-queue"] });
+    queryClient.invalidateQueries({ queryKey: ["/api/standards-ingestion/pending"] });
+    setSelected(new Set());
+  };
+
+  // Atomic bulk action — sends a single request so the server can run
+  // every change (mixed kinds) in one DB transaction and roll back on any
+  // partial failure.
+  const selectedItems = () =>
+    items.filter((i) => selected.has(compositeKey(i))).map((i) => ({ kind: i.kind, id: i.id }));
+
+  const bulkApprove = useMutation({
+    mutationFn: async () => {
+      await apiRequest("POST", "/api/standards-ingestion/moderation/bulk", {
+        action: "approve",
+        items: selectedItems(),
+      });
+    },
+    onSuccess: () => {
+      invalidate();
+      toast({ title: "Approved", description: `${selected.size} item(s) approved.` });
+    },
+    onError: (err: any) =>
+      toast({ title: "Bulk approve failed", description: err?.message || "Partial failures were rolled back.", variant: "destructive" }),
+  });
+
+  const bulkReject = useMutation({
+    mutationFn: async () => {
+      if (!rejectReason.trim()) throw new Error("Reason is required");
+      await apiRequest("POST", "/api/standards-ingestion/moderation/bulk", {
+        action: "reject",
+        reason: rejectReason,
+        items: selectedItems(),
+      });
+    },
+    onSuccess: () => {
+      invalidate();
+      setRejectOpen(false);
+      setRejectReason("");
+      toast({ title: "Rejected", description: `${selected.size} item(s) rejected.` });
+    },
+    onError: (err: any) =>
+      toast({ title: "Bulk reject failed", description: err?.message || "Partial failures were rolled back.", variant: "destructive" }),
+  });
+
+  const toggle = (k: string) =>
+    setSelected((s) => {
+      const n = new Set(s);
+      n.has(k) ? n.delete(k) : n.add(k);
+      return n;
+    });
+  const toggleAll = (on: boolean) => setSelected(on ? new Set(items.map(compositeKey)) : new Set());
+
+  if (isLoading) return <div className="py-8 text-center text-muted-foreground" data-testid="text-moderation-loading">Loading moderation queue…</div>;
+
+  return (
+    <div className="mt-4 space-y-3">
+      <div className="flex items-center gap-3 flex-wrap">
+        <div className="flex items-center gap-1">
+          <Button size="sm" variant={kind === "all" ? "default" : "outline"} onClick={() => { setKind("all"); setPage(0); }} data-testid="button-filter-all">All</Button>
+          <Button size="sm" variant={kind === "pending_standard" ? "default" : "outline"} onClick={() => { setKind("pending_standard"); setPage(0); }} data-testid="button-filter-standards">Standards</Button>
+          <Button size="sm" variant={kind === "curriculum_doc" ? "default" : "outline"} onClick={() => { setKind("curriculum_doc"); setPage(0); }} data-testid="button-filter-docs">Curriculum docs</Button>
+        </div>
+        <div className="flex-1" />
+        <Checkbox
+          checked={items.length > 0 && selected.size === items.length}
+          onCheckedChange={(c) => toggleAll(!!c)}
+          data-testid="checkbox-mod-select-all"
+        />
+        <span className="text-sm text-muted-foreground" data-testid="text-mod-selected-count">{selected.size} selected · {total} pending total</span>
+        <Button size="sm" disabled={selected.size === 0 || bulkApprove.isPending} onClick={() => bulkApprove.mutate()} data-testid="button-mod-bulk-approve">
+          {bulkApprove.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <CheckCircle2 className="h-4 w-4 mr-1" />}
+          Approve selected
+        </Button>
+        <Button size="sm" variant="outline" disabled={selected.size === 0 || bulkReject.isPending} onClick={() => setRejectOpen(true)} data-testid="button-mod-bulk-reject">
+          <XCircle className="h-4 w-4 mr-1" />Reject…
+        </Button>
+      </div>
+
+      {items.length === 0 ? (
+        <Card><CardContent className="py-12 text-center text-muted-foreground" data-testid="text-no-moderation-items">Nothing pending moderation.</CardContent></Card>
+      ) : (
+        items.map((item) => {
+          const k = compositeKey(item);
+          return (
+            <Card key={k} data-testid={`card-mod-${item.kind}-${item.id}`}>
+              <CardContent className="p-3 flex items-start gap-3">
+                <Checkbox checked={selected.has(k)} onCheckedChange={() => toggle(k)} data-testid={`checkbox-mod-${item.id}`} />
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <Badge variant={item.kind === "pending_standard" ? "default" : "secondary"} data-testid={`badge-mod-kind-${item.id}`}>
+                      {item.kind === "pending_standard" ? "Standard" : "Curriculum doc"}
+                    </Badge>
+                    {item.country && <Badge variant="outline">{item.country}{item.state ? `/${item.state}` : ""}</Badge>}
+                    {item.subject && <Badge variant="secondary">{item.subject}</Badge>}
+                    {item.gradeLevel && <Badge variant="secondary">Grade {item.gradeLevel}</Badge>}
+                    {item.docType && <Badge variant="secondary">{item.docType}</Badge>}
+                    {item.code && <span className="font-mono text-xs text-lys-teal">{item.code}</span>}
+                  </div>
+                  <p className="text-sm mt-1 truncate" data-testid={`text-mod-summary-${item.id}`}>
+                    {item.kind === "pending_standard" ? item.description : item.title}
+                  </p>
+                  <p className="text-xs text-muted-foreground mt-1 truncate">
+                    {item.kind === "pending_standard"
+                      ? `Source: ${item.sourceName || item.sourceUrl || "—"}`
+                      : `File: ${item.originalFilename || "—"} · uploaded by ${item.uploaderRole || "?"}`}
+                  </p>
+                </div>
+                <Button size="sm" variant="outline" onClick={() => setActiveItem(item)} data-testid={`button-mod-view-${item.id}`}>
+                  View
+                </Button>
+              </CardContent>
+            </Card>
+          );
+        })
+      )}
+
+      {total > PAGE_SIZE && (
+        <div className="flex items-center justify-between pt-2" data-testid="pagination-moderation">
+          <span className="text-xs text-muted-foreground">
+            Page {page + 1} of {totalPages} · showing {items.length} of {total}
+          </span>
+          <div className="flex items-center gap-1">
+            <Button size="sm" variant="outline" disabled={page === 0} onClick={() => { setPage((p) => Math.max(0, p - 1)); setSelected(new Set()); }} data-testid="button-page-prev">
+              Previous
+            </Button>
+            <Button size="sm" variant="outline" disabled={page + 1 >= totalPages} onClick={() => { setPage((p) => p + 1); setSelected(new Set()); }} data-testid="button-page-next">
+              Next
+            </Button>
+          </div>
+        </div>
+      )}
+
+      <Dialog open={rejectOpen} onOpenChange={setRejectOpen}>
+        <DialogContent data-testid="dialog-bulk-reject">
+          <DialogHeader>
+            <DialogTitle>Reject {selected.size} item(s)</DialogTitle>
+            <DialogDescription>Provide a single reason that applies to every selected item. This will be saved to the audit log.</DialogDescription>
+          </DialogHeader>
+          <Textarea
+            value={rejectReason}
+            onChange={(e) => setRejectReason(e.target.value)}
+            placeholder="e.g. Source URL no longer resolves — re-run sync first."
+            rows={3}
+            data-testid="textarea-reject-reason"
+          />
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => setRejectOpen(false)} data-testid="button-cancel-reject">Cancel</Button>
+            <Button onClick={() => bulkReject.mutate()} disabled={!rejectReason.trim() || bulkReject.isPending} data-testid="button-confirm-reject">
+              {bulkReject.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <XCircle className="h-4 w-4 mr-1" />}
+              Reject all
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {activeItem && <ModerationViewer item={activeItem} onClose={() => setActiveItem(null)} onActed={invalidate} />}
+    </div>
+  );
+}
+
+function ModerationViewer({ item, onClose, onActed }: { item: ModerationQueueItem; onClose: () => void; onActed: () => void }) {
+  const { toast } = useToast();
+  const scrollKey = `mod-scroll:${item.kind}:${item.id}`;
+  const [auditOpen, setAuditOpen] = useState(true);
+
+  const { data: src } = useQuery<any>({
+    queryKey: ["/api/standards-ingestion/moderation-source", item.kind, item.id],
+    queryFn: async () => {
+      const r = await fetch(`/api/standards-ingestion/moderation-source/${item.kind}/${item.id}`, { credentials: "include" });
+      if (!r.ok) throw new Error(await r.text());
+      return r.json();
+    },
+  });
+  const { data: audit = [] } = useQuery<any[]>({
+    queryKey: ["/api/standards-ingestion/audit-log", item.kind, item.id],
+    queryFn: async () => {
+      const r = await fetch(`/api/standards-ingestion/audit-log/${item.kind}/${item.id}`, { credentials: "include" });
+      if (!r.ok) throw new Error(await r.text());
+      return r.json();
+    },
+  });
+
+  const approve = useMutation({
+    mutationFn: async () => {
+      const path = item.kind === "pending_standard"
+        ? "/api/standards-ingestion/pending/approve"
+        : "/api/standards-ingestion/curriculum-docs/approve";
+      await apiRequest("POST", path, { ids: [item.id] });
+    },
+    onSuccess: () => { toast({ title: "Approved" }); onActed(); onClose(); },
+    onError: (err: any) => toast({ title: "Approve failed", description: err?.message, variant: "destructive" }),
+  });
+  const [reason, setReason] = useState("");
+  const reject = useMutation({
+    mutationFn: async () => {
+      const path = item.kind === "pending_standard"
+        ? "/api/standards-ingestion/pending/reject"
+        : "/api/standards-ingestion/curriculum-docs/reject";
+      await apiRequest("POST", path, { ids: [item.id], reason: reason || (item.kind === "curriculum_doc" ? "Rejected by sys admin" : undefined) });
+    },
+    onSuccess: () => { toast({ title: "Rejected" }); onActed(); onClose(); },
+    onError: (err: any) => toast({ title: "Reject failed", description: err?.message, variant: "destructive" }),
+  });
+
+  // Persist scroll position per item (left/right panes).
+  const onScroll = (side: "l" | "r") => (e: React.UIEvent<HTMLDivElement>) => {
+    try { sessionStorage.setItem(`${scrollKey}:${side}`, String((e.target as HTMLDivElement).scrollTop)); } catch {}
+  };
+  const restoreScroll = (side: "l" | "r") => (el: HTMLDivElement | null) => {
+    if (!el) return;
+    try {
+      const v = sessionStorage.getItem(`${scrollKey}:${side}`);
+      if (v) el.scrollTop = Number(v);
+    } catch {}
+  };
+
+  return (
+    <Dialog open={true} onOpenChange={(o) => !o && onClose()}>
+      <DialogContent className="max-w-6xl w-[95vw] h-[90vh] flex flex-col" data-testid="dialog-moderation-viewer">
+        <DialogHeader>
+          <DialogTitle data-testid="text-viewer-title">
+            {item.kind === "pending_standard" ? "Review pending standard" : "Review curriculum doc"}
+          </DialogTitle>
+          <DialogDescription>
+            Compare the AI-extracted content (left) against the original source (right). Use the audit trail below to see every state transition.
+          </DialogDescription>
+        </DialogHeader>
+
+        <div className="grid grid-cols-2 gap-3 flex-1 min-h-0">
+          <div className="border rounded-md flex flex-col min-h-0" data-testid="pane-extracted">
+            <div className="px-3 py-2 border-b bg-muted text-xs font-semibold flex items-center gap-2">
+              <FileText className="h-3 w-3" />Extracted (AI)
+            </div>
+            <div ref={restoreScroll("l")} onScroll={onScroll("l")} className="overflow-auto p-3 text-sm flex-1">
+              {!src ? <div className="text-muted-foreground">Loading…</div> : (
+                <pre className="whitespace-pre-wrap font-mono text-xs" data-testid="text-extracted-content">
+                  {item.kind === "pending_standard"
+                    ? JSON.stringify(src.extracted, null, 2)
+                    : (src.extracted?.text || "(no extracted text)")}
+                </pre>
+              )}
+            </div>
+          </div>
+          <div className="border rounded-md flex flex-col min-h-0" data-testid="pane-source">
+            <div className="px-3 py-2 border-b bg-muted text-xs font-semibold flex items-center gap-2">
+              <ExternalLink className="h-3 w-3" />Original source
+              {src?.source?.url && (
+                <a href={src.source.url} target="_blank" rel="noreferrer" className="ml-auto text-lys-blue underline truncate max-w-[60%]" data-testid="link-source-url">
+                  {src.source.url}
+                </a>
+              )}
+            </div>
+            <div ref={restoreScroll("r")} onScroll={onScroll("r")} className="flex-1 min-h-0">
+              {!src ? (
+                <div className="p-3 text-muted-foreground">Loading…</div>
+              ) : src.kind === "pending_standard" && src.source?.url ? (
+                // External HTML source — sandboxed (no same-origin, no scripts).
+                <iframe
+                  src={src.source.url}
+                  title="Source document"
+                  sandbox=""
+                  referrerPolicy="no-referrer"
+                  className="w-full h-full border-0"
+                  data-testid="iframe-source-html"
+                />
+              ) : src.kind === "curriculum_doc" && src.source?.fileUrl ? (
+                // Browsers render PDFs natively in iframes; HTML uploads are
+                // sandboxed and served with a strict CSP from the backend.
+                <iframe
+                  src={src.source.fileUrl}
+                  title={src.source.filename || "Original document"}
+                  sandbox={src.source.type === "pdf" ? "allow-scripts allow-same-origin" : ""}
+                  className="w-full h-full border-0"
+                  data-testid={`iframe-source-${src.source.type}`}
+                />
+              ) : src.kind === "curriculum_doc" ? (
+                <div className="p-3 text-sm space-y-2">
+                  <p className="text-muted-foreground">
+                    Original file: <strong className="text-foreground">{src.source?.filename}</strong> ({(src.source?.type || "").toUpperCase()}).
+                    Size: {src.source?.sizeBytes ? `${Math.round(src.source.sizeBytes / 1024)} KB` : "—"}
+                  </p>
+                  <p className="text-xs text-muted-foreground" data-testid="text-no-original">
+                    This file was uploaded before original-file storage was enabled, so only the extracted text is available for comparison.
+                  </p>
+                </div>
+              ) : (
+                <div className="p-3 text-muted-foreground">No source available.</div>
+              )}
+            </div>
+          </div>
+        </div>
+
+        <Collapsible open={auditOpen} onOpenChange={setAuditOpen}>
+          <CollapsibleTrigger asChild>
+            <Button variant="ghost" size="sm" className="w-full justify-between" data-testid="button-toggle-audit">
+              <span className="flex items-center gap-2"><History className="h-4 w-4" />Audit trail ({audit.length})</span>
+              {auditOpen ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+            </Button>
+          </CollapsibleTrigger>
+          <CollapsibleContent className="max-h-40 overflow-auto border rounded-md p-2 mt-1">
+            {audit.length === 0 ? (
+              <p className="text-xs text-muted-foreground text-center py-2" data-testid="text-no-audit">No transitions recorded yet.</p>
+            ) : (
+              <ul className="text-xs space-y-1">
+                {audit.map((a) => (
+                  <li key={a.id} className="flex items-start gap-2" data-testid={`audit-row-${a.id}`}>
+                    <Badge variant="outline" className="text-[10px]">{a.action}</Badge>
+                    <span className="text-muted-foreground">{a.createdAt ? new Date(a.createdAt).toLocaleString() : "—"}</span>
+                    <span>by {a.actorUserId || "system"}</span>
+                    {a.reason && <span className="italic text-muted-foreground">— {a.reason}</span>}
+                  </li>
+                ))}
+              </ul>
+            )}
+          </CollapsibleContent>
+        </Collapsible>
+
+        <DialogFooter className="flex-col sm:flex-row gap-2 items-stretch sm:items-center">
+          <Input
+            placeholder="Reason (required to reject)"
+            value={reason}
+            onChange={(e) => setReason(e.target.value)}
+            className="flex-1"
+            data-testid="input-single-reason"
+          />
+          <Button variant="outline" disabled={(item.kind === "curriculum_doc" && !reason.trim()) || reject.isPending} onClick={() => reject.mutate()} data-testid="button-viewer-reject">
+            {reject.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <XCircle className="h-4 w-4 mr-1" />}Reject
+          </Button>
+          <Button disabled={approve.isPending} onClick={() => approve.mutate()} data-testid="button-viewer-approve">
+            {approve.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <CheckCircle2 className="h-4 w-4 mr-1" />}Approve
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }

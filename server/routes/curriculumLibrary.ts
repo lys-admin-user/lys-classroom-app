@@ -58,12 +58,22 @@ import {
   seedSourceRegistryIfEmpty,
   startAnnualSweepScheduler,
 } from "../services/publicStandardsIngestion";
+import {
+  listModerationQueue,
+  listAuditLog,
+  approveCurriculumDocs,
+  rejectCurriculumDocs,
+  type ModerationEntityType,
+} from "../services/ingestionModeration";
 import { db } from "../db";
-import { eq, sql, desc, and, gte } from "drizzle-orm";
+import { eq, sql, desc, and, gte, inArray } from "drizzle-orm";
 import {
   standardsSourceRegistry,
   standardsFallbackMisses,
   publicStandardsSyncRuns,
+  pendingPublicStandards,
+  curriculumDocuments,
+  ingestionAuditLog,
 } from "@shared/schema";
 
 const upload = multer({
@@ -287,6 +297,7 @@ export function registerCurriculumLibraryRoutes(app: Express): void {
           isActive: true,
         } as any,
         extractedText,
+        req.file.buffer,
       );
 
       // For pre-written lessons, route to the user's My Lessons by creating a
@@ -565,9 +576,15 @@ export function registerCurriculumLibraryRoutes(app: Express): void {
       if (!SYS_ADMIN_ROLES.has(user.role)) {
         return res.status(403).json({ error: "System admin required" });
       }
-      const { ids } = z.object({ ids: z.array(z.string()).min(1) }).parse(req.body);
-      const result = await approvePendingStandards(ids, user.id);
-      res.json(result);
+      const body = z
+        .object({ ids: z.array(z.string()).min(1), reason: z.string().optional() })
+        .parse(req.body);
+      try {
+        const result = await approvePendingStandards(body.ids, user.id, body.reason);
+        res.json(result);
+      } catch (err: any) {
+        res.status(409).json({ error: err.message || "Bulk approve failed" });
+      }
     },
   );
 
@@ -580,9 +597,352 @@ export function registerCurriculumLibraryRoutes(app: Express): void {
       if (!SYS_ADMIN_ROLES.has(user.role)) {
         return res.status(403).json({ error: "System admin required" });
       }
-      const { ids } = z.object({ ids: z.array(z.string()).min(1) }).parse(req.body);
-      const result = await rejectPendingStandards(ids, user.id);
+      const body = z
+        .object({ ids: z.array(z.string()).min(1), reason: z.string().optional() })
+        .parse(req.body);
+      try {
+        const result = await rejectPendingStandards(body.ids, user.id, body.reason);
+        res.json(result);
+      } catch (err: any) {
+        res.status(409).json({ error: err.message || "Bulk reject failed" });
+      }
+    },
+  );
+
+  // ---------- Moderation queue (Task #6) ----------
+  // Merged feed of pending public standards + pending curriculum docs.
+  app.get(
+    "/api/standards-ingestion/moderation-queue",
+    isAuthenticated,
+    async (req: any, res) => {
+      const user = await requireUser(req, res);
+      if (!user) return;
+      if (!SYS_ADMIN_ROLES.has(user.role)) {
+        return res.status(403).json({ error: "System admin required" });
+      }
+      const limit = Math.min(Number(req.query.limit) || 50, 200);
+      const offset = Math.max(Number(req.query.offset) || 0, 0);
+      const kind = (req.query.kind as string) || "all";
+      if (!["all", "pending_standard", "curriculum_doc"].includes(kind)) {
+        return res.status(400).json({ error: "Invalid kind filter" });
+      }
+      const result = await listModerationQueue({
+        limit,
+        offset,
+        kind: kind as "all" | "pending_standard" | "curriculum_doc",
+      });
       res.json(result);
+    },
+  );
+
+  // Audit trail for a single queue item.
+  app.get(
+    "/api/standards-ingestion/audit-log/:entityType/:entityId",
+    isAuthenticated,
+    async (req: any, res) => {
+      const user = await requireUser(req, res);
+      if (!user) return;
+      if (!SYS_ADMIN_ROLES.has(user.role)) {
+        return res.status(403).json({ error: "System admin required" });
+      }
+      const entityType = req.params.entityType as ModerationEntityType;
+      if (!["pending_standard", "curriculum_doc"].includes(entityType)) {
+        return res.status(400).json({ error: "Invalid entityType" });
+      }
+      const log = await listAuditLog(entityType, req.params.entityId);
+      res.json(log);
+    },
+  );
+
+  // Side-by-side viewer source for a queue item. Returns the extracted text
+  // (left pane) and a hint for rendering the source on the right pane.
+  app.get(
+    "/api/standards-ingestion/moderation-source/:entityType/:entityId",
+    isAuthenticated,
+    async (req: any, res) => {
+      const user = await requireUser(req, res);
+      if (!user) return;
+      if (!SYS_ADMIN_ROLES.has(user.role)) {
+        return res.status(403).json({ error: "System admin required" });
+      }
+      const entityType = req.params.entityType as ModerationEntityType;
+      const id = req.params.entityId;
+      if (entityType === "pending_standard") {
+        const [row] = await db
+          .select()
+          .from(pendingPublicStandards)
+          .where(eq(pendingPublicStandards.id, id));
+        if (!row) return res.status(404).json({ error: "Not found" });
+        return res.json({
+          kind: "pending_standard",
+          extracted: {
+            code: row.code,
+            description: row.description,
+            subject: row.subject,
+            gradeLevel: row.gradeLevel,
+            strand: row.strand,
+            confidenceScore: row.confidenceScore,
+          },
+          source: {
+            type: "url",
+            url: row.sourceUrl,
+          },
+          item: row,
+        });
+      }
+      if (entityType === "curriculum_doc") {
+        const doc = await getCurriculumDocument(id);
+        if (!doc) return res.status(404).json({ error: "Not found" });
+        // getCurriculumDocument strips originalFileBytes for general callers,
+        // so we re-check existence here without loading the blob.
+        const [presence] = await db
+          .select({
+            hasOriginal: sql<boolean>`${curriculumDocuments.originalFileBytes} IS NOT NULL`,
+          })
+          .from(curriculumDocuments)
+          .where(eq(curriculumDocuments.id, id));
+        const hasOriginal = !!presence?.hasOriginal;
+        const sourceType: "pdf" | "html" =
+          doc.mimeType === "application/pdf" ? "pdf" : "html";
+        return res.json({
+          kind: "curriculum_doc",
+          extracted: {
+            text: doc.extractedText || "",
+            standardsExtractedCount: doc.standardsExtractedCount ?? 0,
+            extractionStatus: doc.extractionStatus,
+          },
+          source: {
+            type: sourceType,
+            filename: doc.originalFilename,
+            mimeType: doc.mimeType,
+            sizeBytes: doc.fileSizeBytes,
+            hasOriginal,
+            fileUrl: hasOriginal
+              ? `/api/standards-ingestion/moderation-file/${doc.id}`
+              : null,
+          },
+          item: doc,
+        });
+      }
+      return res.status(400).json({ error: "Invalid entityType" });
+    },
+  );
+
+  // Serve the original uploaded file bytes for the side-by-side viewer.
+  // The browser natively renders PDFs in an iframe and HTML in a sandboxed
+  // iframe (we set the Content-Type from the stored mimeType).
+  app.get(
+    "/api/standards-ingestion/moderation-file/:id",
+    isAuthenticated,
+    async (req: any, res) => {
+      const user = await requireUser(req, res);
+      if (!user) return;
+      if (!SYS_ADMIN_ROLES.has(user.role)) {
+        return res.status(403).json({ error: "System admin required" });
+      }
+      const [row] = await db
+        .select({
+          bytes: curriculumDocuments.originalFileBytes,
+          mimeType: curriculumDocuments.mimeType,
+          filename: curriculumDocuments.originalFilename,
+        })
+        .from(curriculumDocuments)
+        .where(eq(curriculumDocuments.id, req.params.id));
+      if (!row || !row.bytes) {
+        return res.status(404).json({ error: "Original file not stored" });
+      }
+      res.setHeader("Content-Type", row.mimeType || "application/octet-stream");
+      res.setHeader(
+        "Content-Disposition",
+        `inline; filename="${encodeURIComponent(row.filename || "document")}"`,
+      );
+      // HTML must be sandboxed by the iframe consumer; we also set CSP so
+      // an injected HTML upload can't reach back into the admin origin.
+      if ((row.mimeType || "").startsWith("text/html")) {
+        res.setHeader(
+          "Content-Security-Policy",
+          "default-src 'none'; img-src data:; style-src 'unsafe-inline'",
+        );
+      }
+      res.send(Buffer.isBuffer(row.bytes) ? row.bytes : Buffer.from(row.bytes as any));
+    },
+  );
+
+  // Unified atomic bulk moderation endpoint (Task #6 atomicity requirement).
+  // Accepts a mixed list of {kind,id} items and processes them in a single
+  // DB transaction so a partial failure rolls back EVERY change across both
+  // pending standards and curriculum docs.
+  app.post(
+    "/api/standards-ingestion/moderation/bulk",
+    isAuthenticated,
+    async (req: any, res) => {
+      const user = await requireUser(req, res);
+      if (!user) return;
+      if (!SYS_ADMIN_ROLES.has(user.role)) {
+        return res.status(403).json({ error: "System admin required" });
+      }
+      const body = z
+        .object({
+          action: z.enum(["approve", "reject"]),
+          reason: z.string().optional(),
+          items: z
+            .array(
+              z.object({
+                kind: z.enum(["pending_standard", "curriculum_doc"]),
+                id: z.string().min(1),
+              }),
+            )
+            .min(1),
+        })
+        .parse(req.body);
+      if (body.action === "reject" && !body.reason?.trim()) {
+        return res.status(400).json({ error: "Reason required for rejection" });
+      }
+      const stdIds = body.items.filter((i) => i.kind === "pending_standard").map((i) => i.id);
+      const docIds = body.items.filter((i) => i.kind === "curriculum_doc").map((i) => i.id);
+      try {
+        const result = await db.transaction(async (tx) => {
+          let approvedStds = 0;
+          let approvedDocs = 0;
+          let rejectedStds = 0;
+          let rejectedDocs = 0;
+          if (body.action === "approve") {
+            if (stdIds.length > 0) {
+              const r = await approvePendingStandards(stdIds, user.id, body.reason, tx);
+              approvedStds = r.approved;
+            }
+            if (docIds.length > 0) {
+              // Inline atomic doc approve using the same tx so failures roll
+              // back across both entity types.
+              const targets = await tx
+                .select({ id: curriculumDocuments.id })
+                .from(curriculumDocuments)
+                .where(
+                  and(
+                    inArray(curriculumDocuments.id, docIds),
+                    eq(curriculumDocuments.isActive, true),
+                    eq(curriculumDocuments.moderationStatus, "pending"),
+                  ),
+                );
+              if (targets.length !== docIds.length) {
+                throw new Error(
+                  `Bulk approve aborted: ${docIds.length - targets.length} of ${docIds.length} doc(s) not found, inactive, or already reviewed`,
+                );
+              }
+              await tx
+                .update(curriculumDocuments)
+                .set({
+                  moderationStatus: "approved",
+                  moderationReason: body.reason ?? null,
+                  moderationReviewedByUserId: user.id,
+                  moderationReviewedAt: new Date(),
+                  updatedAt: new Date(),
+                })
+                .where(inArray(curriculumDocuments.id, docIds));
+              await tx.insert(ingestionAuditLog).values(
+                docIds.map((id) => ({
+                  entityType: "curriculum_doc" as const,
+                  entityId: id,
+                  action: "approved" as const,
+                  actorUserId: user.id,
+                  reason: body.reason ?? null,
+                })),
+              );
+              approvedDocs = docIds.length;
+            }
+          } else {
+            if (stdIds.length > 0) {
+              const r = await rejectPendingStandards(stdIds, user.id, body.reason, tx);
+              rejectedStds = r.rejected;
+            }
+            if (docIds.length > 0) {
+              const targets = await tx
+                .select({ id: curriculumDocuments.id })
+                .from(curriculumDocuments)
+                .where(
+                  and(
+                    inArray(curriculumDocuments.id, docIds),
+                    eq(curriculumDocuments.isActive, true),
+                    eq(curriculumDocuments.moderationStatus, "pending"),
+                  ),
+                );
+              if (targets.length !== docIds.length) {
+                throw new Error(
+                  `Bulk reject aborted: ${docIds.length - targets.length} of ${docIds.length} doc(s) not found, inactive, or already reviewed`,
+                );
+              }
+              await tx
+                .update(curriculumDocuments)
+                .set({
+                  moderationStatus: "rejected",
+                  moderationReason: body.reason!,
+                  moderationReviewedByUserId: user.id,
+                  moderationReviewedAt: new Date(),
+                  updatedAt: new Date(),
+                })
+                .where(inArray(curriculumDocuments.id, docIds));
+              await tx.insert(ingestionAuditLog).values(
+                docIds.map((id) => ({
+                  entityType: "curriculum_doc" as const,
+                  entityId: id,
+                  action: "rejected" as const,
+                  actorUserId: user.id,
+                  reason: body.reason!,
+                })),
+              );
+              rejectedDocs = docIds.length;
+            }
+          }
+          return { approvedStds, approvedDocs, rejectedStds, rejectedDocs };
+        });
+        res.json(result);
+      } catch (err: any) {
+        res.status(409).json({ error: err.message || "Bulk moderation failed" });
+      }
+    },
+  );
+
+  // Bulk approve curriculum docs.
+  app.post(
+    "/api/standards-ingestion/curriculum-docs/approve",
+    isAuthenticated,
+    async (req: any, res) => {
+      const user = await requireUser(req, res);
+      if (!user) return;
+      if (!SYS_ADMIN_ROLES.has(user.role)) {
+        return res.status(403).json({ error: "System admin required" });
+      }
+      const body = z
+        .object({ ids: z.array(z.string()).min(1), reason: z.string().optional() })
+        .parse(req.body);
+      try {
+        const result = await approveCurriculumDocs(body.ids, user.id, body.reason);
+        res.json(result);
+      } catch (err: any) {
+        res.status(409).json({ error: err.message || "Bulk approve failed" });
+      }
+    },
+  );
+
+  // Bulk reject curriculum docs — reason required.
+  app.post(
+    "/api/standards-ingestion/curriculum-docs/reject",
+    isAuthenticated,
+    async (req: any, res) => {
+      const user = await requireUser(req, res);
+      if (!user) return;
+      if (!SYS_ADMIN_ROLES.has(user.role)) {
+        return res.status(403).json({ error: "System admin required" });
+      }
+      const body = z
+        .object({ ids: z.array(z.string()).min(1), reason: z.string().min(1) })
+        .parse(req.body);
+      try {
+        const result = await rejectCurriculumDocs(body.ids, user.id, body.reason);
+        res.json(result);
+      } catch (err: any) {
+        res.status(409).json({ error: err.message || "Bulk reject failed" });
+      }
     },
   );
 

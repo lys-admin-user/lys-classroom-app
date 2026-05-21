@@ -19,6 +19,7 @@ import {
   educationalStandardsDb,
   standardSets,
   standardsJurisdictions,
+  ingestionAuditLog,
   type StandardsIngestionRequest,
   type StandardsSourceRegistry,
   type PendingPublicStandard,
@@ -375,23 +376,42 @@ export async function runSyncForSource(
     const { kept: items, rejected: verbatimRejected } = filterVerbatimItems(candidates, sourceText);
 
     if (items.length > 0) {
-      await db.insert(pendingPublicStandards).values(
-        items.map((s) => ({
-          ingestionRequestId: ingestionRequestId ?? null,
-          sourceRegistryId: source.id,
-          syncRunId: run.id,
-          country: source.country,
-          state: source.state,
-          subject: s.subject ?? null,
-          gradeLevel: s.gradeLevel ?? null,
-          code: s.code ?? null,
-          description: s.description!,
-          strand: s.strand ?? null,
-          sourceUrl: source.sourceUrl,
-          confidenceScore: typeof s.confidence === "number" ? Math.max(0, Math.min(100, s.confidence)) : 50,
-          status: "pending_review",
-        })),
-      );
+      const inserted = await db
+        .insert(pendingPublicStandards)
+        .values(
+          items.map((s) => ({
+            ingestionRequestId: ingestionRequestId ?? null,
+            sourceRegistryId: source.id,
+            syncRunId: run.id,
+            country: source.country,
+            state: source.state,
+            subject: s.subject ?? null,
+            gradeLevel: s.gradeLevel ?? null,
+            code: s.code ?? null,
+            description: s.description!,
+            strand: s.strand ?? null,
+            sourceUrl: source.sourceUrl,
+            confidenceScore: typeof s.confidence === "number" ? Math.max(0, Math.min(100, s.confidence)) : 50,
+            status: "pending_review",
+          })),
+        )
+        .returning({ id: pendingPublicStandards.id });
+      // Task #6: log a `created` row for every newly inserted pending standard
+      // so the moderation viewer's audit trail starts at ingestion, not approval.
+      try {
+        const { writeAuditLog } = await import("./ingestionModeration");
+        for (const row of inserted) {
+          await writeAuditLog({
+            entityType: "pending_standard",
+            entityId: row.id,
+            action: "created",
+            actorUserId: triggeredByUserId,
+            details: { syncRunId: run.id, sourceRegistryId: source.id },
+          });
+        }
+      } catch (err) {
+        console.error("[publicStandardsIngestion] audit-log create failed:", err);
+      }
     }
 
     await db
@@ -474,122 +494,165 @@ export async function listPendingStandards(filter: {
 export async function approvePendingStandards(
   ids: string[],
   reviewerId: string,
+  reason?: string,
+  externalTx?: any,
 ): Promise<{ approved: number }> {
   if (ids.length === 0) return { approved: 0 };
-  const targets = await db
-    .select()
-    .from(pendingPublicStandards)
-    .where(
-      and(
-        eq(pendingPublicStandards.status, "pending_review"),
-        inArray(pendingPublicStandards.id, ids),
-      ),
-    );
-
-  for (const item of targets) {
-    // Find or create jurisdiction
-    const jurisdictionName = item.state || item.country;
-    const jurisdictionAbbr = (item.state || item.country).slice(0, 8).toUpperCase();
-    let [jurisdiction] = await db
+  const run = async (tx: any) => {
+    const targets = await tx
       .select()
-      .from(standardsJurisdictions)
+      .from(pendingPublicStandards)
       .where(
         and(
-          eq(standardsJurisdictions.country, item.country),
-          eq(standardsJurisdictions.name, jurisdictionName),
+          eq(pendingPublicStandards.status, "pending_review"),
+          inArray(pendingPublicStandards.id, ids),
         ),
       );
-    if (!jurisdiction) {
-      [jurisdiction] = await db
-        .insert(standardsJurisdictions)
-        .values({
-          country: item.country,
-          name: jurisdictionName,
-          abbreviation: jurisdictionAbbr,
-          standardsName: `${item.country} National Curriculum`,
-          source: "manual",
-          sourceUrl: item.sourceUrl,
-        })
-        .returning();
+    // Atomicity guard (Task #6): bulk approve is all-or-nothing — if any
+    // requested id is missing or already reviewed, the whole tx rolls back.
+    if (targets.length !== ids.length) {
+      throw new Error(
+        `Bulk approve aborted: ${ids.length - targets.length} of ${ids.length} pending standard(s) not found or already reviewed`,
+      );
     }
 
-    // Find or create standard set (per subject + grade)
-    const setUid = createHash("sha256")
-      .update(
-        `${item.country}|${item.state || ""}|${item.subject || "general"}|${item.gradeLevel || "all"}`,
-      )
-      .digest("hex")
-      .slice(0, 32);
-    let [stdSet] = await db
-      .select()
-      .from(standardSets)
-      .where(eq(standardSets.uid, setUid));
-    if (!stdSet) {
-      [stdSet] = await db
-        .insert(standardSets)
+    for (const item of targets) {
+      const jurisdictionName = item.state || item.country;
+      const jurisdictionAbbr = (item.state || item.country).slice(0, 8).toUpperCase();
+      let [jurisdiction] = await tx
+        .select()
+        .from(standardsJurisdictions)
+        .where(
+          and(
+            eq(standardsJurisdictions.country, item.country),
+            eq(standardsJurisdictions.name, jurisdictionName),
+          ),
+        );
+      if (!jurisdiction) {
+        [jurisdiction] = await tx
+          .insert(standardsJurisdictions)
+          .values({
+            country: item.country,
+            name: jurisdictionName,
+            abbreviation: jurisdictionAbbr,
+            standardsName: `${item.country} National Curriculum`,
+            source: "manual",
+            sourceUrl: item.sourceUrl,
+          })
+          .returning();
+      }
+
+      const setUid = createHash("sha256")
+        .update(
+          `${item.country}|${item.state || ""}|${item.subject || "general"}|${item.gradeLevel || "all"}`,
+        )
+        .digest("hex")
+        .slice(0, 32);
+      let [stdSet] = await tx
+        .select()
+        .from(standardSets)
+        .where(eq(standardSets.uid, setUid));
+      if (!stdSet) {
+        [stdSet] = await tx
+          .insert(standardSets)
+          .values({
+            uid: setUid,
+            jurisdictionId: jurisdiction.id,
+            title: `${item.subject || "General"} ${item.gradeLevel ? `Grade ${item.gradeLevel}` : ""}`.trim(),
+            subject: item.subject || "General",
+            educationLevels: item.gradeLevel ? [item.gradeLevel] : [],
+            documentUrl: item.sourceUrl,
+            source: "manual",
+          })
+          .returning();
+      }
+
+      const stdUid = createHash("sha256")
+        .update(`${stdSet.uid}|${item.code || item.description.slice(0, 64)}`)
+        .digest("hex")
+        .slice(0, 32);
+      const [published] = await tx
+        .insert(educationalStandardsDb)
         .values({
-          uid: setUid,
-          jurisdictionId: jurisdiction.id,
-          title: `${item.subject || "General"} ${item.gradeLevel ? `Grade ${item.gradeLevel}` : ""}`.trim(),
-          subject: item.subject || "General",
-          educationLevels: item.gradeLevel ? [item.gradeLevel] : [],
-          documentUrl: item.sourceUrl,
+          uid: stdUid,
+          standardSetId: stdSet.id,
+          humanCoding: item.code || `GEN-${stdUid.slice(0, 8)}`,
+          statement: item.description,
+          gradeLevel: item.gradeLevel,
+          isActive: true,
           source: "manual",
         })
+        .onConflictDoNothing({ target: educationalStandardsDb.uid })
         .returning();
+
+      await tx
+        .update(pendingPublicStandards)
+        .set({
+          status: "approved",
+          reviewedByUserId: reviewerId,
+          reviewedAt: new Date(),
+          publishedStandardId: published?.id ?? null,
+        })
+        .where(eq(pendingPublicStandards.id, item.id));
+
+      await tx.insert(ingestionAuditLog).values({
+        entityType: "pending_standard",
+        entityId: item.id,
+        action: "approved",
+        actorUserId: reviewerId,
+        reason: reason ?? null,
+        details: { publishedStandardId: published?.id ?? null },
+      });
     }
-
-    // Insert the actual standard
-    const stdUid = createHash("sha256")
-      .update(`${stdSet.uid}|${item.code || item.description.slice(0, 64)}`)
-      .digest("hex")
-      .slice(0, 32);
-    const [published] = await db
-      .insert(educationalStandardsDb)
-      .values({
-        uid: stdUid,
-        standardSetId: stdSet.id,
-        humanCoding: item.code || `GEN-${stdUid.slice(0, 8)}`,
-        statement: item.description,
-        gradeLevel: item.gradeLevel,
-        isActive: true,
-        source: "manual",
-      })
-      .onConflictDoNothing({ target: educationalStandardsDb.uid })
-      .returning();
-
-    await db
-      .update(pendingPublicStandards)
-      .set({
-        status: "approved",
-        reviewedByUserId: reviewerId,
-        reviewedAt: new Date(),
-        publishedStandardId: published?.id ?? null,
-      })
-      .where(eq(pendingPublicStandards.id, item.id));
-  }
-  return { approved: targets.length };
+    return targets.length;
+  };
+  const approved = externalTx ? await run(externalTx) : await db.transaction(run);
+  return { approved };
 }
 
 export async function rejectPendingStandards(
   ids: string[],
   reviewerId: string,
+  reason?: string,
+  externalTx?: any,
 ): Promise<{ rejected: number }> {
   if (ids.length === 0) return { rejected: 0 };
-  await db
-    .update(pendingPublicStandards)
-    .set({
-      status: "rejected",
-      reviewedByUserId: reviewerId,
-      reviewedAt: new Date(),
-    })
-    .where(
-      and(
-        eq(pendingPublicStandards.status, "pending_review"),
-        inArray(pendingPublicStandards.id, ids),
-      ),
+  const run = async (tx: any) => {
+    const targets = await tx
+      .select({ id: pendingPublicStandards.id })
+      .from(pendingPublicStandards)
+      .where(
+        and(
+          eq(pendingPublicStandards.status, "pending_review"),
+          inArray(pendingPublicStandards.id, ids),
+        ),
+      );
+    if (targets.length !== ids.length) {
+      throw new Error(
+        `Bulk reject aborted: ${ids.length - targets.length} of ${ids.length} pending standard(s) not found or already reviewed`,
+      );
+    }
+    await tx
+      .update(pendingPublicStandards)
+      .set({
+        status: "rejected",
+        reviewedByUserId: reviewerId,
+        reviewedAt: new Date(),
+      })
+      .where(inArray(pendingPublicStandards.id, ids));
+    await tx.insert(ingestionAuditLog).values(
+      targets.map((t: { id: string }) => ({
+        entityType: "pending_standard",
+        entityId: t.id,
+        action: "rejected",
+        actorUserId: reviewerId,
+        reason: reason ?? null,
+      })),
     );
-  return { rejected: ids.length };
+    return targets.length;
+  };
+  const rejected = externalTx ? await run(externalTx) : await db.transaction(run);
+  return { rejected };
 }
 
 // -------------------- Annual cleanup scheduler --------------------

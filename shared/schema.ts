@@ -1,5 +1,13 @@
 import { sql } from "drizzle-orm";
-import { pgTable, text, varchar, integer, boolean, jsonb, timestamp, real, index, uniqueIndex } from "drizzle-orm/pg-core";
+import { pgTable, text, varchar, integer, boolean, jsonb, timestamp, real, index, uniqueIndex, customType } from "drizzle-orm/pg-core";
+
+// Postgres BYTEA custom type for storing original uploaded files so the
+// moderation viewer can render them side-by-side with the AI extraction.
+const bytea = customType<{ data: Buffer; default: false }>({
+  dataType() {
+    return "bytea";
+  },
+});
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 import { isCoverageOptionalCountry } from "./standards";
@@ -3960,6 +3968,10 @@ export const curriculumDocuments = pgTable("curriculum_documents", {
   originalFilename: text("original_filename").notNull(),
   mimeType: text("mime_type"),
   fileSizeBytes: integer("file_size_bytes"),
+  // Raw bytes of the original upload so sys-admins can compare the AI
+  // extraction against the source in the moderation viewer (Task #6).
+  // Capped at 20MB by the multer upload limit upstream.
+  originalFileBytes: bytea("original_file_bytes"),
   // Extracted content (text only — no blob storage)
   extractedText: text("extracted_text"),
   // Extraction lifecycle
@@ -3971,17 +3983,26 @@ export const curriculumDocuments = pgTable("curriculum_documents", {
   linkedLessonId: varchar("linked_lesson_id"), // for docType=lesson, pointer into the lessons table
   // Visibility / lifecycle
   isActive: boolean("is_active").notNull().default(true),
+  // Sys-admin moderation lifecycle (Task #6). "pending" | "approved" | "rejected"
+  moderationStatus: text("moderation_status").notNull().default("pending"),
+  moderationReason: text("moderation_reason"),
+  moderationReviewedByUserId: varchar("moderation_reviewed_by_user_id"),
+  moderationReviewedAt: timestamp("moderation_reviewed_at"),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 }, (table) => [
   index("idx_curriculum_docs_org").on(table.organizationId),
   index("idx_curriculum_docs_user").on(table.uploadedByUserId),
   index("idx_curriculum_docs_type_subject").on(table.docType, table.subject),
+  index("idx_curriculum_docs_moderation").on(table.moderationStatus),
 ]);
 export const insertCurriculumDocumentSchema = createInsertSchema(curriculumDocuments).omit({
   id: true, createdAt: true, updatedAt: true,
   extractionStatus: true, extractionError: true, standardsExtractedCount: true,
   extractedText: true, linkedLessonId: true,
+  moderationStatus: true, moderationReason: true,
+  moderationReviewedByUserId: true, moderationReviewedAt: true,
+  originalFileBytes: true,
 });
 export type InsertCurriculumDocument = z.infer<typeof insertCurriculumDocumentSchema>;
 export type CurriculumDocument = typeof curriculumDocuments.$inferSelect;
@@ -4160,3 +4181,40 @@ export const publicStandardsSyncRuns = pgTable("public_standards_sync_runs", {
   index("idx_pssr_trigger_started").on(table.triggerType, table.startedAt),
 ]);
 export type PublicStandardsSyncRun = typeof publicStandardsSyncRuns.$inferSelect;
+
+// ============================================================================
+// INGESTION AUDIT LOG (Task #6: Moderation tooling)
+// One row per state transition on a moderation target (pending standard set
+// or curriculum doc). Powers the audit-trail panel in the moderation queue.
+// ============================================================================
+export const ingestionAuditLog = pgTable("ingestion_audit_log", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  // "pending_standard" | "curriculum_doc"
+  entityType: text("entity_type").notNull(),
+  entityId: varchar("entity_id").notNull(),
+  // "created" | "edited" | "approved" | "rejected" | "reactivated"
+  action: text("action").notNull(),
+  actorUserId: varchar("actor_user_id"),
+  reason: text("reason"),
+  // Snapshot of fields that changed; freeform JSON.
+  details: jsonb("details").$type<Record<string, unknown>>(),
+  createdAt: timestamp("created_at").defaultNow(),
+}, (table) => [
+  index("idx_ingestion_audit_entity").on(table.entityType, table.entityId),
+  index("idx_ingestion_audit_created").on(table.createdAt),
+]);
+export type IngestionAuditLog = typeof ingestionAuditLog.$inferSelect;
+
+// Curriculum doc moderation state. Added in Task #6 so system admins can
+// approve/reject AI-extracted curriculum docs in the moderation queue.
+// Note: the column is added in-place via db:push; existing rows default to
+// `pending` so admins can backfill review.
+// (See `curriculumDocuments` table above — these are the supported values
+// for the `moderationStatus` field.)
+export const CURRICULUM_DOC_MODERATION_STATUSES = [
+  "pending",
+  "approved",
+  "rejected",
+] as const;
+export type CurriculumDocModerationStatus =
+  typeof CURRICULUM_DOC_MODERATION_STATUSES[number];
