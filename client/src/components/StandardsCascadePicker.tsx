@@ -1,6 +1,8 @@
-import { useQuery } from "@tanstack/react-query";
-import { Globe, MapPin, FileText, ChevronRight, ExternalLink } from "lucide-react";
+import { useMemo, useState } from "react";
+import { useQuery, useMutation } from "@tanstack/react-query";
+import { Globe, MapPin, FileText, ChevronRight, ExternalLink, Star, Clock, Search } from "lucide-react";
 import { Label } from "@/components/ui/label";
+import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -8,8 +10,9 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { X } from "lucide-react";
 import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover";
-import { apiRequest } from "@/lib/queryClient";
+import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/hooks/use-auth";
 import type { StandardCode } from "@shared/standards";
 
 export interface CatalogCodeClient extends StandardCode {
@@ -18,6 +21,7 @@ export interface CatalogCodeClient extends StandardCode {
   jurisdictionName?: string | null;
   standardsName?: string | null;
   lastVerifiedAt?: string | null;
+  gradeLevel?: string | null;
 }
 
 interface Props {
@@ -35,13 +39,40 @@ interface Props {
   scrollHeight?: string;
 }
 
-function tierLabel(tier?: string): string {
+interface FavoriteRow {
+  id: string;
+  country: string;
+  state: string;
+  subject: string;
+  code: string;
+  description: string;
+  gradeLevel: string | null;
+  standardsName: string | null;
+  jurisdictionName: string | null;
+  source: "official" | "curated" | "fallback" | null;
+  sourceUrl: string | null;
+}
+
+interface RecentRow {
+  country: string;
+  state: string;
+  subject: string;
+  code: string;
+  description: string;
+  gradeLevel: string | null;
+  standardsName: string | null;
+  source: "official" | "curated" | "fallback" | null;
+  sourceUrl: string | null;
+  lastUsedAt: string | null;
+}
+
+function tierLabel(tier?: string | null): string {
   if (tier === "official") return "Official";
   if (tier === "curated") return "Curated";
   return "Starter";
 }
 
-function tierExplain(tier?: string): string {
+function tierExplain(tier?: string | null): string {
   if (tier === "official") return "Sourced from an official ministry or standards-consortium feed.";
   if (tier === "curated") return "Admin-curated entry — not yet verified against an official ministry feed.";
   return "Starter library entry — used when no official source is available yet.";
@@ -159,6 +190,8 @@ export function StandardsCascadePicker({
   scrollHeight = "h-48",
 }: Props) {
   const { toast } = useToast();
+  const { isAuthenticated } = useAuth();
+  const [searchQuery, setSearchQuery] = useState("");
 
   const { data: countriesData } = useQuery<string[]>({
     queryKey: ["/api/standards/countries"],
@@ -184,7 +217,200 @@ export function StandardsCascadePicker({
   const standardCodes = standardCodesData || [];
   const standardsName = states.find((s) => s.abbreviation === selectedState)?.standardsName || "";
 
+  // Favorites (global per teacher across subjects/grades; pinned).
+  const { data: favoritesData } = useQuery<FavoriteRow[]>({
+    queryKey: ["/api/teacher-standards/favorites"],
+    enabled: isAuthenticated,
+  });
+  const favorites = favoritesData || [];
+
+  // Recents scoped to the current cascade selection so "what I picked last
+  // time for this subject" appears at the top of the list.
+  const { data: recentsData } = useQuery<RecentRow[]>({
+    queryKey: [
+      "/api/teacher-standards/recents",
+      selectedCountry,
+      selectedState,
+      selectedSubject,
+    ],
+    enabled: isAuthenticated && !!selectedCountry && !!selectedState && !!selectedSubject,
+    queryFn: async () => {
+      const params = new URLSearchParams({
+        country: selectedCountry,
+        state: selectedState,
+        subject: selectedSubject,
+        limit: "10",
+      });
+      const res = await fetch(`/api/teacher-standards/recents?${params}`, { credentials: "include" });
+      if (!res.ok) return [];
+      return res.json();
+    },
+  });
+  const recents = recentsData || [];
+
+  // Cross-grade search results.
+  const trimmedQuery = searchQuery.trim();
+  const { data: searchResults } = useQuery<CatalogCodeClient[]>({
+    queryKey: [
+      "/api/teacher-standards/search",
+      selectedCountry,
+      selectedState,
+      selectedSubject,
+      trimmedQuery,
+    ],
+    enabled:
+      isAuthenticated &&
+      !!selectedCountry &&
+      !!selectedState &&
+      !!selectedSubject &&
+      trimmedQuery.length >= 2,
+    queryFn: async () => {
+      const params = new URLSearchParams({
+        country: selectedCountry,
+        state: selectedState,
+        subject: selectedSubject,
+        q: trimmedQuery,
+      });
+      const res = await fetch(`/api/teacher-standards/search?${params}`, { credentials: "include" });
+      if (!res.ok) return [];
+      return res.json();
+    },
+  });
+
+  const addFavoriteMutation = useMutation({
+    mutationFn: async (code: CatalogCodeClient) => {
+      await apiRequest("POST", "/api/teacher-standards/favorites", {
+        country: selectedCountry,
+        state: selectedState,
+        subject: selectedSubject,
+        code: code.code,
+        description: code.description,
+        gradeLevel: code.gradeLevel ?? null,
+        standardsName: code.standardsName ?? standardsName ?? null,
+        jurisdictionName: code.jurisdictionName ?? null,
+        source: code.source ?? null,
+        sourceUrl: code.sourceUrl ?? null,
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/teacher-standards/favorites"] });
+    },
+    onError: () => toast({ title: "Couldn't save favorite", variant: "destructive" }),
+  });
+
+  const removeFavoriteMutation = useMutation({
+    mutationFn: async (fav: { country: string; state: string; subject: string; code: string }) => {
+      await apiRequest("DELETE", "/api/teacher-standards/favorites", fav);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/teacher-standards/favorites"] });
+    },
+  });
+
+  // Build composite keys for membership checks.
+  const favoriteKeys = useMemo(
+    () => new Set(favorites.map((f) => `${f.country}|${f.state}|${f.subject}|${f.code}`)),
+    [favorites],
+  );
+  const codeKey = (c: { country?: string; state?: string; subject?: string; code: string }) =>
+    `${c.country ?? selectedCountry}|${c.state ?? selectedState}|${c.subject ?? selectedSubject}|${c.code}`;
+
+  const isFavorited = (code: string) =>
+    favoriteKeys.has(`${selectedCountry}|${selectedState}|${selectedSubject}|${code}`);
+
+  const toggleFavorite = (code: CatalogCodeClient) => {
+    if (isFavorited(code.code)) {
+      removeFavoriteMutation.mutate({
+        country: selectedCountry,
+        state: selectedState,
+        subject: selectedSubject,
+        code: code.code,
+      });
+    } else {
+      addFavoriteMutation.mutate(code);
+    }
+  };
+
+  // Subject-scoped favorites are pinned at the top of the picker for this
+  // cascade selection. Favorites from other subjects are still listed in the
+  // dedicated favorites panel below so teachers can jump back into them.
+  const pinnedFavoritesForSubject = useMemo(
+    () =>
+      favorites.filter(
+        (f) =>
+          f.country === selectedCountry &&
+          f.state === selectedState &&
+          f.subject === selectedSubject,
+      ),
+    [favorites, selectedCountry, selectedState, selectedSubject],
+  );
+
+  // Dedup the main code list: drop entries already shown in pinned or recents.
+  const pinnedKeySet = new Set(pinnedFavoritesForSubject.map((f) => f.code));
+  const recentKeySet = new Set(recents.map((r) => r.code));
+  const codesWithoutPinned = standardCodes.filter(
+    (c) => !pinnedKeySet.has(c.code) && !recentKeySet.has(c.code),
+  );
+  const recentsNotPinned = recents.filter((r) => !pinnedKeySet.has(r.code));
+
   const tid = (suffix: string) => (testIdPrefix ? `${testIdPrefix}-${suffix}` : suffix);
+
+  const renderCodeRow = (
+    code: CatalogCodeClient,
+    options: { showFavorite?: boolean; showGrade?: boolean; keyPrefix?: string } = {},
+  ) => {
+    const { showFavorite = true, showGrade = false, keyPrefix = "" } = options;
+    const checked = selectedStandardCodes.some((c) => c.code === code.code);
+    const favored = isFavorited(code.code);
+    return (
+      <div
+        key={`${keyPrefix}${code.code}`}
+        className="flex items-start gap-2 p-2 rounded-md hover-elevate cursor-pointer"
+      >
+        <Checkbox
+          id={`${testIdPrefix}-${keyPrefix}${code.code}`}
+          checked={checked}
+          onCheckedChange={() => onToggleCode(code)}
+          className="mt-0.5"
+          data-testid={tid(`checkbox-standard-${keyPrefix}${code.code}`)}
+        />
+        <label
+          htmlFor={`${testIdPrefix}-${keyPrefix}${code.code}`}
+          className="font-roboto text-sm cursor-pointer leading-relaxed flex-1"
+        >
+          <span className="font-semibold text-lys-teal">{code.code}</span>
+          {showGrade && code.gradeLevel && (
+            <Badge variant="outline" className="ml-2 text-[10px] font-roboto">
+              {code.gradeLevel}
+            </Badge>
+          )}
+          <span className="text-muted-foreground ml-2">{code.description}</span>
+          {showStandardSources && code.source && (
+            <StandardsSourcePopover
+              code={code}
+              testId={tid(`badge-source-${keyPrefix}${code.code}`)}
+            />
+          )}
+        </label>
+        {showFavorite && isAuthenticated && (
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              toggleFavorite(code);
+            }}
+            className="mt-0.5 p-1 rounded hover-elevate"
+            aria-label={favored ? "Unfavorite" : "Favorite"}
+            data-testid={tid(`button-favorite-${code.code}`)}
+          >
+            <Star
+              className={`h-3.5 w-3.5 ${favored ? "fill-lys-yellow text-lys-yellow" : "text-muted-foreground"}`}
+            />
+          </button>
+        )}
+      </div>
+    );
+  };
 
   return (
     <div className="space-y-4">
@@ -306,40 +532,147 @@ export function StandardsCascadePicker({
         </div>
       )}
 
+      {/* Cross-subject favorites bar — pinned codes for other subjects so a
+          teacher can jump back to a starred code without re-cascading. */}
+      {isAuthenticated && favorites.length > 0 && (
+        <div className="space-y-1.5" data-testid={tid("favorites-bar")}>
+          <Label className="font-roboto text-xs text-muted-foreground flex items-center gap-1">
+            <Star className="h-3 w-3 fill-lys-yellow text-lys-yellow" />
+            Your favorites
+          </Label>
+          <div className="flex flex-wrap gap-1.5">
+            {favorites.slice(0, 12).map((f) => (
+              <button
+                type="button"
+                key={f.id}
+                onClick={() => {
+                  if (
+                    f.country !== selectedCountry ||
+                    f.state !== selectedState ||
+                    f.subject !== selectedSubject
+                  ) {
+                    onCountryChange(f.country);
+                    onStateChange(f.state);
+                    onSubjectChange(f.subject);
+                  }
+                  onToggleCode({
+                    code: f.code,
+                    description: f.description,
+                    gradeLevel: f.gradeLevel,
+                    standardsName: f.standardsName ?? undefined,
+                    jurisdictionName: f.jurisdictionName ?? undefined,
+                    source: f.source ?? undefined,
+                    sourceUrl: f.sourceUrl ?? undefined,
+                  });
+                }}
+                className="text-xs font-roboto border border-lys-yellow/40 bg-lys-yellow/5 hover-elevate rounded-md px-2 py-1 inline-flex items-center gap-1"
+                data-testid={tid(`button-favorite-pill-${f.code}`)}
+              >
+                <Star className="h-3 w-3 fill-lys-yellow text-lys-yellow" />
+                <span className="font-semibold text-lys-teal">{f.code}</span>
+                <span className="text-muted-foreground truncate max-w-[12rem]">{f.subject}</span>
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
       {standardCodes.length > 0 && (
         <div className="space-y-2">
-          <Label className="font-roboto text-sm text-muted-foreground">
-            {standardsName} Standard Codes (select all that apply)
-          </Label>
+          <div className="flex items-center justify-between gap-2 flex-wrap">
+            <Label className="font-roboto text-sm text-muted-foreground">
+              {standardsName} Standard Codes (select all that apply)
+            </Label>
+          </div>
+
+          {/* Cross-grade search. Hits a dedicated endpoint that returns codes
+              across every grade of the currently selected subject. */}
+          {isAuthenticated && (
+            <div className="relative">
+              <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
+              <Input
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="Search all grades by code or description..."
+                className="pl-7 h-8 text-sm font-roboto"
+                data-testid={tid("input-search-codes")}
+              />
+            </div>
+          )}
+
           <ScrollArea className={`${scrollHeight} rounded-md border bg-muted/30`}>
-            <div className="p-3 space-y-1">
-              {standardCodes.map((code) => (
-                <div
-                  key={code.code}
-                  className="flex items-start gap-3 p-2 rounded-md hover-elevate cursor-pointer"
-                >
-                  <Checkbox
-                    id={`${testIdPrefix}-${code.code}`}
-                    checked={selectedStandardCodes.some((c) => c.code === code.code)}
-                    onCheckedChange={() => onToggleCode(code)}
-                    className="mt-0.5"
-                    data-testid={tid(`checkbox-standard-${code.code}`)}
-                  />
-                  <label
-                    htmlFor={`${testIdPrefix}-${code.code}`}
-                    className="font-roboto text-sm cursor-pointer leading-relaxed flex-1"
-                  >
-                    <span className="font-semibold text-lys-teal">{code.code}</span>
-                    <span className="text-muted-foreground ml-2">{code.description}</span>
-                    {showStandardSources && code.source && (
-                      <StandardsSourcePopover
-                        code={code}
-                        testId={tid(`badge-source-${code.code}`)}
-                      />
-                    )}
-                  </label>
+            <div className="p-3 space-y-3">
+              {/* Search results take over the list when the user is searching. */}
+              {trimmedQuery.length >= 2 ? (
+                <div className="space-y-1" data-testid={tid("search-results")}>
+                  <p className="text-[11px] uppercase tracking-wide font-roboto text-muted-foreground px-1">
+                    Search results across all grades
+                  </p>
+                  {(searchResults ?? []).length === 0 ? (
+                    <p className="text-xs text-muted-foreground italic px-1">
+                      No codes match "{trimmedQuery}".
+                    </p>
+                  ) : (
+                    (searchResults ?? []).map((c) =>
+                      renderCodeRow(c, { showGrade: true, keyPrefix: "search-" }),
+                    )
+                  )}
                 </div>
-              ))}
+              ) : (
+                <>
+                  {pinnedFavoritesForSubject.length > 0 && (
+                    <div className="space-y-1">
+                      <p className="text-[11px] uppercase tracking-wide font-roboto text-lys-yellow px-1 flex items-center gap-1">
+                        <Star className="h-3 w-3 fill-lys-yellow text-lys-yellow" />
+                        Favorites
+                      </p>
+                      {pinnedFavoritesForSubject.map((f) =>
+                        renderCodeRow(
+                          {
+                            code: f.code,
+                            description: f.description,
+                            gradeLevel: f.gradeLevel,
+                            standardsName: f.standardsName ?? undefined,
+                            jurisdictionName: f.jurisdictionName ?? undefined,
+                            source: f.source ?? undefined,
+                            sourceUrl: f.sourceUrl ?? undefined,
+                          },
+                          { keyPrefix: "fav-" },
+                        ),
+                      )}
+                    </div>
+                  )}
+
+                  {recentsNotPinned.length > 0 && (
+                    <div className="space-y-1" data-testid={tid("recents-row")}>
+                      <p className="text-[11px] uppercase tracking-wide font-roboto text-muted-foreground px-1 flex items-center gap-1">
+                        <Clock className="h-3 w-3" />
+                        Recently used
+                      </p>
+                      {recentsNotPinned.map((r) =>
+                        renderCodeRow(
+                          {
+                            code: r.code,
+                            description: r.description,
+                            gradeLevel: r.gradeLevel,
+                            standardsName: r.standardsName ?? undefined,
+                            source: r.source ?? undefined,
+                            sourceUrl: r.sourceUrl ?? undefined,
+                          },
+                          { keyPrefix: "recent-" },
+                        ),
+                      )}
+                    </div>
+                  )}
+
+                  {(pinnedFavoritesForSubject.length > 0 || recentsNotPinned.length > 0) && (
+                    <p className="text-[11px] uppercase tracking-wide font-roboto text-muted-foreground px-1">
+                      All standards
+                    </p>
+                  )}
+                  {codesWithoutPinned.map((c) => renderCodeRow(c))}
+                </>
+              )}
             </div>
           </ScrollArea>
           {selectedStandardCodes.length > 0 && (

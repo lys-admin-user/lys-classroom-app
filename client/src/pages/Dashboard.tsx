@@ -30,7 +30,8 @@ import {
   MessageCircle,
   Send,
   CheckSquare,
-  Circle
+  Circle,
+  FileText
 } from "lucide-react";
 import { Link } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
@@ -370,6 +371,109 @@ function StudentMessagingWidget() {
 }
 
 // ─── New Educator Checklist ────────────────────────────────────────────────────
+
+// Task #7 — "Standards I've used" dashboard widget. Aggregates from the
+// teacher_standards_usage log so it reflects both lesson- and assignment-side
+// codes, with clickable counts that deep-link back to lessons/assignments.
+interface StandardsHistoryRow {
+  country: string;
+  state: string;
+  subject: string;
+  code: string;
+  description: string;
+  gradeLevel: string | null;
+  standardsName: string | null;
+  useCount: number;
+  lastUsedAt: string | null;
+  lessonIds: string[];
+  assignmentIds: string[];
+}
+
+function StandardsUsedWidget() {
+  const { data: rows, isLoading } = useQuery<StandardsHistoryRow[]>({
+    queryKey: ["/api/teacher-standards/history"],
+  });
+  const items = rows ?? [];
+
+  const formatWhen = (iso: string | null) => {
+    if (!iso) return "—";
+    const d = new Date(iso);
+    if (isNaN(d.getTime())) return "—";
+    const diffMs = Date.now() - d.getTime();
+    const day = 86400000;
+    if (diffMs < day) return "today";
+    if (diffMs < 2 * day) return "yesterday";
+    if (diffMs < 30 * day) return `${Math.floor(diffMs / day)}d ago`;
+    return d.toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" });
+  };
+
+  return (
+    <Card data-testid="card-standards-used">
+      <CardHeader className="pb-3">
+        <CardTitle className="font-oswald text-lg flex items-center gap-2">
+          <FileText className="h-4 w-4 text-lys-teal" />
+          Standards I've used
+        </CardTitle>
+        <CardDescription className="font-roboto text-xs">
+          Every code you've attached to a lesson or assignment
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-2">
+        {isLoading ? (
+          <p className="text-xs text-muted-foreground font-roboto">Loading...</p>
+        ) : items.length === 0 ? (
+          <p className="text-xs text-muted-foreground font-roboto" data-testid="text-standards-empty">
+            No standards attached yet. They'll show up here after you save your first lesson.
+          </p>
+        ) : (
+          <>
+            <div className="max-h-64 overflow-y-auto pr-1 space-y-1.5">
+              {items.slice(0, 20).map((row) => {
+                const target =
+                  row.lessonIds.length > 0
+                    ? `/my-lessons?standard=${encodeURIComponent(row.code)}`
+                    : `/assignments?standard=${encodeURIComponent(row.code)}`;
+                return (
+                  <Link
+                    key={`${row.country}|${row.state}|${row.subject}|${row.code}`}
+                    href={target}
+                    className="block p-2 rounded-md hover-elevate border border-transparent"
+                    data-testid={`row-standard-history-${row.code}`}
+                  >
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="font-semibold text-lys-teal text-sm">{row.code}</span>
+                      <div className="flex items-center gap-2 flex-shrink-0">
+                        <Badge variant="outline" className="text-[10px] font-roboto" data-testid={`badge-count-${row.code}`}>
+                          {row.useCount}× used
+                        </Badge>
+                        <span className="text-[10px] text-muted-foreground font-roboto" data-testid={`text-lastused-${row.code}`}>
+                          {formatWhen(row.lastUsedAt)}
+                        </span>
+                      </div>
+                    </div>
+                    <p className="text-xs text-muted-foreground font-roboto line-clamp-1">
+                      {row.description}
+                    </p>
+                    <p className="text-[10px] text-muted-foreground font-roboto mt-0.5">
+                      {row.subject}
+                      {row.gradeLevel ? ` · ${row.gradeLevel}` : ""}
+                      {row.standardsName ? ` · ${row.standardsName}` : ""}
+                    </p>
+                  </Link>
+                );
+              })}
+            </div>
+            {items.length > 20 && (
+              <p className="text-[10px] text-muted-foreground font-roboto px-1">
+                Showing top 20 of {items.length} codes
+              </p>
+            )}
+          </>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
 
 function NewEducatorChecklist({ lessonsCount, goalsCount }: { lessonsCount: number; goalsCount: number }) {
   const { data: classesData } = useQuery<any[]>({ queryKey: ["/api/classes"] });
@@ -1118,6 +1222,7 @@ function EducatorDashboard() {
             <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
               <UpcomingDeadlines role="educator" />
               <NewEducatorChecklist lessonsCount={totalLessons} goalsCount={totalGoals} />
+              <StandardsUsedWidget />
             </div>
           </div>
         </section>

@@ -525,6 +525,29 @@ export default function LessonGenerator() {
       setIsSaved(true);
       setSavedLessonId(data.id);
       queryClient.invalidateQueries({ queryKey: ["/api/lessons"] });
+      // Record standard usage so the picker's "Recently used" row and the
+      // dashboard "Standards I've used" history populate. Fire-and-forget.
+      if (selectedStandardCodes.length > 0 && selectedCountry && selectedState && selectedSubject) {
+        apiRequest("POST", "/api/teacher-standards/record", {
+          lessonId: data.id,
+          codes: selectedStandardCodes.map((c: any) => ({
+            country: selectedCountry,
+            state: selectedState,
+            subject: selectedSubject,
+            code: c.code,
+            description: c.description ?? "",
+            gradeLevel: c.gradeLevel ?? gradeLevel ?? null,
+            standardsName: c.standardsName ?? standardsName ?? null,
+            source: c.source ?? null,
+            sourceUrl: c.sourceUrl ?? null,
+          })),
+        })
+          .then(() => {
+            queryClient.invalidateQueries({ queryKey: ["/api/teacher-standards/recents"] });
+            queryClient.invalidateQueries({ queryKey: ["/api/teacher-standards/history"] });
+          })
+          .catch(() => {});
+      }
       toast({
         title: "Lesson Saved!",
         description: "Now you can create an aligned assignment from this lesson. Scroll down to get started.",
@@ -583,6 +606,29 @@ export default function LessonGenerator() {
     onSuccess: (data: any) => {
       setGeneratedAssignment(data);
       queryClient.invalidateQueries({ queryKey: ["/api/assignments"] });
+      // Record assignment-side standards usage so history reflects both
+      // lesson- and assignment-attached codes.
+      if (selectedStandardCodes.length > 0 && selectedCountry && selectedState && selectedSubject && data?.id) {
+        apiRequest("POST", "/api/teacher-standards/record", {
+          assignmentId: data.id,
+          codes: selectedStandardCodes.map((c: any) => ({
+            country: selectedCountry,
+            state: selectedState,
+            subject: selectedSubject,
+            code: c.code,
+            description: c.description ?? "",
+            gradeLevel: c.gradeLevel ?? gradeLevel ?? null,
+            standardsName: c.standardsName ?? standardsName ?? null,
+            source: c.source ?? null,
+            sourceUrl: c.sourceUrl ?? null,
+          })),
+        })
+          .then(() => {
+            queryClient.invalidateQueries({ queryKey: ["/api/teacher-standards/recents"] });
+            queryClient.invalidateQueries({ queryKey: ["/api/teacher-standards/history"] });
+          })
+          .catch(() => {});
+      }
       toast({
         title: "Assignment Created!",
         description: `Your ${assignmentType} is ready to use.`,

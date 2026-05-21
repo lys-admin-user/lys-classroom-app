@@ -4218,3 +4218,93 @@ export const CURRICULUM_DOC_MODERATION_STATUSES = [
 ] as const;
 export type CurriculumDocModerationStatus =
   typeof CURRICULUM_DOC_MODERATION_STATUSES[number];
+
+// ─── Teacher Standards Quality-of-Life (Task #7) ──────────────────────────────
+//
+// Two narrow per-user tables that back the favorites star, the "Recently used"
+// row in the standards picker, and the "Standards I've used" dashboard widget.
+// Both are keyed by (userId, country, state, subject, code) so the picker can
+// efficiently query the slice for the current cascade selection without
+// scanning every code a teacher has ever touched.
+//
+// The favorite rows snapshot the human-readable description + source tier at
+// time of starring so the pinned list keeps rendering even if the underlying
+// catalog row is later edited or retired.
+export const teacherStandardsFavorites = pgTable(
+  "teacher_standards_favorites",
+  {
+    id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+    userId: varchar("user_id").notNull(),
+    country: text("country").notNull(),
+    state: text("state").notNull(),
+    subject: text("subject").notNull(),
+    code: text("code").notNull(),
+    description: text("description").notNull(),
+    gradeLevel: text("grade_level"),
+    standardsName: text("standards_name"),
+    jurisdictionName: text("jurisdiction_name"),
+    source: text("source"),
+    sourceUrl: text("source_url"),
+    createdAt: timestamp("created_at").defaultNow(),
+  },
+  (table) => [
+    uniqueIndex("uniq_teacher_fav_code").on(
+      table.userId,
+      table.country,
+      table.state,
+      table.subject,
+      table.code,
+    ),
+    index("idx_teacher_fav_user").on(table.userId),
+  ],
+);
+
+export const insertTeacherStandardFavoriteSchema = createInsertSchema(
+  teacherStandardsFavorites,
+).omit({ id: true, createdAt: true });
+export type InsertTeacherStandardFavorite = z.infer<
+  typeof insertTeacherStandardFavoriteSchema
+>;
+export type TeacherStandardFavorite = typeof teacherStandardsFavorites.$inferSelect;
+
+// One row per (code × lesson/assignment) usage. Derives both the picker's
+// "Recently used" row (dedup by code, take the 10 most recent) and the
+// dashboard "Standards I've used" widget (group by code, count + max(usedAt),
+// link back to originating lesson/assignment ids).
+export const teacherStandardsUsage = pgTable(
+  "teacher_standards_usage",
+  {
+    id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+    userId: varchar("user_id").notNull(),
+    country: text("country").notNull(),
+    state: text("state").notNull(),
+    subject: text("subject").notNull(),
+    code: text("code").notNull(),
+    description: text("description").notNull(),
+    gradeLevel: text("grade_level"),
+    standardsName: text("standards_name"),
+    source: text("source"),
+    sourceUrl: text("source_url"),
+    lessonId: varchar("lesson_id"),
+    assignmentId: varchar("assignment_id"),
+    usedAt: timestamp("used_at").defaultNow(),
+  },
+  (table) => [
+    index("idx_teacher_usage_user_code").on(
+      table.userId,
+      table.country,
+      table.state,
+      table.subject,
+      table.code,
+    ),
+    index("idx_teacher_usage_user_recent").on(table.userId, table.usedAt),
+  ],
+);
+
+export const insertTeacherStandardsUsageSchema = createInsertSchema(
+  teacherStandardsUsage,
+).omit({ id: true, usedAt: true });
+export type InsertTeacherStandardsUsage = z.infer<
+  typeof insertTeacherStandardsUsageSchema
+>;
+export type TeacherStandardsUsage = typeof teacherStandardsUsage.$inferSelect;

@@ -23,6 +23,7 @@ import "./account";
 import "./analytics";
 import "./misc";
 import "./lessonAi";
+import "./teacherStandards";
 
 export {
   DatabaseStorage,
