@@ -1684,6 +1684,19 @@ export const assignments = pgTable("assignments", {
   accommodationModified: boolean("accommodation_modified").default(false),
   accommodationTypes: jsonb("accommodation_types").$type<string[]>(),
   accommodationNotes: text("accommodation_notes"),
+  // Standards selected via the country→state→subject→codes cascade, persisted
+  // so the assignment detail can render badges + source provenance later. Each
+  // entry preserves the catalog source tier and the linkable provenance URL
+  // shown by the standard-code popover at selection time.
+  standardsCodes: jsonb("standards_codes").$type<{
+    code: string;
+    description: string;
+    source?: "official" | "curated" | "fallback";
+    sourceUrl?: string | null;
+    jurisdictionName?: string | null;
+    standardsName?: string | null;
+    lastVerifiedAt?: string | null;
+  }[]>(),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });

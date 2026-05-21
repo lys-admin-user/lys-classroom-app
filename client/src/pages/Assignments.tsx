@@ -24,6 +24,7 @@ import { useTier } from "@/hooks/use-tier";
 import { useTrial } from "@/hooks/use-trial";
 import { PLAN_PRICES } from "@/lib/pricing";
 import type { Lesson, Assignment, Class, Student, StudentGroup, AccommodationType } from "@shared/schema";
+import { StandardsCascadePicker, StandardsSourcePopover, type CatalogCodeClient } from "@/components/StandardsCascadePicker";
 import { accommodationLabels } from "@shared/schema";
 
 const ASSIGNMENT_TYPES = [
@@ -110,6 +111,32 @@ export default function Assignments() {
   const [manualInstructions, setManualInstructions] = useState("");
   const [manualDueDate, setManualDueDate] = useState("");
   const [manualClassId, setManualClassId] = useState("");
+  const [manualStdCountry, setManualStdCountry] = useState("");
+  const [manualStdState, setManualStdState] = useState("");
+  const [manualStdSubject, setManualStdSubject] = useState("");
+  const [manualStdCodes, setManualStdCodes] = useState<CatalogCodeClient[]>([]);
+  const handleManualStdCountry = (c: string) => {
+    setManualStdCountry(c);
+    setManualStdState("");
+    setManualStdSubject("");
+    setManualStdCodes([]);
+  };
+  const handleManualStdState = (s: string) => {
+    setManualStdState(s);
+    setManualStdSubject("");
+    setManualStdCodes([]);
+  };
+  const handleManualStdSubject = (s: string) => {
+    setManualStdSubject(s);
+    setManualStdCodes([]);
+  };
+  const toggleManualStdCode = (code: CatalogCodeClient) => {
+    setManualStdCodes((prev) =>
+      prev.some((c) => c.code === code.code)
+        ? prev.filter((c) => c.code !== code.code)
+        : [...prev, code],
+    );
+  };
   const [manualQuestions, setManualQuestions] = useState<{
     type: "multiple_choice" | "short_answer" | "essay" | "true_false";
     question: string;
@@ -366,6 +393,10 @@ export default function Assignments() {
       setManualDueDate("");
       setManualClassId("");
       setManualQuestions([]);
+      setManualStdCountry("");
+      setManualStdState("");
+      setManualStdSubject("");
+      setManualStdCodes([]);
     },
     onError: () => {
       toast({ title: "Error", description: "Failed to create assignment", variant: "destructive" });
@@ -401,6 +432,7 @@ export default function Assignments() {
       classId: manualClassId || undefined,
       assignmentType: "individual",
       status: "draft",
+      standardsCodes: manualStdCodes.length > 0 ? manualStdCodes : undefined,
     });
   };
 
@@ -1698,6 +1730,29 @@ export default function Assignments() {
 
                 <Separator />
 
+                <div className="space-y-3">
+                  <div className="flex items-center gap-2">
+                    <GraduationCap className="h-5 w-5 text-lys-red" />
+                    <Label className="font-oswald text-base">Aligned Standards (optional)</Label>
+                  </div>
+                  <p className="text-sm text-muted-foreground">
+                    Tag this assignment with the standard codes it covers so they can be surfaced on the assignment detail.
+                  </p>
+                  <StandardsCascadePicker
+                    selectedCountry={manualStdCountry}
+                    selectedState={manualStdState}
+                    selectedSubject={manualStdSubject}
+                    selectedStandardCodes={manualStdCodes}
+                    onCountryChange={handleManualStdCountry}
+                    onStateChange={handleManualStdState}
+                    onSubjectChange={handleManualStdSubject}
+                    onToggleCode={toggleManualStdCode}
+                    testIdPrefix="manual-std"
+                  />
+                </div>
+
+                <Separator />
+
                 <div>
                   <div className="flex items-center justify-between gap-2 mb-4 flex-wrap">
                     <div>
@@ -2049,7 +2104,7 @@ export default function Assignments() {
                         </div>
                         <CardDescription className="line-clamp-2">{assignment.description}</CardDescription>
                       </CardHeader>
-                      <CardContent className="pb-2">
+                      <CardContent className="pb-2 space-y-2">
                         <div className="flex items-center gap-4 text-sm text-muted-foreground">
                           <span className="flex items-center gap-1">
                             <FileText className="h-4 w-4" />
@@ -2060,6 +2115,31 @@ export default function Assignments() {
                             {assignment.totalPoints} pts
                           </span>
                         </div>
+                        {((assignment as any).standardsCodes as CatalogCodeClient[] | null | undefined)?.length ? (
+                          <div
+                            className="flex flex-wrap items-center gap-1.5 pt-1"
+                            data-testid={`standards-list-${assignment.id}`}
+                          >
+                            <GraduationCap className="h-3.5 w-3.5 text-muted-foreground" />
+                            {((assignment as any).standardsCodes as CatalogCodeClient[]).map((sc) => (
+                              <span
+                                key={sc.code}
+                                className="inline-flex items-center"
+                                data-testid={`standard-${assignment.id}-${sc.code}`}
+                              >
+                                <Badge variant="secondary" className="text-[10px] font-roboto">
+                                  {sc.code}
+                                </Badge>
+                                {sc.source && (
+                                  <StandardsSourcePopover
+                                    code={sc}
+                                    testId={`badge-source-${assignment.id}-${sc.code}`}
+                                  />
+                                )}
+                              </span>
+                            ))}
+                          </div>
+                        ) : null}
                       </CardContent>
                       <CardFooter className="gap-2">
                         <Dialog open={assignDialogOpen} onOpenChange={setAssignDialogOpen}>

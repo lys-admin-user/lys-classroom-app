@@ -51,6 +51,9 @@ export interface CatalogCode {
   gradeLevel?: string | null;
   source: CatalogSourceTier;
   sourceUrl?: string | null;
+  jurisdictionName?: string | null;
+  standardsName?: string | null;
+  lastVerifiedAt?: string | null;
 }
 
 // Countries (or "Common Core") whose jurisdictions publish per-outcome codes
@@ -244,12 +247,19 @@ export async function listCodes(
     const standards = gradeLevels.length > 0
       ? await storage.getEducationalStandardsByGradeLevels(subjectSet.id, gradeLevels)
       : await storage.getEducationalStandards(subjectSet.id);
+    const lastVerifiedRaw = (subjectSet as any).lastSyncedAt || (jurisdiction as any).lastSyncedAt || null;
+    const lastVerifiedAt: string | null = lastVerifiedRaw
+      ? (lastVerifiedRaw instanceof Date ? lastVerifiedRaw.toISOString() : String(lastVerifiedRaw))
+      : null;
     return standards.map((s) => ({
       code: s.humanCoding,
       description: s.statement,
       gradeLevel: s.gradeLevel,
       source: dbSourceTier,
       sourceUrl: subjectSet.documentUrl || jurisdiction.sourceUrl,
+      jurisdictionName: jurisdiction.name,
+      standardsName: jurisdiction.standardsName,
+      lastVerifiedAt,
     }));
   }
 
@@ -268,10 +278,14 @@ export async function listCodes(
       userId: opts.userId ?? null,
     });
   }
+  const fallbackStandardsName = jurisdiction?.standardsName ?? null;
+  const fallbackJurisdictionName = jurisdiction?.name ?? null;
   return fallbackCodes.map((s) => ({
     code: s.code,
     description: s.description,
     source: "fallback",
+    jurisdictionName: fallbackJurisdictionName,
+    standardsName: fallbackStandardsName,
   }));
 }
 

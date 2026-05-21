@@ -16,6 +16,7 @@ import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { streamGeneration } from "@/lib/streamGeneration";
 import { GenerationCountdown, type GenerationPhase, type FallbackSource } from "@/components/GenerationCountdown";
+import { StandardsCascadePicker } from "@/components/StandardsCascadePicker";
 import { useAuth } from "@/hooks/use-auth";
 import { useTier } from "@/hooks/use-tier";
 import { useTrial } from "@/hooks/use-trial";
@@ -848,89 +849,19 @@ ${addedResources.length > 0 ? addedResources.map(r => `- ${r.title}: ${r.url}`).
                     )}
                   </div>
                   
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label className="font-roboto text-sm text-muted-foreground flex items-center gap-1">
-                        <Globe className="h-3 w-3" />
-                        Country
-                      </Label>
-                      <Select value={selectedCountry} onValueChange={handleCountryChange}>
-                        <SelectTrigger className="font-roboto" data-testid="select-country">
-                          <SelectValue placeholder="Select country" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {countries.map((country) => (
-                            <SelectItem key={country} value={country} className="font-roboto">
-                              {country}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    <div className="space-y-2">
-                      <Label className="font-roboto text-sm text-muted-foreground flex items-center gap-1">
-                        <MapPin className="h-3 w-3" />
-                        State/Region
-                      </Label>
-                      <Select value={selectedState} onValueChange={handleStateChange} disabled={!selectedCountry}>
-                        <SelectTrigger className="font-roboto" data-testid="select-state">
-                          <SelectValue placeholder="Select state" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {states.map((state) => (
-                            <SelectItem key={state.abbreviation} value={state.abbreviation} className="font-roboto">
-                              {state.state} ({state.standardsName})
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label className="font-roboto text-sm text-muted-foreground flex items-center gap-1">
-                      <FileText className="h-3 w-3" />
-                      Subject Area
-                    </Label>
-                    <Select value={selectedSubject} onValueChange={handleSubjectChange} disabled={!selectedState}>
-                      <SelectTrigger className="font-roboto" data-testid="select-subject">
-                        <SelectValue placeholder="Select subject" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {subjects.map((subject) => (
-                          <SelectItem key={subject.subject} value={subject.subject} className="font-roboto">
-                            {subject.subject}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-
-                  {/* Selection breadcrumb path */}
-                  {(selectedCountry || selectedState || selectedSubject) && (
-                    <div className="flex items-center gap-1 text-xs font-roboto text-muted-foreground bg-muted/50 rounded-md px-3 py-2" data-testid="breadcrumb-selection">
-                      {selectedCountry && (
-                        <>
-                          <Globe className="h-3 w-3" />
-                          <span>{selectedCountry}</span>
-                        </>
-                      )}
-                      {selectedState && (
-                        <>
-                          <ChevronRight className="h-3 w-3" />
-                          <MapPin className="h-3 w-3" />
-                          <span>{states.find(s => s.abbreviation === selectedState)?.state || selectedState}</span>
-                        </>
-                      )}
-                      {selectedSubject && (
-                        <>
-                          <ChevronRight className="h-3 w-3" />
-                          <FileText className="h-3 w-3" />
-                          <span>{selectedSubject}</span>
-                        </>
-                      )}
-                    </div>
-                  )}
+                  <StandardsCascadePicker
+                    selectedCountry={selectedCountry}
+                    selectedState={selectedState}
+                    selectedSubject={selectedSubject}
+                    selectedStandardCodes={selectedStandardCodes as any}
+                    onCountryChange={handleCountryChange}
+                    onStateChange={handleStateChange}
+                    onSubjectChange={handleSubjectChange}
+                    onToggleCode={toggleStandardCode as any}
+                    showStandardSources={showStandardSources}
+                    showRequestCurriculum={showStandardSources}
+                    testIdPrefix=""
+                  />
 
                   {alignmentDocs.length > 0 && (
                     <div className="rounded-md border border-lys-blue/30 bg-lys-blue/5 p-3" data-testid="banner-alignment-docs">
@@ -947,116 +878,6 @@ ${addedResources.length > 0 ? addedResources.map(r => `- ${r.title}: ${r.url}`).
                     </div>
                   )}
 
-                  {/* Track B #15 — Empty-state CTA. When the teacher has
-                      picked country/state/subject but the cascade returned
-                      zero codes, give them a one-click path to request the
-                      curriculum instead of a silent dead-end. We only show
-                      it after a subject is chosen (otherwise it's expected
-                      to be empty) and only for solo educators (admins use
-                      the dedicated ingestion dashboard). */}
-                  {selectedSubject && standardCodes.length === 0 && showStandardSources && (
-                    <div
-                      className="rounded-md border border-dashed border-lys-yellow/50 bg-lys-yellow/5 p-4 text-sm"
-                      data-testid="empty-state-no-codes"
-                    >
-                      <p className="font-semibold mb-1">No standard codes available for this subject yet.</p>
-                      <p className="text-muted-foreground mb-3">
-                        You can still generate a lesson — we'll align it to grade-level outcomes from your country's curriculum. Want us to add code-level standards for {selectedCountry}?
-                      </p>
-                      <Button
-                        type="button"
-                        size="sm"
-                        variant="outline"
-                        data-testid="button-request-curriculum"
-                        onClick={async () => {
-                          try {
-                            await apiRequest("POST", "/api/standards-ingestion/requests", {
-                              country: selectedCountry,
-                              state: selectedState || undefined,
-                              notes: `Requested from lesson generator: ${selectedSubject}${gradeLevel ? ` / ${gradeLevel}` : ""}`,
-                            });
-                            toast({ title: "Request sent", description: "A system administrator will review your request." });
-                          } catch (err: any) {
-                            toast({ title: "Request failed", description: err.message, variant: "destructive" });
-                          }
-                        }}
-                      >
-                        Request this curriculum
-                      </Button>
-                    </div>
-                  )}
-
-                  {standardCodes.length > 0 && (
-                    <div className="space-y-2">
-                      <Label className="font-roboto text-sm text-muted-foreground">
-                        {standardsName} Standard Codes (select all that apply)
-                      </Label>
-                      <ScrollArea className="h-48 rounded-md border bg-muted/30">
-                        <div className="p-3 space-y-1">
-                          {standardCodes.map((code) => (
-                            <div 
-                              key={code.code} 
-                              className="flex items-start gap-3 p-2 rounded-md hover-elevate cursor-pointer"
-                            >
-                              <Checkbox
-                                id={code.code}
-                                checked={selectedStandardCodes.some(c => c.code === code.code)}
-                                onCheckedChange={() => toggleStandardCode(code)}
-                                className="mt-0.5"
-                                data-testid={`checkbox-standard-${code.code}`}
-                              />
-                              <label htmlFor={code.code} className="font-roboto text-sm cursor-pointer leading-relaxed flex-1">
-                                <span className="font-semibold text-lys-teal">{code.code}</span>
-                                <span className="text-muted-foreground ml-2">{code.description}</span>
-                                {showStandardSources && (code as any).source && (
-                                  <Badge
-                                    variant="outline"
-                                    className={`ml-2 text-[10px] font-roboto align-middle ${
-                                      (code as any).source === "official"
-                                        ? "border-lys-teal/40 text-lys-teal"
-                                        : (code as any).source === "curated"
-                                        ? "border-lys-yellow/50 text-lys-yellow"
-                                        : "border-muted-foreground/30 text-muted-foreground"
-                                    }`}
-                                    title={
-                                      (code as any).source === "official"
-                                        ? "Official ministry / standards-consortium source"
-                                        : (code as any).source === "curated"
-                                        ? "Admin-curated entry — not yet verified against an official ministry feed"
-                                        : "Starter library — used when no official source is available yet"
-                                    }
-                                    data-testid={`badge-source-${code.code}`}
-                                  >
-                                    {(code as any).source === "official"
-                                      ? "official"
-                                      : (code as any).source === "curated"
-                                      ? "curated"
-                                      : "starter"}
-                                  </Badge>
-                                )}
-                              </label>
-                            </div>
-                          ))}
-                        </div>
-                      </ScrollArea>
-                      {selectedStandardCodes.length > 0 && (
-                        <div className="flex flex-wrap gap-1.5 mt-2">
-                          {selectedStandardCodes.map((code) => (
-                            <Badge 
-                              key={code.code} 
-                              variant="secondary" 
-                              className="font-roboto text-xs cursor-pointer"
-                              onClick={() => toggleStandardCode(code)}
-                              data-testid={`badge-selected-${code.code}`}
-                            >
-                              {code.code}
-                              <X className="h-3 w-3 ml-1" />
-                            </Badge>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-                  )}
                 </div>
 
                 {isAfrican && africanProfile && (
