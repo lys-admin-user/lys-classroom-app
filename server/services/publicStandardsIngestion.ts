@@ -131,6 +131,18 @@ export async function createIngestionRequest(input: {
       status: "pending",
     })
     .returning();
+  // Task #8: notify system admins of every new ingestion request. Fire and
+  // forget — notifications must never block the request submission path.
+  try {
+    const { notifyIngestionRequestSubmitted } = await import("./notificationsService");
+    void notifyIngestionRequestSubmitted({
+      requestId: row.id,
+      country: row.country,
+      state: row.state,
+    });
+  } catch (err) {
+    console.error("[publicStandardsIngestion] notify-request failed:", err);
+  }
   return row;
 }
 
@@ -430,6 +442,27 @@ export async function runSyncForSource(
       .set({ lastSyncedAt: new Date(), lastSyncStatus: "ok" })
       .where(eq(standardsSourceRegistry.id, source.id));
 
+    // Task #8 notifications: fire on the two interesting outcomes of a
+    // successful run — verbatim rejection spike (data-quality signal) and
+    // new pending standards ready to moderate.
+    try {
+      const notif = await import("./notificationsService");
+      void notif.notifyVerbatimRejectionSpike({
+        syncRunId: run.id,
+        country: source.country,
+        state: source.state,
+        rejectedCount: verbatimRejected,
+      });
+      void notif.notifyPendingStandardsReady({
+        syncRunId: run.id,
+        country: source.country,
+        state: source.state,
+        pendingCount: items.length,
+      });
+    } catch (err) {
+      console.error("[publicStandardsIngestion] notify-success failed:", err);
+    }
+
     return { ...run, status: "completed", sourcesSucceeded: 1, pendingCreated: items.length, verbatimRejected };
   } catch (err: any) {
     const msg = err?.message || String(err);
@@ -441,6 +474,18 @@ export async function runSyncForSource(
       .update(standardsSourceRegistry)
       .set({ lastSyncedAt: new Date(), lastSyncStatus: "failed" })
       .where(eq(standardsSourceRegistry.id, source.id));
+    // Task #8: alert admins on sync failure.
+    try {
+      const { notifySyncRunFailed } = await import("./notificationsService");
+      void notifySyncRunFailed({
+        syncRunId: run.id,
+        country: source.country,
+        state: source.state,
+        errorMessage: msg,
+      });
+    } catch (notifErr) {
+      console.error("[publicStandardsIngestion] notify-failure failed:", notifErr);
+    }
     return { ...run, status: "failed", errorMessage: msg };
   }
 }

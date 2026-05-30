@@ -96,6 +96,12 @@ export const userPreferences = pgTable("user_preferences", {
     experienceLevel: string;
     recommendedFeatures: string[];
   }>(),
+  // Standards observability opt-outs (Task #8). System admins receive
+  // a weekly digest email + in-app notifications by default; either channel
+  // can be disabled from account settings. Both columns are NULL-safe and
+  // default to false so existing rows continue to receive notifications.
+  emailDigestOptOut: boolean("email_digest_opt_out").default(false),
+  inAppNotificationsOptOut: boolean("in_app_notifications_opt_out").default(false),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });

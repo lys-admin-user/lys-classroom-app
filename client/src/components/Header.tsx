@@ -1,6 +1,7 @@
 import { Link, useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
 import { ThemeToggle } from "./ThemeToggle";
+import { NotificationsBell } from "./NotificationsBell";
 import { LogIn, LogOut, Settings, CreditCard, Compass } from "lucide-react";
 import { useAuth } from "@/hooks/use-auth";
 import { SidebarTrigger, useSidebar } from "@/components/ui/sidebar";
@@ -122,6 +123,7 @@ export function Header() {
             </Link>
           </Button>
         )}
+        <NotificationsBell />
         <ThemeToggle />
         
         {isLoading ? (

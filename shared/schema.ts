@@ -4308,3 +4308,61 @@ export type InsertTeacherStandardsUsage = z.infer<
   typeof insertTeacherStandardsUsageSchema
 >;
 export type TeacherStandardsUsage = typeof teacherStandardsUsage.$inferSelect;
+
+// ============================================================================
+// STANDARDS OBSERVABILITY (Task #8: digests + in-app notifications)
+// One row per admin event. The in-app bell reads from here; the weekly digest
+// summarizes the same underlying activity tables (ingestion requests / sync
+// runs / fallback misses) into an email and also reuses these notifications
+// for the "unread since last digest" rollup.
+// ============================================================================
+export const NOTIFICATION_KINDS = [
+  "ingestion_request_submitted",
+  "sync_run_failed",
+  "verbatim_rejection_spike",
+  "pending_standards_ready",
+] as const;
+export type NotificationKind = (typeof NOTIFICATION_KINDS)[number];
+
+export const adminNotifications = pgTable(
+  "admin_notifications",
+  {
+    id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+    userId: varchar("user_id").notNull(),
+    kind: text("kind").notNull().$type<NotificationKind>(),
+    title: text("title").notNull(),
+    body: text("body").notNull(),
+    link: text("link"),
+    relatedEntityId: varchar("related_entity_id"),
+    isRead: boolean("is_read").notNull().default(false),
+    createdAt: timestamp("created_at").defaultNow(),
+  },
+  (table) => [
+    index("idx_admin_notif_user_unread").on(table.userId, table.isRead, table.createdAt),
+  ],
+);
+export const insertAdminNotificationSchema = createInsertSchema(adminNotifications).omit({
+  id: true,
+  createdAt: true,
+  isRead: true,
+});
+export type InsertAdminNotification = z.infer<typeof insertAdminNotificationSchema>;
+export type AdminNotification = typeof adminNotifications.$inferSelect;
+
+// Append-only audit of every weekly digest we've assembled. Persisting the
+// rendered subject + body gives admins a paper trail when the real outbound
+// transport (SMTP / SendGrid / etc.) is not configured in this environment.
+export const standardsDigestLog = pgTable("standards_digest_log", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull(),
+  email: text("email"),
+  subject: text("subject").notNull(),
+  body: text("body").notNull(),
+  // "sent" | "skipped_opted_out" | "logged_no_transport" | "failed"
+  status: text("status").notNull(),
+  errorMessage: text("error_message"),
+  periodStart: timestamp("period_start").notNull(),
+  periodEnd: timestamp("period_end").notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+export type StandardsDigestLog = typeof standardsDigestLog.$inferSelect;

@@ -9,6 +9,7 @@ import { useLocation } from "wouter";
 import { PLAN_PRICES, SEAT_PRICES, SEAT_MINIMUMS } from "@/lib/pricing";
 import EducatorProfileForm from "@/components/EducatorProfileForm";
 import ProfileTierSitemap from "@/components/ProfileTierSitemap";
+import { NotificationSettings } from "@/components/NotificationSettings";
 import type { EducatorProfile } from "@shared/schema";
 
 export default function Settings() {
@@ -136,6 +137,10 @@ export default function Settings() {
           <Separator />
 
           <ProfileTierSitemap />
+
+          <Separator />
+
+          <NotificationSettings />
 
           <Separator />
 
