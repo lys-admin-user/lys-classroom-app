@@ -81,6 +81,60 @@ interface AccommodationSuggestion {
   source: string;
 }
 
+// Shared renderer for the standards-source provenance badges so the saved
+// cards, the generated/preview detail, and the student/parent views all show
+// the same code badges + source popover. When `includePrint` is set, a static
+// badge-free line is emitted for print output alongside the screen badges.
+function AssignmentStandardsBadges({
+  codes,
+  testIdPrefix,
+  showPopover = true,
+  includePrint = false,
+}: {
+  codes: CatalogCodeClient[] | null | undefined;
+  testIdPrefix: string;
+  showPopover?: boolean;
+  includePrint?: boolean;
+}) {
+  if (!codes?.length) return null;
+  return (
+    <>
+      <div
+        className={`flex flex-wrap items-center gap-1.5${includePrint ? " print:hidden" : ""}`}
+        data-testid={`${testIdPrefix}-standards-list`}
+      >
+        <GraduationCap className="h-3.5 w-3.5 text-muted-foreground" />
+        {codes.map((sc) => (
+          <span
+            key={sc.code}
+            className="inline-flex items-center"
+            data-testid={`${testIdPrefix}-standard-${sc.code}`}
+          >
+            <Badge variant="secondary" className="text-[10px] font-roboto">
+              {sc.code}
+            </Badge>
+            {showPopover && sc.source && (
+              <StandardsSourcePopover
+                code={sc}
+                testId={`${testIdPrefix}-badge-source-${sc.code}`}
+              />
+            )}
+          </span>
+        ))}
+      </div>
+      {includePrint && (
+        <p
+          className="hidden print:block text-xs"
+          data-testid={`${testIdPrefix}-standards-print`}
+        >
+          <span className="font-semibold">Standards: </span>
+          {codes.map((sc) => sc.code).join(", ")}
+        </p>
+      )}
+    </>
+  );
+}
+
 export default function Assignments() {
   const [, setLocation] = useLocation();
   const { toast } = useToast();
@@ -986,6 +1040,16 @@ export default function Assignments() {
                   </div>
                 </div>
 
+                {/* Standards-source provenance (interactive, screen only) */}
+                {((generatedAssignment.standardsCodes as CatalogCodeClient[] | null | undefined)?.length) ? (
+                  <div className="print:hidden">
+                    <AssignmentStandardsBadges
+                      codes={generatedAssignment.standardsCodes as CatalogCodeClient[]}
+                      testIdPrefix="preview"
+                    />
+                  </div>
+                ) : null}
+
                 {/* Progress Summary Bar */}
                 <Card className="print:hidden">
                   <CardContent className="py-3 px-4">
@@ -1095,6 +1159,18 @@ export default function Assignments() {
                           )}
                         </div>
                       </div>
+                      {/* Tagged standards — static, badge-free line for print/export */}
+                      {((generatedAssignment.standardsCodes as CatalogCodeClient[] | null | undefined)?.length) ? (
+                        <p
+                          className="hidden print:block text-sm mt-3"
+                          data-testid="preview-standards-print"
+                        >
+                          <span className="font-semibold">Standards: </span>
+                          {(generatedAssignment.standardsCodes as CatalogCodeClient[])
+                            .map((sc) => sc.code)
+                            .join(", ")}
+                        </p>
+                      ) : null}
                     </div>
 
                     {/* Worksheet Layout with Sidebar */}
@@ -2005,6 +2081,13 @@ export default function Assignments() {
                                   {assignment.assignmentType && (
                                     <Badge variant="outline" className="mt-2 capitalize">{assignment.assignmentType}</Badge>
                                   )}
+                                  <div className="mt-2">
+                                    <AssignmentStandardsBadges
+                                      codes={(assignment as any).standardsCodes as CatalogCodeClient[] | null | undefined}
+                                      testIdPrefix={`assigned-${assignment.id}`}
+                                      showPopover={false}
+                                    />
+                                  </div>
                                 </CardContent>
                                 <CardFooter>
                                   <Button size="sm" className="w-full" data-testid={`button-start-${assignment.id}`}>
@@ -2065,6 +2148,13 @@ export default function Assignments() {
                                     {recipient.feedback}
                                   </p>
                                 )}
+                                <div className="mt-2">
+                                  <AssignmentStandardsBadges
+                                    codes={(assignment as any).standardsCodes as CatalogCodeClient[] | null | undefined}
+                                    testIdPrefix={`completed-${assignment.id}`}
+                                    showPopover={false}
+                                  />
+                                </div>
                               </CardContent>
                               <CardFooter>
                                 <Button size="sm" variant="outline" className="w-full" data-testid={`button-review-${assignment.id}`}>
@@ -2115,31 +2205,12 @@ export default function Assignments() {
                             {assignment.totalPoints} pts
                           </span>
                         </div>
-                        {((assignment as any).standardsCodes as CatalogCodeClient[] | null | undefined)?.length ? (
-                          <div
-                            className="flex flex-wrap items-center gap-1.5 pt-1"
-                            data-testid={`standards-list-${assignment.id}`}
-                          >
-                            <GraduationCap className="h-3.5 w-3.5 text-muted-foreground" />
-                            {((assignment as any).standardsCodes as CatalogCodeClient[]).map((sc) => (
-                              <span
-                                key={sc.code}
-                                className="inline-flex items-center"
-                                data-testid={`standard-${assignment.id}-${sc.code}`}
-                              >
-                                <Badge variant="secondary" className="text-[10px] font-roboto">
-                                  {sc.code}
-                                </Badge>
-                                {sc.source && (
-                                  <StandardsSourcePopover
-                                    code={sc}
-                                    testId={`badge-source-${assignment.id}-${sc.code}`}
-                                  />
-                                )}
-                              </span>
-                            ))}
-                          </div>
-                        ) : null}
+                        <div className="pt-1">
+                          <AssignmentStandardsBadges
+                            codes={(assignment as any).standardsCodes as CatalogCodeClient[] | null | undefined}
+                            testIdPrefix={assignment.id}
+                          />
+                        </div>
                       </CardContent>
                       <CardFooter className="gap-2">
                         <Dialog open={assignDialogOpen} onOpenChange={setAssignDialogOpen}>
