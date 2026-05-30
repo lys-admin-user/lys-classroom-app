@@ -155,6 +155,67 @@ const lessonAiMethods: ThisType<DatabaseStorage> = {
     return row;
   },
 
+  // ----- AI cost analytics -----
+  // Aggregates real OpenAI spend recorded on the two attribution tables.
+  // `windowDays` limits to the trailing N days (0 = all time).
+  async getAiCostSummary(windowDays: number = 30): Promise<{
+    windowDays: number;
+    lessons: { count: number; costUsd: number; promptTokens: number; completionTokens: number; avgCostUsd: number };
+    assignments: { count: number; costUsd: number; promptTokens: number; completionTokens: number; avgCostUsd: number };
+    totalCostUsd: number;
+    daily: Array<{ day: string; lessonCost: number; assignmentCost: number }>;
+  }> {
+    const sinceClause = windowDays > 0
+      ? sql`WHERE created_at >= NOW() - (${windowDays} * INTERVAL '1 day')`
+      : sql``;
+
+    const lessonAgg = await db.execute(sql`
+      SELECT COUNT(*)::int AS count,
+             COALESCE(SUM(cost_usd), 0)::float AS "costUsd",
+             COALESCE(SUM(prompt_tokens), 0)::int AS "promptTokens",
+             COALESCE(SUM(completion_tokens), 0)::int AS "completionTokens",
+             COALESCE(AVG(cost_usd), 0)::float AS "avgCostUsd"
+      FROM lesson_generation_attribution
+      ${sinceClause}
+    `);
+    const assignmentAgg = await db.execute(sql`
+      SELECT COUNT(*)::int AS count,
+             COALESCE(SUM(cost_usd), 0)::float AS "costUsd",
+             COALESCE(SUM(prompt_tokens), 0)::int AS "promptTokens",
+             COALESCE(SUM(completion_tokens), 0)::int AS "completionTokens",
+             COALESCE(AVG(cost_usd), 0)::float AS "avgCostUsd"
+      FROM assignment_generation_attribution
+      ${sinceClause}
+    `);
+    const dailyAgg = await db.execute(sql`
+      SELECT day,
+             COALESCE(SUM(lesson_cost), 0)::float AS "lessonCost",
+             COALESCE(SUM(assignment_cost), 0)::float AS "assignmentCost"
+      FROM (
+        SELECT DATE(created_at) AS day, cost_usd AS lesson_cost, 0 AS assignment_cost
+        FROM lesson_generation_attribution ${sinceClause}
+        UNION ALL
+        SELECT DATE(created_at) AS day, 0 AS lesson_cost, cost_usd AS assignment_cost
+        FROM assignment_generation_attribution ${sinceClause}
+      ) merged
+      GROUP BY day
+      ORDER BY day DESC
+      LIMIT 60
+    `);
+
+    const lessons = ((lessonAgg as any).rows ?? [])[0] ?? { count: 0, costUsd: 0, promptTokens: 0, completionTokens: 0, avgCostUsd: 0 };
+    const assignments = ((assignmentAgg as any).rows ?? [])[0] ?? { count: 0, costUsd: 0, promptTokens: 0, completionTokens: 0, avgCostUsd: 0 };
+    const daily = (((dailyAgg as any).rows ?? []) as Array<{ day: string; lessonCost: number; assignmentCost: number }>).reverse();
+
+    return {
+      windowDays,
+      lessons,
+      assignments,
+      totalCostUsd: (lessons.costUsd || 0) + (assignments.costUsd || 0),
+      daily,
+    };
+  },
+
   async updateLessonAttributionScore(cacheKey: string, finalScore: number): Promise<void> {
     await db.update(lessonGenerationAttribution)
       .set({ finalScore })

@@ -18,7 +18,7 @@ import { Slider } from "@/components/ui/slider";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useState, useEffect } from "react";
-import { Shield, Building2, Users, Plus, Trash2, Settings, BarChart3, AlertTriangle, Loader2, Flag, Mail, Edit2, ToggleLeft, Percent, TrendingUp, Target, Award, GraduationCap, Star, Brain, Compass, Briefcase, Library, FileText, Clock, Search, UserPlus, Mail as MailIcon, Upload, Download, CheckSquare, Square, AlertCircle, Activity, Ban, PlayCircle, Save } from "lucide-react";
+import { Shield, Building2, Users, Plus, Trash2, Settings, BarChart3, AlertTriangle, Loader2, Flag, Mail, Edit2, ToggleLeft, Percent, TrendingUp, Target, Award, GraduationCap, Star, Brain, Compass, Briefcase, Library, FileText, Clock, Search, UserPlus, Mail as MailIcon, Upload, Download, CheckSquare, Square, AlertCircle, Activity, Ban, PlayCircle, Save, DollarSign } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Progress } from "@/components/ui/progress";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -431,6 +431,27 @@ export default function SiteAdminPage() {
     queryKey: ["/api/admin/performance/organizations"],
     enabled: adminCheck?.isSiteAdmin,
   });
+
+  // AI cost tracking
+  type AiCostBucket = { count: number; costUsd: number; promptTokens: number; completionTokens: number; avgCostUsd: number };
+  type AiCostSummary = {
+    windowDays: number;
+    lessons: AiCostBucket;
+    assignments: AiCostBucket;
+    totalCostUsd: number;
+    daily: Array<{ day: string; lessonCost: number; assignmentCost: number }>;
+  };
+  const [aiCostWindow, setAiCostWindow] = useState(30);
+  const { data: aiCosts, isLoading: aiCostsLoading } = useQuery<AiCostSummary>({
+    queryKey: ["/api/admin/ai-costs", { windowDays: aiCostWindow }],
+    queryFn: async () => {
+      const res = await fetch(`/api/admin/ai-costs?windowDays=${aiCostWindow}`, { credentials: "include" });
+      if (!res.ok) throw new Error("Failed to load AI costs");
+      return res.json();
+    },
+    enabled: adminCheck?.isSiteAdmin,
+  });
+  const usd = (n: number | undefined) => `$${(n ?? 0).toFixed(n != null && n < 1 ? 4 : 2)}`;
 
   // Sort metrics by goal completion rate (client-side safety)
   const sortedEducatorMetrics = [...educatorMetrics].sort((a, b) => b.goalsCompletionRate - a.goalsCompletionRate);
@@ -1885,6 +1906,70 @@ export default function SiteAdminPage() {
               </p>
             </div>
           </div>
+
+          {/* AI Generation Cost (real OpenAI spend) */}
+          <Card data-testid="card-ai-costs">
+            <CardHeader className="flex flex-row items-center justify-between gap-4 pb-2">
+              <div className="flex items-center gap-2">
+                <DollarSign className="h-5 w-5 text-muted-foreground" />
+                <CardTitle className="text-base">AI Generation Cost</CardTitle>
+              </div>
+              <Select value={String(aiCostWindow)} onValueChange={(v) => setAiCostWindow(Number(v))}>
+                <SelectTrigger className="w-[160px]" data-testid="select-ai-cost-window">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="7">Last 7 days</SelectItem>
+                  <SelectItem value="30">Last 30 days</SelectItem>
+                  <SelectItem value="90">Last 90 days</SelectItem>
+                  <SelectItem value="0">All time</SelectItem>
+                </SelectContent>
+              </Select>
+            </CardHeader>
+            <CardContent>
+              {aiCostsLoading ? (
+                <div className="h-24 bg-muted animate-pulse rounded" />
+              ) : aiCosts ? (
+                <>
+                  <div className="grid gap-4 grid-cols-2 lg:grid-cols-4">
+                    <div data-testid="ai-cost-total">
+                      <div className="text-xs text-muted-foreground">Total spend</div>
+                      <div className="text-2xl font-bold">{usd(aiCosts.totalCostUsd)}</div>
+                      <div className="text-xs text-muted-foreground">
+                        {aiCosts.lessons.count + aiCosts.assignments.count} generations
+                      </div>
+                    </div>
+                    <div data-testid="ai-cost-lessons">
+                      <div className="text-xs text-muted-foreground">Lessons</div>
+                      <div className="text-2xl font-bold">{usd(aiCosts.lessons.costUsd)}</div>
+                      <div className="text-xs text-muted-foreground">
+                        {aiCosts.lessons.count} · avg {usd(aiCosts.lessons.avgCostUsd)}
+                      </div>
+                    </div>
+                    <div data-testid="ai-cost-assignments">
+                      <div className="text-xs text-muted-foreground">Assignments</div>
+                      <div className="text-2xl font-bold">{usd(aiCosts.assignments.costUsd)}</div>
+                      <div className="text-xs text-muted-foreground">
+                        {aiCosts.assignments.count} · avg {usd(aiCosts.assignments.avgCostUsd)}
+                      </div>
+                    </div>
+                    <div data-testid="ai-cost-tokens">
+                      <div className="text-xs text-muted-foreground">Tokens</div>
+                      <div className="text-2xl font-bold">
+                        {((aiCosts.lessons.promptTokens + aiCosts.lessons.completionTokens + aiCosts.assignments.promptTokens + aiCosts.assignments.completionTokens) / 1000).toLocaleString(undefined, { maximumFractionDigits: 0 })}K
+                      </div>
+                      <div className="text-xs text-muted-foreground">prompt + completion</div>
+                    </div>
+                  </div>
+                  <p className="text-xs text-muted-foreground mt-4">
+                    Real per-call OpenAI cost recorded at generation time (chat completions only; embeddings excluded as negligible).
+                  </p>
+                </>
+              ) : (
+                <p className="text-sm text-muted-foreground">No cost data yet.</p>
+              )}
+            </CardContent>
+          </Card>
 
           {/* System-Wide Overview */}
           {systemStatsLoading ? (

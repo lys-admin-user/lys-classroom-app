@@ -7,6 +7,7 @@ import { LYS_ACCOMMODATIONS, LYS_BKD_VOCAB, LYS_DOMAINS } from "./lysReference";
 import { storage } from "./storage";
 import { buildVoiceBlock } from "./services/voiceProfileService";
 import { critiqueAndMaybeRewrite } from "./services/voiceCriticService";
+import { UsageMeter } from "./services/aiCost";
 import { normalizeSubject as normalizeSubjectFromCanon } from "./services/lysCanonService";
 import { resolveFallbackAssignment } from "./services/fallbackResolver";
 import { startThinkingTicker, type StreamEmit } from "./services/generationStream";
@@ -774,6 +775,8 @@ Create a ${request.assignmentType} that directly assesses mastery of the above o
       response_format: { type: "json_object" },
       temperature: 0.7,
     });
+    const usageMeter = new UsageMeter();
+    usageMeter.record("gpt-4o", "draft", response.usage);
 
     const content = response.choices[0]?.message?.content;
     if (!content) {
@@ -841,12 +844,14 @@ Create a ${request.assignmentType} that directly assesses mastery of the above o
         if (critic.rewritten && critic.finalContent) {
           assignmentResult = critic.finalContent;
         }
+        if (critic.usage) usageMeter.record(critic.usage.model, "voice-critic", critic.usage);
         voiceMeta = { voiceScore: critic.voiceScore, tellsDetected: critic.tellsDetected, rewritten: critic.rewritten, notes: critic.notes };
       } catch {
         /* non-fatal */
       }
     }
 
+    const cost = usageMeter.toAttribution();
     try {
       await storage.createAssignmentAttribution({
         assignmentId: null,
@@ -865,6 +870,10 @@ Create a ${request.assignmentType} that directly assesses mastery of the above o
         // Cache the full assignment for resilience fallback when OpenAI is
         // later unreachable.
         generatedContent: assignmentResult,
+        promptTokens: cost.promptTokens,
+        completionTokens: cost.completionTokens,
+        costUsd: cost.costUsd,
+        costBreakdown: cost.costBreakdown,
       });
     } catch (err) {
       console.warn("[assignmentGenerator] attribution insert failed (non-fatal):", (err as Error).message);

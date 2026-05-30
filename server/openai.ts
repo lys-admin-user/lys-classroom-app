@@ -14,6 +14,7 @@ import { buildCanonBlock, normalizeSubject as normalizeSubjectFromCanon } from "
 import { retrieveExamples } from "./services/lessonRetrievalService";
 import { buildVoiceBlock } from "./services/voiceProfileService";
 import { critiqueAndMaybeRewrite } from "./services/voiceCriticService";
+import { UsageMeter } from "./services/aiCost";
 import { resolveFallbackLesson } from "./services/fallbackResolver";
 import { startThinkingTicker, type StreamEmit } from "./services/generationStream";
 
@@ -261,6 +262,7 @@ IMPORTANT: Respond ONLY with a valid JSON object, no additional text.${africanIn
   let voiceBlock = "";
   let voiceSnippetIds: string[] = [];
   let subjectVersion = 1;
+  const usageMeter = new UsageMeter();
 
   if (useNewRetrieval) {
     const [retrieval, canon, voice] = await Promise.all([
@@ -377,6 +379,7 @@ JSON structure:
       response_format: { type: "json_object" },
       max_tokens: 3000,
     });
+    usageMeter.record("gpt-4o", "draft", response.usage);
 
     const content = response.choices[0].message.content;
     if (!content || !content.trim()) {
@@ -420,6 +423,7 @@ You MUST address these gaps to achieve Distinguished level (90%+).`;
         response_format: { type: "json_object" },
         max_tokens: 3000,
       });
+      usageMeter.record("gpt-4o", "redraft", retryResponse.usage);
 
       const retryContent = retryResponse.choices[0].message.content;
       if (retryContent && retryContent.trim()) {
@@ -449,10 +453,11 @@ You MUST address these gaps to achieve Distinguished level (90%+).`;
               topic: request.topic, subject, gradeLevel: request.gradeLevel, mode: "lesson",
             });
             finalRetry = critic.finalContent;
+            if (critic.usage) usageMeter.record(critic.usage.model, "voice-critic", critic.usage);
             retryVoiceMeta = { voiceScore: critic.voiceScore, tellsDetected: critic.tellsDetected, rewritten: critic.rewritten, notes: critic.notes };
           }
           await saveLessonToCache(request, cacheKey, finalRetry);
-          await recordAttribution(cacheKey, finalRetry, request, attributionData, retryQuality.percentage, retryVoiceMeta, voiceSnippetIds);
+          await recordAttribution(cacheKey, finalRetry, request, attributionData, retryQuality.percentage, retryVoiceMeta, voiceSnippetIds, usageMeter);
           return { ...finalRetry, cacheHit: false };
         }
         }
@@ -470,11 +475,12 @@ You MUST address these gaps to achieve Distinguished level (90%+).`;
         topic: request.topic, subject, gradeLevel: request.gradeLevel, mode: "lesson",
       });
       finalLesson = critic.finalContent;
+      if (critic.usage) usageMeter.record(critic.usage.model, "voice-critic", critic.usage);
       voiceMeta = { voiceScore: critic.voiceScore, tellsDetected: critic.tellsDetected, rewritten: critic.rewritten, notes: critic.notes };
     }
 
     await saveLessonToCache(request, cacheKey, finalLesson);
-    await recordAttribution(cacheKey, finalLesson, request, attributionData, qualityResult.percentage, voiceMeta, voiceSnippetIds);
+    await recordAttribution(cacheKey, finalLesson, request, attributionData, qualityResult.percentage, voiceMeta, voiceSnippetIds, usageMeter);
     return { ...finalLesson, cacheHit: false };
   } catch (error) {
     console.error("Error generating lesson plan:", error);
@@ -530,8 +536,10 @@ async function recordAttribution(
   finalScore: number,
   voiceMeta: { voiceScore: number | null; tellsDetected: string[]; rewritten: boolean; notes?: string } = { voiceScore: null, tellsDetected: [], rewritten: false },
   voiceSnippetIds: string[] = [],
+  usageMeter?: UsageMeter,
 ): Promise<void> {
   try {
+    const cost = usageMeter?.toAttribution();
     await storage.createLessonAttribution({
       cacheKey,
       lessonId: lesson?.id ?? null,
@@ -549,6 +557,10 @@ async function recordAttribution(
       voiceCritique: { tellsDetected: voiceMeta.tellsDetected, notes: voiceMeta.notes },
       rewritten: voiceMeta.rewritten,
       voiceSnippetIds,
+      promptTokens: cost?.promptTokens ?? null,
+      completionTokens: cost?.completionTokens ?? null,
+      costUsd: cost?.costUsd ?? null,
+      costBreakdown: cost?.costBreakdown ?? [],
     });
   } catch (err) {
     console.warn("[openai] attribution insert failed (non-fatal):", (err as Error).message);

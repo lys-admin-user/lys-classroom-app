@@ -3751,6 +3751,17 @@ export function registerAdminRoutes(app: Express): void {
     }
   });
 
+  // AI generation cost summary — real OpenAI spend recorded per generation.
+  app.get("/api/admin/ai-costs", isAuthenticated, isSiteAdmin, async (req: any, res) => {
+    try {
+      const windowDays = req.query.windowDays !== undefined ? Number(req.query.windowDays) : 30;
+      const summary = await storage.getAiCostSummary(Number.isFinite(windowDays) && windowDays >= 0 ? windowDays : 30);
+      res.json(summary);
+    } catch (e) {
+      res.status(500).json({ error: "Failed to load AI cost summary" });
+    }
+  });
+
   // Top exemplars by attribution / score correlation.
   app.get("/api/admin/lesson-attribution/top", isAuthenticated, isSiteAdmin, async (req: any, res) => {
     try {

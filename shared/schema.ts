@@ -3883,12 +3883,30 @@ export const lessonGenerationAttribution = pgTable("lesson_generation_attributio
   voiceCritique: jsonb("voice_critique").$type<{ tellsDetected?: string[]; notes?: string }>(),
   rewritten: boolean("rewritten").default(false), // true if critic rewrote below threshold
   voiceSnippetIds: jsonb("voice_snippet_ids").$type<string[]>().default([]),
+  // AI cost tracking — populated per generation from OpenAI usage. Totals
+  // across every model call (main draft + optional re-draft + voice critic).
+  promptTokens: integer("prompt_tokens"),
+  completionTokens: integer("completion_tokens"),
+  costUsd: real("cost_usd"),
+  costBreakdown: jsonb("cost_breakdown").$type<AiCostEntry[]>().default([]),
   createdAt: timestamp("created_at").defaultNow(),
 }, (table) => [
   index("idx_lga_cache_key").on(table.cacheKey),
   index("idx_lga_lesson").on(table.lessonId),
+  index("idx_lga_created").on(table.createdAt),
 ]);
 export type LessonGenerationAttribution = typeof lessonGenerationAttribution.$inferSelect;
+
+// Per-model breakdown of the AI cost for a single generation. Stored as a
+// jsonb array on both attribution tables so the admin panel can show exactly
+// where the spend went (which model, which phase).
+export type AiCostEntry = {
+  model: string;
+  phase: string; // e.g. "draft" | "redraft" | "voice-critic"
+  promptTokens: number;
+  completionTokens: number;
+  costUsd: number;
+};
 
 // Mirror of lesson attribution for the assignment generator. Lighter — assignments
 // don't carry the same per-section richness, but we still track which voice
@@ -3912,11 +3930,17 @@ export const assignmentGenerationAttribution = pgTable("assignment_generation_at
   // is unreachable, the most-recent matching attribution can be served as
   // "closest cached generation" instead of a typo-laden mock.
   generatedContent: jsonb("generated_content").$type<any>(),
+  // AI cost tracking — see lessonGenerationAttribution for shape notes.
+  promptTokens: integer("prompt_tokens"),
+  completionTokens: integer("completion_tokens"),
+  costUsd: real("cost_usd"),
+  costBreakdown: jsonb("cost_breakdown").$type<AiCostEntry[]>().default([]),
   createdAt: timestamp("created_at").defaultNow(),
 }, (table) => [
   index("idx_aga_assignment").on(table.assignmentId),
   index("idx_aga_lesson").on(table.lessonId),
   index("idx_aga_topic_grade_type").on(table.topic, table.gradeLevel, table.assignmentType),
+  index("idx_aga_created").on(table.createdAt),
 ]);
 export type AssignmentGenerationAttribution = typeof assignmentGenerationAttribution.$inferSelect;
 

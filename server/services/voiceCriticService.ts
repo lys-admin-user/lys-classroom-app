@@ -22,7 +22,12 @@ export interface VoiceCriticResult<T = any> {
   rewritten: boolean;
   finalContent: T;
   notes?: string;
+  // OpenAI token usage for this critic call (null when skipped/errored) so the
+  // caller can fold it into per-generation cost tracking.
+  usage?: { model: string; prompt_tokens: number; completion_tokens: number } | null;
 }
+
+const CRITIC_MODEL = "gpt-4o-mini";
 
 const RUBRIC_PROMPT = `You are the LYS Voice Auditor. You evaluate generated educational content against the LYS Master Teacher voice rubric.
 
@@ -59,7 +64,7 @@ export async function critiqueAndMaybeRewrite<T>(
     };
 
     const res = await openai.chat.completions.create({
-      model: "gpt-4o-mini",
+      model: CRITIC_MODEL,
       messages: [
         { role: "system", content: RUBRIC_PROMPT },
         { role: "user", content: JSON.stringify(userPayload).slice(0, 30000) },
@@ -69,9 +74,15 @@ export async function critiqueAndMaybeRewrite<T>(
       temperature: 0.4,
     });
 
+    const usage = {
+      model: CRITIC_MODEL,
+      prompt_tokens: res.usage?.prompt_tokens ?? 0,
+      completion_tokens: res.usage?.completion_tokens ?? 0,
+    };
+
     const raw = res.choices[0]?.message?.content;
     if (!raw) {
-      return { voiceScore: null, tellsDetected: [], rewritten: false, finalContent: content };
+      return { voiceScore: null, tellsDetected: [], rewritten: false, finalContent: content, usage };
     }
 
     const parsed = JSON.parse(raw) as {
@@ -100,6 +111,7 @@ export async function critiqueAndMaybeRewrite<T>(
         rewritten: true,
         finalContent: merged as T,
         notes,
+        usage,
       };
     }
 
@@ -109,6 +121,7 @@ export async function critiqueAndMaybeRewrite<T>(
       rewritten: false,
       finalContent: content,
       notes,
+      usage,
     };
   } catch (err) {
     console.warn("[voiceCriticService] error (non-fatal):", (err as Error).message);

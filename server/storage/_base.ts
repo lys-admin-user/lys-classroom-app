@@ -4186,6 +4186,13 @@ export interface DatabaseStorage extends IStorage {
   getSubjectCanonVersion(subject: string): Promise<number>;
   bumpSubjectCanonVersion(subject: string): Promise<number>;
   createLessonAttribution(attr: Omit<import("@shared/schema").LessonGenerationAttribution, "id" | "createdAt">): Promise<import("@shared/schema").LessonGenerationAttribution>;
+  getAiCostSummary(windowDays?: number): Promise<{
+    windowDays: number;
+    lessons: { count: number; costUsd: number; promptTokens: number; completionTokens: number; avgCostUsd: number };
+    assignments: { count: number; costUsd: number; promptTokens: number; completionTokens: number; avgCostUsd: number };
+    totalCostUsd: number;
+    daily: Array<{ day: string; lessonCost: number; assignmentCost: number }>;
+  }>;
   updateLessonAttributionScore(cacheKey: string, finalScore: number): Promise<void>;
   listTopExemplars(limit?: number): Promise<Array<{ masterLessonId: string; uses: number; avgScore: number; avgVoiceScore: number | null; rewriteRate: number }>>;
   createLessonEditSignal(signal: Omit<import("@shared/schema").LessonEditSignal, "id" | "createdAt">): Promise<import("@shared/schema").LessonEditSignal>;
