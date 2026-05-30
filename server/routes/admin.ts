@@ -830,6 +830,74 @@ export function registerAdminRoutes(app: Express): void {
   });
 
 
+  // Confirm a jurisdiction's source — records that a human moderator checked
+  // the official feed still publishes the standards we ingested. This stamps
+  // lastVerifiedAt (distinct from lastSyncedAt) which the source popover shows
+  // as "Last verified". Falls back to "Not yet verified" when never confirmed.
+  app.post("/api/admin/standards/jurisdictions/:id/verify", isAuthenticated, requireSiteAdmin, async (req: any, res) => {
+    try {
+      if (!await requireSiteAdminForStandards(req, res)) return;
+      const userId = req.user?.claims?.sub;
+      const { id } = req.params;
+      const updated = await storage.updateJurisdiction(id, {
+        lastVerifiedAt: new Date(),
+        lastVerifiedBy: userId,
+      } as any);
+      if (!updated) {
+        res.status(404).json({ error: "Jurisdiction not found" });
+        return;
+      }
+      await logAuditEvent({
+        userId,
+        action: "standards_source_verified",
+        resourceType: "standards_jurisdiction",
+        resourceId: id,
+        category: "admin_action",
+        severity: "info",
+        details: { name: updated.name, country: updated.country },
+        ipAddress: req.ip || "",
+      });
+      res.json({ success: true, jurisdiction: updated });
+    } catch (error) {
+      console.error("Verify jurisdiction error:", error);
+      res.status(500).json({ error: "Failed to verify jurisdiction" });
+    }
+  });
+
+
+  // Confirm a single standard set's source (set-level verification wins over
+  // jurisdiction-level when resolving the "Last verified" date).
+  app.post("/api/admin/standards/sets/:id/verify", isAuthenticated, requireSiteAdmin, async (req: any, res) => {
+    try {
+      if (!await requireSiteAdminForStandards(req, res)) return;
+      const userId = req.user?.claims?.sub;
+      const { id } = req.params;
+      const updated = await storage.updateStandardSet(id, {
+        lastVerifiedAt: new Date(),
+        lastVerifiedBy: userId,
+      } as any);
+      if (!updated) {
+        res.status(404).json({ error: "Standard set not found" });
+        return;
+      }
+      await logAuditEvent({
+        userId,
+        action: "standards_source_verified",
+        resourceType: "standard_set",
+        resourceId: id,
+        category: "admin_action",
+        severity: "info",
+        details: { title: updated.title, subject: updated.subject },
+        ipAddress: req.ip || "",
+      });
+      res.json({ success: true, standardSet: updated });
+    } catch (error) {
+      console.error("Verify standard set error:", error);
+      res.status(500).json({ error: "Failed to verify standard set" });
+    }
+  });
+
+
   // Get individual standards for a standard set
   app.get("/api/admin/standards/sets/:id/standards", isAuthenticated, requireSiteAdmin, async (req: any, res) => {
     try {

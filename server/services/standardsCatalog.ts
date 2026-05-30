@@ -247,7 +247,12 @@ export async function listCodes(
     const standards = gradeLevels.length > 0
       ? await storage.getEducationalStandardsByGradeLevels(subjectSet.id, gradeLevels)
       : await storage.getEducationalStandards(subjectSet.id);
-    const lastVerifiedRaw = (subjectSet as any).lastSyncedAt || (jurisdiction as any).lastSyncedAt || null;
+    // Use the real human-confirmed verification timestamp. Set-level
+    // verification wins over jurisdiction-level. We deliberately do NOT fall
+    // back to lastSyncedAt — "we ingested this" is not the same as "a human
+    // confirmed the source still publishes it." Null surfaces as "Not yet
+    // verified" in the source popover.
+    const lastVerifiedRaw = (subjectSet as any).lastVerifiedAt || (jurisdiction as any).lastVerifiedAt || null;
     const lastVerifiedAt: string | null = lastVerifiedRaw
       ? (lastVerifiedRaw instanceof Date ? lastVerifiedRaw.toISOString() : String(lastVerifiedRaw))
       : null;

@@ -12,7 +12,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Checkbox } from "@/components/ui/checkbox";
 import { Textarea } from "@/components/ui/textarea";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
-import { RefreshCw, Database, FileText, CheckCircle, XCircle, Clock, ChevronRight, AlertCircle, ClipboardCheck, Sparkles, Download } from "lucide-react";
+import { RefreshCw, Database, FileText, CheckCircle, XCircle, Clock, ChevronRight, AlertCircle, ClipboardCheck, Sparkles, Download, ShieldCheck } from "lucide-react";
 import { Progress } from "@/components/ui/progress";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -228,6 +228,24 @@ export default function StandardsAdmin() {
     },
   });
 
+  const verifyJurisdictionMutation = useMutation({
+    mutationFn: (id: string) => apiRequest("POST", `/api/admin/standards/jurisdictions/${id}/verify`),
+    onSuccess: () => {
+      toast({ title: "Source Verified", description: "Recorded that you confirmed this jurisdiction's source." });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/standards/jurisdictions"] });
+    },
+    onError: () => toast({ title: "Couldn't verify source", variant: "destructive" }),
+  });
+
+  const verifySetMutation = useMutation({
+    mutationFn: (id: string) => apiRequest("POST", `/api/admin/standards/sets/${id}/verify`),
+    onSuccess: () => {
+      toast({ title: "Source Verified", description: "Recorded that you confirmed this standard set's source." });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/standards/jurisdictions", selectedJurisdiction, "sets"] });
+    },
+    onError: () => toast({ title: "Couldn't verify source", variant: "destructive" }),
+  });
+
   const extractMutation = useMutation({
     mutationFn: ({ rawText, jurisdictionName }: { rawText: string; jurisdictionName: string }) =>
       apiRequest("POST", "/api/admin/standards/extract", { rawText, jurisdictionName }),
@@ -433,6 +451,57 @@ export default function StandardsAdmin() {
                   </div>
                 </div>
               </div>
+
+              {selectedJurisdiction && (
+                <div className="mt-4 flex flex-wrap items-center gap-3 border-t pt-4">
+                  {(() => {
+                    const j = jurisdictions?.find((x) => x.id === selectedJurisdiction);
+                    const verifiedAt = (j as any)?.lastVerifiedAt as string | null | undefined;
+                    return (
+                      <>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => verifyJurisdictionMutation.mutate(selectedJurisdiction)}
+                          disabled={verifyJurisdictionMutation.isPending}
+                          data-testid="button-verify-jurisdiction"
+                        >
+                          <ShieldCheck className="h-4 w-4 mr-2" />
+                          Confirm jurisdiction source
+                        </Button>
+                        <span className="text-xs text-muted-foreground" data-testid="text-jurisdiction-verified">
+                          {verifiedAt
+                            ? `Last verified ${new Date(verifiedAt).toLocaleDateString()}`
+                            : "Not yet verified"}
+                        </span>
+                      </>
+                    );
+                  })()}
+                  {selectedSet && (() => {
+                    const s = standardSets?.find((x) => x.id === selectedSet);
+                    const verifiedAt = (s as any)?.lastVerifiedAt as string | null | undefined;
+                    return (
+                      <>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => verifySetMutation.mutate(selectedSet)}
+                          disabled={verifySetMutation.isPending}
+                          data-testid="button-verify-set"
+                        >
+                          <ShieldCheck className="h-4 w-4 mr-2" />
+                          Confirm set source
+                        </Button>
+                        <span className="text-xs text-muted-foreground" data-testid="text-set-verified">
+                          {verifiedAt
+                            ? `Set last verified ${new Date(verifiedAt).toLocaleDateString()}`
+                            : "Set not yet verified"}
+                        </span>
+                      </>
+                    );
+                  })()}
+                </div>
+              )}
             </CardContent>
           </Card>
 

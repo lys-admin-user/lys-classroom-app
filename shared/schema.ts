@@ -928,6 +928,12 @@ export const standardsJurisdictions = pgTable("standards_jurisdictions", {
   //                        the annual cleanup pass to prioritize.
   coverageMode: text("coverage_mode").notNull().default("codes_required"),
   lastSyncedAt: timestamp("last_synced_at"),
+  // When a human moderator last confirmed this jurisdiction's source still
+  // publishes the standards we ingested. Distinct from lastSyncedAt, which
+  // only records when we last *ingested* data. Null = never verified, which
+  // the source popover surfaces as "Not yet verified".
+  lastVerifiedAt: timestamp("last_verified_at"),
+  lastVerifiedBy: varchar("last_verified_by"),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
@@ -952,6 +958,11 @@ export const standardSets = pgTable("standard_sets", {
   licenseUrl: text("license_url"),
   source: text("source").notNull(), // "csp", "case", "manual", "pdf_import"
   lastSyncedAt: timestamp("last_synced_at"),
+  // Human-confirmed verification timestamp for this set's source — see the
+  // matching note on standardsJurisdictions. Set-level verification wins over
+  // jurisdiction-level when resolving "Last verified" in standardsCatalog.
+  lastVerifiedAt: timestamp("last_verified_at"),
+  lastVerifiedBy: varchar("last_verified_by"),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
