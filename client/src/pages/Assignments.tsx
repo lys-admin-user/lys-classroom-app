@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useLocation } from "wouter";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from "@/components/ui/card";
@@ -135,6 +135,37 @@ function AssignmentStandardsBadges({
   );
 }
 
+// Derive structured standard codes from a saved lesson's lossy `standards`
+// string. The lesson save flow serializes alignment as
+// "[Country] StandardsName: CODE1, CODE2" — we strip the optional country
+// provenance prefix, then read the comma-separated codes that follow the
+// standards-name label. Lessons whose standards are free-text (no colon)
+// expose no per-outcome codes and yield an empty list.
+function parseLessonStandardCodes(
+  standards: string | null | undefined,
+): CatalogCodeClient[] {
+  if (!standards) return [];
+  const withoutCountry = standards.replace(/^\s*\[[^\]]*\]\s*/, "");
+  const colonIdx = withoutCountry.indexOf(":");
+  if (colonIdx < 0) return [];
+  return withoutCountry
+    .slice(colonIdx + 1)
+    .split(",")
+    .map((c) => c.trim())
+    .filter(Boolean)
+    .map((code) => ({ code, description: "" }));
+}
+
+// Pull the "[Country]" provenance prefix back out of a lesson's standards
+// string so the AI Generate tab's picker can pre-select the right country.
+function parseLessonStandardCountry(
+  standards: string | null | undefined,
+): string {
+  if (!standards) return "";
+  const m = standards.match(/^\s*\[([^\]]+)\]/);
+  return m ? m[1].trim() : "";
+}
+
 export default function Assignments() {
   const [, setLocation] = useLocation();
   const { toast } = useToast();
@@ -186,6 +217,36 @@ export default function Assignments() {
   };
   const toggleManualStdCode = (code: CatalogCodeClient) => {
     setManualStdCodes((prev) =>
+      prev.some((c) => c.code === code.code)
+        ? prev.filter((c) => c.code !== code.code)
+        : [...prev, code],
+    );
+  };
+
+  // AI Generate tab: standards inherited from the selected source lesson.
+  // Pre-populated from the lesson's saved alignment (see useEffect below) and
+  // editable via the same StandardsCascadePicker before the generated
+  // assignment is saved. Unlike the manual flow, cascade navigation does NOT
+  // clear the inherited codes — teachers add to or remove from the inherited
+  // set rather than starting from scratch.
+  const [aiStdCountry, setAiStdCountry] = useState("");
+  const [aiStdState, setAiStdState] = useState("");
+  const [aiStdSubject, setAiStdSubject] = useState("");
+  const [aiStdCodes, setAiStdCodes] = useState<CatalogCodeClient[]>([]);
+  const handleAiStdCountry = (c: string) => {
+    setAiStdCountry(c);
+    setAiStdState("");
+    setAiStdSubject("");
+  };
+  const handleAiStdState = (s: string) => {
+    setAiStdState(s);
+    setAiStdSubject("");
+  };
+  const handleAiStdSubject = (s: string) => {
+    setAiStdSubject(s);
+  };
+  const toggleAiStdCode = (code: CatalogCodeClient) => {
+    setAiStdCodes((prev) =>
       prev.some((c) => c.code === code.code)
         ? prev.filter((c) => c.code !== code.code)
         : [...prev, code],
@@ -352,6 +413,23 @@ export default function Assignments() {
     enabled: isAuthenticated,
   });
 
+  // When the source lesson changes, seed the AI Generate tab's standards from
+  // that lesson's saved alignment so generated assignments inherit the lesson's
+  // codes by default (teachers can still adjust before saving).
+  useEffect(() => {
+    if (!selectedLesson) {
+      setAiStdCodes([]);
+      setAiStdCountry("");
+      setAiStdState("");
+      setAiStdSubject("");
+      return;
+    }
+    setAiStdCodes(parseLessonStandardCodes(selectedLesson.standards));
+    setAiStdCountry(parseLessonStandardCountry(selectedLesson.standards));
+    setAiStdState("");
+    setAiStdSubject("");
+  }, [selectedLesson?.id]);
+
   const { data: assignments, isLoading: assignmentsLoading } = useQuery<Assignment[]>({
     queryKey: ["/api/assignments"],
     enabled: isAuthenticated && !isStudent && !isParent,
@@ -430,6 +508,10 @@ export default function Assignments() {
       toast({ title: "Assignment Saved", description: "Your assignment has been saved." });
       setGeneratedAssignment(null);
       setSelectedLesson(null);
+      setAiStdCodes([]);
+      setAiStdCountry("");
+      setAiStdState("");
+      setAiStdSubject("");
     },
     onError: () => {
       toast({ title: "Error", description: "Failed to save assignment", variant: "destructive" });
@@ -534,6 +616,7 @@ export default function Assignments() {
       accommodationModified: generatedAssignment.accommodationModified,
       accommodationTypes: generatedAssignment.accommodationTypes,
       accommodationNotes: generatedAssignment.accommodationNotes,
+      standardsCodes: aiStdCodes.length > 0 ? aiStdCodes : undefined,
     });
   };
 
@@ -984,6 +1067,45 @@ export default function Assignments() {
               </Card>
             </div>
 
+            {selectedLesson && (
+              <Card data-testid="card-ai-standards">
+                <CardHeader>
+                  <CardTitle className="font-oswald flex items-center gap-2">
+                    <GraduationCap className="h-5 w-5 text-lys-red" />
+                    Aligned Standards
+                  </CardTitle>
+                  <CardDescription>
+                    Inherited from <span className="font-medium text-foreground">{selectedLesson.title}</span>. These codes will be tagged on the generated assignment — adjust them below before saving if needed.
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  {aiStdCodes.length > 0 && (
+                    <div data-testid="ai-std-inherited-summary">
+                      <p className="text-xs text-muted-foreground mb-1.5 font-roboto">
+                        Tagged on this assignment ({aiStdCodes.length}):
+                      </p>
+                      <AssignmentStandardsBadges
+                        codes={aiStdCodes}
+                        testIdPrefix="ai-std-inherited"
+                        showPopover={false}
+                      />
+                    </div>
+                  )}
+                  <StandardsCascadePicker
+                    selectedCountry={aiStdCountry}
+                    selectedState={aiStdState}
+                    selectedSubject={aiStdSubject}
+                    selectedStandardCodes={aiStdCodes}
+                    onCountryChange={handleAiStdCountry}
+                    onStateChange={handleAiStdState}
+                    onSubjectChange={handleAiStdSubject}
+                    onToggleCode={toggleAiStdCode}
+                    testIdPrefix="ai-std"
+                  />
+                </CardContent>
+              </Card>
+            )}
+
             {generatedAssignment && (
               <div className="space-y-4">
                 <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 flex-wrap print:hidden">
@@ -1040,11 +1162,13 @@ export default function Assignments() {
                   </div>
                 </div>
 
-                {/* Standards-source provenance (interactive, screen only) */}
-                {((generatedAssignment.standardsCodes as CatalogCodeClient[] | null | undefined)?.length) ? (
+                {/* Standards-source provenance (interactive, screen only).
+                    Reflects the live AI-tab picker so the preview matches what
+                    will be saved. */}
+                {aiStdCodes.length ? (
                   <div className="print:hidden">
                     <AssignmentStandardsBadges
-                      codes={generatedAssignment.standardsCodes as CatalogCodeClient[]}
+                      codes={aiStdCodes}
                       testIdPrefix="preview"
                     />
                   </div>
@@ -1160,15 +1284,13 @@ export default function Assignments() {
                         </div>
                       </div>
                       {/* Tagged standards — static, badge-free line for print/export */}
-                      {((generatedAssignment.standardsCodes as CatalogCodeClient[] | null | undefined)?.length) ? (
+                      {aiStdCodes.length ? (
                         <p
                           className="hidden print:block text-sm mt-3"
                           data-testid="preview-standards-print"
                         >
                           <span className="font-semibold">Standards: </span>
-                          {(generatedAssignment.standardsCodes as CatalogCodeClient[])
-                            .map((sc) => sc.code)
-                            .join(", ")}
+                          {aiStdCodes.map((sc) => sc.code).join(", ")}
                         </p>
                       ) : null}
                     </div>
