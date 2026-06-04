@@ -533,14 +533,37 @@ export async function listPendingStandards(filter: {
     : await q;
 }
 
+// Fields a system admin may edit inline before approving a pending standard
+// (Task #13). Kept narrow on purpose — country/state/sourceUrl stay immutable
+// so the provenance trail to the original source can't be rewritten.
+export const EDITABLE_PENDING_STANDARD_FIELDS = [
+  "code",
+  "description",
+  "subject",
+  "gradeLevel",
+  "strand",
+] as const;
+export type EditablePendingStandardField =
+  (typeof EDITABLE_PENDING_STANDARD_FIELDS)[number];
+export type PendingStandardEdits = Partial<
+  Record<EditablePendingStandardField, string | null>
+>;
+
 // Approve a batch of pending standards. We materialize them into
 // standardsJurisdictions / standardSets / educational_standards so they
 // flow through the existing standards UI.
+//
+// `editsById` (Task #13): optional per-id field overrides applied inside the
+// same transaction *before* the row is materialized. When a field actually
+// changes we persist it back onto the pending row and write an `edited`
+// audit-log row carrying the field-level diff, so "Save & approve" is a
+// single atomic edit→approve step.
 export async function approvePendingStandards(
   ids: string[],
   reviewerId: string,
   reason?: string,
   externalTx?: any,
+  editsById?: Record<string, PendingStandardEdits>,
 ): Promise<{ approved: number }> {
   if (ids.length === 0) return { approved: 0 };
   const run = async (tx: any) => {
@@ -562,6 +585,46 @@ export async function approvePendingStandards(
     }
 
     for (const item of targets) {
+      // Apply any inline edits before materializing. Mutating `item` in place
+      // means the publish block below uses the edited values transparently.
+      const edits = editsById?.[item.id];
+      if (edits) {
+        const changes: Record<string, { from: unknown; to: unknown }> = {};
+        const patch: Record<string, string | null> = {};
+        for (const field of EDITABLE_PENDING_STANDARD_FIELDS) {
+          if (!(field in edits)) continue;
+          const rawNext = edits[field];
+          const next =
+            rawNext === undefined || rawNext === null
+              ? null
+              : rawNext.trim() === ""
+                ? null
+                : rawNext.trim();
+          const prev = (item as any)[field] ?? null;
+          if (next === prev) continue;
+          if (field === "description" && next === null) {
+            throw new Error("Description cannot be empty");
+          }
+          changes[field] = { from: prev, to: next };
+          patch[field] = next;
+          (item as any)[field] = next;
+        }
+        if (Object.keys(changes).length > 0) {
+          await tx
+            .update(pendingPublicStandards)
+            .set(patch)
+            .where(eq(pendingPublicStandards.id, item.id));
+          await tx.insert(ingestionAuditLog).values({
+            entityType: "pending_standard",
+            entityId: item.id,
+            action: "edited",
+            actorUserId: reviewerId,
+            reason: reason ?? null,
+            details: { changes },
+          });
+        }
+      }
+
       const jurisdictionName = item.state || item.country;
       const jurisdictionAbbr = (item.state || item.country).slice(0, 8).toUpperCase();
       let [jurisdiction] = await tx

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -608,10 +608,22 @@ function ModerationQueue() {
   );
 }
 
+type EditableStandardFields = {
+  code: string;
+  description: string;
+  subject: string;
+  gradeLevel: string;
+  strand: string;
+};
+
 function ModerationViewer({ item, onClose, onActed }: { item: ModerationQueueItem; onClose: () => void; onActed: () => void }) {
   const { toast } = useToast();
   const scrollKey = `mod-scroll:${item.kind}:${item.id}`;
   const [auditOpen, setAuditOpen] = useState(true);
+  // Inline edit state for pending standards (Task #13). Seeded from the
+  // extracted source once it loads; admins can fix typos / wrong grade / etc.
+  // before approving without a reject + re-ingest round trip.
+  const [fields, setFields] = useState<EditableStandardFields | null>(null);
 
   const { data: src } = useQuery<any>({
     queryKey: ["/api/standards-ingestion/moderation-source", item.kind, item.id],
@@ -621,6 +633,18 @@ function ModerationViewer({ item, onClose, onActed }: { item: ModerationQueueIte
       return r.json();
     },
   });
+
+  useEffect(() => {
+    if (item.kind === "pending_standard" && src?.extracted && fields === null) {
+      setFields({
+        code: src.extracted.code ?? "",
+        description: src.extracted.description ?? "",
+        subject: src.extracted.subject ?? "",
+        gradeLevel: src.extracted.gradeLevel ?? "",
+        strand: src.extracted.strand ?? "",
+      });
+    }
+  }, [src, item.kind, fields]);
   const { data: audit = [] } = useQuery<any[]>({
     queryKey: ["/api/standards-ingestion/audit-log", item.kind, item.id],
     queryFn: async () => {
@@ -630,17 +654,33 @@ function ModerationViewer({ item, onClose, onActed }: { item: ModerationQueueIte
     },
   });
 
+  const [reason, setReason] = useState("");
+
+  // For pending standards we always go through edit-approve so any inline
+  // fixes are persisted + audited in the same step. The server only logs the
+  // fields that actually changed, so an untouched form behaves like a plain
+  // approve. Curriculum docs keep the original approve path.
   const approve = useMutation({
     mutationFn: async () => {
-      const path = item.kind === "pending_standard"
-        ? "/api/standards-ingestion/pending/approve"
-        : "/api/standards-ingestion/curriculum-docs/approve";
-      await apiRequest("POST", path, { ids: [item.id] });
+      if (item.kind === "pending_standard") {
+        await apiRequest("POST", "/api/standards-ingestion/pending/edit-approve", {
+          id: item.id,
+          edits: {
+            code: fields?.code ?? "",
+            description: fields?.description ?? "",
+            subject: fields?.subject ?? "",
+            gradeLevel: fields?.gradeLevel ?? "",
+            strand: fields?.strand ?? "",
+          },
+          reason: reason || undefined,
+        });
+      } else {
+        await apiRequest("POST", "/api/standards-ingestion/curriculum-docs/approve", { ids: [item.id] });
+      }
     },
     onSuccess: () => { toast({ title: "Approved" }); onActed(); onClose(); },
     onError: (err: any) => toast({ title: "Approve failed", description: err?.message, variant: "destructive" }),
   });
-  const [reason, setReason] = useState("");
   const reject = useMutation({
     mutationFn: async () => {
       const path = item.kind === "pending_standard"
@@ -679,14 +719,77 @@ function ModerationViewer({ item, onClose, onActed }: { item: ModerationQueueIte
         <div className="grid grid-cols-2 gap-3 flex-1 min-h-0">
           <div className="border rounded-md flex flex-col min-h-0" data-testid="pane-extracted">
             <div className="px-3 py-2 border-b bg-muted text-xs font-semibold flex items-center gap-2">
-              <FileText className="h-3 w-3" />Extracted (AI)
+              <FileText className="h-3 w-3" />
+              {item.kind === "pending_standard" ? "Extracted (AI) — editable" : "Extracted (AI)"}
             </div>
             <div ref={restoreScroll("l")} onScroll={onScroll("l")} className="overflow-auto p-3 text-sm flex-1">
-              {!src ? <div className="text-muted-foreground">Loading…</div> : (
+              {!src ? (
+                <div className="text-muted-foreground">Loading…</div>
+              ) : item.kind === "pending_standard" ? (
+                !fields ? (
+                  <div className="text-muted-foreground">Loading…</div>
+                ) : (
+                  <div className="space-y-3" data-testid="form-edit-standard">
+                    <p className="text-xs text-muted-foreground">
+                      Fix any AI errors before approving. Changes are saved and logged when you click “Save &amp; approve”.
+                    </p>
+                    <div className="space-y-1">
+                      <Label htmlFor="edit-code" className="text-xs">Code</Label>
+                      <Input
+                        id="edit-code"
+                        value={fields.code}
+                        onChange={(e) => setFields({ ...fields, code: e.target.value })}
+                        placeholder="e.g. MATH.K.CC.1"
+                        data-testid="input-edit-code"
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <Label htmlFor="edit-description" className="text-xs">Description <span className="text-destructive">*</span></Label>
+                      <Textarea
+                        id="edit-description"
+                        value={fields.description}
+                        onChange={(e) => setFields({ ...fields, description: e.target.value })}
+                        rows={5}
+                        data-testid="textarea-edit-description"
+                      />
+                    </div>
+                    <div className="grid grid-cols-2 gap-2">
+                      <div className="space-y-1">
+                        <Label htmlFor="edit-subject" className="text-xs">Subject</Label>
+                        <Input
+                          id="edit-subject"
+                          value={fields.subject}
+                          onChange={(e) => setFields({ ...fields, subject: e.target.value })}
+                          data-testid="input-edit-subject"
+                        />
+                      </div>
+                      <div className="space-y-1">
+                        <Label htmlFor="edit-grade" className="text-xs">Grade level</Label>
+                        <Input
+                          id="edit-grade"
+                          value={fields.gradeLevel}
+                          onChange={(e) => setFields({ ...fields, gradeLevel: e.target.value })}
+                          data-testid="input-edit-grade"
+                        />
+                      </div>
+                    </div>
+                    <div className="space-y-1">
+                      <Label htmlFor="edit-strand" className="text-xs">Strand</Label>
+                      <Input
+                        id="edit-strand"
+                        value={fields.strand}
+                        onChange={(e) => setFields({ ...fields, strand: e.target.value })}
+                        data-testid="input-edit-strand"
+                      />
+                    </div>
+                    <p className="text-[11px] text-muted-foreground">
+                      Country/state and source URL stay locked to preserve provenance.
+                    </p>
+                  </div>
+                )
+              ) : (
                 <pre className="whitespace-pre-wrap font-mono text-xs" data-testid="text-extracted-content">
-                  {item.kind === "pending_standard"
-                    ? JSON.stringify(src.extracted, null, 2)
-                    : (src.extracted?.text || "(no extracted text)")}
+                  {src.extracted?.text || "(no extracted text)"}
                 </pre>
               )}
             </div>
@@ -752,14 +855,31 @@ function ModerationViewer({ item, onClose, onActed }: { item: ModerationQueueIte
               <p className="text-xs text-muted-foreground text-center py-2" data-testid="text-no-audit">No transitions recorded yet.</p>
             ) : (
               <ul className="text-xs space-y-1">
-                {audit.map((a) => (
-                  <li key={a.id} className="flex items-start gap-2" data-testid={`audit-row-${a.id}`}>
-                    <Badge variant="outline" className="text-[10px]">{a.action}</Badge>
-                    <span className="text-muted-foreground">{a.createdAt ? new Date(a.createdAt).toLocaleString() : "—"}</span>
-                    <span>by {a.actorUserId || "system"}</span>
-                    {a.reason && <span className="italic text-muted-foreground">— {a.reason}</span>}
-                  </li>
-                ))}
+                {audit.map((a) => {
+                  const changes = a.action === "edited" ? (a.details?.changes as Record<string, { from: unknown; to: unknown }> | undefined) : undefined;
+                  return (
+                    <li key={a.id} className="space-y-1" data-testid={`audit-row-${a.id}`}>
+                      <div className="flex items-start gap-2">
+                        <Badge variant="outline" className="text-[10px]">{a.action}</Badge>
+                        <span className="text-muted-foreground">{a.createdAt ? new Date(a.createdAt).toLocaleString() : "—"}</span>
+                        <span>by {a.actorUserId || "system"}</span>
+                        {a.reason && <span className="italic text-muted-foreground">— {a.reason}</span>}
+                      </div>
+                      {changes && Object.keys(changes).length > 0 && (
+                        <ul className="ml-6 space-y-0.5" data-testid={`audit-diff-${a.id}`}>
+                          {Object.entries(changes).map(([field, diff]) => (
+                            <li key={field} className="flex flex-wrap items-baseline gap-1" data-testid={`audit-diff-field-${field}-${a.id}`}>
+                              <span className="font-medium">{field}:</span>
+                              <span className="line-through text-destructive/80 break-all">{diff.from === null || diff.from === "" ? "∅" : String(diff.from)}</span>
+                              <span className="text-muted-foreground">→</span>
+                              <span className="text-lys-teal break-all">{diff.to === null || diff.to === "" ? "∅" : String(diff.to)}</span>
+                            </li>
+                          ))}
+                        </ul>
+                      )}
+                    </li>
+                  );
+                })}
               </ul>
             )}
           </CollapsibleContent>
@@ -776,8 +896,13 @@ function ModerationViewer({ item, onClose, onActed }: { item: ModerationQueueIte
           <Button variant="outline" disabled={(item.kind === "curriculum_doc" && !reason.trim()) || reject.isPending} onClick={() => reject.mutate()} data-testid="button-viewer-reject">
             {reject.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <XCircle className="h-4 w-4 mr-1" />}Reject
           </Button>
-          <Button disabled={approve.isPending} onClick={() => approve.mutate()} data-testid="button-viewer-approve">
-            {approve.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <CheckCircle2 className="h-4 w-4 mr-1" />}Approve
+          <Button
+            disabled={approve.isPending || (item.kind === "pending_standard" && (!fields || !fields.description.trim()))}
+            onClick={() => approve.mutate()}
+            data-testid="button-viewer-approve"
+          >
+            {approve.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <CheckCircle2 className="h-4 w-4 mr-1" />}
+            {item.kind === "pending_standard" ? "Save & approve" : "Approve"}
           </Button>
         </DialogFooter>
       </DialogContent>

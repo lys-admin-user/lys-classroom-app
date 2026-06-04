@@ -588,6 +588,46 @@ export function registerCurriculumLibraryRoutes(app: Express): void {
     },
   );
 
+  // Edit-and-approve a single pending standard (Task #13). Applies the inline
+  // edits, approves, and records an `edited` audit row with the field-level
+  // diff — all in one transaction.
+  app.post(
+    "/api/standards-ingestion/pending/edit-approve",
+    isAuthenticated,
+    async (req: any, res) => {
+      const user = await requireUser(req, res);
+      if (!user) return;
+      if (!SYS_ADMIN_ROLES.has(user.role)) {
+        return res.status(403).json({ error: "System admin required" });
+      }
+      const body = z
+        .object({
+          id: z.string().min(1),
+          edits: z.object({
+            code: z.string().nullable().optional(),
+            description: z.string().trim().min(1).optional(),
+            subject: z.string().nullable().optional(),
+            gradeLevel: z.string().nullable().optional(),
+            strand: z.string().nullable().optional(),
+          }),
+          reason: z.string().optional(),
+        })
+        .parse(req.body);
+      try {
+        const result = await approvePendingStandards(
+          [body.id],
+          user.id,
+          body.reason,
+          undefined,
+          { [body.id]: body.edits },
+        );
+        res.json(result);
+      } catch (err: any) {
+        res.status(409).json({ error: err.message || "Edit & approve failed" });
+      }
+    },
+  );
+
   app.post(
     "/api/standards-ingestion/pending/reject",
     isAuthenticated,
