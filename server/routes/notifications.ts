@@ -11,7 +11,9 @@ import {
   listNotifications,
   markAllRead,
 } from "../services/notificationsService";
-import { runDigestNow } from "../services/digestScheduler";
+import { runDigestNow, runBacklogDigestNow } from "../services/digestScheduler";
+import { getModerationBacklogStats } from "../services/ingestionModeration";
+import { getBacklogThreshold } from "../services/moderationBacklogDigest";
 
 function requireSystemAdmin() {
   return async (req: any, res: any, next: any) => {
@@ -131,6 +133,30 @@ export function registerNotificationsRoutes(app: Express): void {
     } catch (err) {
       console.error("[digest] manual run failed:", err);
       res.status(500).json({ error: "Failed to run digest" });
+    }
+  });
+
+  // Task #12 — current moderation-queue backlog snapshot + configured alert
+  // threshold, for the admin banner in the Moderation queue tab.
+  app.get("/api/admin/moderation-backlog/stats", isAuthenticated, requireSystemAdmin(), async (_req, res) => {
+    try {
+      const stats = await getModerationBacklogStats();
+      res.json({ ...stats, threshold: getBacklogThreshold() });
+    } catch (err) {
+      console.error("[moderation-backlog] stats failed:", err);
+      res.status(500).json({ error: "Failed to load backlog stats" });
+    }
+  });
+
+  // Manual trigger so system_admin can send the backlog alert on demand
+  // (forces past the threshold gate + per-day dedup).
+  app.post("/api/admin/moderation-backlog/run-now", isAuthenticated, requireSystemAdmin(), async (_req, res) => {
+    try {
+      const result = await runBacklogDigestNow();
+      res.json(result);
+    } catch (err) {
+      console.error("[moderation-backlog] manual run failed:", err);
+      res.status(500).json({ error: "Failed to run backlog alert" });
     }
   });
 }

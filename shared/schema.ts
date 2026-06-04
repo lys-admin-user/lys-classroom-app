@@ -4401,3 +4401,23 @@ export const standardsDigestLog = pgTable("standards_digest_log", {
   createdAt: timestamp("created_at").defaultNow(),
 });
 export type StandardsDigestLog = typeof standardsDigestLog.$inferSelect;
+
+// Task #12 — daily moderation-queue backlog alert log. Append-only paper trail
+// of every backlog digest we've assembled, with the backlog snapshot at send
+// time. `periodDate` (YYYY-MM-DD UTC) gives us per-day idempotency so the
+// daily cron never double-sends across process restarts or multi-tick races.
+export const moderationBacklogDigestLog = pgTable("moderation_backlog_digest_log", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull(),
+  email: text("email"),
+  subject: text("subject").notNull(),
+  body: text("body").notNull(),
+  // "sent" | "logged_no_transport" | "failed"
+  status: text("status").notNull(),
+  errorMessage: text("error_message"),
+  // Backlog snapshot captured when the alert fired.
+  totalPending: integer("total_pending").notNull(),
+  periodDate: text("period_date").notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+export type ModerationBacklogDigestLog = typeof moderationBacklogDigestLog.$inferSelect;

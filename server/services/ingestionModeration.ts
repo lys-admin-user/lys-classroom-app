@@ -169,6 +169,71 @@ export async function listModerationQueue(opts: {
   };
 }
 
+// -------------------- Backlog stats (Task #12) --------------------
+
+export interface BacklogBucket {
+  total: number;
+  over24h: number;
+  over7d: number;
+}
+
+export interface ModerationBacklogStats {
+  pendingStandards: BacklogBucket;
+  pendingDocs: BacklogBucket;
+  total: number;
+}
+
+// Snapshot of the moderation queue depth for the daily backlog alert. Counts
+// pending public standards + pending curriculum docs, each bucketed by age so
+// admins can tell a fresh spike apart from a stale backlog.
+export async function getModerationBacklogStats(
+  now: Date = new Date(),
+): Promise<ModerationBacklogStats> {
+  const t24 = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+  const t7 = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+
+  const [stdRows, docRows] = await Promise.all([
+    db
+      .select({
+        total: sql<number>`count(*)::int`,
+        over24h: sql<number>`count(*) filter (where ${pendingPublicStandards.createdAt} <= ${t24})::int`,
+        over7d: sql<number>`count(*) filter (where ${pendingPublicStandards.createdAt} <= ${t7})::int`,
+      })
+      .from(pendingPublicStandards)
+      .where(eq(pendingPublicStandards.status, "pending_review")),
+    db
+      .select({
+        total: sql<number>`count(*)::int`,
+        over24h: sql<number>`count(*) filter (where ${curriculumDocuments.createdAt} <= ${t24})::int`,
+        over7d: sql<number>`count(*) filter (where ${curriculumDocuments.createdAt} <= ${t7})::int`,
+      })
+      .from(curriculumDocuments)
+      .where(
+        and(
+          eq(curriculumDocuments.isActive, true),
+          eq(curriculumDocuments.moderationStatus, "pending"),
+        ),
+      ),
+  ]);
+
+  const pendingStandards: BacklogBucket = {
+    total: Number(stdRows[0]?.total ?? 0),
+    over24h: Number(stdRows[0]?.over24h ?? 0),
+    over7d: Number(stdRows[0]?.over7d ?? 0),
+  };
+  const pendingDocs: BacklogBucket = {
+    total: Number(docRows[0]?.total ?? 0),
+    over24h: Number(docRows[0]?.over24h ?? 0),
+    over7d: Number(docRows[0]?.over7d ?? 0),
+  };
+
+  return {
+    pendingStandards,
+    pendingDocs,
+    total: pendingStandards.total + pendingDocs.total,
+  };
+}
+
 // -------------------- Curriculum doc bulk approve/reject --------------------
 
 export async function approveCurriculumDocs(

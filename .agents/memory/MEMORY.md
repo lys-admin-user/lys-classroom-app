@@ -1,0 +1,1 @@
+- [Email digest + scheduler pattern](email-digest-pattern.md) — recurring admin email alerts share emailTransport.ts + digestScheduler.ts + a per-period log table for idempotency; reuse, don't reinvent.

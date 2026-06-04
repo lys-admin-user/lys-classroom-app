@@ -21,7 +21,7 @@ import {
 } from "@shared/schema";
 import { and, desc, eq, gte, gt, or, sql as drizzleSql } from "drizzle-orm";
 import { getEmailDigestRecipients } from "./notificationsService";
-import nodemailer, { type Transporter } from "nodemailer";
+import { getBaseUrl, sendEmail } from "./emailTransport";
 
 const ONE_WEEK_MS = 7 * 24 * 60 * 60 * 1000;
 
@@ -39,13 +39,6 @@ export interface DigestPayload {
   }>;
   periodStart: Date;
   periodEnd: Date;
-}
-
-function getBaseUrl(): string {
-  const domains = process.env.REPLIT_DOMAINS?.split(",")[0];
-  if (domains) return `https://${domains}`;
-  if (process.env.REPLIT_DEV_DOMAIN) return `https://${process.env.REPLIT_DEV_DOMAIN}`;
-  return "http://localhost:5000";
 }
 
 // Normalize an arbitrary "now" into a stable (periodStart, periodEnd) tuple
@@ -176,70 +169,6 @@ export function renderDigestEmail(payload: DigestPayload, recipient: { email: st
   return { subject, body: lines.join("\n") };
 }
 
-// ----- SMTP transport (nodemailer) -----
-// Lazily constructed singleton so we don't reconnect for every recipient and
-// don't try to connect at all when no SMTP credentials are configured (which
-// is the normal case in dev / unconfigured Replit envs). When credentials
-// are absent we fall back to console logging + the persistent log table.
-let cachedTransporter: Transporter | null | undefined; // undefined = not yet checked, null = no-transport
-
-function getTransporter(): Transporter | null {
-  if (cachedTransporter !== undefined) return cachedTransporter;
-  const host = process.env.SMTP_HOST;
-  const port = process.env.SMTP_PORT ? Number(process.env.SMTP_PORT) : undefined;
-  const user = process.env.SMTP_USER;
-  const pass = process.env.SMTP_PASS;
-  if (!host || !port) {
-    cachedTransporter = null;
-    return null;
-  }
-  cachedTransporter = nodemailer.createTransport({
-    host,
-    port,
-    secure: port === 465, // SMTPS on 465, STARTTLS otherwise
-    auth: user && pass ? { user, pass } : undefined,
-  });
-  return cachedTransporter;
-}
-
-function getFromAddress(): string {
-  return (
-    process.env.DIGEST_FROM_EMAIL ||
-    process.env.SMTP_FROM ||
-    "LYS Digest <no-reply@laddering-your-success.local>"
-  );
-}
-
-async function sendViaTransport(
-  recipient: { email: string | null },
-  subject: string,
-  body: string,
-): Promise<{ status: "sent" | "logged_no_transport" | "failed"; errorMessage?: string }> {
-  const transporter = getTransporter();
-  if (!transporter || !recipient.email) {
-    // No SMTP configured (or no email on file) — log + persist so admins still
-    // have a paper trail. To enable real delivery, set SMTP_HOST, SMTP_PORT,
-    // and (optionally) SMTP_USER / SMTP_PASS / DIGEST_FROM_EMAIL.
-    console.log(
-      `[standards-digest] (no-transport) to=${recipient.email ?? "(no email)"} subject="${subject}"\n${body}`,
-    );
-    return { status: "logged_no_transport" };
-  }
-  try {
-    await transporter.sendMail({
-      from: getFromAddress(),
-      to: recipient.email,
-      subject,
-      text: body,
-    });
-    return { status: "sent" };
-  } catch (err: any) {
-    const msg = err?.message || String(err);
-    console.error(`[standards-digest] SMTP send failed for ${recipient.email}:`, msg);
-    return { status: "failed", errorMessage: msg.slice(0, 500) };
-  }
-}
-
 export async function sendWeeklyDigest(now: Date = new Date()): Promise<{
   recipients: number;
   sent: number;
@@ -291,7 +220,7 @@ export async function sendWeeklyDigest(now: Date = new Date()): Promise<{
       continue;
     }
     const { subject, body } = renderDigestEmail(payload, r);
-    const result = await sendViaTransport(r, subject, body);
+    const result = await sendEmail(r, subject, body, { logPrefix: "standards-digest" });
     await db.insert(standardsDigestLog).values({
       userId: r.id,
       email: r.email,

@@ -170,7 +170,7 @@ import { registerAccountRoutes } from "./routes/account";
 import { registerAnalyticsRoutes } from "./routes/analytics";
 import { registerMiscRoutes } from "./routes/misc";
 import { registerNotificationsRoutes } from "./routes/notifications";
-import { startDigestScheduler } from "./services/digestScheduler";
+import { startDigestScheduler, startModerationBacklogScheduler } from "./services/digestScheduler";
 
 export async function registerRoutes(
   httpServer: Server,
@@ -234,6 +234,8 @@ export async function registerRoutes(
 
   // Task #8: weekly standards observability digest (Mondays 09:00 site-local).
   startDigestScheduler();
+  // Task #12: daily moderation-queue backlog alert (08:00 site-local).
+  startModerationBacklogScheduler();
 
   return httpServer;
 }

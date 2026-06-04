@@ -333,6 +333,70 @@ function SyncHistory() {
 
 // ===== Task #6: Moderation queue =====
 
+type BacklogStats = {
+  total: number;
+  threshold: number;
+  pendingStandards: { total: number; over24h: number; over7d: number };
+  pendingDocs: { total: number; over24h: number; over7d: number };
+};
+
+// Task #12 — shows current queue depth (by age) + lets an admin fire the daily
+// backlog email on demand. The daily cron sends the same email automatically
+// when the total exceeds the configured threshold.
+function BacklogAlertBanner() {
+  const { toast } = useToast();
+  const { data } = useQuery<BacklogStats>({
+    queryKey: ["/api/admin/moderation-backlog/stats"],
+  });
+
+  const sendNow = useMutation({
+    mutationFn: async () =>
+      apiRequest("POST", "/api/admin/moderation-backlog/run-now", {}),
+    onSuccess: async (res: any) => {
+      const body = await res.json().catch(() => ({}));
+      toast({
+        title: "Backlog alert sent",
+        description: `Emailed ${body.sent ?? 0} admin(s) · ${body.total ?? 0} item(s) pending.`,
+      });
+    },
+    onError: (err: any) =>
+      toast({ title: "Failed to send alert", description: err?.message || "Try again.", variant: "destructive" }),
+  });
+
+  if (!data) return null;
+  const overThreshold = data.total > data.threshold;
+
+  return (
+    <Card data-testid="card-backlog-banner">
+      <CardContent className="p-3 flex items-center gap-4 flex-wrap">
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className="font-semibold" data-testid="text-backlog-total">{data.total} item(s) awaiting review</span>
+            <Badge variant={overThreshold ? "default" : "secondary"} data-testid="badge-backlog-threshold">
+              Alert threshold: {data.threshold}
+            </Badge>
+          </div>
+          <p className="text-xs text-muted-foreground mt-1" data-testid="text-backlog-breakdown">
+            Standards: {data.pendingStandards.total} ({data.pendingStandards.over24h} &gt;24h, {data.pendingStandards.over7d} &gt;7d)
+            {" · "}
+            Docs: {data.pendingDocs.total} ({data.pendingDocs.over24h} &gt;24h, {data.pendingDocs.over7d} &gt;7d)
+          </p>
+        </div>
+        <Button
+          size="sm"
+          variant="outline"
+          disabled={sendNow.isPending}
+          onClick={() => sendNow.mutate()}
+          data-testid="button-send-backlog-alert"
+        >
+          {sendNow.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <ExternalLink className="h-4 w-4 mr-1" />}
+          Send backlog alert now
+        </Button>
+      </CardContent>
+    </Card>
+  );
+}
+
 type ModerationQueueItem = {
   kind: "pending_standard" | "curriculum_doc";
   id: string;
@@ -439,6 +503,7 @@ function ModerationQueue() {
 
   return (
     <div className="mt-4 space-y-3">
+      <BacklogAlertBanner />
       <div className="flex items-center gap-3 flex-wrap">
         <div className="flex items-center gap-1">
           <Button size="sm" variant={kind === "all" ? "default" : "outline"} onClick={() => { setKind("all"); setPage(0); }} data-testid="button-filter-all">All</Button>
