@@ -335,7 +335,7 @@ export default function ScopeEditor() {
           <CardContent className="pt-6 text-center">
             <p className="text-muted-foreground mb-4">Scope and sequence not found.</p>
             <Button asChild>
-              <Link href="/scope-sequence">Back to List</Link>
+              <Link href="/curriculum-planning">Back to List</Link>
             </Button>
           </CardContent>
         </Card>
@@ -350,7 +350,7 @@ export default function ScopeEditor() {
       <div className="max-w-5xl mx-auto space-y-6">
         <div className="flex items-center gap-4">
           <Button variant="ghost" size="icon" asChild>
-            <Link href="/scope-sequence">
+            <Link href="/curriculum-planning">
               <ArrowLeft className="h-4 w-4" />
             </Link>
           </Button>

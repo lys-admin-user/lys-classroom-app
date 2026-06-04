@@ -215,8 +215,8 @@ const EDUCATOR_STEPS: TourStep[] = [
     title: "Scope & Sequence Builder",
     description: "Plan your curriculum from start to finish. Create from scratch or import existing plans with AI-powered unit extraction.",
     icon: Map,
-    targetSelector: '[data-testid="nav-scope-sequence"]',
-    navPath: "/scope-sequence",
+    targetSelector: '[data-testid="nav-curriculum-planning"]',
+    navPath: "/curriculum-planning",
     pillar: "tools",
   },
   {
@@ -369,8 +369,8 @@ const HOMESCHOOL_PARENT_STEPS: TourStep[] = [
     title: "Scope & Sequence Builder",
     description: "Plan your homeschool curriculum with pacing guides and unit organization for the entire year.",
     icon: Map,
-    targetSelector: '[data-testid="nav-scope-sequence"]',
-    navPath: "/scope-sequence",
+    targetSelector: '[data-testid="nav-curriculum-planning"]',
+    navPath: "/curriculum-planning",
     pillar: "tools",
   },
   {
@@ -496,8 +496,8 @@ const CAMPUS_ADMIN_STEPS: TourStep[] = [
     title: "Scope & Sequence",
     description: "Review and manage curriculum plans across your campus. Ensure consistent pacing and standards coverage aligned with your charter, ISD, or network guidelines.",
     icon: Map,
-    targetSelector: '[data-testid="nav-scope-sequence"]',
-    navPath: "/scope-sequence",
+    targetSelector: '[data-testid="nav-curriculum-planning"]',
+    navPath: "/curriculum-planning",
     pillar: "tools",
   },
   {
@@ -596,8 +596,8 @@ const DISTRICT_ADMIN_STEPS: TourStep[] = [
     title: "Scope & Sequence",
     description: "Oversee curriculum planning across your district or charter network. Ensure alignment and consistency across all campuses, whether in one region or spanning multiple states.",
     icon: Map,
-    targetSelector: '[data-testid="nav-scope-sequence"]',
-    navPath: "/scope-sequence",
+    targetSelector: '[data-testid="nav-curriculum-planning"]',
+    navPath: "/curriculum-planning",
     pillar: "tools",
   },
   {

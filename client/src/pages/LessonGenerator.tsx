@@ -788,7 +788,7 @@ ${addedResources.length > 0 ? addedResources.map(r => `- ${r.title}: ${r.url}`).
                 <strong className="font-oswald">Recommended:</strong> Create a Scope & Sequence first to organize your curriculum for the year.
               </span>
               <div className="flex items-center gap-2">
-                <Link href="/scope-sequence">
+                <Link href="/curriculum-planning">
                   <Button variant="default" size="sm" className="gap-1 bg-lys-teal hover:bg-lys-teal/90" data-testid="button-go-to-scope">
                     <LayoutList className="h-3 w-3" />
                     Build Scope

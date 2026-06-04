@@ -494,7 +494,7 @@ export default function DistrictAdmin() {
                 <Button
                   variant="outline"
                   className="w-full justify-between"
-                  onClick={() => setLocation("/scope-sequence")}
+                  onClick={() => setLocation("/curriculum-planning")}
                   data-testid="button-district-scopes"
                 >
                   <span className="flex items-center gap-2">

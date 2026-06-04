@@ -33,6 +33,8 @@ const routeLabels: Record<string, string> = {
   "/settings": "Settings",
   "/analytics": "Analytics",
   "/scope-sequence": "Scope & Sequence",
+  "/curriculum-planning": "Curriculum Planning",
+  "/curriculum-library": "Curriculum Library",
   "/educator-influence": "Educator Influence",
   "/admin/standards": "Standards Admin",
   "/pricing": "Plans & Pricing",

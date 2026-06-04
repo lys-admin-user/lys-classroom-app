@@ -61,7 +61,10 @@ function statusBadge(status: string) {
   return <Badge className={meta.className} data-testid={`badge-status-${status}`}>{meta.label}</Badge>;
 }
 
-export default function CurriculumLibrary() {
+// Source Documents panel — uploaded curriculum docs (scope-and-sequence, YAG,
+// pre-written lessons) + standards request flow. Self-contained so it can be
+// embedded inside the Curriculum Planning hub and the standalone page below.
+export function SourceDocumentsPanel() {
   const { toast } = useToast();
   const [uploadOpen, setUploadOpen] = useState(false);
 
@@ -96,19 +99,16 @@ export default function CurriculumLibrary() {
   const teacherDocs = docs.filter((d) => d.uploaderRole === "teacher");
 
   return (
-    <div className="container mx-auto p-6 max-w-7xl" data-testid="page-curriculum-library">
-      <div className="flex items-center justify-between mb-6">
-        <div>
-          <h1 className="text-3xl font-oswald font-bold" data-testid="text-page-title">Curriculum Library</h1>
-          <p className="text-muted-foreground mt-1">
-            Upload your school's scope-and-sequence, year-at-a-glance, and pre-written lessons.
-            We'll keep the originals and extract structured standards so AI generation aligns to your curriculum.
-          </p>
-        </div>
+    <div data-testid="panel-source-documents">
+      <div className="flex items-start justify-between gap-4">
+        <p className="text-muted-foreground max-w-3xl">
+          Upload your school's scope-and-sequence, year-at-a-glance, and pre-written lessons.
+          We'll keep the originals and extract structured standards so AI generation aligns to your curriculum.
+        </p>
         {perm?.canUpload && (
           <Dialog open={uploadOpen} onOpenChange={setUploadOpen}>
             <DialogTrigger asChild>
-              <Button className="gap-2" data-testid="button-upload-curriculum">
+              <Button className="gap-2 shrink-0" data-testid="button-upload-curriculum">
                 <Upload className="h-4 w-4" /> Upload document
               </Button>
             </DialogTrigger>
@@ -124,7 +124,7 @@ export default function CurriculumLibrary() {
       </div>
 
       {perm && !perm.canUpload && perm.reason && (
-        <Card className="mb-6 border-amber-200 bg-amber-50">
+        <Card className="mt-6 border-amber-200 bg-amber-50">
           <CardContent className="py-4 flex items-center gap-3">
             <AlertCircle className="h-5 w-5 text-amber-700" />
             <p className="text-sm text-amber-800" data-testid="text-permission-reason">{perm.reason}</p>
@@ -161,6 +161,17 @@ export default function CurriculumLibrary() {
           <DocList docs={teacherDocs} isLoading={isLoading} onDelete={(id) => deleteMutation.mutate(id)} onOptOut={() => {}} />
         </TabsContent>
       </Tabs>
+    </div>
+  );
+}
+
+export default function CurriculumLibrary() {
+  return (
+    <div className="container mx-auto p-6 max-w-7xl" data-testid="page-curriculum-library">
+      <div className="mb-6">
+        <h1 className="text-3xl font-oswald font-bold" data-testid="text-page-title">Curriculum Library</h1>
+      </div>
+      <SourceDocumentsPanel />
     </div>
   );
 }

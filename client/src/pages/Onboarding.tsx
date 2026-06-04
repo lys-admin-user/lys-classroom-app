@@ -232,7 +232,7 @@ export default function Onboarding() {
     }
     if (primaryGoal === "career") return "/careers";
     if (primaryGoal === "lessons") return "/lesson-generator";
-    if (primaryGoal === "curriculum") return "/scope-sequence";
+    if (primaryGoal === "curriculum") return "/curriculum-planning";
     if (primaryGoal === "oversight") {
       if (role === "district_admin") return "/district-admin";
       return "/admin";

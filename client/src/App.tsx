@@ -32,11 +32,11 @@ const ActionPlans = lazy(() => import("@/pages/ActionPlans"));
 const Resources = lazy(() => import("@/pages/Resources"));
 const MyLessons = lazy(() => import("@/pages/MyLessons"));
 const CurriculumLibrary = lazy(() => import("@/pages/CurriculumLibrary"));
+const CurriculumPlanning = lazy(() => import("@/pages/CurriculumPlanning"));
 const StandardsIngestionAdmin = lazy(() => import("@/pages/StandardsIngestionAdmin"));
 const Settings = lazy(() => import("@/pages/Settings"));
 const SharedLesson = lazy(() => import("@/pages/SharedLesson"));
 const Analytics = lazy(() => import("@/pages/Analytics"));
-const ScopeSequence = lazy(() => import("@/pages/ScopeSequence"));
 const ScopeEditor = lazy(() => import("@/pages/ScopeEditor"));
 const SelfDiscovery = lazy(() => import("@/pages/SelfDiscovery"));
 const EducatorInfluence = lazy(() => import("@/pages/EducatorInfluence"));
@@ -248,11 +248,11 @@ const AuthLessonGenerator = withAuth(LessonGenerator);
 const AuthActionPlans = withAuth(ActionPlans);
 const AuthMyLessons = withAuth(MyLessons);
 const AuthCurriculumLibrary = withAuth(CurriculumLibrary);
+const AuthCurriculumPlanning = withAuth(CurriculumPlanning);
 const AuthStandardsIngestionAdmin = withAuth(StandardsIngestionAdmin);
 const AuthSettings = withAuth(Settings);
 const AuthSISIntegration = withAuth(SISIntegration);
 const AuthAnalytics = withAuth(Analytics);
-const AuthScopeSequence = withAuth(ScopeSequence);
 const AuthScopeEditor = withAuth(ScopeEditor);
 const AuthEducatorInfluence = withAuth(EducatorInfluence);
 const AuthAssignments = withAuth(Assignments);
@@ -284,6 +284,14 @@ const AuthStandardsAdmin = withAuth(StandardsAdmin);
 const AuthOnboarding = withAuth(Onboarding);
 const AuthDevDocs = withAuth(DevDocs);
 
+function RedirectTo({ to }: { to: string }) {
+  const [, navigate] = useLocation();
+  useEffect(() => {
+    navigate(to, { replace: true });
+  }, [to, navigate]);
+  return <PageLoader />;
+}
+
 function Router() {
   return (
     <Suspense fallback={<PageLoader />}>
@@ -312,12 +320,18 @@ function Router() {
 
         {/* Account-required pages — personal data or admin tools */}
         <Route path="/my-lessons" component={AuthMyLessons} />
-        <Route path="/curriculum-library" component={AuthCurriculumLibrary} />
+        <Route path="/curriculum-planning" component={AuthCurriculumPlanning} />
+        {/* Legacy routes — redirect into the merged Curriculum Planning hub */}
+        <Route path="/curriculum-library">
+          <RedirectTo to="/curriculum-planning?tab=documents" />
+        </Route>
         <Route path="/admin/standards-ingestion" component={AuthStandardsIngestionAdmin} />
         <Route path="/settings" component={AuthSettings} />
         <Route path="/sis-integration" component={AuthSISIntegration} />
         <Route path="/analytics" component={AuthAnalytics} />
-        <Route path="/scope-sequence" component={AuthScopeSequence} />
+        <Route path="/scope-sequence">
+          <RedirectTo to="/curriculum-planning" />
+        </Route>
         <Route path="/scope/:id" component={AuthScopeEditor} />
         <Route path="/educator-influence" component={AuthEducatorInfluence} />
         <Route path="/admin/standards" component={AuthStandardsAdmin} />
