@@ -11,7 +11,8 @@ import { useAuth } from "@/hooks/use-auth";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import type { Lesson, LessonTemplate, Assignment } from "@shared/schema";
-import { Link } from "wouter";
+import { Link, useSearch } from "wouter";
+import { X } from "lucide-react";
 import { TemplateCard, CreateTemplateDialog, UseTemplateDialog, templateCategories, templateGradeLevels } from "./TemplateLibrary";
 import {
   AlertDialog,
@@ -43,9 +44,45 @@ const bkdConfig = {
   do: { label: "DO", icon: Lightbulb, color: "bg-lys-teal/10 text-lys-teal border-lys-teal/20" },
 };
 
+// Extract the standard codes attached to a lesson. Saved lessons serialize
+// their alignment either as JSON ({ codes: [{ code }], standardsName }) or as
+// a lossy string ("[Country] StandardsName: CODE1, CODE2"); we read both so
+// the dashboard "Standards I've used" deep-link can match either shape.
+function getLessonStandardCodes(standards: string | null | undefined): string[] {
+  if (!standards) return [];
+  try {
+    const parsed = JSON.parse(standards);
+    if (parsed?.codes && Array.isArray(parsed.codes)) {
+      return parsed.codes
+        .map((c: { code?: string }) => c?.code?.trim())
+        .filter(Boolean) as string[];
+    }
+  } catch {
+    // Not JSON — fall through to string parsing below.
+  }
+  const withoutCountry = standards.replace(/^\s*\[[^\]]*\]\s*/, "");
+  const colonIdx = withoutCountry.indexOf(":");
+  if (colonIdx < 0) return [];
+  return withoutCountry
+    .slice(colonIdx + 1)
+    .split(",")
+    .map((c) => c.trim())
+    .filter(Boolean);
+}
+
+function lessonMentionsStandard(lesson: Lesson, code: string): boolean {
+  const target = code.trim().toLowerCase();
+  if (!target) return true;
+  return getLessonStandardCodes(lesson.standards).some(
+    (c) => c.toLowerCase() === target,
+  );
+}
+
 export default function MyLessons() {
   const { toast } = useToast();
   const { user, isLoading: authLoading, isAuthenticated } = useAuth();
+  const searchString = useSearch();
+  const standardFilter = (new URLSearchParams(searchString).get("standard") || "").trim();
   const [activeMainTab, setActiveMainTab] = useState("lessons");
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [shareLesson, setShareLesson] = useState<{ id: string; title: string } | null>(null);
@@ -276,6 +313,10 @@ export default function MyLessons() {
     );
   }
 
+  const filteredLessons = standardFilter
+    ? lessons.filter((lesson) => lessonMentionsStandard(lesson, standardFilter))
+    : lessons;
+
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 py-8">
       <div className="mb-6">
@@ -304,6 +345,28 @@ export default function MyLessons() {
         </TabsList>
 
         <TabsContent value="lessons" className="space-y-6">
+          {standardFilter && (
+            <div
+              className="flex items-center justify-between gap-3 rounded-md border border-lys-teal/30 bg-lys-teal/5 px-3 py-2"
+              data-testid="banner-standard-filter"
+            >
+              <p className="text-sm font-roboto">
+                Showing lessons aligned to{" "}
+                <span className="font-semibold text-lys-teal" data-testid="text-filter-standard">
+                  {standardFilter}
+                </span>{" "}
+                <span className="text-muted-foreground">
+                  ({filteredLessons.length} {filteredLessons.length === 1 ? "lesson" : "lessons"})
+                </span>
+              </p>
+              <Link href="/my-lessons">
+                <Button variant="ghost" size="sm" className="font-roboto" data-testid="button-clear-standard-filter">
+                  <X className="h-4 w-4 mr-1" />
+                  Clear filter
+                </Button>
+              </Link>
+            </div>
+          )}
           {standardsCoverage && (
         <Card className="mb-6" data-testid="card-standards-coverage">
           <CardHeader className="pb-2">
@@ -371,9 +434,27 @@ export default function MyLessons() {
             </Button>
           </CardContent>
         </Card>
+      ) : filteredLessons.length === 0 ? (
+        <Card className="max-w-lg mx-auto text-center py-12" data-testid="card-no-filtered-lessons">
+          <CardContent>
+            <div className="mx-auto w-16 h-16 rounded-full bg-muted flex items-center justify-center mb-4">
+              <BookOpen className="h-8 w-8 text-muted-foreground" />
+            </div>
+            <h2 className="font-oswald text-xl mb-2">No Lessons Match This Standard</h2>
+            <p className="font-roboto text-muted-foreground mb-6">
+              None of your saved lessons are aligned to {standardFilter} yet.
+            </p>
+            <Link href="/my-lessons">
+              <Button variant="outline" className="font-oswald" data-testid="button-clear-filter-empty">
+                <X className="h-4 w-4 mr-2" />
+                Clear filter
+              </Button>
+            </Link>
+          </CardContent>
+        </Card>
       ) : (
         <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {lessons.map((lesson) => {
+          {filteredLessons.map((lesson) => {
             const bkd = bkdConfig[lesson.bkdFocus as keyof typeof bkdConfig] || bkdConfig.be;
             const BkdIcon = bkd.icon;
             

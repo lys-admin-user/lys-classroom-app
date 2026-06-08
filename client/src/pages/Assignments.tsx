@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { useLocation } from "wouter";
+import { useLocation, useSearch } from "wouter";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -16,7 +16,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Sparkles, FileText, Users, UserPlus, AlertTriangle, Check, Clock, BookOpen, Target, Compass, Lightbulb, Lock, GraduationCap, Copy, Printer, Pencil, Trash2, Plus, CheckCircle, Play, Search, RefreshCw, Star, ArrowRight, HelpCircle, ScrollText, Heart, ChevronDown, ChevronRight, Eye, EyeOff, BarChart3 } from "lucide-react";
+import { Sparkles, FileText, Users, UserPlus, AlertTriangle, Check, Clock, BookOpen, Target, Compass, Lightbulb, Lock, GraduationCap, Copy, Printer, Pencil, Trash2, Plus, CheckCircle, Play, Search, RefreshCw, Star, ArrowRight, HelpCircle, ScrollText, Heart, ChevronDown, ChevronRight, Eye, EyeOff, BarChart3, X } from "lucide-react";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/use-auth";
@@ -168,6 +168,8 @@ function parseLessonStandardCountry(
 
 export default function Assignments() {
   const [, setLocation] = useLocation();
+  const searchString = useSearch();
+  const standardFilter = (new URLSearchParams(searchString).get("standard") || "").trim();
   const { toast } = useToast();
   const { user, isAuthenticated } = useAuth();
   const { isPaid: hasTrialOrPaid } = useTier();
@@ -656,6 +658,14 @@ export default function Assignments() {
     );
   }
 
+  const filteredAssignments = standardFilter
+    ? (assignments ?? []).filter((a) =>
+        (((a as any).standardsCodes as { code?: string }[] | null | undefined) ?? []).some(
+          (sc) => (sc?.code ?? "").trim().toLowerCase() === standardFilter.toLowerCase(),
+        ),
+      )
+    : (assignments ?? []);
+
   return (
     <div className="min-h-screen bg-background">
       <div className="max-w-7xl mx-auto px-4 py-8">
@@ -676,7 +686,7 @@ export default function Assignments() {
           )}
         </div>
 
-        <Tabs defaultValue={isStudent || isParent ? "saved" : "generate"} className="space-y-6">
+        <Tabs defaultValue={isStudent || isParent || standardFilter ? "saved" : "generate"} className="space-y-6">
           <TabsList>
             {!isStudent && !isParent && (
               <>
@@ -2304,8 +2314,49 @@ export default function Assignments() {
               assignmentsLoading ? (
                 <div className="text-center py-12 text-muted-foreground">Loading assignments...</div>
               ) : assignments && assignments.length > 0 ? (
-                <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
-                  {assignments.map((assignment) => (
+                <div className="space-y-4">
+                  {standardFilter && (
+                    <div
+                      className="flex items-center justify-between gap-3 rounded-md border border-lys-teal/30 bg-lys-teal/5 px-3 py-2"
+                      data-testid="banner-standard-filter"
+                    >
+                      <p className="text-sm">
+                        Showing assignments aligned to{" "}
+                        <span className="font-semibold text-lys-teal" data-testid="text-filter-standard">
+                          {standardFilter}
+                        </span>{" "}
+                        <span className="text-muted-foreground">
+                          ({filteredAssignments.length} {filteredAssignments.length === 1 ? "assignment" : "assignments"})
+                        </span>
+                      </p>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => setLocation("/assignments")}
+                        data-testid="button-clear-standard-filter"
+                      >
+                        <X className="h-4 w-4 mr-1" />
+                        Clear filter
+                      </Button>
+                    </div>
+                  )}
+                  {filteredAssignments.length === 0 ? (
+                    <Card className="text-center py-12" data-testid="card-no-filtered-assignments">
+                      <CardContent>
+                        <FileText className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
+                        <h3 className="font-oswald text-lg mb-2">No Assignments Match This Standard</h3>
+                        <p className="text-muted-foreground mb-4">
+                          None of your assignments are aligned to {standardFilter} yet.
+                        </p>
+                        <Button variant="outline" onClick={() => setLocation("/assignments")} data-testid="button-clear-filter-empty">
+                          <X className="h-4 w-4 mr-2" />
+                          Clear filter
+                        </Button>
+                      </CardContent>
+                    </Card>
+                  ) : (
+                  <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {filteredAssignments.map((assignment) => (
                     <Card key={assignment.id} data-testid={`card-assignment-${assignment.id}`}>
                       <CardHeader className="pb-2">
                         <div className="flex items-start justify-between gap-2">
@@ -2444,6 +2495,8 @@ export default function Assignments() {
                       </CardFooter>
                     </Card>
                   ))}
+                  </div>
+                  )}
                 </div>
               ) : (
                 <Card className="text-center py-12">
