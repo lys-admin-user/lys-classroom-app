@@ -1,1 +1,2 @@
 - [Email digest + scheduler pattern](email-digest-pattern.md) — recurring admin email alerts share emailTransport.ts + digestScheduler.ts + a per-period log table for idempotency; reuse, don't reinvent.
+- [Curriculum doc original files](curriculum-doc-original-files.md) — uploaded PDF/HTML source files live in Postgres bytea (not object storage) by user decision; powers the moderation side-by-side viewer.
