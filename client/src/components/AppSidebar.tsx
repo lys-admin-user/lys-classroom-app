@@ -124,7 +124,7 @@ const navigationGroups: NavGroup[] = [
       { title: "My Lessons", url: "/my-lessons", icon: BookOpen, requiresAuth: true },
       { title: "Curriculum Planning", url: "/curriculum-planning", icon: Map, requiresAuth: true },
       { title: "Gradebook", url: "/gradebook", icon: ClipboardList, requiresAuth: true },
-      { title: "Resource Library", url: "/resource-library", icon: Folder, requiresAuth: true },
+      { title: "Community Library", url: "/resource-library", icon: Folder, requiresAuth: true },
     ],
   },
   {
@@ -140,7 +140,7 @@ const navigationGroups: NavGroup[] = [
       { title: "Classroom", url: "/classroom", icon: School, requiresAuth: true },
       { title: "Gradebook", url: "/gradebook", icon: ClipboardList, requiresAuth: true },
       { title: "Collaboration", url: "/collaboration", icon: Share2, requiresAuth: true },
-      { title: "Resource Library", url: "/resource-library", icon: Folder, requiresAuth: true },
+      { title: "Community Library", url: "/resource-library", icon: Folder, requiresAuth: true },
       { title: "SIS Integration", url: "/sis-integration", icon: Link2, requiresAuth: true },
       { title: "Lesson Authoring", url: "/lesson-authoring", icon: PenTool, requiresAuth: true },
     ],

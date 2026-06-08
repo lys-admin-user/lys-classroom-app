@@ -41,7 +41,7 @@ const routeLabels: Record<string, string> = {
   "/onboarding": "Onboarding",
   "/assignments": "Assignments",
   "/collaboration": "Collaboration",
-  "/resource-library": "Resource Library",
+  "/resource-library": "Community Library",
   "/admin": "Campus Admin",
   "/system-admin": "System Admin",
   "/parent-portal": "Parent Portal",
