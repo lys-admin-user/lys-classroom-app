@@ -32,18 +32,27 @@ import {
   MessageSquare,
   Send,
   Trash2,
-  Edit3
+  Edit3,
+  Activity,
+  Plus,
+  ArrowLeft
 } from "lucide-react";
-import type { StudentJourneyProgress, StudentJourneyMilestone, Assignment, AssignmentRecipient, Student, StudentPortfolio, PortfolioItem, PortfolioComment } from "@shared/schema";
+import type { StudentJourneyProgress, StudentJourneyMilestone, StudentJourneyActivity, Assignment, AssignmentRecipient, Student, StudentPortfolio, PortfolioItem, PortfolioComment } from "@shared/schema";
 import { useMutation } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { Textarea } from "@/components/ui/textarea";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/use-auth";
+import { hasRolePrivilege } from "@shared/models/auth";
 
 interface JourneyData {
   progress: StudentJourneyProgress;
   milestones: StudentJourneyMilestone[];
-  activities: any[];
+  activities: StudentJourneyActivity[];
 }
 
 interface StudentAssignment {
@@ -183,6 +192,42 @@ function AssignmentCard({ assignment, recipient }: { assignment: Assignment; rec
   );
 }
 
+const activityTypeConfig: Record<string, { icon: typeof BookOpen; color: string }> = {
+  assessment: { icon: Sparkles, color: "text-violet-500" },
+  lesson: { icon: BookOpen, color: "text-blue-500" },
+  career_exploration: { icon: Briefcase, color: "text-amber-500" },
+  goal_progress: { icon: TrendingUp, color: "text-emerald-500" },
+  reflection: { icon: Heart, color: "text-rose-500" },
+  milestone_achieved: { icon: Trophy, color: "text-primary" },
+};
+
+function ActivityItem({ activity }: { activity: StudentJourneyActivity }) {
+  const config = activityTypeConfig[activity.activityType] || activityTypeConfig.lesson;
+  const Icon = config.icon;
+
+  return (
+    <div className="flex items-start gap-3 py-3 border-b last:border-0">
+      <div className="p-2 rounded-full bg-muted">
+        <Icon className={`w-4 h-4 ${config.color}`} />
+      </div>
+      <div className="flex-1 min-w-0">
+        <p className="font-medium text-sm">{activity.title}</p>
+        {activity.description && (
+          <p className="text-xs text-muted-foreground mt-0.5">{activity.description}</p>
+        )}
+        {activity.pointsEarned > 0 && (
+          <Badge variant="secondary" className="mt-1 text-xs">
+            +{activity.pointsEarned} points
+          </Badge>
+        )}
+      </div>
+      <span className="text-xs text-muted-foreground">
+        {activity.createdAt ? new Date(activity.createdAt).toLocaleDateString() : "Today"}
+      </span>
+    </div>
+  );
+}
+
 const studentFeatures = [
   { id: "journey", name: "My Journey", icon: TrendingUp, path: "#journey", description: "Track your Be-Know-Do progress" },
   { id: "assignments", name: "Assignments", icon: ClipboardList, path: "#assignments", description: "View and complete your assignments" },
@@ -202,6 +247,14 @@ export default function StudentDashboard() {
   const [activeTab, setActiveTab] = useState("overview");
   const [newComment, setNewComment] = useState("");
   const { user: currentUser } = useAuth();
+  const { toast } = useToast();
+  const isEducatorView = !!currentUser && hasRolePrivilege((currentUser.role ?? "student"), "educator");
+  const [isAddMilestoneOpen, setIsAddMilestoneOpen] = useState(false);
+  const [newMilestone, setNewMilestone] = useState({
+    title: "",
+    description: "",
+    category: "do" as "be" | "know" | "do",
+  });
 
   const { data: student, isLoading: studentLoading } = useQuery<Student>({
     queryKey: ["/api/students", studentId],
@@ -251,6 +304,41 @@ export default function StudentDashboard() {
     },
   });
 
+  const createJourneyMutation = useMutation({
+    mutationFn: async () => {
+      const res = await apiRequest("POST", "/api/student-journey", { studentId });
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/student-journey", studentId] });
+      toast({ title: "Journey started", description: "This student's journey has been created." });
+    },
+    onError: () => {
+      toast({ title: "Failed to create journey", variant: "destructive" });
+    },
+  });
+
+  const addMilestoneMutation = useMutation({
+    mutationFn: async (milestone: typeof newMilestone) => {
+      if (!journeyData?.progress.id) throw new Error("No journey progress");
+      const res = await apiRequest(
+        "POST",
+        `/api/student-journey/${journeyData.progress.id}/milestone`,
+        { ...milestone, studentId }
+      );
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/student-journey", studentId] });
+      setIsAddMilestoneOpen(false);
+      setNewMilestone({ title: "", description: "", category: "do" });
+      toast({ title: "Milestone added", description: "New milestone has been created for this journey." });
+    },
+    onError: () => {
+      toast({ title: "Failed to add milestone", variant: "destructive" });
+    },
+  });
+
   const isLoading = studentLoading || journeyLoading || assignmentsLoading;
 
   if (isLoading) {
@@ -263,6 +351,7 @@ export default function StudentDashboard() {
 
   const progress = journeyData?.progress;
   const milestones = journeyData?.milestones || [];
+  const activities = journeyData?.activities || [];
   const assignments = assignmentsData || [];
   
   const pendingAssignments = assignments.filter(a => a.recipient.status === "assigned" || a.recipient.status === "in_progress");
@@ -272,6 +361,13 @@ export default function StudentDashboard() {
     <div className="min-h-screen bg-background">
       <div className="container mx-auto px-4 py-6 max-w-6xl">
         <div className="flex items-center gap-4 mb-6">
+          {isEducatorView && (
+            <Button variant="ghost" size="icon" asChild data-testid="button-back-classroom">
+              <Link href="/classroom">
+                <ArrowLeft className="w-5 h-5" />
+              </Link>
+            </Button>
+          )}
           <div className="w-12 h-12 rounded-md bg-lys-red/10 flex items-center justify-center">
             <GraduationCap className="h-6 w-6 text-lys-red" />
           </div>
@@ -280,7 +376,7 @@ export default function StudentDashboard() {
               {student ? `${student.firstName}'s Dashboard` : "Student Dashboard"}
             </h1>
             <p className="text-muted-foreground font-roboto">
-              Your Be-Know-Do learning journey
+              {isEducatorView ? "Be-Know-Do progress tracking" : "Your Be-Know-Do learning journey"}
             </p>
           </div>
         </div>
@@ -357,7 +453,7 @@ export default function StudentDashboard() {
 
           <div className="lg:col-span-3">
             <Tabs value={activeTab} onValueChange={setActiveTab}>
-              <TabsList className="w-full justify-start mb-4">
+              <TabsList className="w-full flex flex-wrap h-auto justify-start gap-1 mb-4">
                 <TabsTrigger value="overview" data-testid="tab-overview">Overview</TabsTrigger>
                 <TabsTrigger value="assignments" data-testid="tab-assignments">
                   Assignments
@@ -369,6 +465,14 @@ export default function StudentDashboard() {
                 <TabsTrigger value="portfolio" data-testid="tab-portfolio">
                   <FolderOpen className="w-4 h-4 mr-1" />
                   Portfolio
+                </TabsTrigger>
+                <TabsTrigger value="activity" data-testid="tab-activity">
+                  <Activity className="w-4 h-4 mr-1" />
+                  Activity
+                </TabsTrigger>
+                <TabsTrigger value="careers" data-testid="tab-careers">
+                  <Briefcase className="w-4 h-4 mr-1" />
+                  Careers
                 </TabsTrigger>
               </TabsList>
 
@@ -416,16 +520,35 @@ export default function StudentDashboard() {
                   <Card>
                     <CardContent className="py-12 text-center">
                       <Sparkles className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
-                      <h3 className="text-lg font-semibold mb-2">Start Your Journey</h3>
+                      <h3 className="text-lg font-semibold mb-2">
+                        {isEducatorView ? "Journey Not Started" : "Start Your Journey"}
+                      </h3>
                       <p className="text-muted-foreground mb-4">
-                        Take the Self-Discovery assessment to begin tracking your Be-Know-Do progress.
+                        {isEducatorView
+                          ? "This student's Be-Know-Do journey hasn't been started yet. Create a journey to begin tracking their progress."
+                          : "Take the Self-Discovery assessment to begin tracking your Be-Know-Do progress."}
                       </p>
-                      <Button asChild>
-                        <Link href="/self-discovery">
-                          <Sparkles className="w-4 h-4 mr-2" />
-                          Take Assessment
-                        </Link>
-                      </Button>
+                      {isEducatorView ? (
+                        <Button
+                          onClick={() => createJourneyMutation.mutate()}
+                          disabled={createJourneyMutation.isPending}
+                          data-testid="button-create-journey"
+                        >
+                          {createJourneyMutation.isPending ? (
+                            <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                          ) : (
+                            <Sparkles className="w-4 h-4 mr-2" />
+                          )}
+                          Start Journey
+                        </Button>
+                      ) : (
+                        <Button asChild>
+                          <Link href="/self-discovery">
+                            <Sparkles className="w-4 h-4 mr-2" />
+                            Take Assessment
+                          </Link>
+                        </Button>
+                      )}
                     </CardContent>
                   </Card>
                 )}
@@ -519,20 +642,112 @@ export default function StudentDashboard() {
               <TabsContent value="milestones" className="space-y-6">
                 <Card>
                   <CardHeader>
-                    <CardTitle className="flex items-center gap-2 font-oswald">
-                      <Trophy className="w-5 h-5 text-lys-yellow" />
-                      Your Milestones
-                    </CardTitle>
-                    <CardDescription className="font-roboto">
-                      Track your achievements across Be-Know-Do
-                    </CardDescription>
+                    <div className="flex items-start justify-between gap-2 flex-wrap">
+                      <div>
+                        <CardTitle className="flex items-center gap-2 font-oswald">
+                          <Trophy className="w-5 h-5 text-lys-yellow" />
+                          {isEducatorView ? "Journey Milestones" : "Your Milestones"}
+                        </CardTitle>
+                        <CardDescription className="font-roboto">
+                          Track your achievements across Be-Know-Do
+                        </CardDescription>
+                      </div>
+                      {isEducatorView && progress && (
+                        <Dialog open={isAddMilestoneOpen} onOpenChange={setIsAddMilestoneOpen}>
+                          <DialogTrigger asChild>
+                            <Button size="sm" data-testid="button-add-milestone">
+                              <Plus className="w-4 h-4 mr-2" />
+                              Add Milestone
+                            </Button>
+                          </DialogTrigger>
+                          <DialogContent>
+                            <DialogHeader>
+                              <DialogTitle>Add New Milestone</DialogTitle>
+                              <DialogDescription>
+                                Create a new milestone to track progress in the Be-Know-Do journey.
+                              </DialogDescription>
+                            </DialogHeader>
+                            <div className="space-y-4 py-4">
+                              <div className="space-y-2">
+                                <Label htmlFor="milestone-title">Title</Label>
+                                <Input
+                                  id="milestone-title"
+                                  value={newMilestone.title}
+                                  onChange={(e) => setNewMilestone({ ...newMilestone, title: e.target.value })}
+                                  placeholder="e.g., Complete self-reflection journal"
+                                  data-testid="input-milestone-title"
+                                />
+                              </div>
+                              <div className="space-y-2">
+                                <Label htmlFor="milestone-category">Category</Label>
+                                <Select
+                                  value={newMilestone.category}
+                                  onValueChange={(value: "be" | "know" | "do") =>
+                                    setNewMilestone({ ...newMilestone, category: value })
+                                  }
+                                >
+                                  <SelectTrigger data-testid="select-milestone-category">
+                                    <SelectValue />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    <SelectItem value="be">
+                                      <div className="flex items-center gap-2">
+                                        <Heart className="w-4 h-4 text-rose-500" />
+                                        Being
+                                      </div>
+                                    </SelectItem>
+                                    <SelectItem value="know">
+                                      <div className="flex items-center gap-2">
+                                        <Compass className="w-4 h-4 text-blue-500" />
+                                        Knowing
+                                      </div>
+                                    </SelectItem>
+                                    <SelectItem value="do">
+                                      <div className="flex items-center gap-2">
+                                        <Target className="w-4 h-4 text-emerald-500" />
+                                        Doing
+                                      </div>
+                                    </SelectItem>
+                                  </SelectContent>
+                                </Select>
+                              </div>
+                              <div className="space-y-2">
+                                <Label htmlFor="milestone-description">Description (optional)</Label>
+                                <Textarea
+                                  id="milestone-description"
+                                  value={newMilestone.description}
+                                  onChange={(e) => setNewMilestone({ ...newMilestone, description: e.target.value })}
+                                  placeholder="Describe what this milestone represents..."
+                                  data-testid="input-milestone-description"
+                                />
+                              </div>
+                            </div>
+                            <DialogFooter>
+                              <Button variant="outline" onClick={() => setIsAddMilestoneOpen(false)}>
+                                Cancel
+                              </Button>
+                              <Button
+                                onClick={() => addMilestoneMutation.mutate(newMilestone)}
+                                disabled={!newMilestone.title || addMilestoneMutation.isPending}
+                                data-testid="button-save-milestone"
+                              >
+                                {addMilestoneMutation.isPending && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+                                Save Milestone
+                              </Button>
+                            </DialogFooter>
+                          </DialogContent>
+                        </Dialog>
+                      )}
+                    </div>
                   </CardHeader>
                   <CardContent>
                     {milestones.length === 0 ? (
                       <div className="py-8 text-center">
                         <Trophy className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
                         <p className="text-muted-foreground">
-                          Complete assessments and assignments to earn milestones.
+                          {isEducatorView
+                            ? "No milestones yet. Add milestones to track important achievements."
+                            : "Complete assessments and assignments to earn milestones."}
                         </p>
                       </div>
                     ) : (
@@ -774,6 +989,75 @@ export default function StudentDashboard() {
                     </CardContent>
                   </Card>
                 )}
+              </TabsContent>
+
+              <TabsContent value="activity" className="space-y-6">
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2 font-oswald">
+                      <Activity className="w-5 h-5" />
+                      Activity Timeline
+                    </CardTitle>
+                    <CardDescription className="font-roboto">
+                      Recent learning activities and achievements
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    {activities.length === 0 ? (
+                      <div className="py-8 text-center">
+                        <Clock className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
+                        <p className="text-muted-foreground">No activities recorded yet.</p>
+                      </div>
+                    ) : (
+                      <ScrollArea className="h-[400px] pr-4">
+                        {activities.map((activity) => (
+                          <ActivityItem key={activity.id} activity={activity} />
+                        ))}
+                      </ScrollArea>
+                    )}
+                  </CardContent>
+                </Card>
+              </TabsContent>
+
+              <TabsContent value="careers" className="space-y-6">
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2 font-oswald">
+                      <Briefcase className="w-5 h-5" />
+                      Saved Career Interests
+                    </CardTitle>
+                    <CardDescription className="font-roboto">
+                      Careers you have explored and saved
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    {(!progress?.savedCareerIds || progress.savedCareerIds.length === 0) ? (
+                      <div className="py-8 text-center">
+                        <Briefcase className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
+                        <p className="text-muted-foreground mb-4">No saved careers yet.</p>
+                        <Button variant="outline" asChild data-testid="button-explore-careers">
+                          <Link href="/careers">Explore Careers</Link>
+                        </Button>
+                      </div>
+                    ) : (
+                      <div className="space-y-2">
+                        {progress.savedCareerIds.map((careerId, index) => (
+                          <div
+                            key={careerId}
+                            className="flex items-center gap-3 p-3 bg-muted/30 rounded-md"
+                            data-testid={`career-${careerId}`}
+                          >
+                            <Briefcase className="w-5 h-5 text-muted-foreground" />
+                            <span>Career #{index + 1}</span>
+                            <Button variant="ghost" size="sm" asChild className="ml-auto">
+                              <Link href={`/careers?id=${careerId}`}>View Details</Link>
+                            </Button>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
               </TabsContent>
             </Tabs>
           </div>

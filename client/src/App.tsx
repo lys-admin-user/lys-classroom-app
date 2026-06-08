@@ -1,4 +1,4 @@
-import { Switch, Route, useLocation, useSearch } from "wouter";
+import { Switch, Route, Redirect, useLocation, useSearch } from "wouter";
 import { queryClient } from "./lib/queryClient";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
@@ -54,7 +54,6 @@ const ParentConnect = lazy(() => import("@/pages/ParentConnect"));
 const Milestones = lazy(() => import("@/pages/Milestones"));
 const Classroom = lazy(() => import("@/pages/Classroom"));
 const ProfessionalDevelopment = lazy(() => import("@/pages/ProfessionalDevelopment"));
-const StudentJourney = lazy(() => import("@/pages/StudentJourney"));
 const StudentDashboard = lazy(() => import("@/pages/StudentDashboard"));
 const MyJourney = lazy(() => import("@/pages/MyJourney"));
 const PortfolioBuilder = lazy(() => import("@/pages/PortfolioBuilder"));
@@ -264,7 +263,6 @@ const AuthAdminFoundation = withAuth(AdminFoundation);
 const AuthParentPortal = withAuth(ParentPortal);
 const AuthMilestones = withAuth(Milestones);
 const AuthClassroom = withAuth(Classroom);
-const AuthStudentJourney = withAuth(StudentJourney);
 const AuthStudentDashboard = withAuth(StudentDashboard);
 const AuthMyJourney = withAuth(MyJourney);
 const AuthProfessionalDevelopment = withAuth(ProfessionalDevelopment);
@@ -347,7 +345,9 @@ function Router() {
         <Route path="/parent-connect" component={ParentConnect} />
         <Route path="/milestones" component={AuthMilestones} />
         <Route path="/classroom" component={AuthClassroom} />
-        <Route path="/student-journey/:studentId" component={AuthStudentJourney} />
+        <Route path="/student-journey/:studentId">
+          {(params) => <Redirect to={`/student-dashboard/${params.studentId}`} />}
+        </Route>
         <Route path="/student-dashboard/:studentId" component={AuthStudentDashboard} />
         <Route path="/my-journey" component={AuthMyJourney} />
         <Route path="/professional-development" component={AuthProfessionalDevelopment} />
