@@ -353,6 +353,16 @@ export default function StudentDashboard() {
   const milestones = journeyData?.milestones || [];
   const activities = journeyData?.activities || [];
   const assignments = assignmentsData || [];
+
+  const studentInitials = student
+    ? (`${student.firstName?.[0] ?? ""}${student.lastName?.[0] ?? ""}`.toUpperCase() || "ST")
+    : "ST";
+  const focusLabel = progress
+    ? ({ be: "Being", know: "Knowing", do: "Doing" } as const)[progress.currentFocus ?? "be"]
+    : "";
+  const statusBadge = (progress?.overallScore ?? 0) >= 50
+    ? { label: "On track", className: "bg-emerald-100 text-emerald-700" }
+    : { label: "Getting started", className: "bg-amber-100 text-amber-800" };
   
   const pendingAssignments = assignments.filter(a => a.recipient.status === "assigned" || a.recipient.status === "in_progress");
   const completedAssignments = assignments.filter(a => a.recipient.status === "submitted" || a.recipient.status === "graded");
@@ -360,25 +370,32 @@ export default function StudentDashboard() {
   return (
     <div className="min-h-screen bg-background">
       <div className="container mx-auto px-4 py-6 max-w-6xl">
+        {isEducatorView && (
+          <Button variant="ghost" size="sm" asChild className="mb-4 -ml-2 text-muted-foreground" data-testid="button-back-classroom">
+            <Link href="/classroom">
+              <ArrowLeft className="w-4 h-4 mr-1" />
+              Back to Classroom roster
+            </Link>
+          </Button>
+        )}
+
         <div className="flex items-center gap-4 mb-6">
-          {isEducatorView && (
-            <Button variant="ghost" size="icon" asChild data-testid="button-back-classroom">
-              <Link href="/classroom">
-                <ArrowLeft className="w-5 h-5" />
-              </Link>
-            </Button>
-          )}
-          <div className="w-12 h-12 rounded-md bg-lys-red/10 flex items-center justify-center">
-            <GraduationCap className="h-6 w-6 text-lys-red" />
+          <div className="h-16 w-16 rounded-full bg-gradient-to-br from-lys-red to-blue-500 flex items-center justify-center text-white text-xl font-bold font-oswald shrink-0" data-testid="avatar-student">
+            {studentInitials}
           </div>
           <div>
-            <h1 className="text-2xl font-bold font-marker">
-              {student ? `${student.firstName}'s Dashboard` : "Student Dashboard"}
+            <h1 className="text-2xl font-bold font-marker" data-testid="text-student-name">
+              {student ? `${student.firstName} ${student.lastName}` : "Student Dashboard"}
             </h1>
-            <p className="text-muted-foreground font-roboto">
-              {isEducatorView ? "Be-Know-Do progress tracking" : "Your Be-Know-Do learning journey"}
+            <p className="text-muted-foreground font-roboto text-sm">
+              {[student?.gradeLevel ? `Grade ${student.gradeLevel}` : null, "Be-Know-Do Pathway"].filter(Boolean).join(" · ")}
             </p>
           </div>
+          {progress && (
+            <div className="ml-auto">
+              <Badge className={statusBadge.className} data-testid="badge-status">{statusBadge.label}</Badge>
+            </div>
+          )}
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
@@ -454,14 +471,21 @@ export default function StudentDashboard() {
           <div className="lg:col-span-3">
             <Tabs value={activeTab} onValueChange={setActiveTab}>
               <TabsList className="w-full flex flex-wrap h-auto justify-start gap-1 mb-4">
-                <TabsTrigger value="overview" data-testid="tab-overview">Overview</TabsTrigger>
+                <TabsTrigger value="overview" data-testid="tab-overview">
+                  <Star className="w-4 h-4 mr-1" />
+                  Overview
+                </TabsTrigger>
                 <TabsTrigger value="assignments" data-testid="tab-assignments">
+                  <ClipboardList className="w-4 h-4 mr-1" />
                   Assignments
                   {pendingAssignments.length > 0 && (
                     <Badge variant="destructive" className="ml-2">{pendingAssignments.length}</Badge>
                   )}
                 </TabsTrigger>
-                <TabsTrigger value="milestones" data-testid="tab-milestones">Milestones</TabsTrigger>
+                <TabsTrigger value="milestones" data-testid="tab-milestones">
+                  <Trophy className="w-4 h-4 mr-1" />
+                  Milestones
+                </TabsTrigger>
                 <TabsTrigger value="portfolio" data-testid="tab-portfolio">
                   <FolderOpen className="w-4 h-4 mr-1" />
                   Portfolio
@@ -478,6 +502,7 @@ export default function StudentDashboard() {
 
               <TabsContent value="overview" className="space-y-6">
                 {progress ? (
+                  <>
                   <Card>
                     <CardHeader>
                       <CardTitle className="flex items-center gap-2 font-oswald">
@@ -516,6 +541,23 @@ export default function StudentDashboard() {
                       </div>
                     </CardContent>
                   </Card>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                    {[
+                      { label: "Current Focus", value: focusLabel, icon: Compass },
+                      { label: "Milestones Earned", value: `${progress.totalMilestonesAchieved} of ${milestones.length}`, icon: Trophy },
+                      { label: "Assessments Completed", value: String(progress.totalAssessmentsCompleted), icon: CheckCircle2 },
+                    ].map((s) => (
+                      <Card key={s.label} data-testid={`stat-${s.label.toLowerCase().replace(/\s+/g, "-")}`}>
+                        <CardContent className="pt-5">
+                          <s.icon className="h-5 w-5 text-muted-foreground mb-2" />
+                          <p className="text-lg font-semibold">{s.value}</p>
+                          <p className="text-xs text-muted-foreground">{s.label}</p>
+                        </CardContent>
+                      </Card>
+                    ))}
+                  </div>
+                  </>
                 ) : (
                   <Card>
                     <CardContent className="py-12 text-center">
