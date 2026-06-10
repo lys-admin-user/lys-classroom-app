@@ -475,6 +475,124 @@ function StandardsUsedWidget() {
   );
 }
 
+// Task #16 — "Standards I haven't covered yet". Sibling card to the history
+// widget. The server subtracts the teacher's usage log from the full cascade
+// for their most-used (country, state, subject); each row deep-links into the
+// lesson generator with that curriculum context + code preselected.
+interface UncoveredCode {
+  code: string;
+  description: string;
+  gradeLevel?: string | null;
+  standardsName?: string | null;
+}
+
+interface UncoveredResponse {
+  context: { country: string; state: string; subject: string } | null;
+  uncovered: UncoveredCode[];
+  coveredCount: number;
+  totalCount: number;
+}
+
+function UncoveredStandardsWidget() {
+  const { data, isLoading } = useQuery<UncoveredResponse>({
+    queryKey: ["/api/teacher-standards/uncovered"],
+  });
+
+  const context = data?.context ?? null;
+  const uncovered = data?.uncovered ?? [];
+  const coveredCount = data?.coveredCount ?? 0;
+  const totalCount = data?.totalCount ?? 0;
+  const coveragePct = totalCount > 0 ? Math.round((coveredCount / totalCount) * 100) : 0;
+
+  const buildHref = (code: string) => {
+    if (!context) return "/lesson-generator";
+    const params = new URLSearchParams({
+      country: context.country,
+      state: context.state,
+      subject: context.subject,
+      code,
+    });
+    return `/lesson-generator?${params.toString()}`;
+  };
+
+  return (
+    <Card data-testid="card-standards-uncovered">
+      <CardHeader className="pb-3">
+        <CardTitle className="font-oswald text-lg flex items-center gap-2">
+          <AlertCircle className="h-4 w-4 text-lys-red" />
+          Gaps to cover
+        </CardTitle>
+        <CardDescription className="font-roboto text-xs">
+          {context
+            ? `Codes in ${context.subject} (${context.state}) you haven't used yet`
+            : "Standards in your curriculum you haven't touched"}
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-2">
+        {isLoading ? (
+          <p className="text-xs text-muted-foreground font-roboto">Loading...</p>
+        ) : !context ? (
+          <p className="text-xs text-muted-foreground font-roboto" data-testid="text-uncovered-empty">
+            Attach a standard to a lesson first, then we'll show you what's left to cover.
+          </p>
+        ) : uncovered.length === 0 ? (
+          <p className="text-xs text-muted-foreground font-roboto" data-testid="text-uncovered-complete">
+            {totalCount > 0
+              ? "Nice — you've covered every code in this curriculum!"
+              : "This curriculum has no per-outcome codes to track."}
+          </p>
+        ) : (
+          <>
+            {totalCount > 0 && (
+              <div className="mb-1">
+                <div className="flex items-center justify-between text-[11px] font-roboto mb-1">
+                  <span className="text-muted-foreground">Coverage</span>
+                  <span className="font-medium" data-testid="text-uncovered-coverage">
+                    {coveredCount}/{totalCount} ({coveragePct}%)
+                  </span>
+                </div>
+                <Progress value={coveragePct} className="h-1.5" />
+              </div>
+            )}
+            <div className="max-h-64 overflow-y-auto pr-1 space-y-1.5">
+              {uncovered.slice(0, 20).map((row) => (
+                <Link
+                  key={row.code}
+                  href={buildHref(row.code)}
+                  className="block p-2 rounded-md hover-elevate border border-transparent"
+                  data-testid={`row-standard-uncovered-${row.code}`}
+                >
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="font-semibold text-lys-red text-sm">{row.code}</span>
+                    <span className="text-[10px] text-muted-foreground font-roboto flex items-center gap-1 flex-shrink-0">
+                      Plan a lesson <ArrowRight className="h-3 w-3" />
+                    </span>
+                  </div>
+                  <p className="text-xs text-muted-foreground font-roboto line-clamp-1">
+                    {row.description}
+                  </p>
+                  {(row.gradeLevel || row.standardsName) && (
+                    <p className="text-[10px] text-muted-foreground font-roboto mt-0.5">
+                      {row.gradeLevel ?? ""}
+                      {row.gradeLevel && row.standardsName ? " · " : ""}
+                      {row.standardsName ?? ""}
+                    </p>
+                  )}
+                </Link>
+              ))}
+            </div>
+            {uncovered.length > 20 && (
+              <p className="text-[10px] text-muted-foreground font-roboto px-1">
+                Showing 20 of {uncovered.length} uncovered codes
+              </p>
+            )}
+          </>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
 function NewEducatorChecklist({ lessonsCount, goalsCount }: { lessonsCount: number; goalsCount: number }) {
   const { data: classesData } = useQuery<any[]>({ queryKey: ["/api/classes"] });
   const classes = classesData ?? [];
@@ -1223,6 +1341,7 @@ function EducatorDashboard() {
               <UpcomingDeadlines role="educator" />
               <NewEducatorChecklist lessonsCount={totalLessons} goalsCount={totalGoals} />
               <StandardsUsedWidget />
+              <UncoveredStandardsWidget />
             </div>
           </div>
         </section>

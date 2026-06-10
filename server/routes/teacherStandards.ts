@@ -157,6 +157,59 @@ export function registerTeacherStandardsRoutes(app: Express): void {
     }
   });
 
+  // Task #16 — "Standards I haven't covered yet". The counterpart to the
+  // history widget: take the teacher's most-used (country, state, subject),
+  // pull the full code list from the same cascade the lesson generator uses,
+  // and subtract the codes they've already attached to a lesson/assignment.
+  // Surfaces curriculum gaps before report time.
+  app.get("/api/teacher-standards/uncovered", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user?.claims?.sub ?? null;
+      const history = await storage.getTeacherStandardsHistory(userId);
+      if (history.length === 0) {
+        return res.json({ context: null, uncovered: [], coveredCount: 0, totalCount: 0 });
+      }
+
+      // Group usage by (country, state, subject) and pick the teacher's most
+      // active curriculum context by total times-used. Ties break on the
+      // number of distinct codes already touched.
+      const groups = new Map<
+        string,
+        { country: string; state: string; subject: string; totalUse: number; codes: Set<string> }
+      >();
+      for (const row of history) {
+        const key = `${row.country}|${row.state}|${row.subject}`;
+        const g =
+          groups.get(key) ??
+          { country: row.country, state: row.state, subject: row.subject, totalUse: 0, codes: new Set<string>() };
+        g.totalUse += row.useCount;
+        g.codes.add(row.code);
+        groups.set(key, g);
+      }
+      const top = Array.from(groups.values()).sort(
+        (a, b) => b.totalUse - a.totalUse || b.codes.size - a.codes.size,
+      )[0];
+
+      const { listCodes } = await import("../services/standardsCatalog");
+      const allCodes = await listCodes(top.country, top.state, top.subject, { userId });
+
+      // International curricula that publish no per-outcome codes legitimately
+      // return an empty list — there's nothing to "cover", so the widget
+      // shows its empty state rather than a misleading gap report.
+      const uncovered = allCodes.filter((c) => !top.codes.has(c.code));
+
+      res.json({
+        context: { country: top.country, state: top.state, subject: top.subject },
+        uncovered,
+        coveredCount: top.codes.size,
+        totalCount: allCodes.length,
+      });
+    } catch (error) {
+      console.error("Get teacher uncovered standards error:", error);
+      res.status(500).json({ error: "Failed to load uncovered standards" });
+    }
+  });
+
   // Fire-and-forget usage logger. Returns 200 on validation issues so a
   // malformed payload from the client never blocks the originating save.
   app.post("/api/teacher-standards/record", isAuthenticated, async (req: any, res) => {

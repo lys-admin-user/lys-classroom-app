@@ -84,6 +84,10 @@ export default function LessonGenerator() {
   const [selectedState, setSelectedState] = useState("");
   const [selectedSubject, setSelectedSubject] = useState("");
   const [selectedStandardCodes, setSelectedStandardCodes] = useState<StandardCode[]>([]);
+  // Task #16 — code passed via ?code= from the dashboard "Gaps to cover" widget.
+  // Held until the cascade's code list loads, then matched + auto-selected.
+  const [pendingPreselectCode, setPendingPreselectCode] = useState<string | null>(null);
+  const [paramsApplied, setParamsApplied] = useState(false);
   // Bilingual local-language code (e.g., "yo", "ig", "ha"). Empty = English only.
   // Only used / shown when selectedCountry is an African country.
   const [selectedLanguage, setSelectedLanguage] = useState("");
@@ -143,6 +147,33 @@ export default function LessonGenerator() {
   const search = useSearch();
   const viewLessonId = new URLSearchParams(search).get("view");
   const shouldRestoreGuestState = new URLSearchParams(search).has("restore");
+  // Task #16 — true when the dashboard "Gaps to cover" deep-link supplied any
+  // curriculum context. Used to make URL params win deterministically over the
+  // educator-profile defaults, even when the profile query is already cached.
+  const hasUrlStandardsParams = useMemo(() => {
+    const p = new URLSearchParams(search);
+    return p.has("country") || p.has("state") || p.has("subject") || p.has("code");
+  }, [search]);
+
+  // Task #16 — deep-link from the dashboard "Gaps to cover" widget:
+  // ?country=&state=&subject=&code= preselects the cascade and auto-selects
+  // the standard code once its list loads.
+  useEffect(() => {
+    if (paramsApplied) return;
+    const params = new URLSearchParams(search);
+    const country = params.get("country");
+    const state = params.get("state");
+    const subject = params.get("subject");
+    const code = params.get("code");
+    if (!country && !state && !subject && !code) return;
+    if (country) setSelectedCountry(country);
+    if (state) setSelectedState(state);
+    if (subject) setSelectedSubject(subject);
+    if (code) setPendingPreselectCode(code);
+    // URL wins over the educator-profile defaults below.
+    setProfileApplied(true);
+    setParamsApplied(true);
+  }, [search, paramsApplied]);
 
   const { data: viewLessonData, isLoading: viewLessonLoading } = useQuery<Lesson>({
     queryKey: ["/api/lessons", viewLessonId],
@@ -248,6 +279,11 @@ export default function LessonGenerator() {
   useEffect(() => {
     // Don't overwrite values we just restored from a guest handoff.
     if (shouldRestoreGuestState) return;
+    // Task #16 — a dashboard deep-link with curriculum params always wins over
+    // the educator-profile defaults. Checked directly off the URL (not the
+    // profileApplied flag) so a cached profile query can't race ahead and
+    // clobber the deep-link context before the URL effect's state lands.
+    if (hasUrlStandardsParams) return;
     if (educatorProfile && !profileApplied) {
       if (educatorProfile.country) setSelectedCountry(resolveCountryName(educatorProfile.country));
       if (educatorProfile.state) setSelectedState(educatorProfile.state);
@@ -257,7 +293,7 @@ export default function LessonGenerator() {
       }
       setProfileApplied(true);
     }
-  }, [educatorProfile, profileApplied]);
+  }, [educatorProfile, profileApplied, hasUrlStandardsParams, shouldRestoreGuestState]);
 
   // Fetch standards from API instead of hardcoded data
   const { data: countriesData } = useQuery<string[]>({
@@ -282,6 +318,21 @@ export default function LessonGenerator() {
     enabled: !!selectedCountry && !!selectedState && !!selectedSubject,
   });
   const standardCodes = standardCodesData || [];
+
+  // Task #16 — once the cascade's code list loads, match the ?code= deep-link
+  // and select it (with its real description), then clear the pending marker.
+  useEffect(() => {
+    if (!pendingPreselectCode || standardCodes.length === 0) return;
+    const match = standardCodes.find((c) => c.code === pendingPreselectCode);
+    if (match) {
+      setSelectedStandardCodes((prev) =>
+        prev.some((c) => c.code === match.code)
+          ? prev
+          : [...prev, { code: match.code, description: match.description }],
+      );
+    }
+    setPendingPreselectCode(null);
+  }, [pendingPreselectCode, standardCodes]);
 
   const standardsName = useMemo(() => {
     const stateInfo = states.find(s => s.abbreviation === selectedState);
