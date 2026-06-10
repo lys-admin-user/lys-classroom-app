@@ -31,7 +31,6 @@ const Careers = lazy(() => import("@/pages/Careers"));
 const ActionPlans = lazy(() => import("@/pages/ActionPlans"));
 const Resources = lazy(() => import("@/pages/Resources"));
 const MyLessons = lazy(() => import("@/pages/MyLessons"));
-const CurriculumLibrary = lazy(() => import("@/pages/CurriculumLibrary"));
 const CurriculumPlanning = lazy(() => import("@/pages/CurriculumPlanning"));
 const StandardsIngestionAdmin = lazy(() => import("@/pages/StandardsIngestionAdmin"));
 const Settings = lazy(() => import("@/pages/Settings"));
@@ -246,7 +245,6 @@ function withAuth(Component: React.ComponentType<any>) {
 const AuthLessonGenerator = withAuth(LessonGenerator);
 const AuthActionPlans = withAuth(ActionPlans);
 const AuthMyLessons = withAuth(MyLessons);
-const AuthCurriculumLibrary = withAuth(CurriculumLibrary);
 const AuthCurriculumPlanning = withAuth(CurriculumPlanning);
 const AuthStandardsIngestionAdmin = withAuth(StandardsIngestionAdmin);
 const AuthSettings = withAuth(Settings);

@@ -51,7 +51,6 @@ import {
   UserPlus,
   HelpCircle,
   Wand2,
-  Globe,
 } from "lucide-react";
 
 function hasMinRole(userRole: string, minRole: UserRole): boolean {
@@ -112,7 +111,7 @@ const navigationGroups: NavGroup[] = [
     items: [
       { title: "Action Plans", url: "/action-plans", icon: Target, requiresAuth: true },
       { title: "Campus Activities", url: "/campus-activities", icon: Trophy, requiresAuth: true },
-      { title: "Assignments", url: "/assignments", icon: ClipboardList, requiresAuth: true, minRole: "homeschool_parent" },
+      { title: "Assignments", url: "/assignments", icon: ClipboardList, requiresAuth: true, exactRole: "homeschool_parent" },
     ],
   },
   {
@@ -131,7 +130,6 @@ const navigationGroups: NavGroup[] = [
     label: "Educator Tools",
     minRole: "educator",
     items: [
-      { title: "Standards Ingestion", url: "/admin/standards-ingestion", icon: Globe, requiresAuth: true, exactRole: "system_admin" },
       { title: "AI Lesson Generator", url: "/lesson-generator", icon: Sparkles, requiresAuth: true },
       { title: "AI Assignment Generator", url: "/assignments", icon: Wand2, requiresAuth: true },
       { title: "My Lessons", url: "/my-lessons", icon: BookOpen, requiresAuth: true },
