@@ -368,6 +368,8 @@ export interface IStorage {
   tryReserveGuestLessonGeneration(guestKey: { guestId?: string; ipAddress: string }, limit: number, topic?: string): Promise<{ success: boolean; currentCount: number }>;
   saveGuestHandoff(guestKey: { guestId?: string; ipAddress: string }, formContext: any, lastLessonContent: any): Promise<void>;
   claimGuestHandoff(guestId: string, userId: string): Promise<{ formContext: any; lastLessonContent: any } | null>;
+  saveGuestLead(guestKey: { guestId?: string; ipAddress: string }, email: string): Promise<void>;
+  getGuestLead(guestKey: { guestId?: string; ipAddress: string }): Promise<{ email: string } | null>;
   
   // Lesson Templates
   getLessonTemplates(userId: string): Promise<LessonTemplate[]>;

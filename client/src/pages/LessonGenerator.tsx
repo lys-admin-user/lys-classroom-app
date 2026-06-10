@@ -32,6 +32,7 @@ import { Link, useLocation, useSearch } from "wouter";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { GuestSignupModal } from "@/components/GuestSignupModal";
+import { GuestEmailModal } from "@/components/GuestEmailModal";
 
 const defaultGradeLevels = [
   "Elementary (K-2)",
@@ -143,6 +144,9 @@ export default function LessonGenerator() {
   // paywall card or reactively when the server returns requiresSignup.
   const [guestModalOpen, setGuestModalOpen] = useState(false);
   const [guestModalHardWall, setGuestModalHardWall] = useState(false);
+  // Email gate — opened the first time an anonymous user generates, before any
+  // free lesson is granted. Capturing the email unlocks the 5 free lessons.
+  const [emailModalOpen, setEmailModalOpen] = useState(false);
 
   const search = useSearch();
   const viewLessonId = new URLSearchParams(search).get("view");
@@ -208,7 +212,7 @@ export default function LessonGenerator() {
     enabled: isAuthenticated,
   });
 
-  const { data: guestUsageData, refetch: refetchGuestUsage } = useQuery<{ used: number; limit: number; remaining: number }>({
+  const { data: guestUsageData, refetch: refetchGuestUsage } = useQuery<{ used: number; limit: number; remaining: number; emailCaptured: boolean }>({
     queryKey: ["/api/lessons/guest-usage"],
     enabled: !isAuthenticated,
   });
@@ -518,6 +522,11 @@ export default function LessonGenerator() {
       });
     },
     onError: (error: any) => {
+      if (error?.requiresEmail) {
+        // Server requires an email before unlocking free lessons.
+        setEmailModalOpen(true);
+        return;
+      }
       if (error?.requiresSignup) {
         // Server confirmed the guest is out of free lessons. Open the
         // signup modal with form values + last lesson preserved.
@@ -736,6 +745,12 @@ export default function LessonGenerator() {
         description: "Please select your educational standards. This ensures your lesson meets legal requirements.",
         variant: "destructive",
       });
+      return;
+    }
+    // Email gate — anonymous users provide an email once to unlock free
+    // lessons. Capturing it opens the modal; onCaptured proceeds to generate.
+    if (!isAuthenticated && guestUsageData && !guestUsageData.emailCaptured) {
+      setEmailModalOpen(true);
       return;
     }
     generateMutation.mutate();
@@ -2348,6 +2363,15 @@ ${addedResources.length > 0 ? addedResources.map(r => `- ${r.title}: ${r.url}`).
           lessonPart,
         }}
         lastLessonContent={generatedLesson}
+      />
+
+      <GuestEmailModal
+        open={emailModalOpen}
+        onOpenChange={setEmailModalOpen}
+        onCaptured={() => {
+          refetchGuestUsage();
+          generateMutation.mutate();
+        }}
       />
     </div>
   );

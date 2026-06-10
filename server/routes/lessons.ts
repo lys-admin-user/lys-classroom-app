@@ -265,6 +265,15 @@ export function registerLessonsRoutes(app: Express): void {
   app.post("/api/lessons/generate-guest", async (req: any, res) => {
     try {
       const validated = generateLessonRequestSchema.parse(req.body);
+      const lead = await storage.getGuestLead(guestKeyFromReq(req));
+      if (!lead) {
+        res.status(403).json({
+          error: "Email required",
+          message: "Enter your email to unlock 5 free lessons.",
+          requiresEmail: true,
+        });
+        return;
+      }
       const { success, currentCount } = await storage.tryReserveGuestLessonGeneration(
         guestKeyFromReq(req),
         GUEST_LESSON_LIMIT,
@@ -313,6 +322,14 @@ export function registerLessonsRoutes(app: Express): void {
     }
 
     try {
+      const lead = await storage.getGuestLead(guestKeyFromReq(req));
+      if (!lead) {
+        return res.status(403).json({
+          error: "Email required",
+          message: "Enter your email to unlock 5 free lessons.",
+          requiresEmail: true,
+        });
+      }
       const { success, currentCount } = await storage.tryReserveGuestLessonGeneration(
         guestKeyFromReq(req),
         GUEST_LESSON_LIMIT,
@@ -365,10 +382,37 @@ export function registerLessonsRoutes(app: Express): void {
   // Guest usage check endpoint
   app.get("/api/lessons/guest-usage", async (req: any, res) => {
     try {
-      const count = await storage.countGuestGenerations(guestKeyFromReq(req));
-      res.json({ used: count, limit: GUEST_LESSON_LIMIT, remaining: Math.max(0, GUEST_LESSON_LIMIT - count) });
+      const key = guestKeyFromReq(req);
+      const count = await storage.countGuestGenerations(key);
+      const lead = await storage.getGuestLead(key);
+      res.json({
+        used: count,
+        limit: GUEST_LESSON_LIMIT,
+        remaining: Math.max(0, GUEST_LESSON_LIMIT - count),
+        emailCaptured: !!lead,
+      });
     } catch (error) {
       res.status(500).json({ error: "Failed to check guest usage" });
+    }
+  });
+
+
+  // Email gate: a guest provides an email to unlock their 5 free lessons. The
+  // email is stored as a lead (contact list); browser/guestId tracking still
+  // enforces the monthly ceiling.
+  const guestEmailSchema = z.object({ email: z.string().email() });
+  app.post("/api/lessons/guest-email", async (req: any, res) => {
+    try {
+      const { email } = guestEmailSchema.parse(req.body);
+      await storage.saveGuestLead(guestKeyFromReq(req), email);
+      res.json({ ok: true, emailCaptured: true });
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        res.status(400).json({ error: "Please enter a valid email address." });
+      } else {
+        console.error("Guest email capture error:", error);
+        res.status(500).json({ error: "Failed to save email" });
+      }
     }
   });
 

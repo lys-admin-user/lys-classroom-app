@@ -36,6 +36,7 @@ import {
 import { Link } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/use-auth";
+import { RoleQuickStart } from "@/components/RoleQuickStart";
 import { DemoVideoModal } from "@/components/DemoVideoModal";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -1032,7 +1033,7 @@ function StudentDashboard() {
 }
 
 function EducatorDashboard() {
-  const { isAuthenticated } = useAuth();
+  const { isAuthenticated, user } = useAuth();
   const [showDemo, setShowDemo] = useState(false);
 
   const { data: lessonsData } = useQuery<any[]>({
@@ -1069,6 +1070,7 @@ function EducatorDashboard() {
 
   return (
     <div className="min-h-screen bg-background" data-testid="educator-dashboard">
+      {isAuthenticated && <RoleQuickStart role={user?.role} />}
       <section className="relative overflow-hidden bg-gradient-to-br from-lys-yellow/20 via-background to-lys-teal/10">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 py-12 lg:py-20">
           <div className="grid lg:grid-cols-2 gap-8 lg:gap-12 items-center">

@@ -53,13 +53,13 @@ import {
   Wand2,
 } from "lucide-react";
 
-function hasMinRole(userRole: string, minRole: UserRole): boolean {
+export function hasMinRole(userRole: string, minRole: UserRole): boolean {
   const userLevel = ROLE_HIERARCHY[userRole as UserRole] ?? 0;
   const requiredLevel = ROLE_HIERARCHY[minRole] ?? 0;
   return userLevel >= requiredLevel;
 }
 
-interface NavItem {
+export interface NavItem {
   title: string;
   url: string;
   icon: React.ComponentType<{ className?: string }>;
@@ -68,7 +68,7 @@ interface NavItem {
   requiresAuth?: boolean;
 }
 
-interface NavGroup {
+export interface NavGroup {
   label: string;
   items: NavItem[];
   minRole?: UserRole;
@@ -76,7 +76,7 @@ interface NavGroup {
   colorClass?: string;
 }
 
-const navigationGroups: NavGroup[] = [
+export const navigationGroups: NavGroup[] = [
   {
     label: "Overview",
     items: [
@@ -123,6 +123,9 @@ const navigationGroups: NavGroup[] = [
       { title: "My Lessons", url: "/my-lessons", icon: BookOpen, requiresAuth: true },
       { title: "Curriculum Planning", url: "/curriculum-planning", icon: Map, requiresAuth: true },
       { title: "Gradebook", url: "/gradebook", icon: ClipboardList, requiresAuth: true },
+      { title: "Assessments", url: "/assessments", icon: FileText, requiresAuth: true },
+      { title: "Collaboration", url: "/collaboration", icon: Share2, requiresAuth: true },
+      { title: "SIS Integration", url: "/sis-integration", icon: Link2, requiresAuth: true },
       { title: "Community Library", url: "/resource-library", icon: Folder, requiresAuth: true },
     ],
   },

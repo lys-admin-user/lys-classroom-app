@@ -98,6 +98,21 @@ export const insertGuestLessonGenerationSchema = createInsertSchema(guestLessonG
 export type InsertGuestLessonGeneration = z.infer<typeof insertGuestLessonGenerationSchema>;
 export type GuestLessonGeneration = typeof guestLessonGenerations.$inferSelect;
 
+// Guest lead capture (email gate). An email is captured once before a guest
+// may generate free lessons; it doubles as a marketing contact list. Browser
+// (guestId) is the primary signal, with ipAddress as a secondary guard.
+export const guestLeads = pgTable("guest_leads", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  email: varchar("email").notNull(),
+  guestId: varchar("guest_id"),
+  ipAddress: varchar("ip_address"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertGuestLeadSchema = createInsertSchema(guestLeads).omit({ id: true, createdAt: true });
+export type InsertGuestLead = z.infer<typeof insertGuestLeadSchema>;
+export type GuestLead = typeof guestLeads.$inferSelect;
+
 // Goals Table (for action plans)
 export const goals = pgTable("goals", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),

@@ -4,8 +4,9 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
-import { Settings as SettingsIcon, User, Crown, Loader2 } from "lucide-react";
-import { useLocation } from "wouter";
+import { Settings as SettingsIcon, User, Crown, Loader2, Shield, Building2, Users as UsersIcon, ChevronRight } from "lucide-react";
+import { Link, useLocation } from "wouter";
+import { hasMinRole } from "@/components/AppSidebar";
 import { PLAN_PRICES, SEAT_PRICES, SEAT_MINIMUMS } from "@/lib/pricing";
 import EducatorProfileForm from "@/components/EducatorProfileForm";
 import ProfileTierSitemap from "@/components/ProfileTierSitemap";
@@ -53,6 +54,23 @@ export default function Settings() {
 
   const tier = profileData?.tier || "free";
   const profile = profileData?.profile;
+  const userRole = user?.role || "student";
+
+  // Role-aware administration shortcuts. Admins manage their org from dedicated
+  // pages; Settings links out to them rather than duplicating those controls.
+  const adminLinks: { label: string; description: string; href: string; icon: typeof Shield }[] = [];
+  if (hasMinRole(userRole, "campus_admin")) {
+    adminLinks.push({ label: "Campus Admin", description: "Manage your campus, staff, and settings", href: "/admin", icon: Shield });
+    adminLinks.push({ label: "Standards Catalog", description: "Review the standards used on your campus", href: "/admin/standards", icon: SettingsIcon });
+  }
+  if (hasMinRole(userRole, "district_admin")) {
+    adminLinks.push({ label: "District / Network Admin", description: "Oversee campuses and district-wide settings", href: "/district-admin", icon: Building2 });
+    adminLinks.push({ label: "Campuses", description: "Manage the campuses in your network", href: "/district-admin/campuses", icon: Building2 });
+  }
+  if (hasMinRole(userRole, "site_admin")) {
+    adminLinks.push({ label: "System Administration", description: "Platform-wide controls and configuration", href: "/system-admin", icon: SettingsIcon });
+    adminLinks.push({ label: "Manage Users", description: "Add, edit, and assign roles to users", href: "/system-admin/users", icon: UsersIcon });
+  }
 
   const tierColors: Record<string, string> = {
     free: "bg-muted text-muted-foreground",
@@ -148,6 +166,49 @@ export default function Settings() {
             existingProfile={profile}
             isOnboarding={!profile}
           />
+
+          {adminLinks.length > 0 && (
+            <>
+              <Separator />
+              <Card data-testid="card-admin-settings">
+                <CardHeader>
+                  <div className="flex items-center gap-3">
+                    <Shield className="h-5 w-5 text-lys-teal" />
+                    <div>
+                      <CardTitle className="font-oswald">Administration</CardTitle>
+                      <CardDescription className="font-roboto">
+                        Manage your organization from these tools
+                      </CardDescription>
+                    </div>
+                  </div>
+                </CardHeader>
+                <CardContent>
+                  <div className="grid sm:grid-cols-2 gap-3">
+                    {adminLinks.map((link) => {
+                      const Icon = link.icon;
+                      return (
+                        <Link key={link.href} href={link.href}>
+                          <div
+                            className="flex items-center gap-3 rounded-md border p-3 hover-elevate active-elevate-2 cursor-pointer"
+                            data-testid={`link-admin-${link.href.replace(/\//g, "-")}`}
+                          >
+                            <Icon className="h-5 w-5 text-lys-teal shrink-0" />
+                            <div className="flex-1 min-w-0">
+                              <p className="font-oswald text-sm">{link.label}</p>
+                              <p className="text-xs text-muted-foreground font-roboto truncate">
+                                {link.description}
+                              </p>
+                            </div>
+                            <ChevronRight className="h-4 w-4 text-muted-foreground shrink-0" />
+                          </div>
+                        </Link>
+                      );
+                    })}
+                  </div>
+                </CardContent>
+              </Card>
+            </>
+          )}
         </div>
       </div>
     </div>

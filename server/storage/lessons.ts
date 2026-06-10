@@ -487,6 +487,40 @@ const lessonsMethods: ThisType<DatabaseStorage> = {
   },
 
 
+  // Email gate for guests. Capture a lead email once per guest identity to
+  // unlock free lessons; the dedicated table doubles as a marketing contact
+  // list. Idempotent per guestId+email so resubmits don't duplicate rows.
+  async saveGuestLead(guestKey: { guestId?: string; ipAddress: string }, email: string): Promise<void> {
+    const { guestId, ipAddress } = guestKey;
+    const normalized = email.trim().toLowerCase();
+    const existing = await db.execute(sql`
+      SELECT id FROM guest_leads
+      WHERE email = ${normalized}
+        AND ${guestId ? sql`guest_id = ${guestId}` : sql`false`}
+      LIMIT 1
+    `);
+    if (existing.rows.length > 0) return;
+    await db.execute(sql`
+      INSERT INTO guest_leads (id, email, guest_id, ip_address, created_at)
+      VALUES (gen_random_uuid(), ${normalized}, ${guestId ?? null}, ${ipAddress}, NOW())
+    `);
+  },
+
+  // Return the most recent lead for this guest identity (guestId, or IP
+  // fallback so shared-network users aren't re-prompted), or null if none.
+  async getGuestLead(guestKey: { guestId?: string; ipAddress: string }): Promise<{ email: string } | null> {
+    const { guestId, ipAddress } = guestKey;
+    const result = await db.execute(sql`
+      SELECT email FROM guest_leads
+      WHERE ${guestId ? sql`guest_id = ${guestId}` : sql`false`}
+         OR ip_address = ${ipAddress}
+      ORDER BY created_at DESC LIMIT 1
+    `);
+    const row = result.rows[0] as any;
+    return row?.email ? { email: row.email } : null;
+  },
+
+
   // Race-safe reservation. A Postgres transactional advisory lock keyed on
   // the guestId (or IP hash when no cookie) serializes concurrent generate
   // attempts from the same identity so the count-then-insert cannot exceed

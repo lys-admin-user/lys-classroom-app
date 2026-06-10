@@ -12,6 +12,7 @@ import { OnboardingReminderBanner } from "@/components/OnboardingReminderBanner"
 import { TrialBanner } from "@/components/TrialBanner";
 import { ImpersonationBanner } from "@/components/ImpersonationBanner";
 import { OnboardingTour } from "@/components/OnboardingTour";
+import { CommandPalette } from "@/components/CommandPalette";
 import { useAuth } from "@/hooks/use-auth";
 import { useEffect, useState, lazy, Suspense } from "react";
 import { Button } from "@/components/ui/button";
@@ -432,6 +433,7 @@ function App() {
               </SidebarInset>
             </div>
             <TourManager />
+            <CommandPalette />
           </SidebarProvider>
         </OnboardingGuard>
         <NeedsAnalyzerModal />
