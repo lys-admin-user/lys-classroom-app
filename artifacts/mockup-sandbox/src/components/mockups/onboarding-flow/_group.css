@@ -1,0 +1,19 @@
+@import url('https://fonts.googleapis.com/css2?family=Oswald:wght@400;500;600&family=Permanent+Marker&family=Roboto:wght@400;500;700&display=swap');
+
+:root {
+  --lys-red: 7 84% 54%;
+  --lys-yellow: 45 93% 62%;
+  --lys-teal: 186 98% 23%;
+}
+
+.font-marker {
+  font-family: 'Permanent Marker', cursive;
+}
+
+.font-oswald {
+  font-family: 'Oswald', sans-serif;
+}
+
+.font-roboto {
+  font-family: 'Roboto', sans-serif;
+}
