@@ -13,6 +13,7 @@ import { TrialBanner } from "@/components/TrialBanner";
 import { ImpersonationBanner } from "@/components/ImpersonationBanner";
 import { OnboardingTour } from "@/components/OnboardingTour";
 import { CommandPalette } from "@/components/CommandPalette";
+import { RoleRoutedLanding } from "@/components/RoleRoutedLanding";
 import { useAuth } from "@/hooks/use-auth";
 import { useEffect, useState, lazy, Suspense } from "react";
 import { Button } from "@/components/ui/button";
@@ -408,33 +409,48 @@ function TourManager() {
   );
 }
 
-function App() {
+function AppShell() {
+  const { isAuthenticated, isLoading } = useAuth();
+  const [location] = useLocation();
+
   const sidebarStyle = {
     "--sidebar-width": "16rem",
     "--sidebar-width-icon": "3.5rem",
   };
 
+  // Anonymous visitors landing on "/" get the full-screen role-routed landing
+  // page (no app sidebar/header/footer) — it's a pre-login marketing surface.
+  if (!isLoading && !isAuthenticated && location === "/") {
+    return <RoleRoutedLanding />;
+  }
+
+  return (
+    <SidebarProvider style={sidebarStyle as React.CSSProperties}>
+      <div className="flex min-h-screen w-full">
+        <AppSidebar />
+        <SidebarInset className="flex flex-col flex-1">
+          <ImpersonationBanner />
+          <TrialBanner />
+          <OnboardingReminderBanner />
+          <Header />
+          <main className="flex-1 overflow-auto">
+            <Router />
+          </main>
+          <Footer />
+        </SidebarInset>
+      </div>
+      <TourManager />
+      <CommandPalette />
+    </SidebarProvider>
+  );
+}
+
+function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>
         <OnboardingGuard>
-          <SidebarProvider style={sidebarStyle as React.CSSProperties}>
-            <div className="flex min-h-screen w-full">
-              <AppSidebar />
-              <SidebarInset className="flex flex-col flex-1">
-                <ImpersonationBanner />
-                <TrialBanner />
-                <OnboardingReminderBanner />
-                <Header />
-                <main className="flex-1 overflow-auto">
-                  <Router />
-                </main>
-                <Footer />
-              </SidebarInset>
-            </div>
-            <TourManager />
-            <CommandPalette />
-          </SidebarProvider>
+          <AppShell />
         </OnboardingGuard>
         <NeedsAnalyzerModal />
         <Toaster />
