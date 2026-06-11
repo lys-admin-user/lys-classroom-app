@@ -69,13 +69,13 @@ const ROLES: LandingRole[] = [
     headline: "Run your homeschool like a pro.",
     description:
       "Skip the prep and the guesswork. Get ready-to-teach lessons and activities tailored to your child's pace, level, and interests.",
-    cta: "Build a lesson free",
+    cta: "Plan your week free",
     benefits: [
       "Lessons matched to your child's level",
       "Flexible, day-by-day pacing",
       "Every subject, fully covered",
     ],
-    route: "/lesson-generator",
+    route: "/homeschool",
   },
   {
     id: "admin",

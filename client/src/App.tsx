@@ -30,6 +30,7 @@ import NotFound from "@/pages/not-found";
 const LessonGenerator = lazy(() => import("@/pages/LessonGenerator"));
 const PracticeGenerator = lazy(() => import("@/pages/PracticeGenerator"));
 const ForSchools = lazy(() => import("@/pages/ForSchools"));
+const HomeschoolPlanner = lazy(() => import("@/pages/HomeschoolPlanner"));
 const Assessments = lazy(() => import("@/pages/Assessments"));
 const Careers = lazy(() => import("@/pages/Careers"));
 const ActionPlans = lazy(() => import("@/pages/ActionPlans"));
@@ -304,6 +305,7 @@ function Router() {
         <Route path="/lesson-generator" component={LessonGenerator} />
         <Route path="/practice" component={PracticeGenerator} />
         <Route path="/for-schools" component={ForSchools} />
+        <Route path="/homeschool" component={HomeschoolPlanner} />
         <Route path="/assessments" component={Assessments} />
         <Route path="/careers" component={Careers} />
         <Route path="/resources" component={Resources} />

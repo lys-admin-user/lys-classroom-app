@@ -159,6 +159,7 @@ import { registerParentRoutes } from "./routes/parent";
 import { registerLessonsRoutes } from "./routes/lessons";
 import { registerPracticeRoutes } from "./routes/practice";
 import { registerDemoRoutes } from "./routes/demo";
+import { registerHomeschoolRoutes } from "./routes/homeschool";
 import { registerTeacherStandardsRoutes } from "./routes/teacherStandards";
 import { registerClassroomRoutes } from "./routes/classroom";
 import { registerCareersRoutes } from "./routes/careers";
@@ -222,6 +223,7 @@ export async function registerRoutes(
   registerLessonsRoutes(app);
   registerPracticeRoutes(app);
   registerDemoRoutes(app);
+  registerHomeschoolRoutes(app);
   registerTeacherStandardsRoutes(app);
   registerClassroomRoutes(app);
   registerCareersRoutes(app);

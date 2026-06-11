@@ -132,6 +132,7 @@ const aiLimiter = rateLimit({
 app.use("/api/lessons/generate", aiLimiter);
 app.use("/api/assignments/generate", aiLimiter);
 app.use("/api/practice/generate", aiLimiter);
+app.use("/api/homeschool/generate", aiLimiter);
 
 // Public, unauthenticated write endpoint — throttle to deter spam submissions.
 const demoRequestLimiter = rateLimit({

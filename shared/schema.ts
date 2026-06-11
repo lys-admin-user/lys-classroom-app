@@ -527,6 +527,47 @@ export const insertDemoRequestSchema = createInsertSchema(demoRequests).omit({
 export type InsertDemoRequest = z.infer<typeof insertDemoRequestSchema>;
 export type DemoRequest = typeof demoRequests.$inferSelect;
 
+// Homeschool Weekly Planner — a parent-facing flow that turns a child's grade +
+// chosen subjects + interests into a ready-to-teach, day-by-day week plan.
+// Open to anonymous visitors via the same guest email-gate + monthly free quota
+// shared with lesson/practice generation.
+export const generateHomeschoolPlanRequestSchema = z.object({
+  gradeLevel: z.string().min(1, "Grade level is required"),
+  subjects: z
+    .array(z.string().min(1))
+    .min(1, "Pick at least one subject")
+    .max(10, "That's a lot of subjects — pick up to 10"),
+  daysPerWeek: z.coerce.number().int().min(1).max(7).default(5),
+  interests: z.string().max(300).optional(),
+  notes: z.string().max(500).optional(),
+});
+
+export type GenerateHomeschoolPlanRequest = z.infer<typeof generateHomeschoolPlanRequestSchema>;
+
+export interface HomeschoolActivity {
+  subject: string;
+  focus: string;
+  activity: string;
+  materials?: string[];
+  estimatedMinutes?: number;
+}
+
+export interface HomeschoolDayPlan {
+  id: string;
+  day: string;
+  theme?: string;
+  activities: HomeschoolActivity[];
+}
+
+export interface GeneratedHomeschoolPlan {
+  id: string;
+  title: string;
+  gradeLevel: string;
+  weeklyTheme?: string;
+  overview?: string;
+  days: HomeschoolDayPlan[];
+}
+
 // Public API contract for the demo-request form (trims/validates user input).
 export const demoRequestSchema = z.object({
   name: z.string().min(1, "Name is required").max(200),
