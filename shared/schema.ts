@@ -471,6 +471,40 @@ export const generateLessonRequestSchema = z.object({
 
 export type GenerateLessonRequest = z.infer<typeof generateLessonRequestSchema>;
 
+// Student Practice Generation — a lightweight, student-facing flow that turns a
+// subject/grade/topic into a set of practice questions with progressive,
+// step-by-step hints (not just the final answer). Open to anonymous visitors via
+// the same guest email-gate + monthly free quota used by lesson generation.
+export const generatePracticeRequestSchema = z.object({
+  subject: z.string().min(1, "Subject is required"),
+  gradeLevel: z.string().min(1, "Grade level is required"),
+  topic: z.string().min(1, "Topic is required"),
+  questionCount: z.coerce.number().int().min(1).max(10).default(5),
+  difficulty: z.enum(["easy", "medium", "hard"]).default("medium"),
+});
+
+export type GeneratePracticeRequest = z.infer<typeof generatePracticeRequestSchema>;
+
+export interface PracticeQuestion {
+  id: string;
+  type: "multiple_choice" | "short_answer";
+  question: string;
+  options?: string[];
+  hints: string[];
+  answer: string;
+  explanation: string;
+}
+
+export interface GeneratedPracticeSet {
+  id: string;
+  title: string;
+  subject: string;
+  topic: string;
+  gradeLevel: string;
+  difficulty: "easy" | "medium" | "hard";
+  questions: PracticeQuestion[];
+}
+
 export const lessonPlanCache = pgTable("lesson_plan_cache", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   cacheKey: varchar("cache_key").notNull().unique(),

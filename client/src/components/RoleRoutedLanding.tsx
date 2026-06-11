@@ -59,7 +59,7 @@ const ROLES: LandingRole[] = [
       "Practice that adapts to you",
       "Study guides in seconds",
     ],
-    route: "/lesson-generator",
+    route: "/practice",
   },
   {
     id: "parent",

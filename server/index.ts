@@ -131,6 +131,7 @@ const aiLimiter = rateLimit({
 });
 app.use("/api/lessons/generate", aiLimiter);
 app.use("/api/assignments/generate", aiLimiter);
+app.use("/api/practice/generate", aiLimiter);
 
 // Stripe webhook route MUST be registered BEFORE express.json() middleware
 // Webhooks require raw Buffer body, not parsed JSON

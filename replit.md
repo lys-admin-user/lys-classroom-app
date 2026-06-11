@@ -32,6 +32,7 @@ _Populate as you build_
 -   **Role-Aware Home Band**: `client/src/components/RoleQuickStart.tsx` (rendered atop the authenticated Dashboard)
 -   **Anonymous Landing**: `client/src/components/RoleRoutedLanding.tsx` (full-screen role-routed pre-login landing; mounted via `AppShell` in `client/src/App.tsx`)
 -   **Guest Email Gate**: `client/src/components/GuestEmailModal.tsx`, `guest_leads` table in `shared/schema.ts`, endpoints in `server/routes/lessons.ts`
+-   **Student Practice Flow**: `client/src/pages/PracticeGenerator.tsx` (page, route `/practice`), `server/routes/practice.ts` (endpoints), `server/practiceGenerator.ts` (OpenAI generator), schema in `shared/schema.ts` (`generatePracticeRequestSchema`, `PracticeQuestion`, `GeneratedPracticeSet`)
 
 ## Architecture decisions
 
@@ -49,6 +50,7 @@ _Populate as you build_
 ## Product
 
 -   AI-powered lesson planning and assignment generation.
+-   Student practice generator (`/practice`): subject/grade/topic → practice questions with progressive step-by-step hints, answer reveal + explanation. Open to anonymous via the shared guest email-gate + 5/month free quota (reuses `tryReserveGuestLessonGeneration`, so practice + lessons share one guest bucket). Reached from the anonymous landing's Student card.
 -   Self-discovery, career exploration, and goal-setting tools (Be-Know-Do framework).
 -   Comprehensive educational resources and shared library.
 -   Student digital portfolios and transfer system.
