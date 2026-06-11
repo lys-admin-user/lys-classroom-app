@@ -91,7 +91,7 @@ const ROLES: LandingRole[] = [
       "Usage analytics & oversight",
       "Centralized rollout & management",
     ],
-    route: "/pricing",
+    route: "/for-schools",
   },
 ];
 

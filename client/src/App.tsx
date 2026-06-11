@@ -29,6 +29,7 @@ import NotFound from "@/pages/not-found";
 // Lazy — every other page is fetched on demand
 const LessonGenerator = lazy(() => import("@/pages/LessonGenerator"));
 const PracticeGenerator = lazy(() => import("@/pages/PracticeGenerator"));
+const ForSchools = lazy(() => import("@/pages/ForSchools"));
 const Assessments = lazy(() => import("@/pages/Assessments"));
 const Careers = lazy(() => import("@/pages/Careers"));
 const ActionPlans = lazy(() => import("@/pages/ActionPlans"));
@@ -302,6 +303,7 @@ function Router() {
         <Route path="/start" component={NeedsAnalyzerPage} />
         <Route path="/lesson-generator" component={LessonGenerator} />
         <Route path="/practice" component={PracticeGenerator} />
+        <Route path="/for-schools" component={ForSchools} />
         <Route path="/assessments" component={Assessments} />
         <Route path="/careers" component={Careers} />
         <Route path="/resources" component={Resources} />
@@ -424,6 +426,17 @@ function AppShell() {
   // page (no app sidebar/header/footer) — it's a pre-login marketing surface.
   if (!isLoading && !isAuthenticated && location === "/") {
     return <RoleRoutedLanding />;
+  }
+
+  // The school-admin "See it for your school" page is a pre-login marketing
+  // surface (reached from the landing's admin card), so anonymous visitors see
+  // it full-screen without the app sidebar/header/footer.
+  if (!isLoading && !isAuthenticated && location === "/for-schools") {
+    return (
+      <Suspense fallback={<PageLoader />}>
+        <ForSchools />
+      </Suspense>
+    );
   }
 
   return (

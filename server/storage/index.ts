@@ -24,6 +24,7 @@ import "./analytics";
 import "./misc";
 import "./lessonAi";
 import "./teacherStandards";
+import "./demo";
 
 export {
   DatabaseStorage,

@@ -1,1 +1,4 @@
 - [Mockup preview screenshot cache](mockup-preview-screenshot-cache.md) — external_url screenshots of /__mockup/preview/ are cached by URL; append ?v=N to force a fresh capture after edits.
+- [Role shortcuts consistency](role-shortcuts-consistency.md) — role-aware destinations must agree across Home, Sidebar, and Settings; site_admin is system-level.
+- [Email digest + scheduler pattern](email-digest-pattern.md) — convention for new recurring admin email alerts (digests/backlog alerts).
+- [Curriculum doc original-file storage](curriculum-doc-original-files.md) — uploaded curriculum source files live in Postgres bytea, not object storage, for the moderation viewer.

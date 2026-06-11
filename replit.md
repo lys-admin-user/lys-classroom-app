@@ -33,6 +33,7 @@ _Populate as you build_
 -   **Anonymous Landing**: `client/src/components/RoleRoutedLanding.tsx` (full-screen role-routed pre-login landing; mounted via `AppShell` in `client/src/App.tsx`)
 -   **Guest Email Gate**: `client/src/components/GuestEmailModal.tsx`, `guest_leads` table in `shared/schema.ts`, endpoints in `server/routes/lessons.ts`
 -   **Student Practice Flow**: `client/src/pages/PracticeGenerator.tsx` (page, route `/practice`), `server/routes/practice.ts` (endpoints), `server/practiceGenerator.ts` (OpenAI generator), schema in `shared/schema.ts` (`generatePracticeRequestSchema`, `PracticeQuestion`, `GeneratedPracticeSet`)
+-   **School Admin "See it for your school"**: `client/src/pages/ForSchools.tsx` (page, route `/for-schools`), `server/routes/demo.ts` (`POST /api/demo-requests`), `server/storage/demo.ts` (`createDemoRequest`), `demo_requests` table + `demoRequestSchema` in `shared/schema.ts`
 
 ## Architecture decisions
 

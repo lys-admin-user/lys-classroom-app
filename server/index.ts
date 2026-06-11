@@ -133,6 +133,14 @@ app.use("/api/lessons/generate", aiLimiter);
 app.use("/api/assignments/generate", aiLimiter);
 app.use("/api/practice/generate", aiLimiter);
 
+// Public, unauthenticated write endpoint — throttle to deter spam submissions.
+const demoRequestLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000,
+  max: 10,
+  message: { error: "Too many demo requests. Please try again later." },
+});
+app.use("/api/demo-requests", demoRequestLimiter);
+
 // Stripe webhook route MUST be registered BEFORE express.json() middleware
 // Webhooks require raw Buffer body, not parsed JSON
 app.post(

@@ -370,6 +370,9 @@ export interface IStorage {
   claimGuestHandoff(guestId: string, userId: string): Promise<{ formContext: any; lastLessonContent: any } | null>;
   saveGuestLead(guestKey: { guestId?: string; ipAddress: string }, email: string): Promise<void>;
   getGuestLead(guestKey: { guestId?: string; ipAddress: string }): Promise<{ email: string } | null>;
+
+  // School/district "Request a demo" lead capture.
+  createDemoRequest(data: import("@shared/schema").DemoRequestInput): Promise<void>;
   
   // Lesson Templates
   getLessonTemplates(userId: string): Promise<LessonTemplate[]>;

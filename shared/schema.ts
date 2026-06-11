@@ -505,6 +505,39 @@ export interface GeneratedPracticeSet {
   questions: PracticeQuestion[];
 }
 
+// School / district "Request a demo" lead capture, submitted from the public
+// "See it for your school" page (`/for-schools`). Doubles as a sales lead list.
+export const demoRequests = pgTable("demo_requests", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  name: text("name").notNull(),
+  email: varchar("email").notNull(),
+  organization: text("organization").notNull(),
+  role: text("role"),
+  teacherCount: text("teacher_count"),
+  message: text("message"),
+  status: text("status").notNull().default("new"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertDemoRequestSchema = createInsertSchema(demoRequests).omit({
+  id: true,
+  status: true,
+  createdAt: true,
+});
+export type InsertDemoRequest = z.infer<typeof insertDemoRequestSchema>;
+export type DemoRequest = typeof demoRequests.$inferSelect;
+
+// Public API contract for the demo-request form (trims/validates user input).
+export const demoRequestSchema = z.object({
+  name: z.string().min(1, "Name is required").max(200),
+  email: z.string().email("A valid email is required"),
+  organization: z.string().min(1, "School or district is required").max(200),
+  role: z.string().max(200).optional(),
+  teacherCount: z.string().max(100).optional(),
+  message: z.string().max(2000).optional(),
+});
+export type DemoRequestInput = z.infer<typeof demoRequestSchema>;
+
 export const lessonPlanCache = pgTable("lesson_plan_cache", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   cacheKey: varchar("cache_key").notNull().unique(),
