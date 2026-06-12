@@ -5,11 +5,11 @@ export const modules: ModuleMap = {
   "./components/mockups/landing-variants/OutcomeProof.tsx": () => import("../components/mockups/landing-variants/OutcomeProof.tsx"),
   "./components/mockups/landing-variants/RoleRouted.tsx": () => import("../components/mockups/landing-variants/RoleRouted.tsx"),
   "./components/mockups/landing-variants/ToolFirst.tsx": () => import("../components/mockups/landing-variants/ToolFirst.tsx"),
+  "./components/mockups/lys-app-redesign/Dashboard.tsx": () => import("../components/mockups/lys-app-redesign/Dashboard.tsx"),
   "./components/mockups/onboarding-flow/FirstValue.tsx": () => import("../components/mockups/onboarding-flow/FirstValue.tsx"),
   "./components/mockups/onboarding-flow/Home.tsx": () => import("../components/mockups/onboarding-flow/Home.tsx"),
   "./components/mockups/onboarding-flow/Landing.tsx": () => import("../components/mockups/onboarding-flow/Landing.tsx"),
   "./components/mockups/onboarding-flow/Setup.tsx": () => import("../components/mockups/onboarding-flow/Setup.tsx"),
-  "./components/mockups/lys-app-redesign/Dashboard.tsx": () => import("../components/mockups/lys-app-redesign/Dashboard.tsx"),
   "./components/mockups/student-merge/MenuBeforeAfter.tsx": () => import("../components/mockups/student-merge/MenuBeforeAfter.tsx"),
   "./components/mockups/student-merge/UnifiedStudentPage.tsx": () => import("../components/mockups/student-merge/UnifiedStudentPage.tsx")
 };
