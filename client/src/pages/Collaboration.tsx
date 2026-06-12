@@ -157,7 +157,7 @@ export default function Collaboration() {
       <div className="max-w-6xl mx-auto px-4 py-8">
         <div className="flex items-center justify-between gap-4 mb-8 flex-wrap">
           <div>
-            <h1 className="text-3xl font-marker text-foreground">Collaboration Hub</h1>
+            <h1 className="text-3xl font-oswald font-semibold tracking-tight text-foreground">Collaboration Hub</h1>
             <p className="text-muted-foreground mt-1">Co-create lesson plans with fellow educators in real-time</p>
           </div>
           <div className="flex gap-2 flex-wrap">

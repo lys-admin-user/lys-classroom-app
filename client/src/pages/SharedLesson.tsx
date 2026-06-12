@@ -101,7 +101,7 @@ export default function SharedLesson() {
         <CardHeader className="border-b bg-muted/30">
           <div className="flex items-start justify-between gap-4 flex-wrap">
             <div>
-              <CardTitle className="font-marker text-2xl">{lesson.title}</CardTitle>
+              <CardTitle className="font-oswald font-semibold tracking-tight text-2xl">{lesson.title}</CardTitle>
               <CardDescription className="font-roboto mt-1">{lesson.topic}</CardDescription>
             </div>
             <Badge variant="outline" className="font-roboto">

@@ -337,7 +337,7 @@ export default function Assessments() {
               <div className="w-16 h-16 rounded-full bg-green-500/10 flex items-center justify-center mx-auto mb-4">
                 <CheckCircle2 className="h-8 w-8 text-green-500" />
               </div>
-              <CardTitle className="font-marker text-3xl">Your Results Are In!</CardTitle>
+              <CardTitle className="font-oswald font-semibold tracking-tight text-3xl">Your Results Are In!</CardTitle>
               <CardDescription className="font-roboto">
                 {selectedAssessment.title} - Completed
               </CardDescription>
@@ -345,7 +345,7 @@ export default function Assessments() {
             <CardContent className="space-y-6">
               <div className="text-center p-6 rounded-lg bg-gradient-to-br from-lys-yellow/20 to-lys-red/20">
                 <Badge className="mb-3 bg-lys-red text-white font-oswald">Primary Trait</Badge>
-                <h2 className="font-marker text-4xl capitalize mb-2">{result.primaryTrait}</h2>
+                <h2 className="font-oswald font-semibold tracking-tight text-4xl capitalize mb-2">{result.primaryTrait}</h2>
                 <p className="font-roboto text-muted-foreground">{result.summary}</p>
               </div>
 
@@ -438,7 +438,7 @@ export default function Assessments() {
 
           <Card>
             <CardHeader>
-              <CardTitle className="font-marker text-2xl">{question.text}</CardTitle>
+              <CardTitle className="font-oswald font-semibold tracking-tight text-2xl">{question.text}</CardTitle>
             </CardHeader>
             <CardContent>
               <RadioGroup
@@ -512,7 +512,7 @@ export default function Assessments() {
               <Heart className="h-6 w-6 text-lys-yellow" />
             </div>
             <div>
-              <h1 className="font-marker text-3xl sm:text-4xl text-foreground">
+              <h1 className="font-oswald font-semibold tracking-tight text-3xl sm:text-4xl text-foreground">
                 BE: Identity Assessments
               </h1>
               <p className="font-roboto text-muted-foreground">

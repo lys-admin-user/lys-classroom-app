@@ -341,7 +341,7 @@ export default function Careers() {
                       </Badge>
                     )}
                   </div>
-                  <CardTitle className="font-marker text-2xl sm:text-3xl">{selectedCareer.title}</CardTitle>
+                  <CardTitle className="font-oswald font-semibold tracking-tight text-2xl sm:text-3xl">{selectedCareer.title}</CardTitle>
                   <CardDescription className="font-roboto mt-2">
                     {selectedCareer.description}
                   </CardDescription>
@@ -581,7 +581,7 @@ export default function Careers() {
               <Compass className="h-6 w-6 text-lys-red" />
             </div>
             <div>
-              <h1 className="font-marker text-3xl sm:text-4xl text-foreground">
+              <h1 className="font-oswald font-semibold tracking-tight text-3xl sm:text-4xl text-foreground">
                 KNOW: Career Pathways
               </h1>
               <p className="font-roboto text-muted-foreground">
@@ -634,7 +634,7 @@ export default function Careers() {
                 <Card className="bg-gradient-to-r from-lys-teal/10 to-lys-yellow/10">
                   <CardContent className="p-8 text-center">
                     <Target className="h-12 w-12 text-lys-teal mx-auto mb-4" />
-                    <h3 className="font-marker text-2xl mb-2">Discover Your Ideal Career Path</h3>
+                    <h3 className="font-oswald font-semibold tracking-tight text-2xl mb-2">Discover Your Ideal Career Path</h3>
                     <p className="text-muted-foreground font-roboto mb-6 max-w-md mx-auto">
                       Complete the Self-Discovery assessment to unlock personalized career recommendations based on your unique Be-Know-Do profile.
                     </p>
@@ -655,7 +655,7 @@ export default function Careers() {
                     <Card className="bg-gradient-to-r from-lys-red/5 via-lys-yellow/5 to-lys-teal/5">
                       <CardContent className="p-6">
                         <div className="flex flex-wrap items-center gap-4 mb-4">
-                          <h3 className="font-marker text-xl">Your Be-Know-Do Profile</h3>
+                          <h3 className="font-oswald font-semibold tracking-tight text-xl">Your Be-Know-Do Profile</h3>
                           <div className="flex gap-2">
                             <Badge className="bg-lys-red/10 text-lys-red font-roboto gap-1">
                               <Heart className="h-3 w-3" />

@@ -199,7 +199,7 @@ export default function ProfessionalDevelopment() {
     <div className="min-h-screen bg-background">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 py-8">
         <div className="mb-8">
-          <h1 className="font-marker text-3xl sm:text-4xl text-foreground mb-2" data-testid="text-page-title">
+          <h1 className="font-oswald font-semibold tracking-tight text-3xl sm:text-4xl text-foreground mb-2" data-testid="text-page-title">
             Professional Development
           </h1>
           <p className="font-roboto text-muted-foreground">
@@ -1379,7 +1379,7 @@ function EducatorBKDAssessment() {
           <div className="w-14 h-14 rounded-full bg-lys-yellow/10 flex items-center justify-center mx-auto mb-3">
             <Trophy className="h-7 w-7 text-lys-yellow" />
           </div>
-          <h2 className="font-marker text-2xl sm:text-3xl text-foreground mb-1">Your Educator BKD Profile</h2>
+          <h2 className="font-oswald font-semibold tracking-tight text-2xl sm:text-3xl text-foreground mb-1">Your Educator BKD Profile</h2>
           <p className="font-roboto text-muted-foreground text-sm">
             This reflects your professional identity, knowledge, and classroom impact.
           </p>

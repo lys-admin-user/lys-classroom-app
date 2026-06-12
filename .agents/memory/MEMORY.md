@@ -1,1 +1,1 @@
-- [gpt-5 API contract](gpt5-api-contract.md) — gpt-5/gpt-5-mini chat calls: no custom temperature, use max_completion_tokens, always set reasoning_effort:"minimal" or content comes back empty.
+- [LYS design system](design-system.md) — Oswald headings, font-marker reserved for the LYS logo only, brand-red-tinted sidebar active state, yellow text uses hsl(45,93%,38%).

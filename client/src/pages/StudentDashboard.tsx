@@ -384,7 +384,7 @@ export default function StudentDashboard() {
             {studentInitials}
           </div>
           <div>
-            <h1 className="text-2xl font-bold font-marker" data-testid="text-student-name">
+            <h1 className="text-2xl font-bold font-oswald tracking-tight" data-testid="text-student-name">
               {student ? `${student.firstName} ${student.lastName}` : "Student Dashboard"}
             </h1>
             <p className="text-muted-foreground font-roboto text-sm">

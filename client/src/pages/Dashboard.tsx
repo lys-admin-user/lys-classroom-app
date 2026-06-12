@@ -696,7 +696,7 @@ function StudentDashboard() {
                 <Flame className="w-3 h-3 mr-1" />
                 Welcome Back
               </Badge>
-              <h1 className="font-marker text-3xl sm:text-4xl lg:text-5xl text-foreground mb-3 leading-tight">
+              <h1 className="font-oswald font-semibold tracking-tight text-3xl sm:text-4xl lg:text-5xl text-foreground mb-3 leading-tight">
                 Hey {user?.firstName || "there"}!
               </h1>
               <p className="font-oswald text-lg text-muted-foreground mb-6">
@@ -805,7 +805,7 @@ function StudentDashboard() {
           <GettingStartedGuide />
           <div className="flex flex-wrap items-center justify-between gap-4 mb-6 mt-6">
             <div>
-              <h2 className="font-marker text-2xl sm:text-3xl text-foreground mb-1">
+              <h2 className="font-oswald font-semibold tracking-tight text-2xl sm:text-3xl text-foreground mb-1">
                 What's Next?
               </h2>
               <p className="font-roboto text-muted-foreground text-sm">
@@ -996,7 +996,7 @@ function StudentDashboard() {
       <section className="py-8 lg:py-12">
         <div className="max-w-7xl mx-auto px-4 sm:px-6">
           <div className="text-center mb-8">
-            <h2 className="font-marker text-2xl sm:text-3xl text-foreground mb-2">
+            <h2 className="font-oswald font-semibold tracking-tight text-2xl sm:text-3xl text-foreground mb-2">
               The Be-Know-Do Method
             </h2>
             <p className="font-roboto text-muted-foreground max-w-2xl mx-auto">
@@ -1070,7 +1070,7 @@ function EducatorDashboard() {
 
   return (
     <div className="min-h-screen bg-background" data-testid="educator-dashboard">
-      {isAuthenticated && <RoleQuickStart role={user?.role} />}
+      {isAuthenticated && <RoleQuickStart role={user?.role ?? undefined} />}
       <section className="relative overflow-hidden bg-gradient-to-br from-lys-yellow/20 via-background to-lys-teal/10">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 py-12 lg:py-20">
           <div className="grid lg:grid-cols-2 gap-8 lg:gap-12 items-center">
@@ -1078,7 +1078,7 @@ function EducatorDashboard() {
               <Badge className="bg-lys-red/10 text-lys-red border-lys-red/20 mb-4 font-roboto">
                 For Educators Who Inspire
               </Badge>
-              <h1 className="font-marker text-4xl sm:text-5xl lg:text-6xl text-foreground mb-4 leading-tight">
+              <h1 className="font-oswald font-semibold tracking-tight text-4xl sm:text-5xl lg:text-6xl text-foreground mb-4 leading-tight">
                 Your Students' Success Starts Here
               </h1>
               <p className="font-oswald text-lg sm:text-xl text-muted-foreground mb-6">
@@ -1163,7 +1163,7 @@ function EducatorDashboard() {
               <Badge className="bg-lys-red/10 text-lys-red border-lys-red/20 mb-3 font-roboto">
                 2-Minute Overview
               </Badge>
-              <h2 className="font-marker text-2xl sm:text-3xl text-foreground mb-3 leading-tight">
+              <h2 className="font-oswald font-semibold tracking-tight text-2xl sm:text-3xl text-foreground mb-3 leading-tight">
                 See LYS in Action
               </h2>
               <p className="font-roboto text-muted-foreground mb-5 text-sm sm:text-base">
@@ -1227,7 +1227,7 @@ function EducatorDashboard() {
       <section className="py-12 lg:py-16">
         <div className="max-w-7xl mx-auto px-4 sm:px-6">
           <div className="text-center mb-10">
-            <h2 className="font-marker text-3xl sm:text-4xl text-foreground mb-2">
+            <h2 className="font-oswald font-semibold tracking-tight text-3xl sm:text-4xl text-foreground mb-2">
               The Be-Know-Do Method
             </h2>
             <p className="font-roboto text-muted-foreground max-w-2xl mx-auto">
@@ -1267,7 +1267,7 @@ function EducatorDashboard() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6">
           <div className="flex flex-wrap items-center justify-between gap-4 mb-8">
             <div>
-              <h2 className="font-marker text-2xl sm:text-3xl text-foreground mb-1">
+              <h2 className="font-oswald font-semibold tracking-tight text-2xl sm:text-3xl text-foreground mb-1">
                 Quick Actions
               </h2>
               <p className="font-roboto text-muted-foreground text-sm">
@@ -1407,7 +1407,7 @@ function EducatorDashboard() {
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="text-center py-4">
-                  <p className="font-marker text-4xl text-lys-red mb-1" data-testid="text-total-lessons">{totalLessons}</p>
+                  <p className="font-oswald font-semibold tracking-tight text-4xl text-lys-red mb-1" data-testid="text-total-lessons">{totalLessons}</p>
                   <p className="text-sm text-muted-foreground font-roboto">Lessons Created</p>
                 </div>
                 <div className="grid grid-cols-2 gap-4">

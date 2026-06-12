@@ -350,7 +350,7 @@ export default function DistrictAdmin() {
   return (
     <div className="p-4 sm:p-6 max-w-7xl mx-auto space-y-6">
       <div>
-        <h1 className="text-3xl font-marker text-lys-red" data-testid="text-district-title">
+        <h1 className="text-3xl font-oswald font-semibold tracking-tight text-lys-red" data-testid="text-district-title">
           My District
         </h1>
         <p className="text-muted-foreground mt-1">

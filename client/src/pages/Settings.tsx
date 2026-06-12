@@ -36,7 +36,7 @@ export default function Settings() {
         <div className="max-w-2xl mx-auto px-4 sm:px-6 py-12">
           <Card>
             <CardHeader className="text-center">
-              <CardTitle className="font-marker text-2xl">Sign In Required</CardTitle>
+              <CardTitle className="font-oswald font-semibold tracking-tight text-2xl">Sign In Required</CardTitle>
               <CardDescription className="font-roboto">
                 Please sign in to access your settings and educator profile.
               </CardDescription>
@@ -105,7 +105,7 @@ export default function Settings() {
               <SettingsIcon className="h-6 w-6 text-foreground" />
             </div>
             <div>
-              <h1 className="font-marker text-3xl sm:text-4xl text-foreground">
+              <h1 className="font-oswald font-semibold tracking-tight text-3xl sm:text-4xl text-foreground">
                 Settings
               </h1>
               <p className="font-roboto text-muted-foreground">

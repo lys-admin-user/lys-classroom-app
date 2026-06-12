@@ -671,7 +671,7 @@ export default function Assignments() {
       <div className="max-w-7xl mx-auto px-4 py-8">
         <div className="flex items-center justify-between gap-4 mb-8 flex-wrap">
           <div>
-            <h1 className="text-3xl font-marker text-foreground">
+            <h1 className="text-3xl font-oswald font-semibold tracking-tight text-foreground">
               {isStudent || isParent ? "My Assignments" : "Assignment Generator"}
             </h1>
             <p className="text-muted-foreground mt-1">

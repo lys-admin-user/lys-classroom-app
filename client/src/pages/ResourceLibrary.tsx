@@ -186,7 +186,7 @@ export default function ResourceLibrary() {
       <div className="max-w-7xl mx-auto px-4 py-8">
         <div className="flex items-center justify-between gap-4 mb-8 flex-wrap">
           <div>
-            <h1 className="text-3xl font-marker text-foreground">Community Library</h1>
+            <h1 className="text-3xl font-oswald font-semibold tracking-tight text-foreground">Community Library</h1>
             <p className="text-muted-foreground mt-1">Discover and share classroom materials with fellow educators</p>
           </div>
           <Dialog open={createDialogOpen} onOpenChange={setCreateDialogOpen}>

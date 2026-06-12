@@ -522,7 +522,7 @@ export default function TemplateLibrary() {
                 <Library className="h-6 w-6 text-lys-red" />
               </div>
               <div>
-                <h1 className="text-2xl font-bold font-marker" data-testid="text-page-title">
+                <h1 className="text-2xl font-bold font-oswald tracking-tight" data-testid="text-page-title">
                   Template Library
                 </h1>
                 <p className="text-muted-foreground font-roboto">

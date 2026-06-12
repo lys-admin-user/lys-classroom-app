@@ -861,7 +861,7 @@ export default function SystemAdminPage({ params }: { params?: { tab?: string } 
         <Card className="max-w-md mx-auto">
           <CardHeader className="text-center">
             <AlertTriangle className="h-12 w-12 text-destructive mx-auto mb-4" />
-            <CardTitle className="font-marker text-xl">Access Denied</CardTitle>
+            <CardTitle className="font-oswald font-semibold tracking-tight text-xl">Access Denied</CardTitle>
             <CardDescription>
               You need system administrator privileges to access this page. This area is reserved for platform-wide management. Contact a system administrator if you need access.
             </CardDescription>
@@ -892,7 +892,7 @@ export default function SystemAdminPage({ params }: { params?: { tab?: string } 
           <Shield className="h-7 w-7 text-white" />
         </div>
         <div className="flex-1">
-          <h1 className="font-marker text-3xl sm:text-4xl text-foreground">
+          <h1 className="font-oswald font-semibold tracking-tight text-3xl sm:text-4xl text-foreground">
             System Administration
           </h1>
           <p className="font-roboto text-muted-foreground">
@@ -3722,7 +3722,7 @@ export default function SystemAdminPage({ params }: { params?: { tab?: string } 
                 <div className="flex flex-col items-center text-center gap-3 pb-2">
                   {currentPage.icon}
                   <div>
-                    <DialogTitle className="text-xl font-marker">{currentPage.title}</DialogTitle>
+                    <DialogTitle className="text-xl font-oswald font-semibold tracking-tight">{currentPage.title}</DialogTitle>
                     <DialogDescription className="text-sm mt-1">{currentPage.subtitle}</DialogDescription>
                   </div>
                 </div>

@@ -836,7 +836,7 @@ export default function MyJourney() {
   return (
     <div className="container mx-auto px-4 py-8 overflow-hidden" data-testid="my-journey-page">
       <div className="flex flex-col gap-2 mb-8">
-        <h1 className="text-2xl sm:text-3xl font-bold font-marker">{roleContent.journeyTitle}</h1>
+        <h1 className="text-2xl sm:text-3xl font-bold font-oswald tracking-tight">{roleContent.journeyTitle}</h1>
         <p className="text-muted-foreground font-roboto">
           {roleContent.journeySubtitle}
         </p>

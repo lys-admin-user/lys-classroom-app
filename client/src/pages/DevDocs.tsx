@@ -1793,7 +1793,7 @@ export default function DevDocs() {
       <div className="mb-8">
         <div className="flex items-center gap-3 mb-2">
           <Code className="h-6 w-6 text-lys-teal" />
-          <h1 className="font-marker text-3xl text-lys-red" data-testid="text-dev-docs-title">
+          <h1 className="font-oswald font-semibold tracking-tight text-3xl text-lys-red" data-testid="text-dev-docs-title">
             Developer Documentation
           </h1>
         </div>

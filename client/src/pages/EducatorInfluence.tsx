@@ -242,7 +242,7 @@ export default function EducatorInfluence() {
             <div className="mx-auto w-16 h-16 rounded-full bg-lys-red/10 flex items-center justify-center mb-4">
               <AlertCircle className="h-8 w-8 text-lys-red" />
             </div>
-            <CardTitle className="font-marker text-2xl">Sign In Required</CardTitle>
+            <CardTitle className="font-oswald font-semibold tracking-tight text-2xl">Sign In Required</CardTitle>
             <CardDescription className="font-roboto">
               Sign in to access your Educator Influence dashboard and track your affiliate rewards.
             </CardDescription>
@@ -277,7 +277,7 @@ export default function EducatorInfluence() {
           </div>
           <div className="flex-1">
             <div className="flex items-center gap-3">
-              <h1 className="font-marker text-3xl md:text-4xl text-foreground" data-testid="text-page-title">
+              <h1 className="font-oswald font-semibold tracking-tight text-3xl md:text-4xl text-foreground" data-testid="text-page-title">
                 Educator Influence
               </h1>
               {isPro && (
@@ -313,7 +313,7 @@ export default function EducatorInfluence() {
                   </div>
                   <div>
                     <p className="font-oswald text-sm text-muted-foreground">Your Referral Code</p>
-                    <p className="font-marker text-2xl text-lys-red" data-testid="text-referral-code">{dashboard.affiliate.referralCode}</p>
+                    <p className="font-oswald font-semibold tracking-tight text-2xl text-lys-red" data-testid="text-referral-code">{dashboard.affiliate.referralCode}</p>
                   </div>
                 </div>
                 <div className="flex items-center gap-4">

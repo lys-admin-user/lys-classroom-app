@@ -1410,7 +1410,7 @@ export default function HelpDesk() {
   return (
     <div className="min-h-screen p-4 md:p-6 max-w-6xl mx-auto space-y-6">
       <div className="text-center space-y-2">
-        <h1 className="font-marker text-2xl md:text-4xl text-lys-red" data-testid="text-help-title">Help Desk</h1>
+        <h1 className="font-oswald font-semibold tracking-tight text-2xl md:text-4xl text-lys-red" data-testid="text-help-title">Help Desk</h1>
         <p className="text-muted-foreground font-roboto text-base md:text-lg max-w-2xl mx-auto">
           Find answers to common questions and troubleshoot issues quickly
         </p>

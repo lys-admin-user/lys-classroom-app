@@ -294,7 +294,7 @@ export default function MyLessons() {
             <div className="mx-auto w-16 h-16 rounded-full bg-lys-red/10 flex items-center justify-center mb-4">
               <AlertCircle className="h-8 w-8 text-lys-red" />
             </div>
-            <CardTitle className="font-marker text-2xl">Sign In Required</CardTitle>
+            <CardTitle className="font-oswald font-semibold tracking-tight text-2xl">Sign In Required</CardTitle>
             <CardDescription className="font-roboto">
               Sign in to access your saved lesson library and keep all your generated lessons organized.
             </CardDescription>
@@ -320,7 +320,7 @@ export default function MyLessons() {
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 py-8">
       <div className="mb-6">
-        <h1 className="font-marker text-3xl md:text-4xl text-foreground mb-2" data-testid="text-page-title">
+        <h1 className="font-oswald font-semibold tracking-tight text-3xl md:text-4xl text-foreground mb-2" data-testid="text-page-title">
           My Lessons
         </h1>
         <p className="font-roboto text-muted-foreground">

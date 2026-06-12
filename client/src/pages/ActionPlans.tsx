@@ -198,7 +198,7 @@ export default function ActionPlans() {
               <Target className="h-6 w-6 text-lys-teal" />
             </div>
             <div>
-              <h1 className="font-marker text-3xl sm:text-4xl text-foreground">
+              <h1 className="font-oswald font-semibold tracking-tight text-3xl sm:text-4xl text-foreground">
                 DO: Action Plans
               </h1>
               <p className="font-roboto text-muted-foreground">

@@ -51,6 +51,7 @@ import {
   UserPlus,
   HelpCircle,
   Wand2,
+  type LucideIcon,
 } from "lucide-react";
 
 export function hasMinRole(userRole: string, minRole: UserRole): boolean {
@@ -62,7 +63,7 @@ export function hasMinRole(userRole: string, minRole: UserRole): boolean {
 export interface NavItem {
   title: string;
   url: string;
-  icon: React.ComponentType<{ className?: string }>;
+  icon: LucideIcon;
   minRole?: UserRole;
   exactRole?: UserRole;
   requiresAuth?: boolean;
@@ -97,7 +98,7 @@ export const navigationGroups: NavGroup[] = [
   },
   {
     label: "KNOW - Career Paths",
-    colorClass: "text-lys-yellow",
+    colorClass: "text-[hsl(45,93%,38%)]",
     items: [
       { title: "Career Explorer", url: "/careers", icon: Briefcase },
       { title: "Resources", url: "/resources", icon: Library },
@@ -234,20 +235,17 @@ export function AppSidebar() {
 
   return (
     <Sidebar collapsible="icon">
-      <SidebarHeader className="p-4">
-        <Link href="/" className="flex items-center gap-2">
-          <div className="flex items-center">
-            <span className="font-marker text-2xl text-lys-red">L</span>
-            <div className="w-4 h-6 flex flex-col justify-center mx-0.5 group-data-[collapsible=icon]:hidden">
-              <div className="w-3 h-0.5 bg-lys-yellow rounded-full mb-0.5"></div>
-              <div className="w-3 h-0.5 bg-lys-yellow rounded-full mb-0.5"></div>
-              <div className="w-3 h-0.5 bg-lys-yellow rounded-full"></div>
-            </div>
-            <span className="font-marker text-2xl text-lys-red group-data-[collapsible=icon]:hidden">S</span>
+      <SidebarHeader className="p-3">
+        <Link href="/" className="flex items-center gap-2.5 px-1 py-1" data-testid="link-home-brand">
+          <div className="h-9 w-9 shrink-0 bg-lys-red rounded-xl flex items-center justify-center -rotate-6 shadow-sm">
+            <span className="text-white font-marker text-lg leading-none">L</span>
           </div>
-          <span className="font-oswald text-sm text-muted-foreground font-medium group-data-[collapsible=icon]:hidden">
-            Laddering Your Success
-          </span>
+          <div className="leading-none group-data-[collapsible=icon]:hidden">
+            <span className="font-marker text-xl text-lys-red tracking-wider">LYS</span>
+            <p className="font-oswald text-[10px] text-muted-foreground tracking-wide mt-1">
+              Laddering Your Success
+            </p>
+          </div>
         </Link>
       </SidebarHeader>
       
@@ -260,7 +258,7 @@ export function AppSidebar() {
 
           return (
             <SidebarGroup key={group.label}>
-              <SidebarGroupLabel className={group.colorClass}>
+              <SidebarGroupLabel className={`text-[10px] uppercase tracking-widest font-semibold ${group.colorClass ?? ""}`}>
                 {group.label}
               </SidebarGroupLabel>
               <SidebarGroupContent>
@@ -274,9 +272,10 @@ export function AppSidebar() {
                           asChild
                           isActive={isActive}
                           tooltip={item.title}
+                          className="rounded-lg data-[active=true]:bg-lys-red/10 data-[active=true]:text-lys-red data-[active=true]:font-medium"
                         >
                           <Link href={item.url} data-testid={`nav-${item.title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '')}`}>
-                            <Icon className="h-4 w-4" />
+                            <Icon className="h-4 w-4" strokeWidth={1.75} />
                             <span>{item.title}</span>
                             {item.title === "System Dashboard" && pendingCount > 0 && (
                               <Badge variant="destructive" className="ml-auto text-xs px-1.5 py-0" data-testid="badge-pending-rss-count">
@@ -299,25 +298,25 @@ export function AppSidebar() {
       <SidebarFooter className="p-2">
         <SidebarMenu>
           <SidebarMenuItem key="footer-settings">
-            <SidebarMenuButton asChild tooltip="Settings">
+            <SidebarMenuButton asChild tooltip="Settings" className="rounded-lg">
               <Link href="/settings" data-testid="nav-settings">
-                <Settings className="h-4 w-4" />
+                <Settings className="h-4 w-4" strokeWidth={1.75} />
                 <span>Settings</span>
               </Link>
             </SidebarMenuButton>
           </SidebarMenuItem>
           <SidebarMenuItem key="footer-pricing">
-            <SidebarMenuButton asChild tooltip="Plans & Pricing">
+            <SidebarMenuButton asChild tooltip="Plans & Pricing" className="rounded-lg">
               <Link href="/pricing" data-testid="nav-pricing">
-                <CreditCard className="h-4 w-4" />
+                <CreditCard className="h-4 w-4" strokeWidth={1.75} />
                 <span>Plans & Pricing</span>
               </Link>
             </SidebarMenuButton>
           </SidebarMenuItem>
           <SidebarMenuItem key="footer-help">
-            <SidebarMenuButton asChild tooltip="Help Desk">
+            <SidebarMenuButton asChild tooltip="Help Desk" className="rounded-lg">
               <Link href="/help" data-testid="nav-help-desk">
-                <HelpCircle className="h-4 w-4" />
+                <HelpCircle className="h-4 w-4" strokeWidth={1.75} />
                 <span>Help Desk</span>
               </Link>
             </SidebarMenuButton>

@@ -590,7 +590,7 @@ export default function SiteAdminPage() {
         <Card className="max-w-md mx-auto">
           <CardHeader className="text-center">
             <AlertTriangle className="h-12 w-12 text-destructive mx-auto mb-4" />
-            <CardTitle className="font-marker text-xl">Access Denied</CardTitle>
+            <CardTitle className="font-oswald font-semibold tracking-tight text-xl">Access Denied</CardTitle>
             <CardDescription>
               You need campus administrator or higher privileges to access this page. If you believe this is an error, please contact your campus or district administrator.
             </CardDescription>
@@ -612,7 +612,7 @@ export default function SiteAdminPage() {
           <Shield className="h-6 w-6 text-destructive" />
         </div>
         <div>
-          <h1 className="font-marker text-3xl sm:text-4xl text-foreground">
+          <h1 className="font-oswald font-semibold tracking-tight text-3xl sm:text-4xl text-foreground">
             My Campus
           </h1>
           <p className="font-roboto text-muted-foreground">

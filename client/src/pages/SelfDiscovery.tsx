@@ -253,7 +253,7 @@ export default function SelfDiscovery() {
             <div className="w-12 h-12 sm:w-16 sm:h-16 rounded-full bg-lys-yellow/10 flex items-center justify-center mx-auto mb-4">
               <Trophy className="h-6 w-6 sm:h-8 sm:w-8 text-lys-yellow" />
             </div>
-            <h1 className="font-marker text-2xl sm:text-3xl md:text-4xl text-foreground mb-2">
+            <h1 className="font-oswald font-semibold tracking-tight text-2xl sm:text-3xl md:text-4xl text-foreground mb-2">
               Your Student Be-Know-Do Profile
             </h1>
             <p className="font-roboto text-muted-foreground">
@@ -381,7 +381,7 @@ export default function SelfDiscovery() {
             </div>
             <div>
               <div className="flex items-center gap-2">
-                <h1 className="font-marker text-xl sm:text-2xl md:text-3xl text-foreground">
+                <h1 className="font-oswald font-semibold tracking-tight text-xl sm:text-2xl md:text-3xl text-foreground">
                   Student Be-Know-Do Assessment
                 </h1>
                 <Badge variant="secondary" className="font-oswald hidden sm:flex">For Students</Badge>

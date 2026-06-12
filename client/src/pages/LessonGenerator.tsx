@@ -836,7 +836,7 @@ ${addedResources.length > 0 ? addedResources.map(r => `- ${r.title}: ${r.url}`).
               <Sparkles className="h-6 w-6 text-lys-red" />
             </div>
             <div>
-              <h1 className="font-marker text-3xl sm:text-4xl text-foreground">
+              <h1 className="font-oswald font-semibold tracking-tight text-3xl sm:text-4xl text-foreground">
                 AI Lesson Generator
               </h1>
               <p className="font-roboto text-muted-foreground">
@@ -1399,12 +1399,12 @@ ${addedResources.length > 0 ? addedResources.map(r => `- ${r.title}: ${r.url}`).
                             <Input
                               value={editTitle}
                               onChange={(e) => setEditTitle(e.target.value)}
-                              className="font-marker text-lg"
+                              className="font-oswald font-semibold tracking-tight text-lg"
                               data-testid="input-edit-lesson-title"
                             />
                           </div>
                         ) : (
-                          <h2 className="font-marker text-2xl text-foreground mb-3">{generatedLesson.title}</h2>
+                          <h2 className="font-oswald font-semibold tracking-tight text-2xl text-foreground mb-3">{generatedLesson.title}</h2>
                         )}
                         <div className="grid grid-cols-2 md:grid-cols-4 gap-2 text-sm font-roboto">
                           {generatedLesson.course && (

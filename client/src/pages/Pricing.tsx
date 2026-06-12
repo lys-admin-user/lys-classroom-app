@@ -462,7 +462,7 @@ export default function Pricing() {
     <div className="min-h-screen bg-background">
       <div className="max-w-7xl mx-auto px-4 py-6 md:py-12">
         <div className="text-center mb-8">
-          <h1 className="text-2xl md:text-4xl font-marker text-foreground mb-4">
+          <h1 className="text-2xl md:text-4xl font-oswald font-semibold tracking-tight text-foreground mb-4">
             Choose Your Path to Success
           </h1>
           <p className="text-base md:text-lg text-muted-foreground max-w-2xl mx-auto">

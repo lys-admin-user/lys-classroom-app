@@ -792,7 +792,7 @@ export default function Classroom() {
             <School className="h-6 w-6 text-lys-teal" />
           </div>
           <div>
-            <h1 className="font-marker text-3xl sm:text-4xl text-foreground">
+            <h1 className="font-oswald font-semibold tracking-tight text-3xl sm:text-4xl text-foreground">
               {viewMode === "organization" ? "Organization Classroom" : "My Classroom"}
             </h1>
             <p className="font-roboto text-muted-foreground">
