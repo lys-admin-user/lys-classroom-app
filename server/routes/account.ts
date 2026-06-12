@@ -447,9 +447,29 @@ export function registerAccountRoutes(app: Express): void {
   app.patch("/api/user/role", isAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user?.claims?.sub;
-      const validated = updateRoleSchema.parse(req.body);
+      // SECURITY (privilege escalation): this is a self-service endpoint, so a
+      // user must NEVER be able to grant themselves an elevated/admin role here.
+      // Only the non-privileged onboarding identities are accepted. Elevated
+      // roles (staff/campus_admin/district_admin/site_admin/system_admin) are
+      // granted exclusively by an existing admin via /api/admin/users/:id.
+      const selfRoleSchema = z.object({
+        role: z.enum(["student", "educator", "homeschool_parent"]),
+      });
+      const validated = selfRoleSchema.parse(req.body);
       const dbRole = validated.role === "homeschool_parent" ? "educator" : validated.role;
+      const before = await storage.getUser(userId);
       const user = await storage.updateUserRole(userId, dbRole as UserRole);
+      await logAuditEvent({
+        userId,
+        action: "user.self_role_change",
+        category: "security",
+        severity: "info",
+        resourceType: "user",
+        resourceId: userId,
+        details: { from: before?.role ?? null, to: dbRole, requested: validated.role },
+        ipAddress: getClientIP(req),
+        userAgent: req.get("user-agent"),
+      });
       res.json(user);
     } catch (error) {
       if (error instanceof z.ZodError) {

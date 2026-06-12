@@ -581,13 +581,22 @@ export function registerAdminRoutes(app: Express): void {
     try {
       const user = req.user;
       const role = user?.role || user?.claims?.role;
+      const userId = user?.claims?.sub || user?.id;
       
-      if (!["site_admin", "system_admin", "campus_admin"].includes(role)) {
+      if (!["site_admin", "system_admin", "campus_admin", "district_admin"].includes(role)) {
         res.status(403).json({ error: "Admin access required" });
         return;
       }
       
       const { orgId } = req.params;
+      // Tenant isolation: a campus/district admin may only read matriculation
+      // (student PII) for organizations they actually administer. Platform admins
+      // (site/system) are allowed everything via verifyOrgAdminAccess.
+      const allowed = await verifyOrgAdminAccess(userId, orgId);
+      if (!allowed) {
+        res.status(403).json({ error: "You do not have access to this organization" });
+        return;
+      }
       const events = await storage.getMatriculationEventsByOrg(orgId);
       res.json(events);
     } catch (error) {
@@ -720,6 +729,22 @@ export function registerAdminRoutes(app: Express): void {
       }
       
       const { id } = req.params;
+      const achievement = await storage.getStudentAchievement(id);
+      if (!achievement) {
+        res.status(404).json({ error: "Achievement not found" });
+        return;
+      }
+      // Tenant isolation: a campus admin may only verify an achievement earned in
+      // an organization they administer. Platform admins (site/system) are allowed.
+      if (!["site_admin", "system_admin"].includes(role)) {
+        const allowed = achievement.organizationId
+          ? await verifyOrgAdminAccess(userId, achievement.organizationId)
+          : false;
+        if (!allowed) {
+          res.status(403).json({ error: "You do not have access to this student's organization" });
+          return;
+        }
+      }
       const verified = await storage.verifyAchievement(id, userId);
       if (!verified) {
         res.status(404).json({ error: "Achievement not found" });
@@ -738,6 +763,7 @@ export function registerAdminRoutes(app: Express): void {
     try {
       const user = req.user;
       const role = user?.role || user?.claims?.role;
+      const userId = user?.claims?.sub || user?.id;
       
       if (!["site_admin", "system_admin", "campus_admin"].includes(role)) {
         res.status(403).json({ error: "Admin access required" });
@@ -752,6 +778,22 @@ export function registerAdminRoutes(app: Express): void {
         return;
       }
       
+      const achievement = await storage.getStudentAchievement(id);
+      if (!achievement) {
+        res.status(404).json({ error: "Achievement not found" });
+        return;
+      }
+      // Tenant isolation: a campus admin may only revoke an achievement earned in
+      // an organization they administer. Platform admins (site/system) are allowed.
+      if (!["site_admin", "system_admin"].includes(role)) {
+        const allowed = achievement.organizationId
+          ? await verifyOrgAdminAccess(userId, achievement.organizationId)
+          : false;
+        if (!allowed) {
+          res.status(403).json({ error: "You do not have access to this student's organization" });
+          return;
+        }
+      }
       const revoked = await storage.revokeAchievement(id, reason);
       if (!revoked) {
         res.status(404).json({ error: "Achievement not found" });
@@ -1333,6 +1375,17 @@ export function registerAdminRoutes(app: Express): void {
         return;
       }
       const flag = await storage.createFeatureFlag(parsed.data);
+      await logAuditEvent({
+        userId: req.user?.claims?.sub,
+        action: "admin.feature_flag_create",
+        category: "admin_action",
+        severity: "info",
+        resourceType: "feature_flag",
+        resourceId: (flag as any)?.id ?? null,
+        details: { name: (parsed.data as any)?.name, enabled: (parsed.data as any)?.enabled },
+        ipAddress: getClientIP(req),
+        userAgent: req.get("user-agent"),
+      });
       res.json(flag);
     } catch (error) {
       res.status(500).json({ error: "Failed to create feature flag" });
@@ -1355,6 +1408,17 @@ export function registerAdminRoutes(app: Express): void {
         res.status(404).json({ error: "Feature flag not found" });
         return;
       }
+      await logAuditEvent({
+        userId: req.user?.claims?.sub,
+        action: "admin.feature_flag_update",
+        category: "admin_action",
+        severity: "info",
+        resourceType: "feature_flag",
+        resourceId: id,
+        details: parsed.data as any,
+        ipAddress: getClientIP(req),
+        userAgent: req.get("user-agent"),
+      });
       res.json(updated);
     } catch (error) {
       res.status(500).json({ error: "Failed to update feature flag" });
@@ -1367,6 +1431,16 @@ export function registerAdminRoutes(app: Express): void {
     try {
       const { id } = req.params;
       await storage.deleteFeatureFlag(id);
+      await logAuditEvent({
+        userId: req.user?.claims?.sub,
+        action: "admin.feature_flag_delete",
+        category: "admin_action",
+        severity: "warning",
+        resourceType: "feature_flag",
+        resourceId: id,
+        ipAddress: getClientIP(req),
+        userAgent: req.get("user-agent"),
+      });
       res.json({ success: true });
     } catch (error) {
       res.status(500).json({ error: "Failed to delete feature flag" });
@@ -2766,6 +2840,21 @@ export function registerAdminRoutes(app: Express): void {
       updates.updatedAt = new Date();
       
       const [updated] = await db.update(users).set(updates).where(eq(users.id, id)).returning();
+      await logAuditEvent({
+        userId: requesterId,
+        action: "admin.user_update",
+        category: "admin_action",
+        severity: role ? "warning" : "info",
+        resourceType: "user",
+        resourceId: id,
+        details: {
+          changed: Object.keys(updates).filter((k) => k !== "updatedAt"),
+          roleFrom: target?.role ?? null,
+          roleTo: role ?? undefined,
+        },
+        ipAddress: getClientIP(req),
+        userAgent: req.get("user-agent"),
+      });
       res.json(updated);
     } catch (error) {
       res.status(500).json({ error: "Failed to update user" });
@@ -2789,6 +2878,16 @@ export function registerAdminRoutes(app: Express): void {
       await db.delete(educatorProfiles).where(eq(educatorProfiles.userId, id));
       await db.delete(userPreferences).where(eq(userPreferences.userId, id));
       await db.delete(users).where(eq(users.id, id));
+      await logAuditEvent({
+        userId: adminId,
+        action: "admin.user_delete",
+        category: "admin_action",
+        severity: "warning",
+        resourceType: "user",
+        resourceId: id,
+        ipAddress: getClientIP(req),
+        userAgent: req.get("user-agent"),
+      });
       
       res.json({ success: true });
     } catch (error) {
@@ -2875,6 +2974,16 @@ export function registerAdminRoutes(app: Express): void {
         originalAdminId: adminId,
         startedAt: new Date().toISOString(),
       };
+      await logAuditEvent({
+        userId: adminId,
+        action: "admin.impersonate_start",
+        category: "admin_action",
+        severity: "warning",
+        resourceType: "user",
+        resourceId: id,
+        ipAddress: getClientIP(req),
+        userAgent: req.get("user-agent"),
+      });
       
       res.json({ 
         success: true, 

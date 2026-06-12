@@ -52,9 +52,33 @@ declare module "http" {
 
 app.set("trust proxy", 1);
 
+// Content-Security-Policy is enforced only on the published deployment. In dev,
+// Vite/HMR and the Replit preview banner inject inline/eval scripts that a
+// strict CSP would break, so we leave it off locally. 'unsafe-inline' is kept
+// for scripts/styles because React + Tailwind emit inline styles and the built
+// bundle isn't nonce-tagged; nonce-based hardening is a follow-up. frame-src /
+// frame-ancestors are left at helmet defaults ('self') to match the existing
+// X-Frame-Options behavior and not regress the /embed/* surfaces.
+const isDeployment = process.env.REPLIT_DEPLOYMENT === "1";
 app.use(
   helmet({
-    contentSecurityPolicy: false,
+    contentSecurityPolicy: isDeployment
+      ? {
+          useDefaults: true,
+          directives: {
+            defaultSrc: ["'self'"],
+            scriptSrc: ["'self'", "'unsafe-inline'", "https://js.stripe.com"],
+            styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
+            fontSrc: ["'self'", "https://fonts.gstatic.com", "data:"],
+            imgSrc: ["'self'", "data:", "blob:", "https:"],
+            connectSrc: ["'self'", "https:", "wss:"],
+            frameSrc: ["'self'", "https://js.stripe.com"],
+            objectSrc: ["'none'"],
+            baseUri: ["'self'"],
+            upgradeInsecureRequests: [],
+          },
+        }
+      : false,
     crossOriginEmbedderPolicy: false,
   }),
 );
@@ -175,6 +199,38 @@ app.use(
 );
 
 app.use(express.urlencoded({ extended: false, limit: "10mb" }));
+
+// CSRF mitigation: for state-changing API requests, require the browser-sent
+// Origin (or Referer) host to match the server host. Same-origin fetch/XHR from
+// the SPA always sends an Origin header on non-GET requests, so legitimate calls
+// pass; a cross-site forgery attempt carries the attacker's origin and is
+// rejected. Non-browser callers (webhooks) are allowlisted by path. This needs
+// no client changes and complements the SameSite=Lax session cookie.
+const CSRF_EXEMPT_PATHS = new Set<string>([
+  "/api/stripe/webhook",
+]);
+app.use((req, res, next) => {
+  const method = req.method.toUpperCase();
+  if (method === "GET" || method === "HEAD" || method === "OPTIONS") return next();
+  if (!req.path.startsWith("/api")) return next();
+  if (CSRF_EXEMPT_PATHS.has(req.path)) return next();
+
+  const expectedHost = req.get("host");
+  const origin = req.get("origin");
+  const referer = req.get("referer");
+  let sourceHost: string | null = null;
+  try {
+    if (origin) sourceHost = new URL(origin).host;
+    else if (referer) sourceHost = new URL(referer).host;
+  } catch {
+    sourceHost = null;
+  }
+
+  if (!sourceHost || sourceHost !== expectedHost) {
+    return res.status(403).json({ error: "Cross-origin request blocked." });
+  }
+  next();
+});
 
 export function log(message: string, source = "express") {
   const formattedTime = new Date().toLocaleTimeString("en-US", {

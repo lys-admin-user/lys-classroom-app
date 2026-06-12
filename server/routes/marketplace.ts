@@ -73,7 +73,29 @@ import { logAuditEvent, getAuditLogs, getClientIP } from "../services/auditLog";
 import { filterChatMessage } from "../services/contentFilter";
 import { eq, desc, and, sql as drizzleSql, count, inArray, lte, gte } from "drizzle-orm";
 
-const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 10 * 1024 * 1024 } });
+const ALLOWED_UPLOAD_MIME = new Set<string>([
+  "image/png", "image/jpeg", "image/jpg", "image/webp", "image/gif",
+  "application/pdf", "text/plain", "text/csv",
+  "application/msword",
+  "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+  "application/vnd.ms-excel",
+  "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+  "application/vnd.ms-powerpoint",
+  "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+]);
+const ALLOWED_UPLOAD_EXT = new Set<string>([
+  ".pdf", ".txt", ".csv",
+  ".doc", ".docx", ".xls", ".xlsx", ".ppt", ".pptx",
+]);
+const upload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 10 * 1024 * 1024 },
+  fileFilter: (_req, file, cb) => {
+    const ext = (file.originalname.match(/\.[^.]+$/)?.[0] || "").toLowerCase();
+    if (ALLOWED_UPLOAD_MIME.has(file.mimetype) && ALLOWED_UPLOAD_EXT.has(ext)) cb(null, true);
+    else cb(new Error("Unsupported file type."));
+  },
+});
 
 const saveLessonSchema = z.object({
   title: z.string().min(1),

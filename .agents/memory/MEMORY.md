@@ -1,1 +1,7 @@
+- [Security hardening decisions](security-hardening.md) — CSP prod-only, Origin-based CSRF (webhooks exempt), MIME+ext upload allowlist, verifyOrgAdminAccess for tenant scoping, self-role enum limit, audit categories.
 - [LYS design system](design-system.md) — Oswald headings, font-marker reserved for the LYS logo only, brand-red-tinted sidebar active state, yellow text uses hsl(45,93%,38%).
+- [GPT-5 API contract](gpt5-api-contract.md) — quirks/expectations when calling the OpenAI integration.
+- [Role shortcuts consistency](role-shortcuts-consistency.md) — keep sidebar nav + command palette role gating in sync.
+- [Email digest pattern](email-digest-pattern.md) — how digest emails are assembled/sent.
+- [Curriculum doc original files](curriculum-doc-original-files.md) — where original curriculum source docs live.
+- [Mockup preview screenshot cache](mockup-preview-screenshot-cache.md) — caching behavior for mockup-sandbox preview screenshots.
