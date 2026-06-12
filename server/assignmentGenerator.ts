@@ -767,16 +767,17 @@ Create a ${request.assignmentType} that directly assesses mastery of the above o
 
   try {
     const response = await openai.chat.completions.create({
-      model: "gpt-4o",
+      model: "gpt-5",
       messages: [
         { role: "system", content: systemPrompt },
         { role: "user", content: `Create a ${request.assignmentType} based on this lesson:\n${lessonContext}${africanContext}` }
       ],
       response_format: { type: "json_object" },
-      temperature: 0.7,
+      max_completion_tokens: 6000,
+      reasoning_effort: "minimal",
     });
     const usageMeter = new UsageMeter();
-    usageMeter.record("gpt-4o", "draft", response.usage);
+    usageMeter.record("gpt-5", "draft", response.usage);
 
     const content = response.choices[0]?.message?.content;
     if (!content) {

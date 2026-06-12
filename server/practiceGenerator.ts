@@ -54,7 +54,7 @@ Respond ONLY with a valid JSON object in exactly this shape:
 For short_answer questions omit the "options" field or set it to an empty array. Do not include any text outside the JSON object.`;
 
   const response = await openai.chat.completions.create({
-    model: "gpt-4o",
+    model: "gpt-5",
     messages: [
       { role: "system", content: systemPrompt },
       {
@@ -62,8 +62,9 @@ For short_answer questions omit the "options" field or set it to an empty array.
         content: `Create ${count} ${request.difficulty} practice questions on "${safeTopic}" (${safeSubject}) for a ${safeGrade} student.`,
       },
     ],
-    temperature: 0.7,
     response_format: { type: "json_object" },
+    max_completion_tokens: 6000,
+    reasoning_effort: "minimal",
   });
 
   const raw = response.choices[0]?.message?.content;

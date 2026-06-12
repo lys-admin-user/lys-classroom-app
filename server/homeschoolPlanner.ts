@@ -69,7 +69,7 @@ Respond ONLY with a valid JSON object in exactly this shape:
 Do not include any text outside the JSON object.`;
 
   const response = await openai.chat.completions.create({
-    model: "gpt-4o",
+    model: "gpt-5",
     messages: [
       { role: "system", content: systemPrompt },
       {
@@ -77,8 +77,9 @@ Do not include any text outside the JSON object.`;
         content: `Create a ${days}-day homeschool plan for a ${safeGrade} child covering ${safeSubjects.join(", ")}.${safeInterests ? ` Interests: ${safeInterests}.` : ""}`,
       },
     ],
-    temperature: 0.7,
     response_format: { type: "json_object" },
+    max_completion_tokens: 6000,
+    reasoning_effort: "minimal",
   });
 
   const raw = response.choices[0]?.message?.content;

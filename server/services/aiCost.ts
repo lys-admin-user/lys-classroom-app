@@ -18,6 +18,16 @@ function envNum(name: string, fallback: number): number {
 
 // Per 1,000,000 tokens.
 const PRICING: Record<string, Price> = {
+  "gpt-5-mini": {
+    input: envNum("AI_PRICE_GPT_5_MINI_INPUT", 0.25),
+    output: envNum("AI_PRICE_GPT_5_MINI_OUTPUT", 2),
+  },
+  // Prefix match keeps "gpt-5-mini" matching before the broader "gpt-5" entry
+  // because priceFor() does an exact lookup first, then startsWith().
+  "gpt-5": {
+    input: envNum("AI_PRICE_GPT_5_INPUT", 1.25),
+    output: envNum("AI_PRICE_GPT_5_OUTPUT", 10),
+  },
   "gpt-4o": {
     input: envNum("AI_PRICE_GPT_4O_INPUT", 2.5),
     output: envNum("AI_PRICE_GPT_4O_OUTPUT", 10),

@@ -102,14 +102,14 @@ Return the JSON array of standards:`;
 
   try {
     const response = await openai.chat.completions.create({
-      model: "gpt-4o",
+      model: "gpt-5",
       messages: [
         { role: "system", content: systemPrompt },
         { role: "user", content: userPrompt },
       ],
       response_format: { type: "json_object" },
-      temperature: 0.2,
-      max_tokens: 4000,
+      max_completion_tokens: 4000,
+      reasoning_effort: "minimal",
     });
 
     const content = response.choices[0]?.message?.content;

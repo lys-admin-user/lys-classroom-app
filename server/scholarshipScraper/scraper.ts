@@ -256,11 +256,11 @@ ${pageText}
 
   try {
     const res = await openai.chat.completions.create({
-      model: "gpt-4o-mini",
+      model: "gpt-5-mini",
       messages: [{ role: "user", content: prompt }],
       response_format: { type: "json_object" },
-      max_tokens: 2500,
-      temperature: 0,
+      max_completion_tokens: 2500,
+      reasoning_effort: "minimal",
     });
     const content = res.choices[0]?.message?.content;
     if (!content) return { ok: false, error: "empty LLM response" };

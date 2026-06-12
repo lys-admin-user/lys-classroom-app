@@ -343,8 +343,9 @@ export async function runSyncForSource(
     // goes through the verbatim guard below before reaching the admin
     // review queue, and admin still approves each row individually.
     const completion = await openai.chat.completions.create({
-      model: "gpt-4o-mini",
+      model: "gpt-5-mini",
       response_format: { type: "json_object" },
+      reasoning_effort: "minimal",
       messages: [
         { role: "system", content: EXTRACTION_PROMPT },
         {
@@ -364,7 +365,6 @@ export async function runSyncForSource(
             .join("\n"),
         },
       ],
-      temperature: 0.2,
     });
 
     const raw = completion.choices[0]?.message?.content?.trim() || "{}";

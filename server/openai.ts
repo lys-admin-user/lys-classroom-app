@@ -371,15 +371,16 @@ JSON structure:
 
   try {
     const response = await openai.chat.completions.create({
-      model: "gpt-4o",
+      model: "gpt-5",
       messages: [
         { role: "system", content: systemPrompt },
         { role: "user", content: userPrompt },
       ],
       response_format: { type: "json_object" },
-      max_tokens: 3000,
+      max_completion_tokens: 6000,
+      reasoning_effort: "minimal",
     });
-    usageMeter.record("gpt-4o", "draft", response.usage);
+    usageMeter.record("gpt-5", "draft", response.usage);
 
     const content = response.choices[0].message.content;
     if (!content || !content.trim()) {
@@ -415,15 +416,16 @@ ${qualityResult.breakdown.filter(b => b.score < b.maxScore).map(b => `- ${b.cate
 You MUST address these gaps to achieve Distinguished level (90%+).`;
 
       const retryResponse = await openai.chat.completions.create({
-        model: "gpt-4o",
+        model: "gpt-5",
         messages: [
           { role: "system", content: systemPrompt },
           { role: "user", content: retryPrompt },
         ],
         response_format: { type: "json_object" },
-        max_tokens: 3000,
+        max_completion_tokens: 6000,
+        reasoning_effort: "minimal",
       });
-      usageMeter.record("gpt-4o", "redraft", retryResponse.usage);
+      usageMeter.record("gpt-5", "redraft", retryResponse.usage);
 
       const retryContent = retryResponse.choices[0].message.content;
       if (retryContent && retryContent.trim()) {
@@ -751,13 +753,14 @@ Generate 5-8 specific professional development recommendations tailored to this 
 
   try {
     const response = await openai.chat.completions.create({
-      model: "gpt-4o",
+      model: "gpt-5",
       messages: [
         { role: "system", content: systemPrompt },
         { role: "user", content: userPrompt },
       ],
       response_format: { type: "json_object" },
-      temperature: 0.7,
+      max_completion_tokens: 4000,
+      reasoning_effort: "minimal",
     });
 
     const content = response.choices[0].message.content;

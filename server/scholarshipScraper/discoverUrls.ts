@@ -145,10 +145,10 @@ ${candidates.map((c, i) => `${i + 1}. ${c.url}  ("${c.text}")`).join("\n")}`;
 
   try {
     const res = await openai.chat.completions.create({
-      model: "gpt-4o-mini",
+      model: "gpt-5-mini",
       messages: [{ role: "user", content: prompt }],
-      max_tokens: 200,
-      temperature: 0,
+      max_completion_tokens: 500,
+      reasoning_effort: "minimal",
     });
     const choice = res.choices[0]?.message?.content?.trim();
     if (!choice || choice.toLowerCase() === "none") return null;

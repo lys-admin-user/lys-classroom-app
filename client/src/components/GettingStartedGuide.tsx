@@ -38,7 +38,7 @@ function StudentGuide({ userId }: { userId: string }) {
 
   const { data: narratives = [] } = useQuery<any[]>({ queryKey: ["/api/narratives"] });
   const { data: activities = [] } = useQuery<any[]>({ queryKey: ["/api/campus-activities"] });
-  const { data: savedCareers = [] } = useQuery<any[]>({ queryKey: ["/api/careers/saved"] });
+  const { data: savedCareers = [] } = useQuery<any[]>({ queryKey: ["/api/saved-careers"] });
   const { data: strengths = [] } = useQuery<any[]>({ queryKey: ["/api/strengths"] });
   const { data: milestones = [] } = useQuery<any[]>({ queryKey: ["/api/lyse-milestones"] });
 

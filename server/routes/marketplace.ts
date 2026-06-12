@@ -756,12 +756,13 @@ export function registerMarketplaceRoutes(app: Express): void {
         const client = new openai();
 
         const captionResponse = await client.chat.completions.create({
-          model: "gpt-4o",
+          model: "gpt-5",
           messages: [{
             role: "user",
             content: `Write a short, professional LinkedIn-style social media caption (2-3 sentences) for an educator named "${displayName}" who recommends "${course}" on the LYS platform. Include a call to action. Do not include hashtags or emojis. Keep it genuine and professional.`,
           }],
-          max_tokens: 150,
+          max_completion_tokens: 500,
+          reasoning_effort: "minimal",
         });
         caption = captionResponse.choices[0]?.message?.content || `${displayName} recommends ${course} on LYS — empowering the next generation of learners. Start your journey today!`;
 

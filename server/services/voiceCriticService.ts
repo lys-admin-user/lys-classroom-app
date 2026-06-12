@@ -27,7 +27,7 @@ export interface VoiceCriticResult<T = any> {
   usage?: { model: string; prompt_tokens: number; completion_tokens: number } | null;
 }
 
-const CRITIC_MODEL = "gpt-4o-mini";
+const CRITIC_MODEL = "gpt-5-mini";
 
 const RUBRIC_PROMPT = `You are the LYS Voice Auditor. You evaluate generated educational content against the LYS Master Teacher voice rubric.
 
@@ -70,8 +70,8 @@ export async function critiqueAndMaybeRewrite<T>(
         { role: "user", content: JSON.stringify(userPayload).slice(0, 30000) },
       ],
       response_format: { type: "json_object" },
-      max_tokens: 4000,
-      temperature: 0.4,
+      max_completion_tokens: 4000,
+      reasoning_effort: "minimal",
     });
 
     const usage = {

@@ -68,8 +68,9 @@ export async function extractStandardsFromDocument(
     const sanitized = sanitizePromptText(doc.extractedText.slice(0, 60_000));
 
     const completion = await openai.chat.completions.create({
-      model: "gpt-4o-mini",
+      model: "gpt-5-mini",
       response_format: { type: "json_object" },
+      reasoning_effort: "minimal",
       messages: [
         { role: "system", content: EXTRACTION_SYSTEM_PROMPT },
         {
@@ -90,7 +91,6 @@ export async function extractStandardsFromDocument(
             .join("\n"),
         },
       ],
-      temperature: 0.1,
     });
 
     const raw = completion.choices[0]?.message?.content?.trim() || "{}";
