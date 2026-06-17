@@ -18,6 +18,7 @@ import {
   standardsFallbackMisses,
   publicStandardsSyncRuns,
   standardsDigestLog,
+  type DigestCadence,
 } from "@shared/schema";
 import { and, desc, eq, gte, gt, or, sql as drizzleSql } from "drizzle-orm";
 import { getEmailDigestRecipients } from "./notificationsService";
@@ -169,14 +170,17 @@ export function renderDigestEmail(payload: DigestPayload, recipient: { email: st
   return { subject, body: lines.join("\n") };
 }
 
-export async function sendWeeklyDigest(now: Date = new Date()): Promise<{
+export async function sendWeeklyDigest(
+  now: Date = new Date(),
+  opts: { cadences?: DigestCadence[] } = {},
+): Promise<{
   recipients: number;
   sent: number;
   skipped: number;
   failed: number;
 }> {
   const payload = await buildDigestPayload(now);
-  const recipients = await getEmailDigestRecipients();
+  const recipients = await getEmailDigestRecipients({ cadences: opts.cadences });
   let sent = 0;
   let skipped = 0;
   let failed = 0;

@@ -79,6 +79,11 @@ export const users = pgTable("users", {
 export type UpsertUser = typeof users.$inferInsert;
 export type User = typeof users.$inferSelect;
 
+// Digest email cadence (Task #17). "off" suppresses digest emails entirely,
+// "daily" sends every morning, "weekly" sends Monday mornings only.
+export type DigestCadence = "off" | "daily" | "weekly";
+export const DIGEST_CADENCES: DigestCadence[] = ["off", "daily", "weekly"];
+
 // User Preferences - stores language, location, and onboarding results
 export const userPreferences = pgTable("user_preferences", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
@@ -102,6 +107,14 @@ export const userPreferences = pgTable("user_preferences", {
   // default to false so existing rows continue to receive notifications.
   emailDigestOptOut: boolean("email_digest_opt_out").default(false),
   inAppNotificationsOptOut: boolean("in_app_notifications_opt_out").default(false),
+  // Per-admin notification controls (Task #17). `digestCadence` lets an admin
+  // choose how often the standards digest email arrives ("off" | "daily" |
+  // "weekly", default "weekly"). `mutedNotificationKinds` holds the set of
+  // in-app notification kinds the admin has muted (each value is a
+  // `NotificationKind` from schema.ts). Defaults keep existing rows on the
+  // prior behavior: weekly digest, nothing muted.
+  digestCadence: varchar("digest_cadence").default("weekly").$type<DigestCadence>(),
+  mutedNotificationKinds: jsonb("muted_notification_kinds").$type<string[]>().default([]),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });

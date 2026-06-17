@@ -13,37 +13,80 @@ import {
   users,
   type AdminNotification,
   type NotificationKind,
+  type DigestCadence,
 } from "@shared/schema";
 import { and, desc, eq, inArray, count } from "drizzle-orm";
 
 const SYSTEM_ADMIN_ROLE = "system_admin";
 
-async function getOptInSystemAdmins(): Promise<{ id: string; email: string | null }[]> {
+// In-app notification recipients for a specific event kind. An admin is
+// excluded if they disabled in-app notifications entirely OR muted this
+// particular kind (Task #17). Missing preferences rows default to receiving
+// everything.
+async function getOptInSystemAdmins(
+  kind: NotificationKind,
+): Promise<{ id: string; email: string | null }[]> {
   const admins = await db
     .select({ id: users.id, email: users.email })
     .from(users)
     .where(eq(users.role, SYSTEM_ADMIN_ROLE));
   if (admins.length === 0) return [];
   const prefs = await db
-    .select({ userId: userPreferences.userId, optOut: userPreferences.inAppNotificationsOptOut })
+    .select({
+      userId: userPreferences.userId,
+      optOut: userPreferences.inAppNotificationsOptOut,
+      muted: userPreferences.mutedNotificationKinds,
+    })
     .from(userPreferences)
     .where(inArray(userPreferences.userId, admins.map((a) => a.id)));
-  const optedOut = new Set(prefs.filter((p) => p.optOut === true).map((p) => p.userId));
-  return admins.filter((a) => !optedOut.has(a.id));
+  const excluded = new Set(
+    prefs
+      .filter((p) => p.optOut === true || (p.muted ?? []).includes(kind))
+      .map((p) => p.userId),
+  );
+  return admins.filter((a) => !excluded.has(a.id));
 }
 
-export async function getEmailDigestRecipients(): Promise<{ id: string; email: string | null }[]> {
+// Email digest recipients. `digestCadence` is the source of truth (Task #17):
+// admins on the "off" cadence never receive digests. By default (no `cadences`
+// filter) we exclude only "off" admins; when `cadences` is provided we
+// additionally restrict to admins whose chosen cadence is in that set, which is
+// how the scheduler distinguishes daily vs. weekly recipients.
+//
+// Safety fallback for un-migrated rows: if a row has no valid cadence yet, we
+// honor the deprecated `emailDigestOptOut` boolean (true -> treat as "off") so
+// a pre-existing opt-out can never be accidentally re-enrolled. Rows with
+// neither signal default to "weekly".
+export async function getEmailDigestRecipients(
+  opts: { cadences?: DigestCadence[] } = {},
+): Promise<{ id: string; email: string | null }[]> {
   const admins = await db
     .select({ id: users.id, email: users.email })
     .from(users)
     .where(eq(users.role, SYSTEM_ADMIN_ROLE));
   if (admins.length === 0) return [];
   const prefs = await db
-    .select({ userId: userPreferences.userId, optOut: userPreferences.emailDigestOptOut })
+    .select({
+      userId: userPreferences.userId,
+      cadence: userPreferences.digestCadence,
+      optOut: userPreferences.emailDigestOptOut,
+    })
     .from(userPreferences)
     .where(inArray(userPreferences.userId, admins.map((a) => a.id)));
-  const optedOut = new Set(prefs.filter((p) => p.optOut === true).map((p) => p.userId));
-  return admins.filter((a) => !optedOut.has(a.id));
+  const prefByUser = new Map(prefs.map((p) => [p.userId, p]));
+  const validCadences = new Set<DigestCadence>(["off", "daily", "weekly"]);
+  const allowed = opts.cadences ? new Set(opts.cadences) : null;
+  return admins.filter((a) => {
+    const p = prefByUser.get(a.id);
+    const raw = p?.cadence as DigestCadence | null | undefined;
+    // Resolve effective cadence: valid stored cadence wins; otherwise fall back
+    // to the legacy opt-out flag for rows that predate the cadence column.
+    const cadence: DigestCadence =
+      raw && validCadences.has(raw) ? raw : p?.optOut === true ? "off" : "weekly";
+    if (cadence === "off") return false;
+    if (allowed && !allowed.has(cadence)) return false;
+    return true;
+  });
 }
 
 interface CreatePayload {
@@ -56,7 +99,7 @@ interface CreatePayload {
 
 async function fanOutToAdmins(payload: CreatePayload): Promise<void> {
   try {
-    const admins = await getOptInSystemAdmins();
+    const admins = await getOptInSystemAdmins(payload.kind);
     if (admins.length === 0) return;
     await db.insert(adminNotifications).values(
       admins.map((a) => ({

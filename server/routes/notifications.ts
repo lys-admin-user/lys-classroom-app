@@ -2,7 +2,7 @@
 import type { Express } from "express";
 import { db } from "../db";
 import { storage } from "../storage";
-import { userPreferences } from "@shared/schema";
+import { userPreferences, NOTIFICATION_KINDS, DIGEST_CADENCES, type DigestCadence } from "@shared/schema";
 import { eq } from "drizzle-orm";
 import { z } from "zod";
 import { isAuthenticated } from "../replit_integrations/auth";
@@ -29,9 +29,14 @@ function requireSystemAdmin() {
   };
 }
 
+// `emailDigestOptOut` is deprecated (Task #17) — digest delivery is now driven
+// solely by `digestCadence` ("off" replaces the old opt-out). We still accept
+// it for backward compatibility and translate it into a cadence below.
 const settingsSchema = z.object({
   emailDigestOptOut: z.boolean().optional(),
   inAppNotificationsOptOut: z.boolean().optional(),
+  digestCadence: z.enum(DIGEST_CADENCES as [string, ...string[]]).optional(),
+  mutedNotificationKinds: z.array(z.enum(NOTIFICATION_KINDS as unknown as [string, ...string[]])).optional(),
 });
 
 export function registerNotificationsRoutes(app: Express): void {
@@ -79,9 +84,14 @@ export function registerNotificationsRoutes(app: Express): void {
     try {
       const userId = req.user.claims.sub;
       const prefs = await storage.getUserPreferences(userId);
+      const digestCadence = (prefs?.digestCadence as DigestCadence | undefined) ?? "weekly";
       res.json({
-        emailDigestOptOut: prefs?.emailDigestOptOut ?? false,
+        // Derived from cadence so the deprecated flag never disagrees with the
+        // authoritative cadence value.
+        emailDigestOptOut: digestCadence === "off",
         inAppNotificationsOptOut: prefs?.inAppNotificationsOptOut ?? false,
+        digestCadence,
+        mutedNotificationKinds: prefs?.mutedNotificationKinds ?? [],
       });
     } catch (err) {
       res.status(500).json({ error: "Failed to load notification settings" });
@@ -92,23 +102,40 @@ export function registerNotificationsRoutes(app: Express): void {
     try {
       const userId = req.user.claims.sub;
       const validated = settingsSchema.parse(req.body);
+
+      // Resolve the effective cadence. An explicit `digestCadence` wins; a
+      // legacy `emailDigestOptOut` boolean is translated (true -> "off",
+      // false -> "weekly"). We then keep the deprecated column in sync so the
+      // two never disagree.
+      let cadence: DigestCadence | undefined =
+        validated.digestCadence as DigestCadence | undefined;
+      if (cadence === undefined && validated.emailDigestOptOut !== undefined) {
+        cadence = validated.emailDigestOptOut ? "off" : "weekly";
+      }
+
       // Upsert pattern: getUserPreferences returns null for fresh users.
       const existing = await storage.getUserPreferences(userId);
       if (!existing) {
+        const initialCadence: DigestCadence = cadence ?? "weekly";
         await db.insert(userPreferences).values({
           userId,
-          emailDigestOptOut: validated.emailDigestOptOut ?? false,
+          emailDigestOptOut: initialCadence === "off",
           inAppNotificationsOptOut: validated.inAppNotificationsOptOut ?? false,
+          digestCadence: initialCadence,
+          mutedNotificationKinds: validated.mutedNotificationKinds ?? [],
         });
       } else {
         await db
           .update(userPreferences)
           .set({
-            ...(validated.emailDigestOptOut !== undefined
-              ? { emailDigestOptOut: validated.emailDigestOptOut }
+            ...(cadence !== undefined
+              ? { digestCadence: cadence, emailDigestOptOut: cadence === "off" }
               : {}),
             ...(validated.inAppNotificationsOptOut !== undefined
               ? { inAppNotificationsOptOut: validated.inAppNotificationsOptOut }
+              : {}),
+            ...(validated.mutedNotificationKinds !== undefined
+              ? { mutedNotificationKinds: validated.mutedNotificationKinds }
               : {}),
             updatedAt: new Date(),
           })
