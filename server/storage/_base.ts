@@ -26,6 +26,10 @@ import {
   type InsertSequenceUnit,
   type ScopeChangeRequest,
   type InsertScopeChangeRequest,
+  type CurriculumShare,
+  type InsertCurriculumShare,
+  type CurriculumAccessRequest,
+  type InsertCurriculumAccessRequest,
   type SelfDiscoveryResult,
   type InsertSelfDiscoveryResult,
   type SavedCareer,
@@ -453,6 +457,21 @@ export interface IStorage {
   createScopeSequence(scope: InsertScopeSequence): Promise<ScopeSequence>;
   updateScopeSequence(id: string, updates: Partial<ScopeSequence>, userId: string): Promise<ScopeSequence | undefined>;
   deleteScopeSequence(id: string, userId: string): Promise<boolean>;
+
+  // Curriculum access control + sharing
+  getDescendantOrgIds(rootOrgIds: string[]): Promise<Set<string>>;
+  getCurriculumAccessProfile(userId: string): Promise<{ isPlatformAdmin: boolean; schoolAdminOrgIds: Set<string>; memberOrgIds: Set<string>; districtVisibleOrgIds: Set<string>; }>;
+  canViewScope(userId: string, scope: ScopeSequence): Promise<boolean>;
+  canEditScope(userId: string, scope: ScopeSequence): Promise<boolean>;
+  canManageScope(userId: string, scope: ScopeSequence): Promise<boolean>;
+  getCurriculumShares(scopeId: string): Promise<CurriculumShare[]>;
+  getCurriculumShareForUser(scopeId: string, userId: string): Promise<CurriculumShare | undefined>;
+  createCurriculumShare(share: InsertCurriculumShare): Promise<CurriculumShare>;
+  deleteCurriculumShare(scopeId: string, sharedWithUserId: string): Promise<boolean>;
+  getCurriculumAccessRequests(scopeId: string): Promise<CurriculumAccessRequest[]>;
+  getCurriculumAccessRequest(id: string): Promise<CurriculumAccessRequest | undefined>;
+  createCurriculumAccessRequest(request: InsertCurriculumAccessRequest & { requesterId: string }): Promise<CurriculumAccessRequest>;
+  updateCurriculumAccessRequest(id: string, updates: Partial<CurriculumAccessRequest>): Promise<CurriculumAccessRequest | undefined>;
   
   // Sequence Units
   getSequenceUnits(scopeId: string): Promise<SequenceUnit[]>;

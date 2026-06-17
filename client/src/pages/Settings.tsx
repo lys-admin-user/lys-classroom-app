@@ -11,6 +11,7 @@ import { PLAN_PRICES, SEAT_PRICES, SEAT_MINIMUMS } from "@/lib/pricing";
 import EducatorProfileForm from "@/components/EducatorProfileForm";
 import ProfileTierSitemap from "@/components/ProfileTierSitemap";
 import { NotificationSettings } from "@/components/NotificationSettings";
+import { MfaSettingsCard } from "@/components/MfaSettingsCard";
 import type { EducatorProfile } from "@shared/schema";
 
 export default function Settings() {
@@ -166,6 +167,13 @@ export default function Settings() {
             existingProfile={profile}
             isOnboarding={!profile}
           />
+
+          {hasMinRole(userRole, "site_admin") && (
+            <>
+              <Separator />
+              <MfaSettingsCard />
+            </>
+          )}
 
           {adminLinks.length > 0 && (
             <>

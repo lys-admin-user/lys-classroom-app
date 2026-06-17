@@ -26,6 +26,10 @@ import {
   type InsertSequenceUnit,
   type ScopeChangeRequest,
   type InsertScopeChangeRequest,
+  type CurriculumShare,
+  type InsertCurriculumShare,
+  type CurriculumAccessRequest,
+  type InsertCurriculumAccessRequest,
   type SelfDiscoveryResult,
   type InsertSelfDiscoveryResult,
   type SavedCareer,
@@ -143,6 +147,8 @@ import {
   scopeSequences,
   sequenceUnits,
   scopeChangeRequests,
+  curriculumShares,
+  curriculumAccessRequests,
   selfDiscoveryResults,
   savedCareers,
   educatorAffiliates,
@@ -461,73 +467,158 @@ const curriculumMethods: ThisType<DatabaseStorage> = {
   },
 
 
+  // Recursively resolve all descendant org IDs for a set of root orgs
+  async getDescendantOrgIds(rootOrgIds: string[]): Promise<Set<string>> {
+    const result = new Set<string>();
+    const queue = [...rootOrgIds];
+    while (queue.length) {
+      const current = queue.shift()!;
+      const children = await this.getChildOrganizations(current);
+      for (const child of children) {
+        if (!result.has(child.id)) {
+          result.add(child.id);
+          queue.push(child.id);
+        }
+      }
+    }
+    return result;
+  },
+
+
+  // Build the curriculum access profile that drives view/list authorization.
+  async getCurriculumAccessProfile(userId: string): Promise<{
+    isPlatformAdmin: boolean;
+    schoolAdminOrgIds: Set<string>;
+    memberOrgIds: Set<string>;
+    districtVisibleOrgIds: Set<string>;
+  }> {
+    const user = await this.getUser(userId);
+    const isPlatformAdmin = await this.isSiteAdmin(userId);
+    const memberships = await this.getUserOrganizations(userId);
+    const schoolAdminOrgIds = new Set<string>();
+    const memberOrgIds = new Set<string>();
+    const districtRootIds: string[] = [];
+
+    for (const m of memberships) {
+      memberOrgIds.add(m.organizationId);
+      const org: Organization | undefined = await this.getOrganization(m.organizationId);
+      if (!org) continue;
+      const isOrgAdmin = m.role === "admin" || m.role === "owner";
+      if (!isOrgAdmin) continue;
+      if (org.type === "school" || org.type === "campus") {
+        schoolAdminOrgIds.add(org.id);
+      }
+      if (org.type === "district" || org.type === "network" || org.type === "charter_network") {
+        districtRootIds.push(org.id);
+      }
+    }
+
+    // Global district_admin role: treat all their orgs as district roots.
+    if (user?.role === "district_admin") {
+      for (const m of memberships) districtRootIds.push(m.organizationId);
+    }
+
+    const descendants = await this.getDescendantOrgIds(districtRootIds);
+    const districtVisibleOrgIds = new Set<string>(districtRootIds);
+    descendants.forEach(id => districtVisibleOrgIds.add(id));
+    return { isPlatformAdmin, schoolAdminOrgIds, memberOrgIds, districtVisibleOrgIds };
+  },
+
+
+  // Can the user VIEW this scope?
+  async canViewScope(userId: string, scope: ScopeSequence): Promise<boolean> {
+    if (scope.userId === userId) return true;
+    if (await this.isSiteAdmin(userId)) return true;
+    const share = await this.getCurriculumShareForUser(scope.id, userId);
+    if (share) return true;
+    if (scope.visibility === "system" && scope.status === "published") return true;
+
+    const profile = await this.getCurriculumAccessProfile(userId);
+    const orgIds = [scope.organizationId, scope.campusId].filter(Boolean) as string[];
+
+    // School admins see ALL their school's scopes regardless of visibility/status.
+    if (orgIds.some(o => profile.schoolAdminOrgIds.has(o))) return true;
+
+    // Campus-published scopes are visible to members of that school.
+    if (scope.status === "published" && scope.visibility === "campus"
+        && orgIds.some(o => profile.memberOrgIds.has(o))) return true;
+
+    // District/network admins see PUBLISHED scopes across descendant schools.
+    if (scope.status === "published" && orgIds.some(o => profile.districtVisibleOrgIds.has(o))) return true;
+
+    return false;
+  },
+
+
+  // Can the user EDIT this scope's content? Owner, granted edit-collaborator, or platform admin.
+  async canEditScope(userId: string, scope: ScopeSequence): Promise<boolean> {
+    if (scope.userId === userId) return true;
+    if (await this.isSiteAdmin(userId)) return true;
+    const share = await this.getCurriculumShareForUser(scope.id, userId);
+    return !!share && share.permission === "edit";
+  },
+
+
+  // Can the user MANAGE sharing / approve access requests? Owner, edit-collaborator (owner's assignee), or platform admin.
+  async canManageScope(userId: string, scope: ScopeSequence): Promise<boolean> {
+    return await this.canEditScope(userId, scope);
+  },
+
+
   async getScopeSequencesWithHierarchy(userId: string): Promise<ScopeSequence[]> {
     const userScopes = await this.getScopeSequences(userId);
-    const seenIds = new Set(userScopes.map(s => s.id));
-    const inheritedScopes: ScopeSequence[] = [];
-    
-    const userOrgs = await this.getUserOrganizations(userId);
-    
-    for (const membership of userOrgs) {
-      const currentOrg = await this.getOrganization(membership.organizationId);
-      if (!currentOrg) continue;
-      
-      // Get campus-level scopes (only from current org if it's a campus/school)
-      if (currentOrg.type === 'school' || currentOrg.type === 'campus') {
-        const campusScopes = await db.select().from(scopeSequences)
-          .where(and(
-            or(
-              eq(scopeSequences.organizationId, currentOrg.id),
-              eq(scopeSequences.campusId, currentOrg.id) // Backward compatibility
-            ),
-            eq(scopeSequences.visibility as any, 'campus'),
-            eq(scopeSequences.status, 'published')
-          ));
-        
-        for (const scope of campusScopes) {
-          if (!seenIds.has(scope.id)) {
-            seenIds.add(scope.id);
-            inheritedScopes.push(scope);
-          }
-        }
-      }
-      
-      // Get district-level scopes (from parent district)
-      if (currentOrg.parentOrganizationId) {
-        const parentOrg = await this.getOrganization(currentOrg.parentOrganizationId);
-        if (parentOrg && parentOrg.type === 'district') {
-          const districtScopes = await db.select().from(scopeSequences)
-            .where(and(
-              eq(scopeSequences.organizationId, parentOrg.id),
-              eq(scopeSequences.visibility as any, 'district'),
-              eq(scopeSequences.status, 'published')
-            ));
-          
-          for (const scope of districtScopes) {
-            if (!seenIds.has(scope.id)) {
-              seenIds.add(scope.id);
-              inheritedScopes.push(scope);
-            }
-          }
-        }
-      }
+    const byId = new Map<string, ScopeSequence>();
+    for (const s of userScopes) byId.set(s.id, s);
+
+    const profile = await this.getCurriculumAccessProfile(userId);
+
+    // Peer-shared scopes (owner -> this user)
+    const shares = await db.select().from(curriculumShares)
+      .where(eq(curriculumShares.sharedWithUserId, userId));
+    for (const sh of shares) {
+      if (byId.has(sh.scopeId)) continue;
+      const sc = await this.getScopeSequence(sh.scopeId);
+      if (sc) byId.set(sc.id, sc);
     }
-    
-    // Get system-level scopes (available to all)
-    const systemScopes = await db.select().from(scopeSequences)
-      .where(and(
-        eq(scopeSequences.visibility as any, 'system'),
-        eq(scopeSequences.status, 'published')
+
+    // School admin: ALL scopes in their school(s)
+    if (profile.schoolAdminOrgIds.size > 0) {
+      const ids = Array.from(profile.schoolAdminOrgIds);
+      const rows = await db.select().from(scopeSequences).where(
+        or(inArray(scopeSequences.organizationId, ids), inArray(scopeSequences.campusId, ids))
+      );
+      for (const sc of rows) if (!byId.has(sc.id)) byId.set(sc.id, sc);
+    }
+
+    // Members: campus-published scopes for their schools
+    if (profile.memberOrgIds.size > 0) {
+      const ids = Array.from(profile.memberOrgIds);
+      const rows = await db.select().from(scopeSequences).where(and(
+        eq(scopeSequences.status, "published"),
+        eq(scopeSequences.visibility as any, "campus"),
+        or(inArray(scopeSequences.organizationId, ids), inArray(scopeSequences.campusId, ids))
       ));
-    
-    for (const scope of systemScopes) {
-      if (!seenIds.has(scope.id)) {
-        seenIds.add(scope.id);
-        inheritedScopes.push(scope);
-      }
+      for (const sc of rows) if (!byId.has(sc.id)) byId.set(sc.id, sc);
     }
-    
-    return [...userScopes, ...inheritedScopes].sort(
+
+    // District/network admin: published scopes across descendant schools
+    if (profile.districtVisibleOrgIds.size > 0) {
+      const ids = Array.from(profile.districtVisibleOrgIds);
+      const rows = await db.select().from(scopeSequences).where(and(
+        eq(scopeSequences.status, "published"),
+        or(inArray(scopeSequences.organizationId, ids), inArray(scopeSequences.campusId, ids))
+      ));
+      for (const sc of rows) if (!byId.has(sc.id)) byId.set(sc.id, sc);
+    }
+
+    // System-wide published
+    const systemScopes = await db.select().from(scopeSequences).where(and(
+      eq(scopeSequences.visibility as any, "system"),
+      eq(scopeSequences.status, "published")
+    ));
+    for (const sc of systemScopes) if (!byId.has(sc.id)) byId.set(sc.id, sc);
+
+    return Array.from(byId.values()).sort(
       (a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime()
     );
   },
@@ -547,8 +638,9 @@ const curriculumMethods: ThisType<DatabaseStorage> = {
 
   async updateScopeSequence(id: string, updates: Partial<ScopeSequence>, userId: string): Promise<ScopeSequence | undefined> {
     const scope = await this.getScopeSequence(id);
-    if (!scope || scope.userId !== userId) return undefined;
-    
+    if (!scope) return undefined;
+    if (!(await this.canEditScope(userId, scope))) return undefined;
+
     const [updated] = await db.update(scopeSequences)
       .set({ ...updates, updatedAt: new Date() })
       .where(eq(scopeSequences.id, id))
@@ -559,13 +651,76 @@ const curriculumMethods: ThisType<DatabaseStorage> = {
 
   async deleteScopeSequence(id: string, userId: string): Promise<boolean> {
     const scope = await this.getScopeSequence(id);
-    if (!scope || scope.userId !== userId) return false;
-    
-    // Delete associated units first
+    // Deletion is destructive: restrict to the owner or a platform admin.
+    if (!scope) return false;
+    if (scope.userId !== userId && !(await this.isSiteAdmin(userId))) return false;
+
+    // Delete associated units, shares, and access requests first
     await db.delete(sequenceUnits).where(eq(sequenceUnits.scopeId, id));
-    // Delete the scope
+    await db.delete(curriculumShares).where(eq(curriculumShares.scopeId, id));
+    await db.delete(curriculumAccessRequests).where(eq(curriculumAccessRequests.scopeId, id));
     await db.delete(scopeSequences).where(eq(scopeSequences.id, id));
     return true;
+  },
+
+
+  // ---- Curriculum sharing (peer share) ----
+  async getCurriculumShares(scopeId: string): Promise<CurriculumShare[]> {
+    return await db.select().from(curriculumShares)
+      .where(eq(curriculumShares.scopeId, scopeId))
+      .orderBy(desc(curriculumShares.createdAt));
+  },
+
+  async getCurriculumShareForUser(scopeId: string, userId: string): Promise<CurriculumShare | undefined> {
+    const [row] = await db.select().from(curriculumShares)
+      .where(and(eq(curriculumShares.scopeId, scopeId), eq(curriculumShares.sharedWithUserId, userId)));
+    return row || undefined;
+  },
+
+  async createCurriculumShare(share: InsertCurriculumShare): Promise<CurriculumShare> {
+    const existing = await this.getCurriculumShareForUser(share.scopeId, share.sharedWithUserId);
+    if (existing) {
+      const [updated] = await db.update(curriculumShares)
+        .set({ permission: (share.permission ?? existing.permission) as any, sharedBy: share.sharedBy })
+        .where(eq(curriculumShares.id, existing.id))
+        .returning();
+      return updated;
+    }
+    const [created] = await db.insert(curriculumShares).values(share as any).returning();
+    return created;
+  },
+
+  async deleteCurriculumShare(scopeId: string, sharedWithUserId: string): Promise<boolean> {
+    await db.delete(curriculumShares)
+      .where(and(eq(curriculumShares.scopeId, scopeId), eq(curriculumShares.sharedWithUserId, sharedWithUserId)));
+    return true;
+  },
+
+
+  // ---- Curriculum edit-access requests ----
+  async getCurriculumAccessRequests(scopeId: string): Promise<CurriculumAccessRequest[]> {
+    return await db.select().from(curriculumAccessRequests)
+      .where(eq(curriculumAccessRequests.scopeId, scopeId))
+      .orderBy(desc(curriculumAccessRequests.createdAt));
+  },
+
+  async getCurriculumAccessRequest(id: string): Promise<CurriculumAccessRequest | undefined> {
+    const [row] = await db.select().from(curriculumAccessRequests)
+      .where(eq(curriculumAccessRequests.id, id));
+    return row || undefined;
+  },
+
+  async createCurriculumAccessRequest(request: InsertCurriculumAccessRequest & { requesterId: string }): Promise<CurriculumAccessRequest> {
+    const [created] = await db.insert(curriculumAccessRequests).values(request as any).returning();
+    return created;
+  },
+
+  async updateCurriculumAccessRequest(id: string, updates: Partial<CurriculumAccessRequest>): Promise<CurriculumAccessRequest | undefined> {
+    const [updated] = await db.update(curriculumAccessRequests)
+      .set(updates)
+      .where(eq(curriculumAccessRequests.id, id))
+      .returning();
+    return updated || undefined;
   },
 
 

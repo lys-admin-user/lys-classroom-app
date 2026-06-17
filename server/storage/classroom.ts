@@ -350,6 +350,7 @@ import {
   type RssPlacement,
 } from "@shared/schema";
 import { db } from "../db";
+import { decryptIfPossible } from "../services/crypto";
 import { eq, desc, and, asc, gte, sql, or, inArray } from "drizzle-orm";
 import { randomUUID } from "crypto";
 
@@ -719,12 +720,15 @@ const classroomMethods: ThisType<DatabaseStorage> = {
 
 
   async getStudentNotesByClass(classId: string, educatorId: string): Promise<StudentNote[]> {
-    return await db.select().from(studentNotes)
+    const rows = await db.select().from(studentNotes)
       .where(and(
         eq(studentNotes.classId, classId),
         eq(studentNotes.educatorId, educatorId)
       ))
       .orderBy(desc(studentNotes.createdAt));
+    return rows.map((row) => row.content != null
+      ? { ...row, content: (decryptIfPossible(row.content) ?? row.content) }
+      : row);
   },
 
 

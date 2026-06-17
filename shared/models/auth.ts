@@ -72,6 +72,10 @@ export const users = pgTable("users", {
   downgradeTargetTier: varchar("downgrade_target_tier"),
   lastLoginAt: timestamp("last_login_at"),
   loginCount: integer("login_count").default(0),
+  // Admin step-up MFA (TOTP). mfaSecret is stored encrypted at rest.
+  mfaEnabled: boolean("mfa_enabled").default(false),
+  mfaSecret: text("mfa_secret"),
+  mfaActivatedAt: timestamp("mfa_activated_at"),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });

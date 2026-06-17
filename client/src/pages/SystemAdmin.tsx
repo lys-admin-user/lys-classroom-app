@@ -22,6 +22,8 @@ import { Separator } from "@/components/ui/separator";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient, apiRequest } from "@/lib/queryClient";
+import { MfaStepUpDialog } from "@/components/MfaStepUpDialog";
+import { isMfaRequiredError, isMfaEnrollmentRequiredError } from "@/hooks/use-mfa";
 import { useState, useEffect, useCallback } from "react";
 import { 
   Shield, Building2, Users, Trash2, BarChart3, AlertTriangle, Loader2, 
@@ -176,6 +178,17 @@ export default function SystemAdminPage({ params }: { params?: { tab?: string } 
   const [, setLocation] = useLocation();
   const { toast } = useToast();
   const activeTab = params?.tab || "overview";
+
+  // Step-up MFA: when a sensitive action returns a 403 mfaRequired challenge,
+  // capture a retry callback and open the verification dialog.
+  const [mfaPrompt, setMfaPrompt] = useState<{ enrollmentRequired: boolean; retry: () => void } | null>(null);
+  const handleMfaError = (error: any, retry: () => void): boolean => {
+    if (isMfaRequiredError(error)) {
+      setMfaPrompt({ enrollmentRequired: isMfaEnrollmentRequiredError(error), retry });
+      return true;
+    }
+    return false;
+  };
 
   const handleTabChange = useCallback((value: string) => {
     if (value !== activeTab) {
@@ -428,7 +441,8 @@ export default function SystemAdminPage({ params }: { params?: { tab?: string } 
       setTierConfirmData(null);
       toast({ title: "User updated successfully" });
     },
-    onError: () => {
+    onError: (error: any, variables) => {
+      if (handleMfaError(error, () => updateUserMutation.mutate(variables))) return;
       toast({ title: "Failed to update user", variant: "destructive" });
     },
   });
@@ -467,7 +481,8 @@ export default function SystemAdminPage({ params }: { params?: { tab?: string } 
       queryClient.invalidateQueries({ queryKey: ["/api/admin/analytics"] });
       toast({ title: "User deleted" });
     },
-    onError: () => {
+    onError: (error: any, id) => {
+      if (handleMfaError(error, () => deleteUserMutation.mutate(id))) return;
       toast({ title: "Failed to delete user", variant: "destructive" });
     },
   });
@@ -497,7 +512,8 @@ export default function SystemAdminPage({ params }: { params?: { tab?: string } 
       toast({ title: data.message || "Impersonation started" });
       setLocation("/");
     },
-    onError: () => {
+    onError: (error: any, id) => {
+      if (handleMfaError(error, () => impersonateMutation.mutate(id))) return;
       toast({ title: "Failed to impersonate user", variant: "destructive" });
     },
   });
@@ -3763,6 +3779,17 @@ export default function SystemAdminPage({ params }: { params?: { tab?: string } 
           </Dialog>
         );
       })()}
+
+      <MfaStepUpDialog
+        open={!!mfaPrompt}
+        enrollmentRequired={!!mfaPrompt?.enrollmentRequired}
+        onClose={() => setMfaPrompt(null)}
+        onVerified={() => {
+          const retry = mfaPrompt?.retry;
+          setMfaPrompt(null);
+          retry?.();
+        }}
+      />
     </div>
   );
 }

@@ -391,14 +391,21 @@ export function registerCurriculumRoutes(app: Express): void {
   app.get("/api/scopes/:id", isAuthenticated, async (req: any, res) => {
     try {
       const { id } = req.params;
+      const userId = req.user?.claims?.sub;
       const scope = await storage.getScopeSequence(id);
       if (!scope) {
         res.status(404).json({ error: "Scope sequence not found" });
         return;
       }
+      if (!(await storage.canViewScope(userId, scope))) {
+        res.status(404).json({ error: "Scope sequence not found" });
+        return;
+      }
       // Get units for this scope
       const units = await storage.getSequenceUnits(id);
-      res.json({ scope, units });
+      const canEdit = await storage.canEditScope(userId, scope);
+      const canManage = await storage.canManageScope(userId, scope);
+      res.json({ scope, units, canEdit, canManage, isOwner: scope.userId === userId });
     } catch (error) {
       res.status(500).json({ error: "Failed to fetch scope sequence" });
     }
@@ -545,9 +552,9 @@ export function registerCurriculumRoutes(app: Express): void {
       const { scopeId } = req.params;
       const userId = req.user?.claims?.sub;
       
-      // Verify user owns the scope
+      // Verify user can edit the scope (owner, edit-collaborator, or platform admin)
       const scope = await storage.getScopeSequence(scopeId);
-      if (!scope || scope.userId !== userId) {
+      if (!scope || !(await storage.canEditScope(userId, scope))) {
         res.status(403).json({ error: "Not authorized to add units to this scope" });
         return;
       }
@@ -619,7 +626,7 @@ export function registerCurriculumRoutes(app: Express): void {
       const userId = req.user?.claims?.sub;
 
       const scope = await storage.getScopeSequence(scopeId);
-      if (!scope || scope.userId !== userId) {
+      if (!scope || !(await storage.canEditScope(userId, scope))) {
         res.status(403).json({ error: "Not authorized" });
         return;
       }
@@ -652,6 +659,12 @@ export function registerCurriculumRoutes(app: Express): void {
   app.get("/api/scopes/:scopeId/requests", isAuthenticated, async (req: any, res) => {
     try {
       const { scopeId } = req.params;
+      const userId = req.user?.claims?.sub;
+      const scope = await storage.getScopeSequence(scopeId);
+      if (!scope || !(await storage.canViewScope(userId, scope))) {
+        res.status(404).json({ error: "Scope sequence not found" });
+        return;
+      }
       const requests = await storage.getScopeChangeRequests(scopeId);
       res.json(requests);
     } catch (error) {
@@ -664,7 +677,13 @@ export function registerCurriculumRoutes(app: Express): void {
     try {
       const { scopeId } = req.params;
       const userId = req.user?.claims?.sub;
-      
+
+      const scope = await storage.getScopeSequence(scopeId);
+      if (!scope || !(await storage.canViewScope(userId, scope))) {
+        res.status(404).json({ error: "Scope sequence not found" });
+        return;
+      }
+
       const validated = insertScopeChangeRequestSchema.parse({
         ...req.body,
         scopeId,
@@ -679,6 +698,197 @@ export function registerCurriculumRoutes(app: Express): void {
         console.error("Create change request error:", error);
         res.status(500).json({ error: "Failed to create change request" });
       }
+    }
+  });
+
+
+  // ================================
+  // Curriculum Sharing (peer share + edit-access requests)
+  // ================================
+
+  // List who a scope is shared with (owner / edit-collaborator / platform admin)
+  app.get("/api/scopes/:scopeId/shares", isAuthenticated, async (req: any, res) => {
+    try {
+      const { scopeId } = req.params;
+      const userId = req.user?.claims?.sub;
+      const scope = await storage.getScopeSequence(scopeId);
+      if (!scope || !(await storage.canManageScope(userId, scope))) {
+        res.status(403).json({ error: "Not authorized to manage sharing for this scope" });
+        return;
+      }
+      const shares = await storage.getCurriculumShares(scopeId);
+      const enriched = await Promise.all(shares.map(async (s) => {
+        const u = await storage.getUser(s.sharedWithUserId);
+        return {
+          ...s,
+          sharedWithName: u ? [u.firstName, u.lastName].filter(Boolean).join(" ") || u.email : undefined,
+          sharedWithEmail: u?.email,
+        };
+      }));
+      res.json(enriched);
+    } catch (error) {
+      console.error("List shares error:", error);
+      res.status(500).json({ error: "Failed to fetch shares" });
+    }
+  });
+
+  // Share a scope with a specific teacher (by userId or email). View-only by default.
+  app.post("/api/scopes/:scopeId/shares", isAuthenticated, async (req: any, res) => {
+    try {
+      const { scopeId } = req.params;
+      const userId = req.user?.claims?.sub;
+      const scope = await storage.getScopeSequence(scopeId);
+      if (!scope || !(await storage.canManageScope(userId, scope))) {
+        res.status(403).json({ error: "Not authorized to share this scope" });
+        return;
+      }
+
+      const { sharedWithUserId, email } = req.body || {};
+      const permission = req.body?.permission === "edit" ? "edit" : "view";
+
+      let targetUserId: string | undefined = sharedWithUserId;
+      if (!targetUserId && email) {
+        const target = await storage.getUserByEmail(String(email).trim().toLowerCase());
+        if (!target) {
+          res.status(404).json({ error: "No user found with that email" });
+          return;
+        }
+        targetUserId = target.id;
+      }
+      if (!targetUserId) {
+        res.status(400).json({ error: "Provide sharedWithUserId or email" });
+        return;
+      }
+      if (targetUserId === scope.userId) {
+        res.status(400).json({ error: "Owner already has full access" });
+        return;
+      }
+
+      const share = await storage.createCurriculumShare({
+        scopeId,
+        sharedWithUserId: targetUserId,
+        permission,
+        sharedBy: userId,
+      });
+      res.json(share);
+    } catch (error) {
+      console.error("Create share error:", error);
+      res.status(500).json({ error: "Failed to share scope" });
+    }
+  });
+
+  // Remove a share
+  app.delete("/api/scopes/:scopeId/shares/:sharedWithUserId", isAuthenticated, async (req: any, res) => {
+    try {
+      const { scopeId, sharedWithUserId } = req.params;
+      const userId = req.user?.claims?.sub;
+      const scope = await storage.getScopeSequence(scopeId);
+      if (!scope || !(await storage.canManageScope(userId, scope))) {
+        res.status(403).json({ error: "Not authorized to manage sharing for this scope" });
+        return;
+      }
+      await storage.deleteCurriculumShare(scopeId, sharedWithUserId);
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Delete share error:", error);
+      res.status(500).json({ error: "Failed to remove share" });
+    }
+  });
+
+  // List edit-access requests for a scope (owner / edit-collaborator / platform admin)
+  app.get("/api/scopes/:scopeId/access-requests", isAuthenticated, async (req: any, res) => {
+    try {
+      const { scopeId } = req.params;
+      const userId = req.user?.claims?.sub;
+      const scope = await storage.getScopeSequence(scopeId);
+      if (!scope || !(await storage.canManageScope(userId, scope))) {
+        res.status(403).json({ error: "Not authorized to view access requests for this scope" });
+        return;
+      }
+      const requests = await storage.getCurriculumAccessRequests(scopeId);
+      const enriched = await Promise.all(requests.map(async (r) => {
+        const u = await storage.getUser(r.requesterId);
+        return {
+          ...r,
+          requesterName: u ? [u.firstName, u.lastName].filter(Boolean).join(" ") || u.email : undefined,
+          requesterEmail: u?.email,
+        };
+      }));
+      res.json(enriched);
+    } catch (error) {
+      console.error("List access requests error:", error);
+      res.status(500).json({ error: "Failed to fetch access requests" });
+    }
+  });
+
+  // Request edit access to a scope you can view but not edit
+  app.post("/api/scopes/:scopeId/access-requests", isAuthenticated, async (req: any, res) => {
+    try {
+      const { scopeId } = req.params;
+      const userId = req.user?.claims?.sub;
+      const scope = await storage.getScopeSequence(scopeId);
+      if (!scope || !(await storage.canViewScope(userId, scope))) {
+        res.status(404).json({ error: "Scope sequence not found" });
+        return;
+      }
+      if (await storage.canEditScope(userId, scope)) {
+        res.status(400).json({ error: "You already have edit access" });
+        return;
+      }
+      const reason = typeof req.body?.reason === "string" ? req.body.reason : null;
+      const request = await storage.createCurriculumAccessRequest({
+        scopeId,
+        requesterId: userId,
+        requestedPermission: "edit",
+        reason,
+      } as any);
+      res.json(request);
+    } catch (error) {
+      console.error("Create access request error:", error);
+      res.status(500).json({ error: "Failed to request access" });
+    }
+  });
+
+  // Approve or deny an edit-access request (owner / edit-collaborator / platform admin)
+  app.patch("/api/scopes/:scopeId/access-requests/:id", isAuthenticated, async (req: any, res) => {
+    try {
+      const { scopeId, id } = req.params;
+      const userId = req.user?.claims?.sub;
+      const scope = await storage.getScopeSequence(scopeId);
+      if (!scope || !(await storage.canManageScope(userId, scope))) {
+        res.status(403).json({ error: "Not authorized to review access requests for this scope" });
+        return;
+      }
+      const accessRequest = await storage.getCurriculumAccessRequest(id);
+      if (!accessRequest || accessRequest.scopeId !== scopeId) {
+        res.status(404).json({ error: "Access request not found" });
+        return;
+      }
+      const decision = req.body?.status === "approved" ? "approved" : req.body?.status === "denied" ? "denied" : null;
+      if (!decision) {
+        res.status(400).json({ error: "status must be 'approved' or 'denied'" });
+        return;
+      }
+
+      const updated = await storage.updateCurriculumAccessRequest(id, {
+        status: decision,
+        reviewedBy: userId,
+        reviewedAt: new Date(),
+      });
+
+      // On approval, grant the requested permission as a share
+      if (decision === "approved") {
+        await storage.createCurriculumShare({
+          scopeId,
+          sharedWithUserId: accessRequest.requesterId,
+          permission: accessRequest.requestedPermission,
+          sharedBy: userId,
+        });
+      }
+      res.json(updated);
+    } catch (error) {
+      console.error("Review access request error:", error);
+      res.status(500).json({ error: "Failed to review access request" });
     }
   });
 

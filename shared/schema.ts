@@ -761,6 +761,40 @@ export const insertScopeChangeRequestSchema = createInsertSchema(scopeChangeRequ
 export type InsertScopeChangeRequest = z.infer<typeof insertScopeChangeRequestSchema>;
 export type ScopeChangeRequest = typeof scopeChangeRequests.$inferSelect;
 
+// Curriculum peer sharing (owner -> specific user) + edit-access requests
+export type CurriculumSharePermission = "view" | "edit";
+
+export const curriculumShares = pgTable("curriculum_shares", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  scopeId: varchar("scope_id").notNull(),
+  sharedWithUserId: varchar("shared_with_user_id").notNull(),
+  permission: text("permission").notNull().default("view").$type<CurriculumSharePermission>(),
+  sharedBy: varchar("shared_by").notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertCurriculumShareSchema = createInsertSchema(curriculumShares).omit({ id: true, createdAt: true });
+export type InsertCurriculumShare = z.infer<typeof insertCurriculumShareSchema>;
+export type CurriculumShare = typeof curriculumShares.$inferSelect;
+
+export const curriculumAccessRequests = pgTable("curriculum_access_requests", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  scopeId: varchar("scope_id").notNull(),
+  requesterId: varchar("requester_id").notNull(),
+  requestedPermission: text("requested_permission").notNull().default("edit").$type<CurriculumSharePermission>(),
+  reason: text("reason"),
+  status: text("status").notNull().default("pending"), // pending, approved, denied
+  reviewedBy: varchar("reviewed_by"),
+  reviewedAt: timestamp("reviewed_at"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertCurriculumAccessRequestSchema = createInsertSchema(curriculumAccessRequests).omit({
+  id: true, createdAt: true, reviewedAt: true, reviewedBy: true, status: true,
+});
+export type InsertCurriculumAccessRequest = z.infer<typeof insertCurriculumAccessRequestSchema>;
+export type CurriculumAccessRequest = typeof curriculumAccessRequests.$inferSelect;
+
 // Scope with units (for API response)
 export const scopeWithUnitsSchema = z.object({
   scope: z.object({

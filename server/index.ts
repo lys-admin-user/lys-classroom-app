@@ -166,6 +166,14 @@ const demoRequestLimiter = rateLimit({
 });
 app.use("/api/demo-requests", demoRequestLimiter);
 
+// Bulk data exports (e.g. gradebook CSV) — throttle to deter scraping/exfiltration.
+const exportLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000,
+  max: 30,
+  message: { error: "Too many export requests. Please try again later." },
+});
+app.use("/api/classes/:classId/grades/export", exportLimiter);
+
 // Stripe webhook route MUST be registered BEFORE express.json() middleware
 // Webhooks require raw Buffer body, not parsed JSON
 app.post(

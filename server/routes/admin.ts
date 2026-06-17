@@ -70,6 +70,7 @@ import { startScholarshipScheduler, runScholarshipSync, detectSeasonFromDeadline
 import { insertRssFeedSchema } from "@shared/schema";
 import { db } from "../db";
 import { logAuditEvent, getAuditLogs, getClientIP } from "../services/auditLog";
+import { requireFreshMfa, checkFreshMfa } from "./mfa";
 import { filterChatMessage } from "../services/contentFilter";
 import { eq, desc, and, sql as drizzleSql, count, inArray, lte, gte } from "drizzle-orm";
 
@@ -2828,6 +2829,14 @@ export function registerAdminRoutes(app: Express): void {
         return res.status(403).json({ error: "Cannot assign a role equal to or higher than your own." });
       }
 
+      // Step-up MFA required specifically when changing a user's role.
+      if (role && role !== target?.role) {
+        const mfa = await checkFreshMfa(req);
+        if (!mfa.ok) {
+          return res.status(mfa.status).json(mfa.body);
+        }
+      }
+
       const updates: Partial<User> = {};
       if (tier) updates.tier = tier;
       if (role) updates.role = role;
@@ -2863,7 +2872,7 @@ export function registerAdminRoutes(app: Express): void {
 
 
   // Delete user (site admin only)
-  app.delete("/api/admin/users/:id", isAuthenticated, isSiteAdmin, async (req: any, res) => {
+  app.delete("/api/admin/users/:id", isAuthenticated, isSiteAdmin, requireFreshMfa, async (req: any, res) => {
     try {
       const { id } = req.params;
       const adminId = req.user?.claims?.sub;
@@ -2958,7 +2967,7 @@ export function registerAdminRoutes(app: Express): void {
 
 
   // Impersonate user (site admin only) - creates a session token
-  app.post("/api/admin/users/:id/impersonate", isAuthenticated, isSiteAdmin, async (req: any, res) => {
+  app.post("/api/admin/users/:id/impersonate", isAuthenticated, isSiteAdmin, requireFreshMfa, async (req: any, res) => {
     try {
       const { id } = req.params;
       const adminId = req.user?.claims?.sub;

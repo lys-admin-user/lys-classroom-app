@@ -352,7 +352,7 @@ import {
 import { db } from "../db";
 import { eq, desc, and, asc, gte, sql, or, inArray } from "drizzle-orm";
 import { randomUUID } from "crypto";
-
+import { encryptIfPossible, decryptIfPossible } from "../services/crypto";
 import {
   DatabaseStorage,
   seedResources,
@@ -366,6 +366,25 @@ import {
   type AchievementStats,
 } from "./_base";
 
+// Field-level encryption helpers for sensitive student PII. Free-text notes on a
+// student record and the body of educator student-notes (which may contain
+// behavioral/health observations) are encrypted at rest via the app-layer
+// AES-256-GCM helper. Decrypt-on-read is a no-op for plaintext (pre-encryption)
+// rows, so existing data keeps working without a backfill.
+function decryptStudentRow<T extends { notes?: string | null }>(row: T): T {
+  if (row && row.notes != null) {
+    return { ...row, notes: decryptIfPossible(row.notes) } as T;
+  }
+  return row;
+}
+
+function decryptStudentNoteRow<T extends { content: string }>(row: T): T {
+  if (row && row.content != null) {
+    return { ...row, content: (decryptIfPossible(row.content) ?? row.content) } as T;
+  }
+  return row;
+}
+
 // AUTO-SPLIT from server/storage/database.ts -- domain: student (45 methods)
 // The `ThisType<DatabaseStorage>` annotation tells TypeScript that `this`
 // inside these methods is a full DatabaseStorage instance, so cross-domain
@@ -375,33 +394,40 @@ const studentMethods: ThisType<DatabaseStorage> = {
 
   // Students
   async getStudents(userId: string): Promise<Student[]> {
-    return await db.select().from(students)
+    const rows = await db.select().from(students)
       .where(eq(students.userId, userId))
       .orderBy(asc(students.lastName), asc(students.firstName));
+    return rows.map(decryptStudentRow);
   },
 
 
   async getStudent(id: string): Promise<Student | undefined> {
     const [result] = await db.select().from(students).where(eq(students.id, id));
-    return result || undefined;
+    return result ? decryptStudentRow(result) : undefined;
   },
 
 
   async createStudent(student: InsertStudent): Promise<Student> {
-    const [created] = await db.insert(students).values(student as any).returning();
-    return created;
+    const toInsert = student.notes != null
+      ? { ...student, notes: encryptIfPossible(student.notes) }
+      : student;
+    const [created] = await db.insert(students).values(toInsert as any).returning();
+    return decryptStudentRow(created);
   },
 
 
   async updateStudent(id: string, updates: Partial<Student>, userId: string): Promise<Student | undefined> {
     const existing = await this.getStudent(id);
     if (!existing || existing.userId !== userId) return undefined;
-    
+
+    const toUpdate = updates.notes != null
+      ? { ...updates, notes: encryptIfPossible(updates.notes) }
+      : updates;
     const [updated] = await db.update(students)
-      .set({ ...updates, updatedAt: new Date() })
+      .set({ ...toUpdate, updatedAt: new Date() })
       .where(eq(students.id, id))
       .returning();
-    return updated || undefined;
+    return updated ? decryptStudentRow(updated) : undefined;
   },
 
 
@@ -428,7 +454,7 @@ const studentMethods: ThisType<DatabaseStorage> = {
     const [org] = await db.select().from(organizations).where(eq(organizations.id, organizationId));
     
     return {
-      ...result,
+      ...decryptStudentRow(result),
       organizationName: org?.name
     };
   },
@@ -455,9 +481,10 @@ const studentMethods: ThisType<DatabaseStorage> = {
 
 
   async getStudentsByOrganization(organizationId: string): Promise<Student[]> {
-    return await db.select().from(students)
+    const rows = await db.select().from(students)
       .where(eq(students.organizationId, organizationId))
       .orderBy(asc(students.lastName), asc(students.firstName));
+    return rows.map(decryptStudentRow);
   },
 
 
@@ -555,7 +582,7 @@ const studentMethods: ThisType<DatabaseStorage> = {
         .filter(a => a.active)
         .map(a => a.type);
       return accommodationTypes.some(type => studentAccommodationTypes.includes(type));
-    });
+    }).map(decryptStudentRow);
   },
 
 
@@ -813,30 +840,37 @@ const studentMethods: ThisType<DatabaseStorage> = {
 
   // Student Notes Methods
   async getStudentNotes(studentId: string, educatorId: string): Promise<StudentNote[]> {
-    return await db.select().from(studentNotes)
+    const rows = await db.select().from(studentNotes)
       .where(and(
         eq(studentNotes.studentId, studentId),
         eq(studentNotes.educatorId, educatorId)
       ))
       .orderBy(desc(studentNotes.createdAt));
+    return rows.map(decryptStudentNoteRow);
   },
 
 
   async createStudentNote(note: InsertStudentNote): Promise<StudentNote> {
-    const [created] = await db.insert(studentNotes).values(note as any).returning();
-    return created;
+    const toInsert = note.content != null
+      ? { ...note, content: (encryptIfPossible(note.content) ?? note.content) }
+      : note;
+    const [created] = await db.insert(studentNotes).values(toInsert as any).returning();
+    return decryptStudentNoteRow(created);
   },
 
 
   async updateStudentNote(id: string, updates: Partial<StudentNote>, educatorId: string): Promise<StudentNote | undefined> {
     const [existing] = await db.select().from(studentNotes).where(eq(studentNotes.id, id));
     if (!existing || existing.educatorId !== educatorId) return undefined;
-    
+
+    const toUpdate = updates.content != null
+      ? { ...updates, content: (encryptIfPossible(updates.content) ?? updates.content) }
+      : updates;
     const [updated] = await db.update(studentNotes)
-      .set({ ...updates, updatedAt: new Date() })
+      .set({ ...toUpdate, updatedAt: new Date() })
       .where(eq(studentNotes.id, id))
       .returning();
-    return updated || undefined;
+    return updated ? decryptStudentNoteRow(updated) : undefined;
   },
 
 

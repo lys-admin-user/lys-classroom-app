@@ -484,9 +484,31 @@ export function registerClassroomRoutes(app: Express): void {
   app.get("/api/classes/:classId/grades/export", isAuthenticated, async (req: any, res) => {
     try {
       const { classId } = req.params;
+      const requesterId = req.user?.claims?.sub;
       const classData = await storage.getClass(classId);
       if (!classData) {
         res.status(404).json({ error: "Class not found" });
+        return;
+      }
+
+      // Bulk export is sensitive student data. Restrict to the class owner or a
+      // school/system admin; anyone else is denied (and the attempt is audited).
+      const requester = requesterId ? await storage.getUser(requesterId) : undefined;
+      const requesterRole = (requester?.role as UserRole) || "student";
+      const isOwner = classData.userId === requesterId;
+      const isAdmin = hasRolePrivilege(requesterRole, "site_admin");
+      if (!isOwner && !isAdmin) {
+        await logAuditEvent({
+          userId: requesterId,
+          action: "grades.export_denied",
+          category: "security",
+          severity: "warning",
+          resourceType: "class",
+          resourceId: classId,
+          ipAddress: getClientIP(req),
+          userAgent: req.get("user-agent"),
+        });
+        res.status(403).json({ error: "You do not have permission to export this class's grades." });
         return;
       }
 
@@ -504,6 +526,18 @@ export function registerClassroomRoutes(app: Express): void {
           csv += `"${student.studentId || ""}","${student.firstName}","${student.lastName}","${grade.title}",${grade.pointsEarned ?? ""},${grade.pointsPossible},${grade.percentage ?? ""},${grade.letterGrade ?? ""},"${grade.comments || ""}","${grade.gradedAt?.toISOString() || ""}"\n`;
         }
       }
+
+      await logAuditEvent({
+        userId: requesterId,
+        action: "grades.export",
+        category: "data_access",
+        severity: "info",
+        resourceType: "class",
+        resourceId: classId,
+        details: { rowCount: gradesList.length },
+        ipAddress: getClientIP(req),
+        userAgent: req.get("user-agent"),
+      });
 
       res.setHeader("Content-Type", "text/csv");
       res.setHeader("Content-Disposition", `attachment; filename="${classData.name}_grades.csv"`);
