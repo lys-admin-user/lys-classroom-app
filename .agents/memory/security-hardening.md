@@ -25,8 +25,14 @@ description: Durable conventions for CSRF, CSP, uploads, tenant isolation, audit
 - **Why:** Several routes leaked cross-org student PII by trusting a user-supplied orgId.
 
 ## Self-service role changes
-- `PATCH /api/user/role` must restrict its schema to non-privileged roles only: `z.enum(["student","educator","homeschool_parent"])`. Never accept admin/system roles on a self-service endpoint.
-- **Why:** It was `isAuthenticated`-only with a schema allowing all roles → any user could self-promote to system_admin. No client calls this endpoint.
+- ANY self-service endpoint that sets a user's own role must restrict to non-privileged roles only (`student`/`educator`/`homeschool_parent`) AND re-check server-side before `updateUserRole`. This applies to BOTH `PATCH /api/user/role` and `POST /api/onboarding/complete` (the onboarding completion also assigns role).
+- **Why:** Both were self-promotion holes — schema allowing all roles + direct `updateUserRole` let any authed user become system_admin. Onboarding was missed in the first pass because it's an "onboarding" flow, not an obvious "role" endpoint. Treat schema enum + runtime guard as defense-in-depth; audit rejected attempts.
+
+## DSR / COPPA tenant-scoped authorization (server/services/dataSubjectService.ts)
+- DSR act-on-subject and admin listing must be **org-scoped**, not blanket-admin. Only platform admins (`site_admin`/`system_admin`, via `isPlatformAdminRole`) get a global cross-tenant override. Campus/district admins may only reach subjects inside their **managed org sub-tree**, plus themselves + active parent/guardian links.
+- Managed org scope expands ONLY from org memberships where the actor's membership role is `admin`/`owner` — a plain `member` membership (even for a platform `district_admin` role) must NOT widen scope, or an admin in tenant A who is merely a member of tenant B reaches tenant B's subjects.
+- **Why:** First pass used `ADMIN_OVERRIDE_ROLES` (all four admin tiers) with no org check → campus/district admin in one tenant could export/delete/enumerate any other tenant's student DSRs. Mirror the `getCurriculumAccessProfile` scoping model (curriculum.ts) for any new cross-tenant admin surface.
+- COPPA gate (`POST /api/onboarding/complete`): birthdate is required for **every** self-serve completion regardless of role, then under-13 is blocked. Gating on `role === "student"` is bypassable (omit role / pick non-student) — never gate age verification on a client-supplied role.
 
 ## Audit logging
 - Sensitive admin mutations emit `logAuditEvent` (from `server/services/auditLog.ts`): user update/delete, impersonation start, feature-flag create/update/delete.

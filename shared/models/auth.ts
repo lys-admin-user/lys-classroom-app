@@ -76,6 +76,15 @@ export const users = pgTable("users", {
   mfaEnabled: boolean("mfa_enabled").default(false),
   mfaSecret: text("mfa_secret"),
   mfaActivatedAt: timestamp("mfa_activated_at"),
+  // GDPR/CCPA/COPPA data lifecycle.
+  // accountStatus: "active" | "closed" (deactivated, awaiting purge) | "anonymized"
+  // deletedAt: when a hard delete / closure was performed
+  // anonymizedAt: when a school-owned student record had its PII stripped
+  // retentionPurgeAt: when a closed account becomes eligible for auto-purge (3y)
+  accountStatus: varchar("account_status").default("active").$type<"active" | "closed" | "anonymized">(),
+  deletedAt: timestamp("deleted_at"),
+  anonymizedAt: timestamp("anonymized_at"),
+  retentionPurgeAt: timestamp("retention_purge_at"),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });

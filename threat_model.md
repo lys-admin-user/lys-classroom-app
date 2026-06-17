@@ -150,13 +150,33 @@ check and fresh MFA.
    contact emails, and other `notes`/free-text columns remain plaintext. Expanding
    coverage is low-risk (helper tolerates plaintext) but requires care for any
    column used in `WHERE`/lookups (those cannot be transparently encrypted).
-2. **Dependency vulnerabilities** — dependency audit reports multiple high/moderate
-   advisories (notably `axios`, `@xmldom/xmldom`, `esbuild`, `@babel/core`), all
-   with non-major fixes available. `package.json` edits require user approval, so
-   these are flagged for a follow-up upgrade rather than applied here.
+2. **Dependency vulnerabilities** — non-breaking advisories (`axios`,
+   `@xmldom/xmldom`, `@babel/core`, `qs`, `ws`, `underscore`, `body-parser`, etc.)
+   have been patched via lockfile resolution (`npm audit fix`), dropping the audit
+   from 28 to 6 advisories. The remaining 6 require **major** bumps of
+   pre-configured build/ORM tooling — `vite`/`esbuild` (the skill forbids touching
+   the Vite setup), `drizzle-kit` (build-only), and `drizzle-orm` (a major ORM bump
+   is too risky without a dedicated query-regression pass). These are tracked as
+   accepted residual risk in the `scripts/audit-deps.mjs` allow-list and the
+   `.github/dependabot.yml` ignore list; a Dependabot config + a ready-to-enable
+   `.github/workflows/ci.yml` (typecheck + test + audit gate) ship with the repo.
 3. **SAST mediums** — `postMessage` wildcard origin (`*`) in embed components
    (`EmbedWrapper.tsx`, `EmbedRouter.tsx`) and HTML-in-template-string in export/
    integration helpers warrant origin allow-listing and output escaping. The embed
    surfaces are intentionally cross-origin but should validate target/sender origin.
-4. **Audit log integrity** — audit events share the application database; there is
-   no tamper-evident/append-only guarantee. Acceptable for now; note for future.
+4. **Audit log integrity** — audit events now form a SHA-256 hash chain
+   (`verifyAuditChain`), making in-place edits, deletions, and forks detectable.
+   The chain still shares the application database, so an attacker with full DB
+   write access could recompute the whole chain; a periodic off-box hash anchor
+   would close this. Acceptable for now.
+5. **Retention-purge trigger wiring** — `runRetentionPurge` (3-year) is scheduled
+   daily and deletes any user whose `retentionPurgeAt` has passed, but the
+   account-closure/inactivity flow that *sets* `retentionPurgeAt` is not yet wired.
+   Until that exists, the purge runner is a no-op safety net rather than an active
+   lifecycle control. Follow-up: set `retentionPurgeAt = closedAt + 3y` on account
+   closure / prolonged inactivity.
+6. **DSR endpoint test coverage** — unit coverage exists for crypto, RBAC, the
+   COPPA gate, and the audit hash chain (hermetic, no DB). The DSR export/delete
+   authorization and anonymize-vs-hard-delete paths are exercised by code but not
+   yet covered by DB-backed integration tests (those would mutate a live DB).
+   Follow-up: add an ephemeral test DB + fixtures to cover them in CI.

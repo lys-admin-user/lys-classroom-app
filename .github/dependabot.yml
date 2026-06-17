@@ -1,0 +1,28 @@
+version: 2
+updates:
+  - package-ecosystem: "npm"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    open-pull-requests-limit: 10
+    versioning-strategy: increase
+    groups:
+      # Group all non-major (patch + minor) updates into a single PR to reduce noise.
+      minor-and-patch:
+        update-types:
+          - "minor"
+          - "patch"
+    # Major bumps for the pre-configured build/ORM toolchain are intentionally
+    # ignored here — they require manual migration + regression testing.
+    ignore:
+      - dependency-name: "vite"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "drizzle-orm"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "drizzle-kit"
+        update-types: ["version-update:semver-major"]
+
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"

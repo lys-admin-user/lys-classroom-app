@@ -70,6 +70,7 @@ import { startScholarshipScheduler, runScholarshipSync, detectSeasonFromDeadline
 import { insertRssFeedSchema } from "@shared/schema";
 import { db } from "../db";
 import { logAuditEvent, getAuditLogs, getClientIP } from "../services/auditLog";
+import { isUnderCoppaAge, setUserBirthdate } from "../services/dataSubjectService";
 import { filterChatMessage } from "../services/contentFilter";
 import { eq, desc, and, sql as drizzleSql, count, inArray, lte, gte } from "drizzle-orm";
 
@@ -148,8 +149,14 @@ const updatePreferencesSchema = z.object({
   }).optional(),
 });
 
+// Self-serve onboarding may only ever set a non-privileged identity. Elevated
+// roles (staff/admin/system) are granted exclusively through admin-controlled
+// flows — never by the user picking them during onboarding.
+const SELF_SERVE_ONBOARDING_ROLES = ["student", "educator", "homeschool_parent"] as const;
+
 const completeOnboardingSchema = z.object({
-  role: z.enum(["student", "educator", "staff", "campus_admin", "district_admin", "site_admin", "system_admin", "homeschool_parent"]).optional(),
+  birthdate: z.string().optional(),
+  role: z.enum(SELF_SERVE_ONBOARDING_ROLES).optional(),
   preferences: z.object({
     language: z.string().optional(),
     country: z.string().optional(),
@@ -414,10 +421,78 @@ export function registerAccountRoutes(app: Express): void {
     try {
       const userId = req.user?.claims?.sub;
       const validated = completeOnboardingSchema.parse(req.body);
-      const { role, preferences, needsAnalysis } = validated;
-      
-      // Update user role (map homeschool_parent to educator for DB storage)
+      const { role, preferences, needsAnalysis, birthdate } = validated;
+
+      // COPPA gate: block under-13 self sign-up. Under-13 users may only be
+      // added via a school or homeschool-parent account, never through the
+      // self-serve onboarding flow.
+      //
+      // Birthdate is required for EVERY self-serve onboarding completion (any
+      // role), so age can always be checked and a caller cannot skip the gate by
+      // omitting `role` or choosing a non-student role. Any under-13 birthdate
+      // (newly provided OR already stored) is blocked regardless of declared role.
+      const currentUser = await storage.getUser(userId);
+      const parsedBirthdate = birthdate ? new Date(birthdate) : null;
+      const hasNewBirthdate = !!(parsedBirthdate && !isNaN(parsedBirthdate.getTime()));
+      const existingBirthdate = currentUser?.birthdate ? new Date(currentUser.birthdate) : null;
+      const effectiveBirthdate = hasNewBirthdate ? parsedBirthdate : existingBirthdate;
+
+      // Birthdate is MANDATORY for all self-serve onboarding regardless of the
+      // requested role, so COPPA age can always be evaluated. This closes the
+      // bypass where a user picked a non-student role and omitted birthdate to
+      // skip age verification entirely.
+      if (!effectiveBirthdate) {
+        return res.status(400).json({
+          error: "birthdate_required",
+          message: "Please enter your date of birth to continue.",
+        });
+      }
+
+      // Block under-13 self sign-up entirely (newly provided OR already on file),
+      // regardless of declared role.
+      if (isUnderCoppaAge(effectiveBirthdate)) {
+        await logAuditEvent({
+          userId,
+          action: "coppa.self_signup_blocked",
+          category: "security",
+          severity: "warning",
+          resourceType: "user",
+          resourceId: userId,
+          ipAddress: getClientIP(req),
+          userAgent: req.get("user-agent"),
+        });
+        return res.status(403).json({
+          error: "coppa_blocked",
+          message:
+            "Students under 13 can't create their own account. Ask a teacher, school, or parent to set one up for you.",
+        });
+      }
+
+      if (hasNewBirthdate) {
+        await setUserBirthdate(userId, parsedBirthdate!);
+      }
+
+      // Update user role (map homeschool_parent to educator for DB storage).
+      // Defense in depth: even though the schema already restricts `role` to the
+      // self-serve set, re-check here so onboarding can never grant a privileged
+      // role (staff/admin/system) — that path is admin-controlled only.
       if (role) {
+        if (!(SELF_SERVE_ONBOARDING_ROLES as readonly string[]).includes(role)) {
+          await logAuditEvent({
+            userId,
+            action: "onboarding.role_escalation_blocked",
+            category: "security",
+            severity: "warning",
+            resourceType: "user",
+            resourceId: userId,
+            ipAddress: getClientIP(req),
+            userAgent: req.get("user-agent"),
+          });
+          return res.status(403).json({
+            error: "role_not_allowed",
+            message: "That role can't be set during sign-up.",
+          });
+        }
         const dbRole = role === "homeschool_parent" ? "educator" : role;
         await storage.updateUserRole(userId, dbRole as UserRole);
       }

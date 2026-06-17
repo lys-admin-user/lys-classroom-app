@@ -3626,10 +3626,40 @@ export const auditLogs = pgTable("audit_logs", {
   ipAddress: varchar("ip_address"),
   userAgent: text("user_agent"),
   organizationId: varchar("organization_id"),
+  // Tamper-evidence (hash chain). `hash` is sha256 over the canonical row plus
+  // the `prevHash` of the immediately prior chained row. The prevHash->hash
+  // links form a linked list; any insertion/edit/deletion breaks it at verify
+  // time. Order is derived by walking the links, so no separate sequence column
+  // is needed (and existing pre-chain rows are left untouched).
+  prevHash: varchar("prev_hash"),
+  hash: varchar("hash"),
   createdAt: timestamp("created_at").defaultNow(),
 });
 
-export const insertAuditLogSchema = createInsertSchema(auditLogs).omit({ id: true, createdAt: true });
+// Data Subject Requests (GDPR/CCPA/COPPA). Tracks export + delete requests and
+// their lifecycle. Self-serve accounts are hard-deleted; school-owned student
+// records are anonymized. When the subject is a student, the school admin and
+// parent/guardian are alerted.
+export const dataSubjectRequests = pgTable("data_subject_requests", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  type: varchar("type").notNull().$type<"export" | "delete">(),
+  subjectUserId: varchar("subject_user_id").notNull(),
+  requestedBy: varchar("requested_by").notNull(),
+  requestedByRole: varchar("requested_by_role"),
+  scope: varchar("scope").notNull().default("self").$type<"self" | "school">(),
+  organizationId: varchar("organization_id"),
+  status: varchar("status").notNull().default("pending").$type<"pending" | "processing" | "completed" | "failed" | "rejected">(),
+  reason: text("reason"),
+  resultDetails: jsonb("result_details").$type<Record<string, any>>(),
+  completedAt: timestamp("completed_at"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertDataSubjectRequestSchema = createInsertSchema(dataSubjectRequests).omit({ id: true, createdAt: true, completedAt: true, resultDetails: true, status: true });
+export type InsertDataSubjectRequest = z.infer<typeof insertDataSubjectRequestSchema>;
+export type DataSubjectRequest = typeof dataSubjectRequests.$inferSelect;
+
+export const insertAuditLogSchema = createInsertSchema(auditLogs).omit({ id: true, createdAt: true, prevHash: true, hash: true });
 export type InsertAuditLog = z.infer<typeof insertAuditLogSchema>;
 export type AuditLog = typeof auditLogs.$inferSelect;
 

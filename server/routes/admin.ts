@@ -69,7 +69,7 @@ import { fetchAndProcessFeed, fetchAllActiveFeeds, startRssFeedScheduler } from 
 import { startScholarshipScheduler, runScholarshipSync, detectSeasonFromDeadline } from "../services/scholarshipService";
 import { insertRssFeedSchema } from "@shared/schema";
 import { db } from "../db";
-import { logAuditEvent, getAuditLogs, getClientIP } from "../services/auditLog";
+import { logAuditEvent, getAuditLogs, getClientIP, verifyAuditChain } from "../services/auditLog";
 import { requireFreshMfa, checkFreshMfa } from "./mfa";
 import { filterChatMessage } from "../services/contentFilter";
 import { eq, desc, and, sql as drizzleSql, count, inArray, lte, gte } from "drizzle-orm";
@@ -3594,6 +3594,26 @@ export function registerAdminRoutes(app: Express): void {
       res.json(logs);
     } catch (error) {
       res.status(500).json({ error: "Failed to fetch audit logs" });
+    }
+  });
+
+  // Verify the tamper-evidence hash chain over the audit log. A break means a
+  // record was altered, deleted, or inserted out of band directly in the DB.
+  app.get("/api/admin/audit-logs/verify", isAuthenticated, requireSiteAdmin, async (req: any, res) => {
+    try {
+      const result = await verifyAuditChain();
+      await logAuditEvent({
+        userId: req.user?.claims?.sub,
+        action: "audit.chain_verify",
+        category: "security",
+        severity: result.ok ? "info" : "critical",
+        details: result,
+        ipAddress: getClientIP(req),
+        userAgent: req.headers["user-agent"],
+      });
+      res.json(result);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to verify audit chain" });
     }
   });
 

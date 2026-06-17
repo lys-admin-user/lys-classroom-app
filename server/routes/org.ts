@@ -70,6 +70,7 @@ import { startScholarshipScheduler, runScholarshipSync, detectSeasonFromDeadline
 import { insertRssFeedSchema } from "@shared/schema";
 import { db } from "../db";
 import { logAuditEvent, getAuditLogs, getClientIP } from "../services/auditLog";
+import { cached } from "../services/memoryCache";
 import { filterChatMessage } from "../services/contentFilter";
 import { eq, desc, and, sql as drizzleSql, count, inArray, lte, gte } from "drizzle-orm";
 
@@ -352,7 +353,7 @@ export function registerOrgRoutes(app: Express): void {
   // Unions the DB jurisdictions with the static curriculum file so the
   // dropdown is never empty even if seeding hasn't run in this environment
   // (e.g. fresh production deploy). Sorted alphabetically for stable UX.
-  app.get("/api/standards/countries", async (req, res) => {
+  app.get("/api/standards/countries", cached(3600), async (req, res) => {
     try {
       const [jurisdictions, { getCountries }] = await Promise.all([
         storage.getJurisdictions().catch(() => [] as any[]),
@@ -382,7 +383,7 @@ export function registerOrgRoutes(app: Express): void {
   // for the reasoning behind the US-by-name special case and the drift
   // logging into `standards_fallback_misses`.
 
-  app.get("/api/standards/states/:country", async (req, res) => {
+  app.get("/api/standards/states/:country", cached(3600), async (req, res) => {
     try {
       const { listStates } = await import("../services/standardsCatalog");
       const result = await listStates(req.params.country);

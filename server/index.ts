@@ -12,6 +12,7 @@ import { WebhookHandlers } from "./webhookHandlers";
 import { getStripeSync } from "./stripeClient";
 import { readdirSync, statSync } from "node:fs";
 import { join } from "node:path";
+import { logger, httpLogger } from "./observability";
 
 // Dev-time guard: warn if any LYS reference .txt is newer than the generated
 // embedded.ts file. Easy to forget to re-run scripts/regen_lys_embedded.mjs
@@ -51,6 +52,45 @@ declare module "http" {
 }
 
 app.set("trust proxy", 1);
+
+// Liveness probe: cheap, no dependencies. Used by the platform/uptime checks to
+// know the process is up. Registered early so it bypasses heavier middleware.
+app.get("/health", (_req, res) => {
+  res.status(200).json({
+    status: "ok",
+    uptime: process.uptime(),
+    timestamp: new Date().toISOString(),
+  });
+});
+
+// Readiness probe: verifies the process can actually serve traffic by pinging
+// the database. Returns 503 when a dependency is unavailable so a load balancer
+// can hold traffic until the app is truly ready.
+app.get("/ready", async (_req, res) => {
+  try {
+    const { db } = await import("./db");
+    const { sql } = await import("drizzle-orm");
+    await db.execute(sql`SELECT 1`);
+    res.status(200).json({ status: "ready" });
+  } catch (error) {
+    logger.error({ err: error }, "Readiness check failed");
+    res.status(503).json({ status: "not_ready" });
+  }
+});
+
+// API versioning. All routes are defined once under `/api/*`. We expose `/api/v1`
+// as an explicit, stable alias by rewriting the versioned prefix back to `/api`
+// before any routing/rate-limiting runs, so both `/api/...` (legacy, back-compat)
+// and `/api/v1/...` resolve to the same handlers. When a future breaking change
+// is needed, branch here on the version segment instead of forking every route.
+app.use((req, _res, next) => {
+  if (req.url === "/api/v1") {
+    req.url = "/api";
+  } else if (req.url.startsWith("/api/v1/")) {
+    req.url = "/api" + req.url.slice("/api/v1".length);
+  }
+  next();
+});
 
 // Content-Security-Policy is enforced only on the published deployment. In dev,
 // Vite/HMR and the Replit preview banner inject inline/eval scripts that a
@@ -251,31 +291,9 @@ export function log(message: string, source = "express") {
   console.log(`${formattedTime} [${source}] ${message}`);
 }
 
-app.use((req, res, next) => {
-  const start = Date.now();
-  const path = req.path;
-  let capturedJsonResponse: Record<string, any> | undefined = undefined;
-
-  const originalResJson = res.json;
-  res.json = function (bodyJson, ...args) {
-    capturedJsonResponse = bodyJson;
-    return originalResJson.apply(res, [bodyJson, ...args]);
-  };
-
-  res.on("finish", () => {
-    const duration = Date.now() - start;
-    if (path.startsWith("/api")) {
-      let logLine = `${req.method} ${path} ${res.statusCode} in ${duration}ms`;
-      if (capturedJsonResponse) {
-        logLine += ` :: ${JSON.stringify(capturedJsonResponse)}`;
-      }
-
-      log(logLine);
-    }
-  });
-
-  next();
-});
+// Structured per-request logging (pino-http). Attaches a request id, logs
+// method/url/status/latency as JSON, and redacts sensitive headers/fields.
+app.use(httpLogger);
 
 async function initStripe() {
   const databaseUrl = process.env.DATABASE_URL;
@@ -299,6 +317,27 @@ async function initStripe() {
   } catch (error) {
     console.error('Failed to initialize Stripe:', error);
   }
+}
+
+let retentionPurgeIntervalHandle: NodeJS.Timeout | null = null;
+async function scheduleRetentionPurge() {
+  if (retentionPurgeIntervalHandle) return; // idempotent guard
+  const ONE_DAY_MS = 24 * 60 * 60 * 1000;
+  const { runRetentionPurge } = await import("./services/dataSubjectService");
+
+  const runJob = async () => {
+    try {
+      const { purged } = await runRetentionPurge();
+      if (purged > 0) log(`Retention purge removed ${purged} expired account(s)`, "scheduler");
+    } catch (err: any) {
+      log(`Retention purge failed: ${err?.message || err}`, "scheduler");
+    }
+  };
+
+  // Kick once shortly after boot, then daily.
+  setTimeout(() => void runJob(), 60 * 1000);
+  retentionPurgeIntervalHandle = setInterval(() => void runJob(), ONE_DAY_MS);
+  log("Data retention purge scheduled (daily)", "scheduler");
 }
 
 let weeklyVerificationIntervalHandle: NodeJS.Timeout | null = null;
@@ -359,6 +398,9 @@ async function initLessonAiSubsystem(): Promise<void> {
   scheduleWeeklyScholarshipVerification().catch((err) =>
     log(`Failed to schedule verification job: ${err?.message || err}`, "scheduler"),
   );
+  scheduleRetentionPurge().catch((err) =>
+    log(`Failed to schedule retention purge: ${err?.message || err}`, "scheduler"),
+  );
   const { scheduleQuarterlyScholarshipScrape } = await import(
     "./scholarshipScraper/scheduler"
   );
@@ -366,13 +408,23 @@ async function initLessonAiSubsystem(): Promise<void> {
     log(`Failed to schedule scholarship scraper: ${err?.message || err}`, "scheduler"),
   );
 
-  app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
+  app.use((err: any, req: Request, res: Response, _next: NextFunction) => {
     const status = err.status || err.statusCode || 500;
     const message = err.message || "Internal Server Error";
+    const requestId = (req as any).id || res.getHeader("x-request-id");
 
-    log(`ERROR ${status}: ${message}`, "error");
+    // Full structured error (stack + request id) goes to the logs; the client
+    // gets a sanitized message plus the request id for support correlation.
+    logger.error(
+      { err, status, requestId, method: req.method, url: req.originalUrl },
+      `Request failed: ${status} ${message}`,
+    );
+
     if (!res.headersSent) {
-      res.status(status).json({ message });
+      const body: Record<string, any> = { message, requestId };
+      // Never leak internals to clients on a 500.
+      if (status >= 500) body.message = "Internal Server Error";
+      res.status(status).json(body);
     }
   });
 

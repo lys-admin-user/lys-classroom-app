@@ -1,7 +1,4 @@
-- [Security hardening decisions](security-hardening.md) — CSP prod-only, Origin-based CSRF (webhooks exempt), MIME+ext upload allowlist, verifyOrgAdminAccess for tenant scoping, self-role enum limit, audit categories.
-- [LYS design system](design-system.md) — Oswald headings, font-marker reserved for the LYS logo only, brand-red-tinted sidebar active state, yellow text uses hsl(45,93%,38%).
-- [GPT-5 API contract](gpt5-api-contract.md) — quirks/expectations when calling the OpenAI integration.
-- [Role shortcuts consistency](role-shortcuts-consistency.md) — keep sidebar nav + command palette role gating in sync.
-- [Email digest pattern](email-digest-pattern.md) — how digest emails are assembled/sent.
-- [Curriculum doc original files](curriculum-doc-original-files.md) — where original curriculum source docs live.
-- [Mockup preview screenshot cache](mockup-preview-screenshot-cache.md) — caching behavior for mockup-sandbox preview screenshots.
+- [Build/env gotchas](build-env-gotchas.md) — npm install must go through the packager tool, not bash; `npm run check` times out (use a bounded `npx tsc --noEmit`).
+- [Audit hash chain](audit-hash-chain.md) — auditLogs is a serialized SHA-256 hash chain; what the hash commits to and how to keep verify working.
+- [Dependency audit posture](dependency-audit-posture.md) — which advisories are deliberately deferred and why; the allow-list lives in two places that must stay in sync.
+- [Org membership roles](org-membership-roles.md) — organization_memberships.role is member/admin/owner, NOT the platform role hierarchy.
