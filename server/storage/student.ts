@@ -352,7 +352,7 @@ import {
 import { db } from "../db";
 import { eq, desc, and, asc, gte, sql, or, inArray } from "drizzle-orm";
 import { randomUUID } from "crypto";
-import { encryptIfPossible, decryptIfPossible } from "../services/crypto";
+import { encrypt, decryptIfPossible } from "../services/crypto";
 import {
   DatabaseStorage,
   seedResources,
@@ -409,7 +409,7 @@ const studentMethods: ThisType<DatabaseStorage> = {
 
   async createStudent(student: InsertStudent): Promise<Student> {
     const toInsert = student.notes != null
-      ? { ...student, notes: encryptIfPossible(student.notes) }
+      ? { ...student, notes: encrypt(student.notes) }
       : student;
     const [created] = await db.insert(students).values(toInsert as any).returning();
     return decryptStudentRow(created);
@@ -421,7 +421,7 @@ const studentMethods: ThisType<DatabaseStorage> = {
     if (!existing || existing.userId !== userId) return undefined;
 
     const toUpdate = updates.notes != null
-      ? { ...updates, notes: encryptIfPossible(updates.notes) }
+      ? { ...updates, notes: encrypt(updates.notes) }
       : updates;
     const [updated] = await db.update(students)
       .set({ ...toUpdate, updatedAt: new Date() })
@@ -852,7 +852,7 @@ const studentMethods: ThisType<DatabaseStorage> = {
 
   async createStudentNote(note: InsertStudentNote): Promise<StudentNote> {
     const toInsert = note.content != null
-      ? { ...note, content: (encryptIfPossible(note.content) ?? note.content) }
+      ? { ...note, content: encrypt(note.content) }
       : note;
     const [created] = await db.insert(studentNotes).values(toInsert as any).returning();
     return decryptStudentNoteRow(created);
@@ -864,7 +864,7 @@ const studentMethods: ThisType<DatabaseStorage> = {
     if (!existing || existing.educatorId !== educatorId) return undefined;
 
     const toUpdate = updates.content != null
-      ? { ...updates, content: (encryptIfPossible(updates.content) ?? updates.content) }
+      ? { ...updates, content: encrypt(updates.content) }
       : updates;
     const [updated] = await db.update(studentNotes)
       .set({ ...toUpdate, updatedAt: new Date() })

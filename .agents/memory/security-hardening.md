@@ -33,5 +33,18 @@ description: Durable conventions for CSRF, CSP, uploads, tenant isolation, audit
 - Valid `category` values are a fixed union: `auth | data_access | data_modify | admin_action | security | ai_usage | content_moderation | system`. Admin actions use `admin_action`; self-service privilege changes use `security`. `severity` is `info | warning | critical`.
 - **Why:** "admin"/"account" are NOT valid categories and fail typecheck.
 
-## Reported, not implemented (need product input)
-- MFA/step-up for admins, field-level encryption (key mgmt + migration), bulk-export controls, scheduled dependency/SAST scans + threat model. Curriculum scope sharing endpoints left as-is pending a product decision on intended cross-org sharing.
+## App-layer encryption (APP_ENCRYPTION_KEY)
+- `server/services/crypto.ts` = AES-256-GCM, key from `APP_ENCRYPTION_KEY` (base64 32 bytes), ciphertext format `enc:v1:<base64(iv12|tag16|ct)>`. Pass `{ authTagLength: 16 }` to both createCipheriv/createDecipheriv (SAST flags GCM without it).
+- **Write sensitive fields with strict `encrypt()` (throws if key missing); read with `decryptIfPossible()` (tolerates legacy plaintext).** Do NOT use `encryptIfPossible` on writes — it silently stores plaintext when the key is absent, defeating at-rest encryption.
+- Same key encrypts admin MFA secrets (P1) and student PII (P2).
+- **Currently encrypted:** `students.notes`, `student_notes.content` (handled in `server/storage/student.ts` + the `getStudentNotesByClass` read in `server/storage/classroom.ts`). Encrypt-on-write/decrypt-on-read lives at the storage layer, so all callers get plaintext transparently. NOT encrypted yet: student email/birthDate, guardian emails, other `notes` columns — and never encrypt columns used in WHERE/lookups.
+
+## Admin MFA step-up (TOTP)
+- `requireFreshMfa` middleware + `checkFreshMfa(req)` helper in `server/routes/mfa.ts`; ~5-min freshness window via `session.mfaVerifiedAt`. Applied to admin delete-user, impersonate, role-change. otplib v13 **functional** API (generateSecret/generateURI/verifySync). Admin with no MFA enrolled is forced to enroll before the sensitive action.
+
+## Bulk export controls
+- Grades export `GET /api/classes/:classId/grades/export` (server/routes/classroom.ts): authz = class owner OR `hasRolePrivilege(role,"site_admin")` else 403; rate-limited via `exportLimiter` (30/hr) in server/index.ts; audits both `grades.export` (success, data_access) and `grades.export_denied` (warning, security).
+- **Why owner-OR-admin, not admin-only:** export is a normal teacher action; admin-only would break teachers. The prior hole let ANY authed user export ANY class by id (IDOR).
+
+## Still not implemented (residual)
+- Dependency upgrades for known CVEs (axios, @xmldom/xmldom, esbuild, @babel/core) — needs package.json edit (user approval). SAST mediums: wildcard `postMessage` origins in embed components; HTML-in-template-string escaping. See `threat_model.md` (project root) for the full residual list.
