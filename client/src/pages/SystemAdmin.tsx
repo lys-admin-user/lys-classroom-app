@@ -3876,7 +3876,9 @@ function TechnicalSpecsSection() {
       items: [
         { label: "Input Validation", value: "Server-side Zod validation on all endpoints" },
         { label: "Ownership Checks", value: "User-scoped data access with server-side ID regeneration" },
-        { label: "COPPA Compliance", value: "Grade-level ad restriction (K-7 never see ads)" },
+        { label: "COPPA Compliance", value: "Grade-level ad restriction (K-7 never see ads); under-13 self-signup blocked (birthdate required at onboarding)" },
+        { label: "Data Subject Requests", value: "GDPR/CCPA export + erasure via /api/dsr/* — hard-delete self-serve, anonymize school-owned, tenant-scoped" },
+        { label: "Data Retention", value: "Daily scheduler purges accounts past their 3-year retention date (set on account closure/inactivity)" },
         { label: "Session Security", value: "HTTP-only cookies, secure in production, 30-day max age" },
         { label: "RBAC", value: "7-role hierarchy: student < homeschool_parent < educator < campus_admin < district_admin < site_admin < system_admin" },
         { label: "Secrets Management", value: "Replit secrets store for API keys and credentials" },
@@ -4771,6 +4773,10 @@ function SafetySuiteTab() {
               { label: "Security Headers (Helmet)", status: "Active", description: "XSS, clickjacking, MIME-type protection" },
               { label: "COPPA Ad Filtering", status: "Active", description: "No ads for students K-7 grade" },
               { label: "Parental Consent System", status: "Active", description: "Under-13 accounts require parent verification" },
+              { label: "Under-13 Self-Signup Block", status: "Active", description: "Birthdate required at signup; under-13 cannot self-register" },
+              { label: "Data Subject Requests (DSR)", status: "Active", description: "Export + erasure: hard-delete self-serve, anonymize school-owned" },
+              { label: "Data Retention Purge", status: "Active", description: "Daily scheduler removes accounts past their 3-year retention date" },
+              { label: "Tamper-Evident Audit Chain", status: "Active", description: "Audit logs form a verifiable SHA-256 hash chain" },
               { label: "Audit Logging", status: "Active", description: "All security events are recorded" },
               { label: "Role-Based Access Control", status: "Active", description: "7-role hierarchical permission system" },
               { label: "Session Security", status: "Active", description: "HTTP-only cookies with secure flag" },
@@ -4932,7 +4938,7 @@ function DataGovernanceTab() {
               </div>
               <div className="p-3 border rounded-lg">
                 <p className="text-sm font-medium font-roboto">Deletion Policy</p>
-                <p className="text-sm font-roboto text-muted-foreground mt-1">No deletion allowed. Archive hides from UI only. Data retained for 10-year predictive engine.</p>
+                <p className="text-sm font-roboto text-muted-foreground mt-1">Academic marks are immutable (archive hides from UI only). Personal account data follows data-subject requests: self-serve accounts are hard-deleted, school-owned student records anonymized. A daily scheduler purges accounts past their 3-year retention date.</p>
               </div>
             </div>
           </div>

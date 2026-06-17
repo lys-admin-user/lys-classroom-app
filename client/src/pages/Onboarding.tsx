@@ -7,6 +7,7 @@ import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue, SelectGroup, SelectLabel } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Input } from "@/components/ui/input";
 import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
 import { GraduationCap, BookOpen, Building2, ChevronRight, ChevronLeft, Sparkles, Target, Compass, BookMarked, School, Home, Presentation } from "lucide-react";
@@ -125,6 +126,7 @@ export default function Onboarding() {
   const { toast } = useToast();
   const [step, setStep] = useState<StepKey>("role");
   const [role, setRole] = useState<string>("");
+  const [birthdate, setBirthdate] = useState<string>("");
   const [selectedGradeLevels, setSelectedGradeLevels] = useState<string[]>([]);
   const [primaryGoal, setPrimaryGoal] = useState<string>("");
   const [language, setLanguage] = useState("en");
@@ -193,8 +195,25 @@ export default function Onboarding() {
       const redirectPath = getRecommendedPath();
       setLocation(`${redirectPath}?tour=true&role=${encodeURIComponent(role)}&goal=${encodeURIComponent(primaryGoal)}`);
     },
-    onError: () => {
-      toast({ title: "Error", description: "Failed to complete onboarding", variant: "destructive" });
+    onError: (error: any) => {
+      const code = error?.error as string | undefined;
+      // apiRequest merges the JSON error body onto the Error, so error.message is
+      // the friendly server message unless parsing failed (then it's "<status>: ...").
+      const serverMessage =
+        typeof error?.message === "string" && !/^\d{3}:/.test(error.message)
+          ? error.message
+          : undefined;
+      const titleByCode: Record<string, string> = {
+        birthdate_required: "Date of birth needed",
+        coppa_blocked: "Account can't be created here",
+        role_not_allowed: "Role not available at sign-up",
+      };
+      toast({
+        title: code && titleByCode[code] ? titleByCode[code] : "Couldn't finish setup",
+        description:
+          serverMessage || "Something went wrong completing your setup. Please try again.",
+        variant: "destructive",
+      });
     },
   });
 
@@ -256,6 +275,7 @@ export default function Onboarding() {
 
     completeMutation.mutate({
       role,
+      birthdate,
       preferences: {
         language,
         country: codeToCountryName(country),
@@ -295,7 +315,7 @@ export default function Onboarding() {
   const progress = ((currentStepIndex + 1) / steps.length) * 100;
 
   const canProceed = () => {
-    if (step === "role") return !!role;
+    if (step === "role") return !!role && !!birthdate;
     if (step === "classes") return selectedGradeLevels.length > 0;
     if (step === "goals") return !!primaryGoal;
     if (step === "location") return !!language && !!country;
@@ -379,31 +399,37 @@ export default function Onboarding() {
                     <p className="text-sm text-muted-foreground">Home educator teaching your own children</p>
                   </div>
                 </div>
-                <div 
-                  className={`flex items-center gap-4 p-4 rounded-md border cursor-pointer hover-elevate ${role === "campus_admin" ? "border-lys-red bg-muted" : ""}`}
-                  onClick={() => { setRole("campus_admin"); setPrimaryGoal(""); }}
-                  data-testid="option-campus-admin"
-                >
-                  <RadioGroupItem value="campus_admin" id="campus_admin" />
-                  <Building2 className="h-6 w-6 text-lys-red" />
-                  <div>
-                    <Label htmlFor="campus_admin" className="cursor-pointer font-medium">Campus Administrator</Label>
-                    <p className="text-sm text-muted-foreground">Principal or campus leader at a single-campus charter or school site</p>
-                  </div>
-                </div>
-                <div 
-                  className={`flex items-center gap-4 p-4 rounded-md border cursor-pointer hover-elevate ${role === "district_admin" ? "border-lys-red bg-muted" : ""}`}
-                  onClick={() => { setRole("district_admin"); setPrimaryGoal(""); }}
-                  data-testid="option-district-admin"
-                >
-                  <RadioGroupItem value="district_admin" id="district_admin" />
-                  <Presentation className="h-6 w-6 text-lys-red" />
-                  <div>
-                    <Label htmlFor="district_admin" className="cursor-pointer font-medium">District / Charter Network Administrator</Label>
-                    <p className="text-sm text-muted-foreground">ISD, charter network (CMO/EMO), or multi-campus leadership overseeing multiple schools</p>
-                  </div>
-                </div>
               </RadioGroup>
+
+              <div
+                className="flex items-start gap-3 p-4 rounded-md border border-dashed bg-muted/50"
+                data-testid="note-admin-access"
+              >
+                <Building2 className="h-5 w-5 text-muted-foreground shrink-0 mt-0.5" />
+                <p className="text-sm text-muted-foreground">
+                  <span className="font-medium text-foreground">School or district administrator?</span>{" "}
+                  Admin access is set up by your organization, not during self sign-up. Continue as an
+                  Educator to get started, then ask your LYS account team to enable admin tools.
+                </p>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="birthdate" className="text-lg font-oswald">Your date of birth</Label>
+                <p className="text-sm text-muted-foreground">
+                  We ask everyone for this to keep younger learners safe and follow children's privacy
+                  laws (COPPA). Students under 13 need a teacher, school, or parent to set up their
+                  account.
+                </p>
+                <Input
+                  id="birthdate"
+                  type="date"
+                  value={birthdate}
+                  max={new Date().toISOString().split("T")[0]}
+                  onChange={(e) => setBirthdate(e.target.value)}
+                  className="max-w-xs"
+                  data-testid="input-birthdate"
+                />
+              </div>
             </div>
           )}
 

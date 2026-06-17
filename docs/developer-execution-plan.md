@@ -189,3 +189,25 @@ Anything that changes how prompts are assembled, what gets sent to OpenAI, or ho
 - `server/openai.ts` — flag check, cache key, attribution
 - `server/index.ts::initLessonAiSubsystem` — boot wiring
 - `server/storage/lessonAi.ts` — prototype-augmentation pattern (also see Rule 7)
+
+---
+
+## 10. Identity, COPPA & Data-Subject Rights
+
+These rules are non-negotiable — they are the compliance backbone of a K-12 product.
+
+### Self-serve onboarding gate (`server/routes/account.ts`)
+- **Birthdate is mandatory for every self-serve onboarding completion, for every role.** Never make it role-conditional — that reopens the bypass where a user picks a non-student role and omits birthdate to skip the age check. Missing birthdate → `birthdate_required` (400).
+- **Block under-13 self sign-up entirely.** Any under-13 birthdate (newly provided or already stored) → `coppa_blocked` (403) + a `coppa.self_signup_blocked` audit event. Under-13 users may only be created via a school or homeschool-parent account.
+- **Self-serve role is capped.** Only `SELF_SERVE_ONBOARDING_ROLES` (`student`, `educator`, `homeschool_parent`) may be set during onboarding. Anything else → `role_not_allowed` (403) + `onboarding.role_escalation_blocked` audit. Elevated roles (staff/admin/system) are granted only through admin-controlled flows. The onboarding UI must not offer admin roles as selectable options.
+
+### Data-subject requests (`server/routes/dsr.ts`, `server/services/dataSubjectService.ts`)
+- **Export** returns the subject's data as JSON. **Erasure** hard-deletes self-serve accounts and anonymizes school-owned student records (never hard-delete a school-owned student).
+- **Alert on student subjects.** When the subject is a student, alert school admin(s) and parent(s) via audit events + DSR `resultDetails`.
+- **Authorization is tenant-scoped.** Only `site_admin`/`system_admin` get a global override (`isPlatformAdminRole`). Campus/district admins may act only within their managed org sub-tree (admin/owner memberships only — a plain member role grants no scope), plus the subject themselves and active parents/guardians. Do not widen this.
+
+### Retention
+- A daily scheduler runs `runRetentionPurge` and removes any account whose 3-year `retentionPurgeAt` has elapsed. **The account-closure/inactivity flow that *sets* `retentionPurgeAt` is the trigger — until that is wired, the purge runner is a no-op safety net, not an active lifecycle control.** Academic marks remain immutable and are out of scope for this purge.
+
+### Keep copy in sync
+Any change to the rules above must be reflected in user-facing copy: `client/src/pages/Onboarding.tsx` (birthdate field + role options + error toasts), `client/src/pages/HelpDesk.tsx` (COPPA/role articles), `client/src/pages/DevDocs.tsx` (Governance Rule 5 + COPPA section), and the compliance panels in `client/src/pages/SystemAdmin.tsx`.
