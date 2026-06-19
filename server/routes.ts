@@ -175,6 +175,7 @@ import { registerMiscRoutes } from "./routes/misc";
 import { registerNotificationsRoutes } from "./routes/notifications";
 import { registerMfaRoutes } from "./routes/mfa";
 import { registerDsrRoutes } from "./routes/dsr";
+import { registerConsentRoutes } from "./routes/consent";
 import { startDigestScheduler, startModerationBacklogScheduler } from "./services/digestScheduler";
 
 export async function registerRoutes(
@@ -241,6 +242,7 @@ export async function registerRoutes(
   registerNotificationsRoutes(app);
   registerMfaRoutes(app);
   registerDsrRoutes(app);
+  registerConsentRoutes(app);
 
   // Task #8: weekly standards observability digest (Mondays 09:00 site-local).
   startDigestScheduler();

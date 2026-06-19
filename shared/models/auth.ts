@@ -72,6 +72,11 @@ export const users = pgTable("users", {
   downgradeTargetTier: varchar("downgrade_target_tier"),
   lastLoginAt: timestamp("last_login_at"),
   loginCount: integer("login_count").default(0),
+  // Click-wrap policy acceptance. `acceptedPolicyVersion` mirrors the legal
+  // bundle version the user last affirmatively accepted; when it lags behind
+  // CURRENT_POLICY_BUNDLE_VERSION the re-acceptance intercept modal is shown.
+  acceptedPolicyVersion: varchar("accepted_policy_version"),
+  acceptedPolicyAt: timestamp("accepted_policy_at"),
   // Admin step-up MFA (TOTP). mfaSecret is stored encrypted at rest.
   mfaEnabled: boolean("mfa_enabled").default(false),
   mfaSecret: text("mfa_secret"),

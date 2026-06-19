@@ -1,6 +1,7 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "../storage";
+import { recordBillingAuthorization, consentRequestMeta } from "../services/consentService";
 import { generateLessonPlan } from "../openai";
 import { detectAfricanCountryFromText } from "@shared/africaContext";
 import { calculateLessonQualityScore, getQualityLevel } from "../lessonQualityScorer";
@@ -476,10 +477,22 @@ export function registerPaymentsRoutes(app: Express): void {
   app.post("/api/subscription/create-checkout-session", isAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user?.claims?.sub;
-      const { tier } = req.body;
+      const { tier, billingAuthorized } = req.body;
 
       if (!["pro", "campus"].includes(tier)) {
         res.status(400).json({ error: "Invalid tier. Choose 'pro' or 'campus'" });
+        return;
+      }
+
+      // De-coupled recurring-billing authorization (FTC "Click to Cancel" /
+      // ROSCA): the subscriber must give a standalone, affirmative consent to
+      // recurring charges, separate from accepting the Terms. The UI presents an
+      // un-prechecked checkbox; we refuse to start checkout without it.
+      if (billingAuthorized !== true) {
+        res.status(400).json({
+          error: "billing_authorization_required",
+          message: "Please authorize the recurring subscription charge to continue.",
+        });
         return;
       }
 
@@ -527,6 +540,25 @@ export function registerPaymentsRoutes(app: Express): void {
         cancel_url: `${origin}/pricing?checkout_cancelled=true`,
         metadata: { userId, tier },
       });
+
+      // Persist the standalone billing authorization to the consent ledger.
+      try {
+        const { ipAddress, userAgent } = consentRequestMeta(req);
+        await recordBillingAuthorization({ userId, email: user?.email ?? null, ipAddress, userAgent });
+      } catch (consentErr) {
+        console.error("Failed to record billing authorization:", consentErr);
+        // The user DID affirm standalone recurring-billing authorization; if the
+        // ledger write fails we still capture durable evidence in the
+        // tamper-evident audit chain so the authorization is not lost.
+        await logAuditEvent({
+          userId,
+          action: "consent.ledger_write_failed",
+          category: "security",
+          severity: "warning",
+          resourceType: "consent",
+          details: { context: "billing_authorization", error: String((consentErr as Error)?.message ?? consentErr) },
+        }).catch(() => {});
+      }
 
       res.json({ url: session.url, sessionId: session.id });
     } catch (error: any) {
@@ -668,6 +700,60 @@ export function registerPaymentsRoutes(app: Express): void {
     } catch (error: any) {
       console.error("Downgrade error:", error);
       res.status(500).json({ error: "Failed to downgrade plan" });
+    }
+  });
+
+
+  // Explicit "Cancel Subscription" — FTC "Click to Cancel" parity. Cancellation
+  // must be as simple as sign-up: one click, no retention hoops. Cancels at the
+  // end of the paid period (so the user keeps what they paid for) and reverts to
+  // the free tier afterward.
+  app.post("/api/subscription/cancel", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user?.claims?.sub;
+      const userRecord = await db.select().from(users).where(eq(users.id, userId)).limit(1);
+      const user = userRecord[0];
+      if (!user) {
+        res.status(404).json({ error: "User not found" });
+        return;
+      }
+
+      // Real Stripe subscription — cancel at period end.
+      if (user.stripeSubscriptionId && user.subscriptionStatus === "active") {
+        const stripe = await getUncachableStripeClient();
+        const sub = await stripe.subscriptions.update(user.stripeSubscriptionId, {
+          cancel_at_period_end: true,
+        }) as any;
+        const rawTs: number | undefined =
+          typeof sub.current_period_end === "number" ? sub.current_period_end :
+          typeof sub.cancel_at === "number" ? sub.cancel_at :
+          typeof sub.billing_cycle_anchor === "number" ? sub.billing_cycle_anchor :
+          sub.items?.data?.[0]?.current_period_end;
+        const periodEnd = (rawTs && !isNaN(rawTs))
+          ? new Date(rawTs * 1000).toISOString()
+          : new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString();
+
+        await db.update(users)
+          .set({ subscriptionStatus: "canceling", downgradeTargetTier: "free", updatedAt: new Date() })
+          .where(eq(users.id, userId));
+
+        res.json({
+          success: true,
+          immediate: false,
+          currentPeriodEnd: periodEnd,
+          message: `Your subscription is canceled and will end on ${new Date(periodEnd).toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" })}. You'll keep access until then.`,
+        });
+      } else {
+        // Demo / no live subscription — revert immediately.
+        await db.update(users)
+          .set({ tier: "free", subscriptionStatus: null, stripeSubscriptionId: null, downgradeTargetTier: null, updatedAt: new Date() })
+          .where(eq(users.id, userId));
+
+        res.json({ success: true, immediate: true, message: "Your subscription has been canceled." });
+      }
+    } catch (error: any) {
+      console.error("Cancel subscription error:", error);
+      res.status(500).json({ error: "Failed to cancel subscription" });
     }
   });
 

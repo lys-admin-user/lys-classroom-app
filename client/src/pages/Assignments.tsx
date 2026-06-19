@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useLocation, useSearch } from "wouter";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from "@/components/ui/card";
+import { AiGeneratedLabel } from "@/components/AiDisclosure";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Label } from "@/components/ui/label";
@@ -1118,6 +1119,7 @@ export default function Assignments() {
 
             {generatedAssignment && (
               <div className="space-y-4">
+                <AiGeneratedLabel className="print:hidden" />
                 <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 flex-wrap print:hidden">
                   {isEditing ? (
                     <Input 

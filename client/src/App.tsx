@@ -13,6 +13,7 @@ import { TrialBanner } from "@/components/TrialBanner";
 import { ImpersonationBanner } from "@/components/ImpersonationBanner";
 import { OnboardingTour } from "@/components/OnboardingTour";
 import { CommandPalette } from "@/components/CommandPalette";
+import { PolicyReacceptModal } from "@/components/PolicyReacceptModal";
 import { RoleRoutedLanding } from "@/components/RoleRoutedLanding";
 import { useAuth } from "@/hooks/use-auth";
 import { useEffect, useState, lazy, Suspense } from "react";
@@ -77,9 +78,12 @@ const MentorConnect = lazy(() => import("@/pages/MentorConnect"));
 const DistrictAdmin = lazy(() => import("@/pages/DistrictAdmin"));
 const HelpDesk = lazy(() => import("@/pages/HelpDesk"));
 const DevDocs = lazy(() => import("@/pages/DevDocs"));
+const Terms = lazy(() => import("@/pages/Terms"));
+const Privacy = lazy(() => import("@/pages/Privacy"));
+const AiPolicy = lazy(() => import("@/pages/AiPolicy"));
 const EmbedRouter = lazy(() => import("@/pages/EmbedRouter").then(m => ({ default: m.EmbedRouter })));
 
-const EXEMPT_PATHS = ["/onboarding", "/pricing", "/shared", "/p/", "/embed/"];
+const EXEMPT_PATHS = ["/onboarding", "/pricing", "/shared", "/p/", "/embed/", "/terms", "/privacy", "/ai-policy"];
 const MAX_ONBOARDING_SKIPS = 3;
 const SESSION_PROMPT_KEY = "lys_onboarding_prompted";
 
@@ -313,6 +317,9 @@ function Router() {
         <Route path="/mentor-connect" component={MentorConnect} />
         <Route path="/shared/:shareId" component={SharedLesson} />
         <Route path="/pricing" component={Pricing} />
+        <Route path="/terms" component={Terms} />
+        <Route path="/privacy" component={Privacy} />
+        <Route path="/ai-policy" component={AiPolicy} />
         <Route path="/help" component={HelpDesk} />
         <Route path="/p/:slug" component={PortfolioView} />
 
@@ -458,6 +465,7 @@ function AppShell() {
       </div>
       <TourManager />
       <CommandPalette />
+      <PolicyReacceptModal />
     </SidebarProvider>
   );
 }

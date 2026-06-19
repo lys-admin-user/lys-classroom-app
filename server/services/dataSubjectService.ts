@@ -20,9 +20,16 @@ import {
   organizationMemberships,
   organizations,
   dataSubjectRequests,
+  referralEvents,
+  standardsSyncLog,
+  blsSyncLog,
+  scholarshipSyncLog,
+  ingestionAuditLog,
+  standardsDigestLog,
+  moderationBacklogDigestLog,
   type DataSubjectRequest,
 } from "@shared/schema";
-import { and, eq, lte, inArray, or, isNotNull } from "drizzle-orm";
+import { and, eq, lt, lte, inArray, or, isNotNull, isNull } from "drizzle-orm";
 import { logAuditEvent } from "./auditLog";
 import { isCoppaRestricted } from "./dataGovernance";
 
@@ -458,24 +465,145 @@ export async function getUserById(userId: string) {
 // runner deletes any whose purge date has passed.
 export const RETENTION_YEARS = 3;
 
-export async function runRetentionPurge(now: Date = new Date()): Promise<{ purged: number; ids: string[] }> {
+export async function runRetentionPurge(now: Date = new Date()): Promise<{ purged: number; ids: string[]; unmarked: number }> {
   const due = await db
-    .select({ id: users.id })
+    .select({
+      id: users.id,
+      accountStatus: users.accountStatus,
+      lastLoginAt: users.lastLoginAt,
+    })
     .from(users)
     .where(and(isNotNull(users.retentionPurgeAt), lte(users.retentionPurgeAt, now)));
 
-  const ids = due.map((u) => u.id);
-  for (const id of ids) {
-    await hardDeleteUser(id);
+  // Defense-in-depth re-verification at delete time. An account scheduled for
+  // purge purely because it was inactive must NOT be deleted if the user has
+  // signed back in since (their `lastLoginAt` is now recent) — instead we clear
+  // the schedule. Closed / anonymized accounts follow their own closure-driven
+  // purge and are always honored once due.
+  const inactiveCutoff = new Date(now);
+  inactiveCutoff.setMonth(inactiveCutoff.getMonth() - INACTIVE_ACCOUNT_TTL_MONTHS);
+
+  const ids: string[] = [];
+  let unmarked = 0;
+  for (const u of due) {
+    const stillInactive = u.lastLoginAt != null && u.lastLoginAt < inactiveCutoff;
+    const eligible = u.accountStatus !== "active" || stillInactive;
+    if (!eligible) {
+      // User returned within the grace window — rescind the purge schedule.
+      await db.update(users).set({ retentionPurgeAt: null }).where(eq(users.id, u.id));
+      unmarked++;
+      continue;
+    }
+    await hardDeleteUser(u.id);
+    ids.push(u.id);
     await logAuditEvent({
       userId: "system-retention-purge",
       action: "dsr.retention_purge",
       category: "system",
       severity: "warning",
       resourceType: "user",
-      resourceId: id,
-      details: { retentionYears: RETENTION_YEARS },
+      resourceId: u.id,
+      details: { retentionYears: RETENTION_YEARS, accountStatus: u.accountStatus },
     });
   }
-  return { purged: ids.length, ids };
+  return { purged: ids.length, ids, unmarked };
+}
+
+// ---------------------------------------------------------------------------
+// Time-to-live (TTL) retention sweep.
+//
+// Enforces the published retention windows from the Privacy & Data Policy:
+//   - Inactive accounts (no sign-in for 12 months) are marked for purge by
+//     setting `retentionPurgeAt`, after which the runner above hard-deletes them
+//     (with audit logging). This wires the lifecycle trigger that was previously
+//     missing.
+//   - Behavioral/analytics rows (referral tracking events) older than 30 days
+//     are deleted.
+//   - Operational sync / digest log rows older than 90 days are deleted.
+//
+// The append-only legal consent ledger (`consent_events`) and the tamper-evident
+// `audit_logs` hash chain are intentionally NEVER pruned here.
+// ---------------------------------------------------------------------------
+export const INACTIVE_ACCOUNT_TTL_MONTHS = 12;
+export const BEHAVIORAL_TTL_DAYS = 30;
+export const LOG_TTL_DAYS = 90;
+// Grace window between an account being *marked* inactive-for-purge and actually
+// being hard-deleted. This guarantees a marked account is never deleted in the
+// same scheduler run (or even the same day), giving a returning user a window to
+// sign back in (which clears the mark — see below) before any data loss.
+export const INACTIVE_PURGE_GRACE_DAYS = 30;
+
+function daysAgo(now: Date, days: number): Date {
+  return new Date(now.getTime() - days * 24 * 60 * 60 * 1000);
+}
+
+function daysFromNow(now: Date, days: number): Date {
+  return new Date(now.getTime() + days * 24 * 60 * 60 * 1000);
+}
+
+export async function runRetentionTtlSweep(now: Date = new Date()): Promise<{
+  inactiveMarked: number;
+  behavioralDeleted: number;
+  logsDeleted: number;
+}> {
+  // 1. Mark accounts inactive for >= 12 months for purge. We set
+  //    `retentionPurgeAt` to a FUTURE date (now + grace days), never `now`, so a
+  //    marked account is never deleted in the same run as it is marked — the
+  //    actual hard-delete (runRetentionPurge) only fires once the grace window
+  //    has elapsed. Only currently-active accounts are eligible; closed /
+  //    anonymized accounts already have their own purge schedule set at closure.
+  //    Idempotent: only accounts not already scheduled are touched.
+  const inactiveCutoff = new Date(now);
+  inactiveCutoff.setMonth(inactiveCutoff.getMonth() - INACTIVE_ACCOUNT_TTL_MONTHS);
+  const purgeAt = daysFromNow(now, INACTIVE_PURGE_GRACE_DAYS);
+  const newlyInactive = await db
+    .update(users)
+    .set({ retentionPurgeAt: purgeAt })
+    .where(
+      and(
+        eq(users.accountStatus, "active"),
+        isNull(users.retentionPurgeAt),
+        isNotNull(users.lastLoginAt),
+        lt(users.lastLoginAt, inactiveCutoff),
+      ),
+    )
+    .returning({ id: users.id });
+  if (newlyInactive.length > 0) {
+    await logAuditEvent({
+      userId: "system-retention-ttl",
+      action: "dsr.inactive_marked_for_purge",
+      category: "system",
+      severity: "warning",
+      resourceType: "user",
+      details: {
+        count: newlyInactive.length,
+        inactiveMonths: INACTIVE_ACCOUNT_TTL_MONTHS,
+        graceDays: INACTIVE_PURGE_GRACE_DAYS,
+      },
+    });
+  }
+
+  // 2. Behavioral/analytics TTL (30 days).
+  const behavioralCutoff = daysAgo(now, BEHAVIORAL_TTL_DAYS);
+  const behavioral = await db
+    .delete(referralEvents)
+    .where(lt(referralEvents.createdAt, behavioralCutoff))
+    .returning({ id: referralEvents.id });
+
+  // 3. Operational log TTL (90 days).
+  const logCutoff = daysAgo(now, LOG_TTL_DAYS);
+  let logsDeleted = 0;
+  const ia = await db.delete(ingestionAuditLog).where(lt(ingestionAuditLog.createdAt, logCutoff)).returning({ id: ingestionAuditLog.id });
+  const sd = await db.delete(standardsDigestLog).where(lt(standardsDigestLog.createdAt, logCutoff)).returning({ id: standardsDigestLog.id });
+  const md = await db.delete(moderationBacklogDigestLog).where(lt(moderationBacklogDigestLog.createdAt, logCutoff)).returning({ id: moderationBacklogDigestLog.id });
+  const ss = await db.delete(standardsSyncLog).where(lt(standardsSyncLog.startedAt, logCutoff)).returning({ id: standardsSyncLog.id });
+  const bs = await db.delete(blsSyncLog).where(lt(blsSyncLog.startedAt, logCutoff)).returning({ id: blsSyncLog.id });
+  const cs = await db.delete(scholarshipSyncLog).where(lt(scholarshipSyncLog.startedAt, logCutoff)).returning({ id: scholarshipSyncLog.id });
+  logsDeleted = ia.length + sd.length + md.length + ss.length + bs.length + cs.length;
+
+  return {
+    inactiveMarked: newlyInactive.length,
+    behavioralDeleted: behavioral.length,
+    logsDeleted,
+  };
 }

@@ -1,1 +1,1 @@
-- [LYS brand color convention](brand-color-palette.md) — brand hues are teal/red/amber(+yellow); green/emerald only for success; blue/purple/orange/pink are off-brand, map to teal/amber/red.
+- [Retention purge grace window](retention-purge-grace.md) — inactive-account auto-delete must mark with a future grace date and re-verify staleness at delete time, never purge same-run.

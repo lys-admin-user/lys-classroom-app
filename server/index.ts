@@ -323,9 +323,22 @@ let retentionPurgeIntervalHandle: NodeJS.Timeout | null = null;
 async function scheduleRetentionPurge() {
   if (retentionPurgeIntervalHandle) return; // idempotent guard
   const ONE_DAY_MS = 24 * 60 * 60 * 1000;
-  const { runRetentionPurge } = await import("./services/dataSubjectService");
+  const { runRetentionPurge, runRetentionTtlSweep } = await import("./services/dataSubjectService");
 
   const runJob = async () => {
+    try {
+      // TTL sweep first: mark 12-month-inactive accounts for purge + prune
+      // behavioral (30d) and operational log (90d) rows.
+      const ttl = await runRetentionTtlSweep();
+      if (ttl.inactiveMarked > 0 || ttl.behavioralDeleted > 0 || ttl.logsDeleted > 0) {
+        log(
+          `Retention TTL sweep: ${ttl.inactiveMarked} inactive marked, ${ttl.behavioralDeleted} behavioral rows, ${ttl.logsDeleted} log rows pruned`,
+          "scheduler",
+        );
+      }
+    } catch (err: any) {
+      log(`Retention TTL sweep failed: ${err?.message || err}`, "scheduler");
+    }
     try {
       const { purged } = await runRetentionPurge();
       if (purged > 0) log(`Retention purge removed ${purged} expired account(s)`, "scheduler");

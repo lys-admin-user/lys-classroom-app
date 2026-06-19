@@ -127,6 +127,7 @@ export default function Onboarding() {
   const [step, setStep] = useState<StepKey>("role");
   const [role, setRole] = useState<string>("");
   const [birthdate, setBirthdate] = useState<string>("");
+  const [agreedToTerms, setAgreedToTerms] = useState(false);
   const [selectedGradeLevels, setSelectedGradeLevels] = useState<string[]>([]);
   const [primaryGoal, setPrimaryGoal] = useState<string>("");
   const [language, setLanguage] = useState("en");
@@ -276,6 +277,7 @@ export default function Onboarding() {
     completeMutation.mutate({
       role,
       birthdate,
+      agreedToTerms,
       preferences: {
         language,
         country: codeToCountryName(country),
@@ -318,7 +320,7 @@ export default function Onboarding() {
     if (step === "role") return !!role && !!birthdate;
     if (step === "classes") return selectedGradeLevels.length > 0;
     if (step === "goals") return !!primaryGoal;
-    if (step === "location") return !!language && !!country;
+    if (step === "location") return !!language && !!country && agreedToTerms;
     return true;
   };
 
@@ -666,6 +668,32 @@ export default function Onboarding() {
         </CardContent>
 
         <CardFooter className="flex flex-col gap-4">
+          {step === "location" && (
+            <div className="flex items-start gap-3 w-full rounded-md border bg-muted/40 p-3">
+              <Checkbox
+                id="agree-terms"
+                checked={agreedToTerms}
+                onCheckedChange={(v) => setAgreedToTerms(v === true)}
+                className="mt-0.5"
+                data-testid="checkbox-agree-terms"
+              />
+              <Label htmlFor="agree-terms" className="text-sm font-normal leading-relaxed cursor-pointer">
+                I have read and agree to LYS's{" "}
+                <a href="/terms" target="_blank" rel="noreferrer" className="underline font-medium" data-testid="link-onboarding-terms">
+                  Terms of Service &amp; Subscription Agreement
+                </a>
+                ,{" "}
+                <a href="/privacy" target="_blank" rel="noreferrer" className="underline font-medium" data-testid="link-onboarding-privacy">
+                  Privacy &amp; Data Policy
+                </a>
+                , and{" "}
+                <a href="/ai-policy" target="_blank" rel="noreferrer" className="underline font-medium" data-testid="link-onboarding-ai">
+                  Responsible AI Policy
+                </a>
+                .
+              </Label>
+            </div>
+          )}
           <div className="flex justify-between gap-4 w-full">
             <Button
               variant="outline"

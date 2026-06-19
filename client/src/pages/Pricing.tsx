@@ -8,6 +8,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Check, X, Building2, GraduationCap, AlertCircle, Eye, Globe, Info, TrendingDown, CreditCard, FileText, Landmark, Loader2, Sparkles, Users } from "lucide-react";
 import { SiPaypal } from "react-icons/si";
 import { useAuth } from "@/hooks/use-auth";
@@ -203,6 +204,7 @@ export default function Pricing() {
   const [bankFormData, setBankFormData] = useState({ organizationName: "", contactEmail: user?.email || "" });
   const [bankTransferDetails, setBankTransferDetails] = useState<any>(null);
   const [stripeLoading, setStripeLoading] = useState(false);
+  const [billingAuthorized, setBillingAuthorized] = useState(false);
   const [downgradeDialogOpen, setDowngradeDialogOpen] = useState(false);
   const [downgradeTo, setDowngradeTo] = useState<string>("");
 
@@ -371,6 +373,7 @@ export default function Pricing() {
       setCheckoutTier(tierId);
       setSelectedPaymentMethod("");
       setBankTransferDetails(null);
+      setBillingAuthorized(false);
       setCheckoutOpen(true);
     } else if (action === "downgrade") {
       setDowngradeTo(tierId);
@@ -382,7 +385,7 @@ export default function Pricing() {
     if (selectedPaymentMethod === "stripe") {
       setStripeLoading(true);
       try {
-        const res = await apiRequest("POST", "/api/subscription/create-checkout-session", { tier: checkoutTier });
+        const res = await apiRequest("POST", "/api/subscription/create-checkout-session", { tier: checkoutTier, billingAuthorized });
         const data = await res.json();
         if (data.url) {
           window.location.href = data.url;
@@ -949,6 +952,20 @@ export default function Pricing() {
                 <p className="text-xs text-muted-foreground">
                   Your payment is protected by Stripe — no card data is stored on our servers.
                 </p>
+                <div className="flex items-start gap-2 pt-2 mt-2 border-t">
+                  <Checkbox
+                    id="billing-authorized"
+                    checked={billingAuthorized}
+                    onCheckedChange={(v) => setBillingAuthorized(v === true)}
+                    className="mt-0.5"
+                    data-testid="checkbox-billing-authorized"
+                  />
+                  <Label htmlFor="billing-authorized" className="text-xs text-muted-foreground font-normal leading-relaxed cursor-pointer">
+                    I authorize LYS to charge my payment method on a recurring basis for this
+                    subscription until I cancel. I understand I can cancel anytime from Settings,
+                    and that this authorization is separate from the Terms of Service.
+                  </Label>
+                </div>
               </div>
             )}
 
@@ -1094,6 +1111,7 @@ export default function Pricing() {
               <Button
                 onClick={handlePaymentSubmit}
                 disabled={!selectedPaymentMethod || isPending || 
+                  (selectedPaymentMethod === "stripe" && !billingAuthorized) ||
                   (selectedPaymentMethod === "purchase_order" && (!poFormData.poNumber || !poFormData.organizationName || !poFormData.contactEmail)) ||
                   (selectedPaymentMethod === "bank_transfer" && (!bankFormData.organizationName || !bankFormData.contactEmail))
                 }

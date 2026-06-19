@@ -1,6 +1,7 @@
 import { useState, useMemo, useEffect } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { AiGeneratedLabel, AiAgentNotice } from "@/components/AiDisclosure";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -907,6 +908,7 @@ ${addedResources.length > 0 ? addedResources.map(r => `- ${r.title}: ${r.url}`).
                 </CardDescription>
               </CardHeader>
               <CardContent className="p-6 space-y-6">
+                <AiAgentNotice />
                 <div className="space-y-2">
                   <Label htmlFor="topic" className="font-oswald">Topic / Lesson Title</Label>
                   <Textarea
@@ -1385,6 +1387,9 @@ ${addedResources.length > 0 ? addedResources.map(r => `- ${r.title}: ${r.url}`).
                   </div>
                 ) : generatedLesson ? (
                   <ScrollArea className="h-[700px]">
+                    <div className="px-6 pt-4 print:hidden">
+                      <AiGeneratedLabel />
+                    </div>
                     {isEditingLesson && (
                       <div className="mx-6 mt-4 px-3 py-2 rounded-md bg-lys-teal/10 border border-lys-teal/30 flex items-center gap-2 text-sm font-roboto text-lys-teal">
                         <PenLine className="h-4 w-4 shrink-0" />

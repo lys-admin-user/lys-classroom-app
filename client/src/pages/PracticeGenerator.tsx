@@ -5,6 +5,7 @@ import { useAuth } from "@/hooks/use-auth";
 import { useToast } from "@/hooks/use-toast";
 import { GuestEmailModal } from "@/components/GuestEmailModal";
 import { GuestSignupModal } from "@/components/GuestSignupModal";
+import { AiGeneratedLabel, AiAgentNotice } from "@/components/AiDisclosure";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -223,6 +224,7 @@ export default function PracticeGenerator() {
       <Card className="mb-8">
         <CardContent className="pt-6">
           <form onSubmit={handleSubmit} className="space-y-4">
+            <AiAgentNotice />
             <div className="grid gap-4 sm:grid-cols-2">
               <div className="space-y-1.5">
                 <Label htmlFor="subject" className="font-roboto">Subject</Label>
@@ -339,6 +341,7 @@ export default function PracticeGenerator() {
 
       {result && !generate.isPending && (
         <div className="space-y-4" data-testid="section-practice-results">
+          <AiGeneratedLabel />
           <div className="flex flex-wrap items-center gap-3">
             <BookOpen className="h-5 w-5 text-lys-teal" />
             <h2 className="font-oswald text-xl font-semibold" data-testid="text-result-title">

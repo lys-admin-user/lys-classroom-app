@@ -1,6 +1,7 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "../storage";
+import { recordBundleAcceptance, consentRequestMeta } from "../services/consentService";
 import { generateLessonPlan } from "../openai";
 import { detectAfricanCountryFromText } from "@shared/africaContext";
 import { calculateLessonQualityScore, getQualityLevel } from "../lessonQualityScorer";
@@ -420,6 +421,16 @@ export function registerAccountRoutes(app: Express): void {
   app.post("/api/onboarding/complete", isAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user?.claims?.sub;
+
+      // Click-wrap gate: onboarding cannot complete without an affirmative,
+      // un-prechecked agreement to the Terms of Service & Subscription Agreement.
+      if (req.body?.agreedToTerms !== true) {
+        return res.status(400).json({
+          error: "terms_required",
+          message: "Please agree to the Terms of Service to continue.",
+        });
+      }
+
       const validated = completeOnboardingSchema.parse(req.body);
       const { role, preferences, needsAnalysis, birthdate } = validated;
 
@@ -505,7 +516,32 @@ export function registerAccountRoutes(app: Express): void {
       
       // Mark onboarding complete
       const user = await storage.completeOnboarding(userId);
-      
+
+      // Record click-wrap acceptance of the policy bundle in the consent ledger.
+      try {
+        const { ipAddress, userAgent } = consentRequestMeta(req);
+        await recordBundleAcceptance({
+          userId,
+          email: user?.email ?? currentUser?.email ?? null,
+          context: "onboarding",
+          ipAddress,
+          userAgent,
+        });
+      } catch (consentErr) {
+        console.error("Failed to record onboarding consent:", consentErr);
+        // The user DID affirm the click-wrap box; if the ledger write fails we
+        // still capture durable evidence in the tamper-evident audit chain so
+        // the affirmation is not lost.
+        await logAuditEvent({
+          userId,
+          action: "consent.ledger_write_failed",
+          category: "security",
+          severity: "warning",
+          resourceType: "consent",
+          details: { context: "onboarding", error: String((consentErr as Error)?.message ?? consentErr) },
+        }).catch(() => {});
+      }
+
       res.json({ success: true, user });
     } catch (error) {
       if (error instanceof z.ZodError) {

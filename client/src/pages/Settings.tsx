@@ -1,18 +1,131 @@
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/use-auth";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
-import { Settings as SettingsIcon, User, Crown, Loader2, Shield, Building2, Users as UsersIcon, ChevronRight } from "lucide-react";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
+import { Settings as SettingsIcon, User, Crown, Loader2, Shield, Building2, Users as UsersIcon, ChevronRight, CreditCard } from "lucide-react";
 import { Link, useLocation } from "wouter";
 import { hasMinRole } from "@/components/AppSidebar";
 import { PLAN_PRICES, SEAT_PRICES, SEAT_MINIMUMS } from "@/lib/pricing";
+import { apiRequest, queryClient } from "@/lib/queryClient";
+import { useToast } from "@/hooks/use-toast";
 import EducatorProfileForm from "@/components/EducatorProfileForm";
 import ProfileTierSitemap from "@/components/ProfileTierSitemap";
 import { NotificationSettings } from "@/components/NotificationSettings";
 import { MfaSettingsCard } from "@/components/MfaSettingsCard";
 import type { EducatorProfile } from "@shared/schema";
+
+function BillingCard({ tier }: { tier: string }) {
+  const { toast } = useToast();
+  const isPaid = ["pro", "paid", "campus", "enterprise"].includes(tier);
+
+  const cancelMutation = useMutation({
+    mutationFn: async () => {
+      const res = await apiRequest("POST", "/api/subscription/cancel", {});
+      return res.json();
+    },
+    onSuccess: (data: { message?: string }) => {
+      toast({
+        title: "Subscription canceled",
+        description: data?.message || "Your subscription has been canceled.",
+      });
+      queryClient.invalidateQueries({ queryKey: ["/api/subscription/status"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/educator-profile"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/auth/user"] });
+    },
+    onError: () => {
+      toast({
+        title: "Could not cancel",
+        description: "Something went wrong canceling your subscription. Please try again.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  return (
+    <Card data-testid="card-billing">
+      <CardHeader>
+        <div className="flex items-center gap-3">
+          <CreditCard className="h-5 w-5 text-primary" />
+          <div>
+            <CardTitle className="font-oswald">Billing &amp; Subscription</CardTitle>
+            <CardDescription className="font-roboto">
+              Manage your plan and recurring billing
+            </CardDescription>
+          </div>
+        </div>
+      </CardHeader>
+      <CardContent>
+        <div className="flex flex-col gap-4">
+          <div className="flex items-center justify-between gap-4 flex-wrap">
+            <div>
+              <p className="font-roboto text-sm text-foreground">
+                You're on the <span className="font-medium">{tier === "free" ? "Free" : tier}</span> plan.
+              </p>
+              <p className="text-xs text-muted-foreground font-roboto mt-1">
+                {isPaid
+                  ? "Canceling is one click — no hoops. You keep access until the end of your paid period, then return to the Free plan."
+                  : "Upgrade any time to unlock full features. Free plans are never charged."}
+              </p>
+            </div>
+            <Link href="/pricing">
+              <Button variant="outline" data-testid="button-manage-plan">
+                {isPaid ? "Change Plan" : "View Plans"}
+              </Button>
+            </Link>
+          </div>
+
+          {isPaid && (
+            <AlertDialog>
+              <AlertDialogTrigger asChild>
+                <Button
+                  variant="destructive"
+                  className="self-start"
+                  disabled={cancelMutation.isPending}
+                  data-testid="button-cancel-subscription"
+                >
+                  {cancelMutation.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+                  Cancel Subscription
+                </Button>
+              </AlertDialogTrigger>
+              <AlertDialogContent data-testid="dialog-cancel-subscription">
+                <AlertDialogHeader>
+                  <AlertDialogTitle className="font-oswald">Cancel your subscription?</AlertDialogTitle>
+                  <AlertDialogDescription className="font-roboto">
+                    Your subscription will be canceled and you'll keep full access until the
+                    end of your current paid period. After that, your account returns to the
+                    Free plan. You can resubscribe any time.
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel data-testid="button-keep-subscription">Keep Subscription</AlertDialogCancel>
+                  <AlertDialogAction
+                    onClick={() => cancelMutation.mutate()}
+                    data-testid="button-confirm-cancel"
+                  >
+                    Yes, Cancel
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
+          )}
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
 
 export default function Settings() {
   const { isAuthenticated, isLoading: authLoading, user } = useAuth();
@@ -152,6 +265,10 @@ export default function Settings() {
               </div>
             </CardContent>
           </Card>
+
+          <Separator />
+
+          <BillingCard tier={tier} />
 
           <Separator />
 

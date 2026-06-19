@@ -5,6 +5,7 @@ import { useAuth } from "@/hooks/use-auth";
 import { useToast } from "@/hooks/use-toast";
 import { GuestEmailModal } from "@/components/GuestEmailModal";
 import { GuestSignupModal } from "@/components/GuestSignupModal";
+import { AiGeneratedLabel, AiAgentNotice } from "@/components/AiDisclosure";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -202,6 +203,7 @@ export default function HomeschoolPlanner() {
       <Card className="mb-8">
         <CardContent className="pt-6">
           <form onSubmit={handleSubmit} className="space-y-5">
+            <AiAgentNotice />
             <div className="grid gap-4 sm:grid-cols-2">
               <div className="space-y-1.5">
                 <Label htmlFor="grade" className="font-roboto">Child's grade level</Label>
@@ -327,6 +329,7 @@ export default function HomeschoolPlanner() {
 
       {result && !generate.isPending && (
         <div className="space-y-4" data-testid="section-plan-results">
+          <AiGeneratedLabel />
           <div className="rounded-lg border border-lys-teal/30 bg-lys-teal/5 p-4">
             <div className="flex flex-wrap items-center gap-3">
               <CalendarDays className="h-5 w-5 text-lys-teal" />

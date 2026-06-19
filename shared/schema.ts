@@ -3663,6 +3663,28 @@ export const insertAuditLogSchema = createInsertSchema(auditLogs).omit({ id: tru
 export type InsertAuditLog = z.infer<typeof insertAuditLogSchema>;
 export type AuditLog = typeof auditLogs.$inferSelect;
 
+// Append-only consent ledger (FTC/ROSCA + GDPR click-wrap evidence). Each row
+// records one affirmative consent action: who, what policy + version, where it
+// happened, and the exact (millisecond) timestamp, IP, and user agent. Rows are
+// never updated or deleted — this is the proof-of-consent record.
+export const consentEvents = pgTable("consent_events", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id"), // nullable: may be captured before the account exists
+  email: varchar("email"),
+  policyType: varchar("policy_type").notNull(), // tos | privacy | ai | bundle | recurring_billing
+  policyVersion: varchar("policy_version").notNull(),
+  policyUuid: varchar("policy_uuid"),
+  action: varchar("action").notNull().default("accept"), // accept | withdraw
+  context: varchar("context").notNull(), // signup | onboarding | checkout | reaccept
+  ipAddress: varchar("ip_address"),
+  userAgent: text("user_agent"),
+  createdAt: timestamp("created_at", { withTimezone: true, mode: "date", precision: 3 }).defaultNow(),
+});
+
+export const insertConsentEventSchema = createInsertSchema(consentEvents).omit({ id: true, createdAt: true });
+export type InsertConsentEvent = z.infer<typeof insertConsentEventSchema>;
+export type ConsentEvent = typeof consentEvents.$inferSelect;
+
 // =============================================================================
 // ZERO-TRUST DATA GOVERNANCE
 // =============================================================================
