@@ -31,9 +31,9 @@ const categoryColors: Record<string, string> = {
   core: "bg-muted/50",
   ai: "bg-lys-yellow/10",
   collaboration: "bg-lys-teal/10",
-  analytics: "bg-blue-500/10 dark:bg-blue-400/10",
+  analytics: "bg-teal-500/10 dark:bg-teal-400/10",
   admin: "bg-lys-red/10",
-  premium: "bg-purple-500/10 dark:bg-purple-400/10",
+  premium: "bg-teal-500/10 dark:bg-teal-400/10",
 };
 
 const tierColors: Record<string, string> = {

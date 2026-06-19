@@ -113,12 +113,12 @@ type SavedScholarship = {
 
 const typeConfig = {
   scholarship: { label: "Scholarship", icon: DollarSign, color: "bg-green-500/10 text-green-600" },
-  financial_guide: { label: "Financial Guide", icon: FileText, color: "bg-blue-500/10 text-blue-600" },
+  financial_guide: { label: "Financial Guide", icon: FileText, color: "bg-teal-500/10 text-teal-600" },
   essay_template: { label: "Essay Guide", icon: FileText, color: "bg-amber-500/10 text-amber-600" },
-  guide: { label: "Guide", icon: FileText, color: "bg-blue-500/10 text-blue-600" },
+  guide: { label: "Guide", icon: FileText, color: "bg-teal-500/10 text-teal-600" },
   video: { label: "Video", icon: Video, color: "bg-red-500/10 text-red-600" },
-  tool: { label: "Tool", icon: Wrench, color: "bg-purple-500/10 text-purple-600" },
-  article: { label: "Article", icon: BookOpen, color: "bg-orange-500/10 text-orange-600" },
+  tool: { label: "Tool", icon: Wrench, color: "bg-lys-red/10 text-lys-red" },
+  article: { label: "Article", icon: BookOpen, color: "bg-amber-500/10 text-amber-600" },
 };
 
 const categoryConfig = {
@@ -131,11 +131,11 @@ const categoryConfig = {
 };
 
 const marketplaceTypeConfig: Record<string, { label: string; icon: typeof BookOpen; color: string }> = {
-  ebook: { label: "eBook", icon: BookOpen, color: "bg-indigo-500/10 text-indigo-600" },
+  ebook: { label: "eBook", icon: BookOpen, color: "bg-teal-500/10 text-teal-600" },
   mini_course: { label: "Mini Course", icon: GraduationCap, color: "bg-lys-teal/10 text-lys-teal" },
-  guide: { label: "Guide", icon: FileText, color: "bg-blue-500/10 text-blue-600" },
+  guide: { label: "Guide", icon: FileText, color: "bg-teal-500/10 text-teal-600" },
   template: { label: "Template", icon: FileText, color: "bg-amber-500/10 text-amber-600" },
-  workshop: { label: "Workshop", icon: Briefcase, color: "bg-purple-500/10 text-purple-600" },
+  workshop: { label: "Workshop", icon: Briefcase, color: "bg-green-500/10 text-green-600" },
   resource_pack: { label: "Resource Pack", icon: Package, color: "bg-lys-red/10 text-lys-red" },
 };
 
@@ -911,11 +911,11 @@ export default function Resources() {
                 </CardContent>
               </Card>
 
-              <Card className="bg-gradient-to-br from-blue-500/10 to-indigo-500/10 border-blue-500/20 dark:border-blue-800/30">
+              <Card className="bg-gradient-to-br from-teal-500/10 to-teal-500/10 border-teal-500/20 dark:border-teal-800/30">
                 <CardContent className="p-6">
                   <div className="flex items-center gap-4 mb-4">
-                    <div className="w-12 h-12 rounded-md bg-blue-500/20 flex items-center justify-center">
-                      <Globe className="h-6 w-6 text-blue-600 dark:text-blue-400" />
+                    <div className="w-12 h-12 rounded-md bg-teal-500/20 flex items-center justify-center">
+                      <Globe className="h-6 w-6 text-teal-600 dark:text-teal-400" />
                     </div>
                     <div>
                       <h3 className="font-oswald text-lg font-semibold">International Students</h3>
@@ -925,7 +925,7 @@ export default function Resources() {
                   <p className="font-roboto text-sm text-muted-foreground mb-4">
                     Discover scholarships, exchange programs, government-funded opportunities, and resources for studying abroad.
                   </p>
-                  <Button variant="outline" className="font-oswald gap-2 border-blue-500 text-blue-600 dark:text-blue-400" onClick={() => { setSelectedCategory("international"); window.scrollTo({ top: 0, behavior: "smooth" }); }} data-testid="button-explore-international">
+                  <Button variant="outline" className="font-oswald gap-2 border-teal-500 text-teal-600 dark:text-teal-400" onClick={() => { setSelectedCategory("international"); window.scrollTo({ top: 0, behavior: "smooth" }); }} data-testid="button-explore-international">
                     Explore Opportunities
                     <ArrowRight className="h-4 w-4" />
                   </Button>
@@ -1080,8 +1080,8 @@ export default function Resources() {
                           </div>
                         )}
                         {selectedResource.scholarshipType && (
-                          <div className="p-3 rounded-md bg-blue-50 dark:bg-blue-950 border border-blue-200 dark:border-blue-800">
-                            <div className="flex items-center gap-2 text-blue-700 dark:text-blue-400">
+                          <div className="p-3 rounded-md bg-teal-50 dark:bg-teal-950 border border-teal-200 dark:border-teal-800">
+                            <div className="flex items-center gap-2 text-teal-700 dark:text-teal-400">
                               <GraduationCap className="h-4 w-4" />
                               <span className="text-sm font-medium">Type</span>
                             </div>

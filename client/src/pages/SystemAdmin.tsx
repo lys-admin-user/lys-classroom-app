@@ -894,8 +894,8 @@ export default function SystemAdminPage({ params }: { params?: { tab?: string } 
 
   const getTierColor = (tier: string | null) => {
     switch (tier) {
-      case "pro": return "bg-blue-500/10 text-blue-600 border-blue-500/20";
-      case "campus": return "bg-purple-500/10 text-purple-600 border-purple-500/20";
+      case "pro": return "bg-teal-500/10 text-teal-600 border-teal-500/20";
+      case "campus": return "bg-lys-red/10 text-lys-red border-lys-red/20";
       case "enterprise": return "bg-amber-500/10 text-amber-600 border-amber-500/20";
       default: return "bg-muted text-muted-foreground";
     }
@@ -1082,11 +1082,11 @@ export default function SystemAdminPage({ params }: { params?: { tab?: string } 
                           <span className="text-sm">Free</span>
                           <Badge variant="secondary">{analytics?.users.byTier.free || 0}</Badge>
                         </div>
-                        <div className="flex items-center justify-between p-2 rounded-md bg-blue-500/5">
+                        <div className="flex items-center justify-between p-2 rounded-md bg-teal-500/5">
                           <span className="text-sm">Pro</span>
                           <Badge className={getTierColor("pro")}>{analytics?.users.byTier.pro || 0}</Badge>
                         </div>
-                        <div className="flex items-center justify-between p-2 rounded-md bg-purple-500/5">
+                        <div className="flex items-center justify-between p-2 rounded-md bg-teal-500/5">
                           <span className="text-sm">Campus</span>
                           <Badge className={getTierColor("campus")}>{analytics?.users.byTier.campus || 0}</Badge>
                         </div>
@@ -1185,12 +1185,12 @@ export default function SystemAdminPage({ params }: { params?: { tab?: string } 
                       <p className="text-sm text-muted-foreground">Total Points Earned</p>
                     </div>
                     <div className="text-center p-4 rounded-lg bg-muted/50">
-                      <Eye className="h-6 w-6 mx-auto mb-2 text-blue-500" />
+                      <Eye className="h-6 w-6 mx-auto mb-2 text-teal-500" />
                       <div className="text-2xl font-bold">{analytics?.affiliates.totalViews?.toLocaleString() || 0}</div>
                       <p className="text-sm text-muted-foreground">Total Views</p>
                     </div>
                     <div className="text-center p-4 rounded-lg bg-muted/50">
-                      <Share2 className="h-6 w-6 mx-auto mb-2 text-purple-500" />
+                      <Share2 className="h-6 w-6 mx-auto mb-2 text-teal-500" />
                       <div className="text-2xl font-bold">{analytics?.affiliates.totalShares?.toLocaleString() || 0}</div>
                       <p className="text-sm text-muted-foreground">Total Shares</p>
                     </div>
@@ -1407,7 +1407,7 @@ export default function SystemAdminPage({ params }: { params?: { tab?: string } 
                         href={`https://dashboard.stripe.com/customers/${editUserData.stripeCustomerId}`}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="text-xs text-blue-500 hover:text-blue-700 flex items-center gap-1"
+                        className="text-xs text-teal-500 hover:text-teal-700 flex items-center gap-1"
                         data-testid="link-stripe-customer-dashboard"
                       >
                         <ExternalLink className="h-3 w-3" />
@@ -1785,7 +1785,7 @@ export default function SystemAdminPage({ params }: { params?: { tab?: string } 
             <Card className="overflow-visible">
               <CardHeader className="flex flex-row items-center justify-between gap-4 pb-2">
                 <CardTitle className="text-sm font-medium">Pro Users</CardTitle>
-                <CreditCard className="h-4 w-4 text-blue-500" />
+                <CreditCard className="h-4 w-4 text-teal-500" />
               </CardHeader>
               <CardContent>
                 <div className="text-2xl font-bold">{billingData?.stats.totalProUsers || 0}</div>
@@ -1794,7 +1794,7 @@ export default function SystemAdminPage({ params }: { params?: { tab?: string } 
             <Card className="overflow-visible">
               <CardHeader className="flex flex-row items-center justify-between gap-4 pb-2">
                 <CardTitle className="text-sm font-medium">Stripe Connected</CardTitle>
-                <Globe className="h-4 w-4 text-purple-500" />
+                <Globe className="h-4 w-4 text-teal-500" />
               </CardHeader>
               <CardContent>
                 <div className="text-2xl font-bold">{billingData?.stats.usersWithStripe || 0}</div>
@@ -3001,7 +3001,7 @@ export default function SystemAdminPage({ params }: { params?: { tab?: string } 
                 <Card className="overflow-visible">
                   <CardContent className="pt-4 pb-4">
                     <div className="flex items-center gap-2">
-                      <div className="w-3 h-3 rounded-full bg-blue-500" />
+                      <div className="w-3 h-3 rounded-full bg-teal-500" />
                       <div>
                         <p className="text-xs text-muted-foreground">New</p>
                         <p className="text-lg font-bold text-foreground">{userAnalyticsData.platformMetrics.newUsers}</p>
@@ -3194,7 +3194,7 @@ export default function SystemAdminPage({ params }: { params?: { tab?: string } 
 
                     const statusColors: Record<string, string> = {
                       active: "bg-green-500/10 text-green-700 dark:text-green-400 border-green-500/30",
-                      new: "bg-blue-500/10 text-blue-700 dark:text-blue-400 border-blue-500/30",
+                      new: "bg-teal-500/10 text-teal-700 dark:text-teal-400 border-teal-500/30",
                       at_risk: "bg-amber-500/10 text-amber-700 dark:text-amber-400 border-amber-500/30",
                       inactive: "bg-gray-500/10 text-gray-700 dark:text-gray-400 border-gray-500/30",
                       churned: "bg-red-500/10 text-red-700 dark:text-red-400 border-red-500/30",
@@ -3622,7 +3622,7 @@ export default function SystemAdminPage({ params }: { params?: { tab?: string } 
             ),
           },
           {
-            icon: <Users className="h-10 w-10 text-blue-500" />,
+            icon: <Users className="h-10 w-10 text-teal-500" />,
             title: "Users Tab",
             subtitle: "Search, edit, create, and delete users",
             content: (
@@ -3634,8 +3634,8 @@ export default function SystemAdminPage({ params }: { params?: { tab?: string } 
                   <li className="flex gap-2"><CheckCircle className="h-4 w-4 text-green-500 mt-0.5 shrink-0" /><span><strong>Create User</strong> — manually add users with any role and tier</span></li>
                   <li className="flex gap-2"><XCircle className="h-4 w-4 text-red-500 mt-0.5 shrink-0" /><span><strong>Delete User</strong> — permanently removes the account, all their lessons, and goals. This cannot be undone.</span></li>
                 </ul>
-                <div className="rounded-lg border bg-blue-50 dark:bg-blue-950/20 border-blue-200 dark:border-blue-800 p-3">
-                  <p className="text-blue-800 dark:text-blue-300 text-xs">Tip: When editing a user's Stripe Customer ID, a "View in Stripe" link appears so you can open their Stripe dashboard record directly.</p>
+                <div className="rounded-lg border bg-teal-50 dark:bg-teal-950/20 border-teal-200 dark:border-teal-800 p-3">
+                  <p className="text-teal-800 dark:text-teal-300 text-xs">Tip: When editing a user's Stripe Customer ID, a "View in Stripe" link appears so you can open their Stripe dashboard record directly.</p>
                 </div>
               </div>
             ),
@@ -3657,7 +3657,7 @@ export default function SystemAdminPage({ params }: { params?: { tab?: string } 
             ),
           },
           {
-            icon: <Building2 className="h-10 w-10 text-purple-500" />,
+            icon: <Building2 className="h-10 w-10 text-teal-500" />,
             title: "Organizations",
             subtitle: "Schools, districts, and campuses",
             content: (
@@ -3672,7 +3672,7 @@ export default function SystemAdminPage({ params }: { params?: { tab?: string } 
             ),
           },
           {
-            icon: <BarChart3 className="h-10 w-10 text-orange-500" />,
+            icon: <BarChart3 className="h-10 w-10 text-amber-500" />,
             title: "Analytics & Billing",
             subtitle: "Platform metrics and pricing tiers",
             content: (
@@ -4482,7 +4482,7 @@ function SafetySuiteTab() {
   const severityColors: Record<string, string> = {
     high: "bg-red-500/10 text-red-700 dark:text-red-400 border-red-500/30",
     medium: "bg-amber-500/10 text-amber-700 dark:text-amber-400 border-amber-500/30",
-    low: "bg-blue-500/10 text-blue-700 dark:text-blue-400 border-blue-500/30",
+    low: "bg-teal-500/10 text-teal-700 dark:text-teal-400 border-teal-500/30",
   };
 
   return (
@@ -4866,7 +4866,7 @@ function DataGovernanceTab() {
             <Card>
               <CardContent className="p-4">
                 <div className="flex items-center gap-2">
-                  <Award className="h-5 w-5 text-blue-600" />
+                  <Award className="h-5 w-5 text-teal-600" />
                   <div>
                     <p className="text-2xl font-bold font-oswald">{governance?.successLedger.totalMarks || 0}</p>
                     <p className="text-sm text-muted-foreground font-roboto">Success Marks</p>
@@ -5181,7 +5181,7 @@ function TrialMonitoringTab() {
         <Card>
           <CardContent className="pt-6">
             <div className="text-center">
-              <p className="text-2xl font-bold font-oswald text-blue-600" data-testid="text-bound-trials">{stats.boundTrials}</p>
+              <p className="text-2xl font-bold font-oswald text-teal-600" data-testid="text-bound-trials">{stats.boundTrials}</p>
               <p className="text-xs text-muted-foreground font-roboto">User-Bound</p>
             </div>
           </CardContent>
@@ -5407,15 +5407,15 @@ function ContentHubTab() {
   });
 
   const placementLabels: Record<string, { label: string; color: string }> = {
-    know_resource: { label: "KNOW Resources", color: "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200" },
-    ai_lesson: { label: "AI Lesson", color: "bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200" },
+    know_resource: { label: "KNOW Resources", color: "bg-teal-100 text-teal-800 dark:bg-teal-900 dark:text-teal-200" },
+    ai_lesson: { label: "AI Lesson", color: "bg-teal-100 text-teal-800 dark:bg-teal-900 dark:text-teal-200" },
     featured: { label: "My Journey", color: "bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-200" },
     mentor_connect: { label: "Mentor Connect", color: "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200" },
   };
 
   const pillarLabels: Record<string, { label: string; color: string }> = {
-    be: { label: "BE", color: "bg-rose-100 text-rose-800 dark:bg-rose-900 dark:text-rose-200" },
-    know: { label: "KNOW", color: "bg-sky-100 text-sky-800 dark:bg-sky-900 dark:text-sky-200" },
+    be: { label: "BE", color: "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200" },
+    know: { label: "KNOW", color: "bg-teal-100 text-teal-800 dark:bg-teal-900 dark:text-teal-200" },
     do: { label: "DO", color: "bg-emerald-100 text-emerald-800 dark:bg-emerald-900 dark:text-emerald-200" },
   };
 
@@ -5520,7 +5520,7 @@ function ContentHubTab() {
               {feeds.map((feed: any) => (
                 <div key={feed.id} className="flex items-center justify-between border rounded-lg p-3" data-testid={`card-feed-${feed.id}`}>
                   <div className="flex items-center gap-3">
-                    {feed.feedType === "podcast" ? <Headphones className="h-5 w-5 text-purple-500" /> : <FileText className="h-5 w-5 text-blue-500" />}
+                    {feed.feedType === "podcast" ? <Headphones className="h-5 w-5 text-teal-500" /> : <FileText className="h-5 w-5 text-teal-500" />}
                     <div>
                       <div className="font-medium">{feed.name}</div>
                       <div className="text-sm text-muted-foreground">{feed.url}</div>
@@ -5626,7 +5626,7 @@ function ContentItemCard({ item, feeds, placementLabels, pillarLabels, onApprove
       <div className="flex items-start justify-between gap-4">
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 mb-1">
-            {item.audioUrl ? <Headphones className="h-4 w-4 text-purple-500 shrink-0" /> : <FileText className="h-4 w-4 text-blue-500 shrink-0" />}
+            {item.audioUrl ? <Headphones className="h-4 w-4 text-teal-500 shrink-0" /> : <FileText className="h-4 w-4 text-teal-500 shrink-0" />}
             <h4 className="font-semibold truncate" data-testid={`text-title-${item.id}`}>{item.title}</h4>
           </div>
           <p className="text-sm text-muted-foreground line-clamp-2">{item.description}</p>

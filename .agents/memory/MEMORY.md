@@ -1,4 +1,1 @@
-- [Build/env gotchas](build-env-gotchas.md) — npm install must go through the packager tool, not bash; `npm run check` times out (use a bounded `npx tsc --noEmit`).
-- [Audit hash chain](audit-hash-chain.md) — auditLogs is a serialized SHA-256 hash chain; what the hash commits to and how to keep verify working.
-- [Dependency audit posture](dependency-audit-posture.md) — which advisories are deliberately deferred and why; the allow-list lives in two places that must stay in sync.
-- [Org membership roles](org-membership-roles.md) — organization_memberships.role is member/admin/owner, NOT the platform role hierarchy.
+- [LYS brand color convention](brand-color-palette.md) — brand hues are teal/red/amber(+yellow); green/emerald only for success; blue/purple/orange/pink are off-brand, map to teal/amber/red.

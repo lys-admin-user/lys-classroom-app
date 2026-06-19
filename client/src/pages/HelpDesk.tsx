@@ -1381,7 +1381,7 @@ export default function HelpDesk() {
   const severityConfig = {
     error: { color: "bg-red-500/10 text-red-700 dark:text-red-400 border-red-500/30", icon: XCircle, label: "Error" },
     warning: { color: "bg-amber-500/10 text-amber-700 dark:text-amber-400 border-amber-500/30", icon: AlertTriangle, label: "Warning" },
-    info: { color: "bg-blue-500/10 text-blue-700 dark:text-blue-400 border-blue-500/30", icon: Info, label: "Info" },
+    info: { color: "bg-teal-500/10 text-teal-700 dark:text-teal-400 border-teal-500/30", icon: Info, label: "Info" },
   };
 
   if (selectedArticle) {
@@ -1405,7 +1405,7 @@ export default function HelpDesk() {
             <div className="flex items-start gap-3">
               <SeverityIcon className={`h-6 w-6 mt-1 ${
                 selectedArticle.severity === "error" ? "text-red-600" :
-                selectedArticle.severity === "warning" ? "text-amber-600" : "text-blue-600"
+                selectedArticle.severity === "warning" ? "text-amber-600" : "text-teal-600"
               }`} />
               <div className="flex-1">
                 <CardTitle className="font-oswald text-xl md:text-2xl" data-testid="text-article-title">{selectedArticle.title}</CardTitle>
@@ -1552,7 +1552,7 @@ export default function HelpDesk() {
                   >
                     <SeverityIcon className={`h-5 w-5 mt-0.5 shrink-0 ${
                       article.severity === "error" ? "text-red-600" :
-                      article.severity === "warning" ? "text-amber-600" : "text-blue-600"
+                      article.severity === "warning" ? "text-amber-600" : "text-teal-600"
                     }`} />
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2 mb-1">

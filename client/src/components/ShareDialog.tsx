@@ -240,7 +240,7 @@ export function ShareDialog({ open, onOpenChange, lessonId, lessonTitle }: Share
                 disabled={generateLinkMutation.isPending}
                 data-testid="button-share-facebook"
               >
-                <SiFacebook className="h-5 w-5 text-blue-600" />
+                <SiFacebook className="h-5 w-5 text-[#1877F2]" />
                 <span className="font-roboto text-xs">Facebook</span>
               </Button>
               <Button
@@ -250,7 +250,7 @@ export function ShareDialog({ open, onOpenChange, lessonId, lessonTitle }: Share
                 disabled={generateLinkMutation.isPending}
                 data-testid="button-share-linkedin"
               >
-                <SiLinkedin className="h-5 w-5 text-blue-700" />
+                <SiLinkedin className="h-5 w-5 text-[#0A66C2]" />
                 <span className="font-roboto text-xs">LinkedIn</span>
               </Button>
               <Button

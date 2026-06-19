@@ -488,8 +488,8 @@ function DistrictOverview({ data, onSchoolClick }: DistrictOverviewProps) {
         <Card>
           <CardContent className="pt-6">
             <div className="flex items-center gap-4">
-              <div className="w-12 h-12 rounded-md bg-blue-500/10 flex items-center justify-center">
-                <FileText className="h-6 w-6 text-blue-600" />
+              <div className="w-12 h-12 rounded-md bg-teal-500/10 flex items-center justify-center">
+                <FileText className="h-6 w-6 text-teal-600" />
               </div>
               <div>
                 <p className="text-sm text-muted-foreground font-roboto">Total Lessons</p>

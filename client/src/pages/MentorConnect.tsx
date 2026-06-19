@@ -399,8 +399,8 @@ export default function MentorConnect() {
                     <Card key={item.id} className="hover-elevate" data-testid={`card-mentor-resource-${item.id}`}>
                       <CardContent className="p-4 flex flex-col gap-3">
                         <div className="flex items-start gap-3">
-                          <div className={`p-2 rounded-full flex-shrink-0 ${isPodcast ? "bg-purple-500/10" : "bg-blue-500/10"}`}>
-                            <TypeIcon className={`w-4 h-4 ${isPodcast ? "text-purple-500" : "text-blue-500"}`} />
+                          <div className={`p-2 rounded-full flex-shrink-0 ${isPodcast ? "bg-teal-500/10" : "bg-teal-500/10"}`}>
+                            <TypeIcon className={`w-4 h-4 ${isPodcast ? "text-teal-500" : "text-teal-500"}`} />
                           </div>
                           <div className="flex-1 min-w-0">
                             <p className="font-medium text-sm line-clamp-2" data-testid={`text-mentor-resource-title-${item.id}`}>

@@ -1686,9 +1686,9 @@ function SectionContent({ section }: { section: DocSection }) {
           )}
 
           {block.note && (
-            <div className="flex items-start gap-3 p-3 rounded-lg bg-blue-500/10 border border-blue-500/20">
-              <FileText className="h-4 w-4 text-blue-500 shrink-0 mt-0.5" />
-              <p className="text-sm font-roboto text-blue-600 dark:text-blue-400">{block.note}</p>
+            <div className="flex items-start gap-3 p-3 rounded-lg bg-teal-500/10 border border-teal-500/20">
+              <FileText className="h-4 w-4 text-teal-500 shrink-0 mt-0.5" />
+              <p className="text-sm font-roboto text-teal-600 dark:text-teal-400">{block.note}</p>
             </div>
           )}
 

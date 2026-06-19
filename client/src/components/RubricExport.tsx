@@ -231,7 +231,7 @@ export function RubricExport({
                         <th className="text-left p-2 font-medium">Criteria</th>
                         <th className="text-left p-2 font-medium bg-green-50 dark:bg-green-950">Distinguished</th>
                         <th className="text-left p-2 font-medium bg-yellow-50 dark:bg-yellow-950">Accomplished</th>
-                        <th className="text-left p-2 font-medium bg-orange-50 dark:bg-orange-950">Acceptable</th>
+                        <th className="text-left p-2 font-medium bg-amber-50 dark:bg-amber-950">Acceptable</th>
                         <th className="text-left p-2 font-medium bg-red-50 dark:bg-red-950">Needs Improvement</th>
                       </tr>
                     </thead>
@@ -247,7 +247,7 @@ export function RubricExport({
                             <td key={i} className={`p-2 text-xs ${
                               i === 0 ? 'bg-green-50 dark:bg-green-950' :
                               i === 1 ? 'bg-yellow-50 dark:bg-yellow-950' :
-                              i === 2 ? 'bg-orange-50 dark:bg-orange-950' :
+                              i === 2 ? 'bg-amber-50 dark:bg-amber-950' :
                               'bg-red-50 dark:bg-red-950'
                             }`}>
                               {l.description}
@@ -276,7 +276,7 @@ export function RubricExport({
                     <div key={i} className={`p-2 rounded text-sm ${
                       i === 0 ? 'bg-green-50 dark:bg-green-950 border-l-4 border-green-500' :
                       i === 1 ? 'bg-yellow-50 dark:bg-yellow-950 border-l-4 border-yellow-500' :
-                      i === 2 ? 'bg-orange-50 dark:bg-orange-950 border-l-4 border-orange-500' :
+                      i === 2 ? 'bg-amber-50 dark:bg-amber-950 border-l-4 border-amber-500' :
                       'bg-red-50 dark:bg-red-950 border-l-4 border-red-500'
                     }`}>
                       <div className="font-medium">{l.level} ({l.score} pts)</div>

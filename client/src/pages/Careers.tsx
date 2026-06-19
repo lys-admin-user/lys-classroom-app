@@ -100,16 +100,16 @@ const usStates = [
 ];
 
 const pathwayTypes = {
-  college: { label: "4-Year College", color: "bg-blue-500/10 text-blue-600" },
+  college: { label: "4-Year College", color: "bg-teal-500/10 text-teal-600" },
   military: { label: "Military", color: "bg-green-500/10 text-green-600" },
-  trade: { label: "Trade School", color: "bg-orange-500/10 text-orange-600" },
-  certification: { label: "Certification", color: "bg-purple-500/10 text-purple-600" },
+  trade: { label: "Trade School", color: "bg-amber-500/10 text-amber-600" },
+  certification: { label: "Certification", color: "bg-teal-500/10 text-teal-600" },
 };
 
 const outlookLabels: Record<string, { label: string; color: string }> = {
   much_faster: { label: "Much Faster Than Average", color: "text-green-600 bg-green-500/10" },
   faster_than_average: { label: "Faster Than Average", color: "text-emerald-600 bg-emerald-500/10" },
-  average: { label: "Average Growth", color: "text-blue-600 bg-blue-500/10" },
+  average: { label: "Average Growth", color: "text-teal-600 bg-teal-500/10" },
   little_change: { label: "Little Change", color: "text-amber-600 bg-amber-500/10" },
   declining: { label: "Declining", color: "text-red-600 bg-red-500/10" },
 };
@@ -117,7 +117,7 @@ const outlookLabels: Record<string, { label: string; color: string }> = {
 const demandLabels: Record<string, { label: string; color: string }> = {
   very_high: { label: "Very High Demand", color: "text-green-600" },
   high: { label: "High Demand", color: "text-emerald-600" },
-  moderate: { label: "Moderate Demand", color: "text-blue-600" },
+  moderate: { label: "Moderate Demand", color: "text-teal-600" },
   low: { label: "Low Demand", color: "text-amber-600" },
 };
 
@@ -415,8 +415,8 @@ export default function Careers() {
                   </p>
                   <p className="text-xs text-muted-foreground font-roboto">2023-2033</p>
                 </div>
-                <div className="p-4 rounded-md bg-blue-500/10 text-center">
-                  <Users className="h-6 w-6 text-blue-600 mx-auto mb-2" />
+                <div className="p-4 rounded-md bg-teal-500/10 text-center">
+                  <Users className="h-6 w-6 text-teal-600 mx-auto mb-2" />
                   <p className="text-xs text-muted-foreground font-roboto mb-1">Annual Openings</p>
                   <p className="font-oswald text-lg sm:text-xl font-semibold truncate">
                     {selectedCareer.projectedOpenings ? formatNumber(selectedCareer.projectedOpenings) : "N/A"}

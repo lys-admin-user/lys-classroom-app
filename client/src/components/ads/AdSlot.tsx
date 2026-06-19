@@ -24,7 +24,7 @@ const PLACEHOLDER_ADS = [
     description: "Explore top-rated programs that match your career goals",
     cta: "Learn More",
     icon: GraduationCap,
-    bgClass: "from-blue-500/10 to-indigo-500/10",
+    bgClass: "from-teal-500/10 to-amber-500/10",
   },
   {
     category: "career",
@@ -40,7 +40,7 @@ const PLACEHOLDER_ADS = [
     description: "Millions in scholarships available for students like you",
     cta: "Apply Now",
     icon: Award,
-    bgClass: "from-amber-500/10 to-orange-500/10",
+    bgClass: "from-amber-500/10 to-red-500/10",
   },
   {
     category: "test_prep",
@@ -48,7 +48,7 @@ const PLACEHOLDER_ADS = [
     description: "Premium test prep courses with proven results",
     cta: "Start Learning",
     icon: BookOpen,
-    bgClass: "from-purple-500/10 to-pink-500/10",
+    bgClass: "from-teal-500/10 to-red-500/10",
   },
 ];
 

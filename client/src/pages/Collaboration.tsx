@@ -792,7 +792,7 @@ function CollaborationRoom({ session, user, onEnd, onLeave }: CollaborationRoomP
                       onClick={() => session.zoomUrl && window.open(session.zoomUrl, "_blank")}
                       data-testid="button-open-zoom"
                     >
-                      <SiZoom className="h-4 w-4 text-blue-500" />
+                      <SiZoom className="h-4 w-4 text-teal-500" />
                       Open Zoom
                       {session.zoomUrl ? (
                         <ExternalLink className="h-3 w-3 ml-auto text-muted-foreground" />
@@ -856,7 +856,7 @@ function CollaborationRoom({ session, user, onEnd, onLeave }: CollaborationRoomP
                           <div className="mt-3 space-y-3">
                             <div>
                               <Label className="text-xs flex items-center gap-1.5">
-                                <SiZoom className="h-3 w-3 text-blue-500" />
+                                <SiZoom className="h-3 w-3 text-teal-500" />
                                 Zoom Meeting URL
                               </Label>
                               <Input

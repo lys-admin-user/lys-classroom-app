@@ -871,7 +871,7 @@ export default function Assignments() {
                               <div className="flex items-start gap-3">
                                 <div className={`p-2 rounded-md ${
                                   template.bkdFocus === "be" ? "bg-yellow-100 text-yellow-700" :
-                                  template.bkdFocus === "know" ? "bg-blue-100 text-blue-700" :
+                                  template.bkdFocus === "know" ? "bg-teal-100 text-teal-700" :
                                   "bg-red-100 text-red-700"
                                 }`}>
                                   <IconComponent className="w-5 h-5" />
@@ -881,7 +881,7 @@ export default function Assignments() {
                                     <span className="font-medium">{template.label}</span>
                                     <Badge variant="outline" className={`text-xs ${
                                       template.bkdFocus === "be" ? "border-yellow-500 text-yellow-700" :
-                                      template.bkdFocus === "know" ? "border-blue-500 text-blue-700" :
+                                      template.bkdFocus === "know" ? "border-teal-500 text-teal-700" :
                                       "border-red-500 text-red-700"
                                     }`}>
                                       {template.bkdFocus.toUpperCase()}
@@ -1622,12 +1622,12 @@ export default function Assignments() {
                                   </div>
                                   <p className="text-sm text-green-800 dark:text-green-300">{generatedAssignment.project.lowFloor}</p>
                                 </div>
-                                <div className="p-4 rounded-md bg-purple-50 dark:bg-purple-950 border border-purple-200 dark:border-purple-800">
+                                <div className="p-4 rounded-md bg-teal-50 dark:bg-teal-950 border border-teal-200 dark:border-teal-800">
                                   <div className="flex items-center gap-2 mb-2">
-                                    <Star className="w-4 h-4 text-purple-600" />
-                                    <span className="font-oswald text-sm text-purple-700 dark:text-purple-400">High Ceiling (Advanced)</span>
+                                    <Star className="w-4 h-4 text-teal-600" />
+                                    <span className="font-oswald text-sm text-teal-700 dark:text-teal-400">High Ceiling (Advanced)</span>
                                   </div>
-                                  <p className="text-sm text-purple-800 dark:text-purple-300">{generatedAssignment.project.highCeiling}</p>
+                                  <p className="text-sm text-teal-800 dark:text-teal-300">{generatedAssignment.project.highCeiling}</p>
                                 </div>
                               </div>
 
@@ -1789,18 +1789,18 @@ export default function Assignments() {
                                     return (
                                       <div key={styleType} className="mb-5">
                                         <div className={`flex items-center gap-2 mb-2 pb-1 border-b ${
-                                          styleType === "socratic" ? "border-blue-200" :
+                                          styleType === "socratic" ? "border-teal-200" :
                                           styleType === "hebraic" ? "border-amber-200" :
                                           "border-primary/20"
                                         }`}>
                                           <StyleIcon className={`w-5 h-5 ${
-                                            styleType === "socratic" ? "text-blue-600" :
+                                            styleType === "socratic" ? "text-teal-600" :
                                             styleType === "hebraic" ? "text-amber-600" :
                                             "text-primary"
                                           }`} />
                                           <div>
                                             <span className={`font-oswald text-sm ${
-                                              styleType === "socratic" ? "text-blue-700 dark:text-blue-400" :
+                                              styleType === "socratic" ? "text-teal-700 dark:text-teal-400" :
                                               styleType === "hebraic" ? "text-amber-700 dark:text-amber-400" :
                                               "text-primary"
                                             }`}>
@@ -1813,13 +1813,13 @@ export default function Assignments() {
                                         <div className="space-y-3 ml-6">
                                           {stylePrompts.map((rp: any, ri: number) => (
                                             <div key={ri} className={`p-3 rounded-md border ${
-                                              styleType === "socratic" ? "bg-blue-50/50 dark:bg-blue-950/30 border-blue-100 dark:border-blue-900" :
+                                              styleType === "socratic" ? "bg-teal-50/50 dark:bg-teal-950/30 border-teal-100 dark:border-teal-900" :
                                               styleType === "hebraic" ? "bg-amber-50/50 dark:bg-amber-950/30 border-amber-100 dark:border-amber-900" :
                                               "bg-primary/5 border-primary/10"
                                             }`}>
                                               <div className="flex items-start gap-2">
                                                 <Badge variant="outline" className={`text-xs flex-shrink-0 ${
-                                                  styleType === "socratic" ? "border-blue-300 text-blue-700 dark:text-blue-400" :
+                                                  styleType === "socratic" ? "border-teal-300 text-teal-700 dark:text-teal-400" :
                                                   styleType === "hebraic" ? "border-amber-300 text-amber-700 dark:text-amber-400" :
                                                   "border-primary/50"
                                                 }`}>

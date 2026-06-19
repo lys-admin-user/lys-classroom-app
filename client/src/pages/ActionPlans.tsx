@@ -39,12 +39,12 @@ import { Link } from "wouter";
 import { AdBanner } from "@/components/AdBanner";
 
 const categoryConfig = {
-  academic: { label: "Academic", icon: BookOpen, color: "bg-blue-500/10 text-blue-600" },
+  academic: { label: "Academic", icon: BookOpen, color: "bg-teal-500/10 text-teal-600" },
   career: { label: "Career", icon: Target, color: "bg-lys-red/10 text-lys-red" },
-  personal: { label: "Personal", icon: Heart, color: "bg-pink-500/10 text-pink-600" },
+  personal: { label: "Personal", icon: Heart, color: "bg-red-500/10 text-red-600" },
   financial: { label: "Financial", icon: DollarSign, color: "bg-green-500/10 text-green-600" },
-  social: { label: "Social", icon: Users, color: "bg-purple-500/10 text-purple-600" },
-  health: { label: "Health", icon: Activity, color: "bg-orange-500/10 text-orange-600" },
+  social: { label: "Social", icon: Users, color: "bg-teal-500/10 text-teal-600" },
+  health: { label: "Health", icon: Activity, color: "bg-amber-500/10 text-amber-600" },
 };
 
 const bkdConfig = {

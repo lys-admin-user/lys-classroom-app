@@ -38,15 +38,15 @@ const LETTER_GRADE_COLORS: Record<string, string> = {
   "A+": "bg-green-600",
   "A": "bg-green-500",
   "A-": "bg-green-400",
-  "B+": "bg-blue-500",
-  "B": "bg-blue-400",
-  "B-": "bg-blue-300",
+  "B+": "bg-teal-500",
+  "B": "bg-teal-400",
+  "B-": "bg-teal-300",
   "C+": "bg-yellow-500",
   "C": "bg-yellow-400",
   "C-": "bg-yellow-300",
-  "D+": "bg-orange-500",
-  "D": "bg-orange-400",
-  "D-": "bg-orange-300",
+  "D+": "bg-amber-500",
+  "D": "bg-amber-400",
+  "D-": "bg-amber-300",
   "F": "bg-red-500",
 };
 
@@ -861,7 +861,7 @@ export default function Gradebook() {
                               ? avg >= 90 ? "Excellent" : avg >= 80 ? "Good" : avg >= 70 ? "Developing" : "Needs Support"
                               : "No Data";
                             const statusColor = avg !== null
-                              ? avg >= 90 ? "bg-green-500" : avg >= 80 ? "bg-blue-500" : avg >= 70 ? "bg-yellow-500" : "bg-red-500"
+                              ? avg >= 90 ? "bg-green-500" : avg >= 80 ? "bg-teal-500" : avg >= 70 ? "bg-yellow-500" : "bg-red-500"
                               : "bg-gray-400";
 
                             return (

@@ -52,7 +52,7 @@ const DOC_TYPE_LABELS: Record<string, { label: string; icon: any; desc: string }
 function statusBadge(status: string) {
   const map: Record<string, { label: string; className: string }> = {
     pending: { label: "Queued", className: "bg-slate-100 text-slate-700" },
-    processing: { label: "Extracting…", className: "bg-blue-100 text-blue-700" },
+    processing: { label: "Extracting…", className: "bg-teal-100 text-teal-700" },
     extracted: { label: "Ready", className: "bg-green-100 text-green-700" },
     failed: { label: "Failed", className: "bg-red-100 text-red-700" },
     skipped: { label: "Stored", className: "bg-slate-100 text-slate-600" },

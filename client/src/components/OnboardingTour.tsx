@@ -690,7 +690,7 @@ function getPillarColor(pillar?: string) {
     case "know": return "text-lys-yellow";
     case "do": return "text-lys-teal";
     case "tools": return "text-primary";
-    case "admin": return "text-orange-600 dark:text-orange-400";
+    case "admin": return "text-amber-600 dark:text-amber-400";
     default: return "text-foreground";
   }
 }
@@ -701,7 +701,7 @@ function getPillarBadge(pillar?: string) {
     case "know": return { label: "KNOW", className: "bg-lys-yellow/10 text-lys-yellow border-lys-yellow/20" };
     case "do": return { label: "DO", className: "bg-lys-teal/10 text-lys-teal border-lys-teal/20" };
     case "tools": return { label: "TOOLS", className: "bg-primary/10 text-primary border-primary/20" };
-    case "admin": return { label: "ADMIN", className: "bg-orange-500/10 text-orange-600 dark:text-orange-400 border-orange-500/20" };
+    case "admin": return { label: "ADMIN", className: "bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/20" };
     default: return null;
   }
 }

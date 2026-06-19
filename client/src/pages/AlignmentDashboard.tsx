@@ -44,7 +44,7 @@ export default function AlignmentDashboard() {
   const getCoverageColor = (percentage: number) => {
     if (percentage >= 80) return "bg-green-500";
     if (percentage >= 60) return "bg-yellow-500";
-    if (percentage >= 40) return "bg-orange-500";
+    if (percentage >= 40) return "bg-amber-500";
     return "bg-red-500";
   };
 

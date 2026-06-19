@@ -1744,8 +1744,8 @@ export default function SiteAdminPage() {
                 <Card key={template.id} data-testid={`card-template-${template.id}`}>
                   <CardHeader className="flex flex-row items-start justify-between gap-4">
                     <div className="flex items-center gap-3">
-                      <div className={`w-10 h-10 rounded-md flex items-center justify-center ${template.isActive ? "bg-blue-100 dark:bg-blue-900/20" : "bg-muted"}`}>
-                        <Mail className={`h-5 w-5 ${template.isActive ? "text-blue-600" : "text-muted-foreground"}`} />
+                      <div className={`w-10 h-10 rounded-md flex items-center justify-center ${template.isActive ? "bg-teal-100 dark:bg-teal-900/20" : "bg-muted"}`}>
+                        <Mail className={`h-5 w-5 ${template.isActive ? "text-teal-600" : "text-muted-foreground"}`} />
                       </div>
                       <div>
                         <CardTitle className="text-lg font-mono">{template.name}</CardTitle>
@@ -2012,10 +2012,10 @@ export default function SiteAdminPage() {
                 <Card data-testid="stat-card-know">
                   <CardHeader className="flex flex-row items-center justify-between gap-4 pb-2">
                     <CardTitle className="text-sm font-medium">Avg KNOW Score</CardTitle>
-                    <Compass className="h-4 w-4 text-blue-600" />
+                    <Compass className="h-4 w-4 text-teal-600" />
                   </CardHeader>
                   <CardContent>
-                    <div className="text-2xl font-bold text-blue-600" data-testid="stat-value-know">{systemStats.avgKnowScore}%</div>
+                    <div className="text-2xl font-bold text-teal-600" data-testid="stat-value-know">{systemStats.avgKnowScore}%</div>
                     <p className="text-xs text-muted-foreground">Career Exploration Progress</p>
                     <Progress value={systemStats.avgKnowScore} className="mt-2" />
                   </CardContent>
@@ -2146,7 +2146,7 @@ export default function SiteAdminPage() {
                                 <p className="text-xs text-muted-foreground">BE</p>
                               </div>
                               <div className="text-center">
-                                <p className="font-bold text-blue-600">{educator.avgStudentKnowScore}%</p>
+                                <p className="font-bold text-teal-600">{educator.avgStudentKnowScore}%</p>
                                 <p className="text-xs text-muted-foreground">KNOW</p>
                               </div>
                               <div className="text-center">
@@ -2221,7 +2221,7 @@ export default function SiteAdminPage() {
                                 <p className="text-xs text-muted-foreground">BE</p>
                               </div>
                               <div className="text-center">
-                                <p className="font-bold text-blue-600">{campus.avgStudentKnowScore}%</p>
+                                <p className="font-bold text-teal-600">{campus.avgStudentKnowScore}%</p>
                                 <p className="text-xs text-muted-foreground">KNOW</p>
                               </div>
                               <div className="text-center">
@@ -2297,7 +2297,7 @@ export default function SiteAdminPage() {
                                 <p className="text-xs text-muted-foreground">BE</p>
                               </div>
                               <div className="text-center">
-                                <p className="font-bold text-blue-600">{org.avgStudentKnowScore}%</p>
+                                <p className="font-bold text-teal-600">{org.avgStudentKnowScore}%</p>
                                 <p className="text-xs text-muted-foreground">KNOW</p>
                               </div>
                               <div className="text-center">
@@ -2695,7 +2695,7 @@ function OrgSafetySuiteTab() {
   const severityColors: Record<string, string> = {
     high: "bg-red-500/10 text-red-700 dark:text-red-400 border-red-500/30",
     medium: "bg-amber-500/10 text-amber-700 dark:text-amber-400 border-amber-500/30",
-    low: "bg-blue-500/10 text-blue-700 dark:text-blue-400 border-blue-500/30",
+    low: "bg-teal-500/10 text-teal-700 dark:text-teal-400 border-teal-500/30",
   };
 
   return (

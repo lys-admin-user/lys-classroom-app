@@ -1405,7 +1405,7 @@ function DistrictSafetySuiteTab() {
   const severityColors: Record<string, string> = {
     high: "bg-red-500/10 text-red-700 dark:text-red-400 border-red-500/30",
     medium: "bg-amber-500/10 text-amber-700 dark:text-amber-400 border-amber-500/30",
-    low: "bg-blue-500/10 text-blue-700 dark:text-blue-400 border-blue-500/30",
+    low: "bg-teal-500/10 text-teal-700 dark:text-teal-400 border-teal-500/30",
   };
 
   return (

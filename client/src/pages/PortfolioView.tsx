@@ -70,9 +70,9 @@ const themeStyles = {
     accent: "text-lys-teal",
   },
   academic: {
-    headerBg: "bg-gradient-to-r from-blue-900 to-blue-800",
+    headerBg: "bg-gradient-to-r from-teal-900 to-teal-800",
     headerText: "text-white",
-    accent: "text-blue-500",
+    accent: "text-teal-500",
   },
 };
 

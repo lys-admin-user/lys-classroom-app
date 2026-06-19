@@ -31,12 +31,12 @@ type CampusActivity = {
 
 const CATEGORIES: Record<string, { label: string; className: string }> = {
   honor_society: { label: "Honor Society", className: "bg-yellow-500/10 text-yellow-600" },
-  club: { label: "Club", className: "bg-blue-500/10 text-blue-600" },
+  club: { label: "Club", className: "bg-teal-500/10 text-teal-600" },
   sports: { label: "Sports", className: "bg-green-500/10 text-green-600" },
-  volunteer: { label: "Volunteer", className: "bg-pink-500/10 text-pink-600" },
-  leadership: { label: "Leadership", className: "bg-purple-500/10 text-purple-600" },
-  arts: { label: "Arts", className: "bg-orange-500/10 text-orange-600" },
-  academic: { label: "Academic", className: "bg-cyan-500/10 text-cyan-600" },
+  volunteer: { label: "Volunteer", className: "bg-red-500/10 text-red-600" },
+  leadership: { label: "Leadership", className: "bg-lys-red/10 text-lys-red" },
+  arts: { label: "Arts", className: "bg-amber-500/10 text-amber-600" },
+  academic: { label: "Academic", className: "bg-lys-teal/10 text-lys-teal" },
   other: { label: "Other", className: "bg-muted text-muted-foreground" },
 };
 

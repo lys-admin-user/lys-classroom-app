@@ -160,7 +160,7 @@ const STATUS_CONFIG: Record<string, { label: string; variant?: "default" | "seco
 };
 
 const SEASONS = [
-  { value: "early_fall", label: "Early Fall (Aug-Oct)", months: "Aug - Oct", color: "bg-orange-500/10 text-orange-600" },
+  { value: "early_fall", label: "Early Fall (Aug-Oct)", months: "Aug - Oct", color: "bg-amber-500/10 text-amber-600" },
   { value: "late_fall", label: "Late Fall (Nov-Dec)", months: "Nov - Dec", color: "bg-red-500/10 text-red-600" },
   { value: "spring", label: "Spring (Jan-Apr)", months: "Jan - Apr", color: "bg-green-500/10 text-green-600" },
 ];

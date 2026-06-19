@@ -64,15 +64,15 @@ const categoryConfig = {
   be: { 
     label: "Being", 
     icon: Heart, 
-    color: "text-rose-500", 
-    bgColor: "bg-rose-500",
+    color: "text-red-500", 
+    bgColor: "bg-red-500",
     description: "Self-awareness and identity" 
   },
   know: { 
     label: "Knowing", 
     icon: Compass, 
-    color: "text-blue-500", 
-    bgColor: "bg-blue-500",
+    color: "text-teal-500", 
+    bgColor: "bg-teal-500",
     description: "Knowledge and exploration" 
   },
   do: { 
@@ -134,7 +134,7 @@ function AssignmentCard({ assignment, recipient }: { assignment: Assignment; rec
   const statusConfig = {
     assigned: { icon: Circle, label: "Not Started", color: "text-muted-foreground", bg: "bg-muted" },
     in_progress: { icon: Clock, label: "In Progress", color: "text-amber-500", bg: "bg-amber-500/10" },
-    submitted: { icon: CheckCircle2, label: "Submitted", color: "text-blue-500", bg: "bg-blue-500/10" },
+    submitted: { icon: CheckCircle2, label: "Submitted", color: "text-teal-500", bg: "bg-teal-500/10" },
     graded: { icon: Star, label: "Graded", color: "text-emerald-500", bg: "bg-emerald-500/10" },
   };
   
@@ -193,11 +193,11 @@ function AssignmentCard({ assignment, recipient }: { assignment: Assignment; rec
 }
 
 const activityTypeConfig: Record<string, { icon: typeof BookOpen; color: string }> = {
-  assessment: { icon: Sparkles, color: "text-violet-500" },
-  lesson: { icon: BookOpen, color: "text-blue-500" },
+  assessment: { icon: Sparkles, color: "text-teal-500" },
+  lesson: { icon: BookOpen, color: "text-teal-500" },
   career_exploration: { icon: Briefcase, color: "text-amber-500" },
   goal_progress: { icon: TrendingUp, color: "text-emerald-500" },
-  reflection: { icon: Heart, color: "text-rose-500" },
+  reflection: { icon: Heart, color: "text-red-500" },
   milestone_achieved: { icon: Trophy, color: "text-primary" },
 };
 
@@ -380,7 +380,7 @@ export default function StudentDashboard() {
         )}
 
         <div className="flex items-center gap-4 mb-6">
-          <div className="h-16 w-16 rounded-full bg-gradient-to-br from-lys-red to-blue-500 flex items-center justify-center text-white text-xl font-bold font-oswald shrink-0" data-testid="avatar-student">
+          <div className="h-16 w-16 rounded-full bg-gradient-to-br from-lys-red to-teal-500 flex items-center justify-center text-white text-xl font-bold font-oswald shrink-0" data-testid="avatar-student">
             {studentInitials}
           </div>
           <div>
@@ -734,13 +734,13 @@ export default function StudentDashboard() {
                                   <SelectContent>
                                     <SelectItem value="be">
                                       <div className="flex items-center gap-2">
-                                        <Heart className="w-4 h-4 text-rose-500" />
+                                        <Heart className="w-4 h-4 text-red-500" />
                                         Being
                                       </div>
                                     </SelectItem>
                                     <SelectItem value="know">
                                       <div className="flex items-center gap-2">
-                                        <Compass className="w-4 h-4 text-blue-500" />
+                                        <Compass className="w-4 h-4 text-teal-500" />
                                         Knowing
                                       </div>
                                     </SelectItem>
@@ -981,9 +981,9 @@ export default function StudentDashboard() {
                           <div className="space-y-3">
                             {portfolioComments.map((comment) => {
                               const roleColors: Record<string, string> = {
-                                student: "bg-blue-500/10 text-blue-600",
+                                student: "bg-teal-500/10 text-teal-600",
                                 educator: "bg-emerald-500/10 text-emerald-600",
-                                campus_admin: "bg-purple-500/10 text-purple-600",
+                                campus_admin: "bg-teal-500/10 text-teal-600",
                                 parent: "bg-amber-500/10 text-amber-600",
                               };
                               const roleColor = roleColors[comment.authorRole] || roleColors.student;

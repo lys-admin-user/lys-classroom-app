@@ -24,12 +24,12 @@ interface Strength {
 }
 
 const categoryConfig: Record<string, { label: string; icon: typeof Star; color: string }> = {
-  academic: { label: "Academic", icon: Award, color: "bg-blue-500/10 text-blue-600" },
+  academic: { label: "Academic", icon: Award, color: "bg-teal-500/10 text-teal-600" },
   leadership: { label: "Leadership", icon: Star, color: "bg-amber-500/10 text-amber-600" },
-  interpersonal: { label: "Interpersonal", icon: Users, color: "bg-purple-500/10 text-purple-600" },
-  creative: { label: "Creative", icon: Lightbulb, color: "bg-pink-500/10 text-pink-600" },
+  interpersonal: { label: "Interpersonal", icon: Users, color: "bg-teal-500/10 text-teal-600" },
+  creative: { label: "Creative", icon: Lightbulb, color: "bg-red-500/10 text-red-600" },
   technical: { label: "Technical", icon: Monitor, color: "bg-emerald-500/10 text-emerald-600" },
-  character: { label: "Character", icon: Heart, color: "bg-orange-500/10 text-orange-600" },
+  character: { label: "Character", icon: Heart, color: "bg-amber-500/10 text-amber-600" },
 };
 
 const categories = Object.keys(categoryConfig);

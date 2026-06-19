@@ -37,17 +37,17 @@ const CATEGORY_CONFIG = {
     label: "Being",
     description: "Who you are becoming - identity, values, character",
     icon: Heart,
-    color: "text-rose-500",
-    bgColor: "bg-rose-500/10",
-    borderColor: "border-rose-500/20"
+    color: "text-red-500",
+    bgColor: "bg-red-500/10",
+    borderColor: "border-red-500/20"
   },
   knowing: {
     label: "Knowing",
     description: "What you need to learn - knowledge, skills, understanding",
     icon: Brain,
-    color: "text-blue-500",
-    bgColor: "bg-blue-500/10",
-    borderColor: "border-blue-500/20"
+    color: "text-teal-500",
+    bgColor: "bg-teal-500/10",
+    borderColor: "border-teal-500/20"
   },
   doing: {
     label: "Doing",

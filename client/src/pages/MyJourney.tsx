@@ -214,13 +214,13 @@ function StreakCard({ activities }: { activities: StudentJourneyActivity[] }) {
   const streakLevel = streak >= 7 ? "fire" : streak >= 3 ? "warm" : "cold";
   
   return (
-    <Card className={`${streakLevel === "fire" ? "border-orange-500/30 bg-gradient-to-br from-orange-500/10 to-background" : streakLevel === "warm" ? "border-amber-500/30 bg-gradient-to-br from-amber-500/10 to-background" : ""}`}>
+    <Card className={`${streakLevel === "fire" ? "border-amber-500/30 bg-gradient-to-br from-amber-500/10 to-background" : streakLevel === "warm" ? "border-amber-500/30 bg-gradient-to-br from-amber-500/10 to-background" : ""}`}>
       <CardContent className="p-4 flex items-center gap-4">
         <div className={`w-14 h-14 rounded-full flex items-center justify-center ${
-          streakLevel === "fire" ? "bg-orange-500/20" : streakLevel === "warm" ? "bg-amber-500/20" : "bg-muted/30"
+          streakLevel === "fire" ? "bg-amber-500/20" : streakLevel === "warm" ? "bg-amber-500/20" : "bg-muted/30"
         }`}>
           <Flame className={`w-7 h-7 ${
-            streakLevel === "fire" ? "text-orange-500" : streakLevel === "warm" ? "text-amber-500" : "text-muted-foreground"
+            streakLevel === "fire" ? "text-amber-500" : streakLevel === "warm" ? "text-amber-500" : "text-muted-foreground"
           }`} />
         </div>
         <div className="flex-1">
@@ -963,8 +963,8 @@ export default function MyJourney() {
                     <Card key={item.id} className="hover-elevate" data-testid={`card-recommended-content-${item.id}`}>
                       <CardContent className="p-4 flex flex-col gap-3">
                         <div className="flex items-start gap-3">
-                          <div className={`p-2 rounded-full flex-shrink-0 ${isPodcast ? "bg-purple-500/10" : "bg-blue-500/10"}`}>
-                            <TypeIcon className={`w-4 h-4 ${isPodcast ? "text-purple-500" : "text-blue-500"}`} />
+                          <div className={`p-2 rounded-full flex-shrink-0 ${isPodcast ? "bg-teal-500/10" : "bg-teal-500/10"}`}>
+                            <TypeIcon className={`w-4 h-4 ${isPodcast ? "text-teal-500" : "text-teal-500"}`} />
                           </div>
                           <div className="flex-1 min-w-0">
                             <p className="font-medium text-sm line-clamp-2" data-testid={`text-content-title-${item.id}`}>

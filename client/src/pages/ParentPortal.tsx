@@ -551,7 +551,7 @@ function StudentDashboard({ studentData, isLoading }: { studentData: StudentData
                       <p className="text-xs text-muted-foreground">Learning Progress</p>
                     </div>
                     <div className="text-center p-3 rounded-md bg-background" data-testid="stat-readiness-status">
-                      <p className="text-2xl font-bold text-blue-600">
+                      <p className="text-2xl font-bold text-teal-600">
                         {journeyProgress?.overallScore && journeyProgress.overallScore >= 80 ? "On Track" : 
                          journeyProgress?.overallScore && journeyProgress.overallScore >= 60 ? "Developing" : "Getting Started"}
                       </p>
@@ -566,10 +566,10 @@ function StudentDashboard({ studentData, isLoading }: { studentData: StudentData
               </Card>
 
               {/* Learning Alignment - How lessons connect to learning goals */}
-              <Card className="border-blue-200 dark:border-blue-800 bg-blue-50/50 dark:bg-blue-950/20" data-testid="card-learning-alignment">
+              <Card className="border-teal-200 dark:border-teal-800 bg-teal-50/50 dark:bg-teal-950/20" data-testid="card-learning-alignment">
                 <CardHeader className="pb-2">
                   <CardTitle className="flex items-center gap-2 text-lg">
-                    <BookOpen className="h-5 w-5 text-blue-600" />
+                    <BookOpen className="h-5 w-5 text-teal-600" />
                     Learning Alignment
                   </CardTitle>
                   <CardDescription>
@@ -588,7 +588,7 @@ function StudentDashboard({ studentData, isLoading }: { studentData: StudentData
                     </div>
                     <div className="text-center p-3 rounded-md bg-background" data-testid="stat-know-focus">
                       <div className="flex items-center justify-center gap-1 mb-1">
-                        <Brain className="h-4 w-4 text-purple-500" />
+                        <Brain className="h-4 w-4 text-teal-500" />
                         <span className="text-xs font-medium uppercase">KNOW</span>
                       </div>
                       <p className="text-lg font-bold">{journeyProgress?.knowScore || 0}%</p>
@@ -796,14 +796,14 @@ function StudentDashboard({ studentData, isLoading }: { studentData: StudentData
                           assignment.status === 'completed' || assignment.status === 'graded' 
                             ? 'bg-green-500/10' 
                             : assignment.status === 'submitted'
-                            ? 'bg-blue-500/10'
+                            ? 'bg-teal-500/10'
                             : 'bg-muted'
                         }`}>
                           <FileText className={`w-5 h-5 ${
                             assignment.status === 'completed' || assignment.status === 'graded'
                               ? 'text-green-600'
                               : assignment.status === 'submitted'
-                              ? 'text-blue-600'
+                              ? 'text-teal-600'
                               : 'text-muted-foreground'
                           }`} />
                         </div>

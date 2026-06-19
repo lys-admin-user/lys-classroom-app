@@ -660,7 +660,7 @@ function ResourceCard({
               <Badge variant="destructive" className="gap-1"><AlertTriangle className="w-3 h-3" />Fee</Badge>
             )}
             {privacyConcern && (
-              <Badge variant="outline" className="gap-1 text-orange-600 border-orange-300"><ShieldAlert className="w-3 h-3" />Privacy</Badge>
+              <Badge variant="outline" className="gap-1 text-amber-600 border-amber-300"><ShieldAlert className="w-3 h-3" />Privacy</Badge>
             )}
           </div>
         )}

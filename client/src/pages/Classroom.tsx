@@ -65,7 +65,7 @@ const ATTENDANCE_STATUSES = [
   { value: "present", label: "Present", icon: CheckCircle2, selectedClass: "bg-green-600 hover:bg-green-700 text-white" },
   { value: "absent", label: "Absent", icon: XCircle, selectedClass: "bg-red-600 hover:bg-red-700 text-white" },
   { value: "tardy", label: "Tardy", icon: Clock, selectedClass: "bg-yellow-600 hover:bg-yellow-700 text-white" },
-  { value: "excused", label: "Excused", icon: Calendar, selectedClass: "bg-blue-600 hover:bg-blue-700 text-white" }
+  { value: "excused", label: "Excused", icon: Calendar, selectedClass: "bg-teal-600 hover:bg-teal-700 text-white" }
 ];
 
 type OrgWithDetails = OrgMembership & { organization: Organization };
@@ -1651,7 +1651,7 @@ export default function Classroom() {
           <Card>
             <CardHeader>
               <div className="flex items-center gap-2">
-                <Moon className="h-5 w-5 text-blue-500" />
+                <Moon className="h-5 w-5 text-teal-500" />
                 <CardTitle>Quiet Hours</CardTitle>
               </div>
               <CardDescription>

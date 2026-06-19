@@ -33,13 +33,13 @@ const ACHIEVEMENT_CATEGORIES = [
 
 const MATRICULATION_EVENT_TYPES = [
   { value: "enrollment", label: "Enrollment", color: "bg-green-500" },
-  { value: "grade_promotion", label: "Grade Promotion", color: "bg-blue-500" },
+  { value: "grade_promotion", label: "Grade Promotion", color: "bg-teal-500" },
   { value: "grade_retention", label: "Grade Retention", color: "bg-yellow-500" },
-  { value: "transfer_in", label: "Transfer In", color: "bg-purple-500" },
-  { value: "transfer_out", label: "Transfer Out", color: "bg-orange-500" },
+  { value: "transfer_in", label: "Transfer In", color: "bg-teal-500" },
+  { value: "transfer_out", label: "Transfer Out", color: "bg-amber-500" },
   { value: "withdrawal", label: "Withdrawal", color: "bg-red-500" },
   { value: "graduation", label: "Graduation", color: "bg-emerald-500" },
-  { value: "re_enrollment", label: "Re-enrollment", color: "bg-cyan-500" },
+  { value: "re_enrollment", label: "Re-enrollment", color: "bg-teal-500" },
   { value: "status_change", label: "Status Change", color: "bg-gray-500" },
 ] as const;
 
@@ -519,7 +519,7 @@ export default function MatriculationAchievementAdmin() {
                         <p className="text-xs text-muted-foreground">Enrollments</p>
                       </div>
                       <div className="text-center">
-                        <p className="text-lg font-bold text-blue-600">{year.graduations}</p>
+                        <p className="text-lg font-bold text-teal-600">{year.graduations}</p>
                         <p className="text-xs text-muted-foreground">Graduations</p>
                       </div>
                     </div>

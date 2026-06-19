@@ -96,23 +96,23 @@ interface ConfigData {
 }
 
 const eventTypeLabels: Record<string, { label: string; color: string; icon: any }> = {
-  view: { label: "View", color: "bg-blue-500/10 text-blue-600 border-blue-200", icon: Eye },
+  view: { label: "View", color: "bg-teal-500/10 text-teal-600 border-teal-200", icon: Eye },
   share: { label: "Share", color: "bg-green-500/10 text-green-600 border-green-200", icon: Share2 },
-  copy_link: { label: "Link Copy", color: "bg-purple-500/10 text-purple-600 border-purple-200", icon: Copy },
+  copy_link: { label: "Link Copy", color: "bg-teal-500/10 text-teal-600 border-teal-200", icon: Copy },
   signup: { label: "Signup", color: "bg-lys-red/10 text-lys-red border-lys-red/20", icon: Users },
   lesson_save: { label: "Lesson Save", color: "bg-lys-teal/10 text-lys-teal border-lys-teal/20", icon: BookOpen },
   referral_signup: { label: "Referral Signup", color: "bg-lys-red/10 text-lys-red border-lys-red/20", icon: Users },
   course_completion: { label: "Course Complete", color: "bg-emerald-500/10 text-emerald-600 border-emerald-200", icon: Award },
   daily_login_streak: { label: "Login Streak", color: "bg-amber-500/10 text-amber-600 border-amber-200", icon: Zap },
-  verified_review: { label: "Review", color: "bg-indigo-500/10 text-indigo-600 border-indigo-200", icon: Check },
+  verified_review: { label: "Review", color: "bg-teal-500/10 text-teal-600 border-teal-200", icon: Check },
   tier2_commission: { label: "Tier-2 Bonus", color: "bg-lys-yellow/10 text-lys-yellow border-lys-yellow/20", icon: Network },
 };
 
 const txTypeLabels: Record<string, { label: string; color: string; icon: any }> = {
   points_earned: { label: "Points Earned", color: "text-green-600", icon: TrendingUp },
-  points_redeemed: { label: "Points Converted", color: "text-orange-600", icon: ArrowRightLeft },
+  points_redeemed: { label: "Points Converted", color: "text-amber-600", icon: ArrowRightLeft },
   cash_conversion: { label: "Cash Credit", color: "text-emerald-600", icon: DollarSign },
-  cash_payout: { label: "Payout", color: "text-blue-600", icon: CircleDollarSign },
+  cash_payout: { label: "Payout", color: "text-teal-600", icon: CircleDollarSign },
   tier2_commission: { label: "Tier-2 Bonus", color: "text-lys-yellow", icon: Network },
 };
 
@@ -386,8 +386,8 @@ export default function EducatorInfluence() {
                 <Card data-testid="stat-views">
                   <CardContent className="pt-6">
                     <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 rounded-full bg-blue-500/20 flex items-center justify-center">
-                        <Eye className="h-5 w-5 text-blue-600" />
+                      <div className="w-10 h-10 rounded-full bg-teal-500/20 flex items-center justify-center">
+                        <Eye className="h-5 w-5 text-teal-600" />
                       </div>
                       <div>
                         <p className="font-roboto text-2xl font-bold text-foreground">{dashboard.affiliate.totalViews || 0}</p>
@@ -691,7 +691,7 @@ export default function EducatorInfluence() {
                                 </div>
                                 <div className="text-right">
                                   {(tx.pointsAmount || 0) !== 0 && (
-                                    <p className={`font-roboto text-sm font-medium ${(tx.pointsAmount || 0) > 0 ? "text-green-600" : "text-orange-600"}`}>
+                                    <p className={`font-roboto text-sm font-medium ${(tx.pointsAmount || 0) > 0 ? "text-green-600" : "text-amber-600"}`}>
                                       {(tx.pointsAmount || 0) > 0 ? "+" : ""}{tx.pointsAmount} pts
                                     </p>
                                   )}
