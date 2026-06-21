@@ -4630,3 +4630,28 @@ export const moderationBacklogDigestLog = pgTable("moderation_backlog_digest_log
   createdAt: timestamp("created_at").defaultNow(),
 });
 export type ModerationBacklogDigestLog = typeof moderationBacklogDigestLog.$inferSelect;
+
+// Pre-billing reminder send log — append-only paper trail + idempotency for the
+// trial-ending and annual-renewal notices. `kind` + `refId` (free-trial id or
+// Stripe subscription id) + `periodKey` (YYYY-MM-DD of the target end date)
+// uniquely identify one reminder so the daily scheduler never double-sends
+// across restarts or multi-tick races.
+export const billingReminderLog = pgTable(
+  "billing_reminder_log",
+  {
+    id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+    kind: text("kind").notNull(), // "trial_ending" | "renewal"
+    refId: varchar("ref_id").notNull(),
+    periodKey: text("period_key").notNull(),
+    userId: varchar("user_id"),
+    email: text("email"),
+    subject: text("subject").notNull(),
+    status: text("status").notNull(), // EmailSendStatus
+    errorMessage: text("error_message"),
+    createdAt: timestamp("created_at").defaultNow(),
+  },
+  (t) => ({
+    uniqReminder: uniqueIndex("billing_reminder_unique").on(t.kind, t.refId, t.periodKey),
+  }),
+);
+export type BillingReminderLog = typeof billingReminderLog.$inferSelect;

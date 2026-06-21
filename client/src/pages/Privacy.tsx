@@ -72,7 +72,17 @@ export default function Privacy() {
         exposed to end users; user-facing errors display only a generic tracking ID.
       </p>
 
-      <h2>8. Changes &amp; Contact</h2>
+      <h2>8. Cookies &amp; Tracking</h2>
+      <p>
+        We use strictly necessary cookies (for sign-in, session, and security) that are always
+        on. Optional analytics and marketing technologies — such as Google Analytics, the Meta
+        Pixel, and HubSpot — load in your browser <strong>only after you opt in</strong> through
+        our cookie consent banner. We do not enable them until you accept, and you can decline or
+        change your choice at any time. We do not sell your personal data, and analytics IP
+        addresses are anonymized where supported.
+      </p>
+
+      <h2>9. Changes &amp; Contact</h2>
       <p>
         When we make material changes to this policy we will increment its version and prompt
         signed-in users to re-accept. Questions or requests may be sent to{" "}

@@ -7,6 +7,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Download, FileText, Printer, Copy, CheckCircle, Eye } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/use-auth";
+import { PROVENANCE_NOTE, provenanceHtmlComment } from "@/lib/provenance";
 
 interface RubricCriteria {
   name: string;
@@ -108,6 +109,8 @@ export function RubricExport({
   </table>
   
   <div class="total-points">Total Points: ${totalPoints}</div>
+  <p style="margin-top:24px;font-size:11px;color:#888;">${PROVENANCE_NOTE}</p>
+  ${provenanceHtmlComment()}
 </body>
 </html>`;
   };

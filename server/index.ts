@@ -353,6 +353,33 @@ async function scheduleRetentionPurge() {
   log("Data retention purge scheduled (daily)", "scheduler");
 }
 
+let billingReminderIntervalHandle: NodeJS.Timeout | null = null;
+async function scheduleBillingReminders() {
+  if (billingReminderIntervalHandle) return; // idempotent guard
+  const ONE_DAY_MS = 24 * 60 * 60 * 1000;
+  const { runBillingReminders } = await import("./services/billingReminderService");
+
+  const runJob = async () => {
+    try {
+      const res = await runBillingReminders();
+      const sent = res.trial.sent + res.renewal.sent;
+      if (sent > 0) {
+        log(
+          `Billing reminders sent ${sent} (trial ${res.trial.sent}, renewal ${res.renewal.sent})`,
+          "scheduler",
+        );
+      }
+    } catch (err: any) {
+      log(`Billing reminders failed: ${err?.message || err}`, "scheduler");
+    }
+  };
+
+  // Kick a bit after boot (after retention/verification jobs), then daily.
+  setTimeout(() => void runJob(), 90 * 1000);
+  billingReminderIntervalHandle = setInterval(() => void runJob(), ONE_DAY_MS);
+  log("Billing reminders scheduled (daily)", "scheduler");
+}
+
 let weeklyVerificationIntervalHandle: NodeJS.Timeout | null = null;
 async function scheduleWeeklyScholarshipVerification() {
   if (weeklyVerificationIntervalHandle) return; // idempotent guard
@@ -413,6 +440,9 @@ async function initLessonAiSubsystem(): Promise<void> {
   );
   scheduleRetentionPurge().catch((err) =>
     log(`Failed to schedule retention purge: ${err?.message || err}`, "scheduler"),
+  );
+  scheduleBillingReminders().catch((err) =>
+    log(`Failed to schedule billing reminders: ${err?.message || err}`, "scheduler"),
   );
   const { scheduleQuarterlyScholarshipScrape } = await import(
     "./scholarshipScraper/scheduler"

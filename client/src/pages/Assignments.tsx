@@ -3,6 +3,7 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { useLocation, useSearch } from "wouter";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from "@/components/ui/card";
 import { AiGeneratedLabel } from "@/components/AiDisclosure";
+import { provenanceCsvHeader } from "@/lib/provenance";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Label } from "@/components/ui/label";
@@ -2613,6 +2614,7 @@ function ClassBKDInsights() {
     if (!data?.students) return;
     const rows = data.students.filter(s => s.hasAssessment);
     const csv = [
+      provenanceCsvHeader(),
       ["First Name", "Last Name", "Grade", "BE Score", "KNOW Score", "DO Score", "Total", "Strengths", "Growth Areas", "Assessed At"].join(","),
       ...rows.map(s => [
         s.firstName, s.lastName, s.gradeLevel || "", s.beScore, s.knowScore, s.doScore, s.totalScore,

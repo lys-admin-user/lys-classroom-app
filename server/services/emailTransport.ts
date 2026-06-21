@@ -1,14 +1,16 @@
 // Shared outbound email transport.
 //
 // Originally lived inside `standardsDigest.ts` (Task #8); extracted here so the
-// weekly standards digest and the daily moderation-backlog alert (Task #12)
-// share one nodemailer singleton + the same "no SMTP configured" fallback.
+// weekly standards digest, the daily moderation-backlog alert (Task #12), and
+// the pre-billing reminder notices share one outbound path + the same
+// "no transport configured" fallback.
 //
-// When SMTP credentials are absent (the normal case in dev / unconfigured
-// Replit envs) we log the rendered email and return `logged_no_transport` so
-// callers can still persist a paper trail. To enable real delivery, set
-// SMTP_HOST, SMTP_PORT, and (optionally) SMTP_USER / SMTP_PASS plus a from
-// address via DIGEST_FROM_EMAIL or SMTP_FROM.
+// Provider resolution order (first one configured wins):
+//   1. Resend       — set RESEND_API_KEY (+ optional RESEND_FROM_EMAIL).
+//   2. Gmail (SMTP) — set GMAIL_USER + GMAIL_APP_PASSWORD (a Google App Password).
+//   3. Generic SMTP — set SMTP_HOST, SMTP_PORT (+ optional SMTP_USER / SMTP_PASS).
+//   4. None         — log the rendered email and return `logged_no_transport`
+//                     so callers can still persist a paper trail.
 import nodemailer, { type Transporter } from "nodemailer";
 
 export type EmailSendStatus = "sent" | "logged_no_transport" | "failed";
@@ -20,12 +22,32 @@ export function getBaseUrl(): string {
   return "http://localhost:5000";
 }
 
-// Lazily constructed singleton so we don't reconnect for every recipient and
-// don't try to connect at all when no SMTP credentials are configured.
-let cachedTransporter: Transporter | null | undefined; // undefined = not yet checked, null = no-transport
+function getFromAddress(): string {
+  if (process.env.RESEND_FROM_EMAIL) return process.env.RESEND_FROM_EMAIL;
+  if (process.env.DIGEST_FROM_EMAIL) return process.env.DIGEST_FROM_EMAIL;
+  if (process.env.SMTP_FROM) return process.env.SMTP_FROM;
+  if (process.env.GMAIL_USER) return `LYS <${process.env.GMAIL_USER}>`;
+  return "LYS <no-reply@laddering-your-success.local>";
+}
+
+// Lazily constructed nodemailer singleton (Gmail or generic SMTP) so we don't
+// reconnect for every recipient and don't try to connect when nothing is
+// configured. `undefined` = not yet checked, `null` = no SMTP transport.
+let cachedTransporter: Transporter | null | undefined;
 
 function getTransporter(): Transporter | null {
   if (cachedTransporter !== undefined) return cachedTransporter;
+
+  // Gmail via App Password.
+  if (process.env.GMAIL_USER && process.env.GMAIL_APP_PASSWORD) {
+    cachedTransporter = nodemailer.createTransport({
+      service: "gmail",
+      auth: { user: process.env.GMAIL_USER, pass: process.env.GMAIL_APP_PASSWORD },
+    });
+    return cachedTransporter;
+  }
+
+  // Generic SMTP.
   const host = process.env.SMTP_HOST;
   const port = process.env.SMTP_PORT ? Number(process.env.SMTP_PORT) : undefined;
   const user = process.env.SMTP_USER;
@@ -43,12 +65,30 @@ function getTransporter(): Transporter | null {
   return cachedTransporter;
 }
 
-function getFromAddress(): string {
-  return (
-    process.env.DIGEST_FROM_EMAIL ||
-    process.env.SMTP_FROM ||
-    "LYS <no-reply@laddering-your-success.local>"
-  );
+async function sendViaResend(
+  to: string,
+  subject: string,
+  text: string,
+): Promise<{ ok: boolean; error?: string }> {
+  const apiKey = process.env.RESEND_API_KEY;
+  if (!apiKey) return { ok: false, error: "no_resend_key" };
+  try {
+    const resp = await fetch("https://api.resend.com/emails", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${apiKey}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ from: getFromAddress(), to: [to], subject, text }),
+    });
+    if (!resp.ok) {
+      const body = await resp.text().catch(() => "");
+      return { ok: false, error: `resend ${resp.status}: ${body.slice(0, 300)}` };
+    }
+    return { ok: true };
+  } catch (err: any) {
+    return { ok: false, error: err?.message || String(err) };
+  }
 }
 
 export async function sendEmail(
@@ -58,11 +98,24 @@ export async function sendEmail(
   opts: { logPrefix?: string } = {},
 ): Promise<{ status: EmailSendStatus; errorMessage?: string }> {
   const prefix = opts.logPrefix ?? "email";
+
+  if (!recipient.email) {
+    console.log(`[${prefix}] (no-transport) to=(no email) subject="${subject}"\n${body}`);
+    return { status: "logged_no_transport" };
+  }
+
+  // 1. Resend (HTTP API).
+  if (process.env.RESEND_API_KEY) {
+    const r = await sendViaResend(recipient.email, subject, body);
+    if (r.ok) return { status: "sent" };
+    console.error(`[${prefix}] Resend send failed for ${recipient.email}:`, r.error);
+    return { status: "failed", errorMessage: (r.error || "").slice(0, 500) };
+  }
+
+  // 2. Gmail / generic SMTP via nodemailer.
   const transporter = getTransporter();
-  if (!transporter || !recipient.email) {
-    console.log(
-      `[${prefix}] (no-transport) to=${recipient.email ?? "(no email)"} subject="${subject}"\n${body}`,
-    );
+  if (!transporter) {
+    console.log(`[${prefix}] (no-transport) to=${recipient.email} subject="${subject}"\n${body}`);
     return { status: "logged_no_transport" };
   }
   try {

@@ -2,6 +2,7 @@ import { Switch, Route, Redirect, useLocation, useSearch } from "wouter";
 import { queryClient } from "./lib/queryClient";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
+import ConsentBanner from "@/components/ConsentBanner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { SidebarProvider, SidebarInset } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/AppSidebar";
@@ -479,6 +480,7 @@ function App() {
         </OnboardingGuard>
         <NeedsAnalyzerModal />
         <Toaster />
+        <ConsentBanner />
       </TooltipProvider>
     </QueryClientProvider>
   );

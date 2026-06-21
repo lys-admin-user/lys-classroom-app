@@ -1,1 +1,2 @@
 - [Retention purge grace window](retention-purge-grace.md) — inactive-account auto-delete must mark with a future grace date and re-verify staleness at delete time, never purge same-run.
+- [Idempotent scheduled-job writes](idempotent-job-writes.md) — sent-marker writes in daily jobs must be onConflictDoUpdate, not plain insert, or a failed-row retry crashes the whole tick.
