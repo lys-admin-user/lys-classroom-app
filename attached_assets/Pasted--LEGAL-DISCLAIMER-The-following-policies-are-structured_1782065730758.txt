@@ -1,0 +1,137 @@
+> **LEGAL DISCLAIMER:** *The following policies are structured templates incorporating the 2026 legal landscape, federal regulatory postures (FTC, ROSCA), recent state legislation (e.g., California ARL, Maryland HB0107), and global standards (GDPR, EU AI Act 2026). They do not constitute formal legal advice. You must have qualified legal counsel review and customize these documents before placing them into production.*
+
+---
+
+## DOCUMENT 1: Master Terms of Service & Subscription Agreement
+
+```
+================================================================================
+CRITICAL ENGINEERING DIRECTIVE: This document MUST be implemented via an 
+affirmative Click-Wrap interface. The "Create Account" or "Complete Purchase" 
+actions must remain disabled until the user manually toggles an un-checked box 
+stating: "I have read and agree to the Terms of Service and Subscription Agreement."
+================================================================================
+
+```
+
+### 1. Binding Agreement and Click-Wrap Consent
+
+By clicking "I Agree," or by creating an account, authenticating a session, or executing a purchase on `[INSERT APP/PLATFORM NAME]` (the "Platform"), you ("User," "Client," or "Tenant") enter into a legally binding contract with `[INSERT COMPANY NAME]` ("Company," "we," or "us").
+
+If you do not agree to these terms, you are strictly prohibited from accessing the Platform.
+
+### 2. Immutable Consent & Layout Tracking Architecture
+
+Company maintains an un-alterable, append-only transaction ledger logging every user consent event. When you check the agreement box, our system records:
+
+* Your unique Account/User ID and localized IP address.
+* An exact millisecond timestamp.
+* The specific version hash and UUID of this Agreement.
+You acknowledge and agree that our internal audit logs constitute definitive, conclusive proof of your explicit execution of this agreement in any court or arbitration proceeding.
+
+### 3. Subscription Architecture, Billing, and Zero "Drip Pricing"
+
+* **All-Inclusive Fees:** The pricing displayed to you at the point of enrollment represents the true, all-inclusive transactional cost of the tier selected. Company does not utilize "drip pricing"; no hidden processing, administration, or platform maintenance fees will be injected at final checkout.
+* **De-coupled Authorization:** By executing a subscription transaction, you provide a distinct, standalone authorization for Company to automatically charge your designated payment mechanism at the recurring interval stated (e.g., monthly, annually) until explicitly cancelled.
+
+### 4. Direct "Click-to-Cancel" Parity & Automatic Renewal Terms
+
+* **Symmetrical Cancellation:** In strict compliance with state and federal consumer protection standards, canceling your subscription shall feature zero administrative friction and require no more steps than enrollment.
+* **Self-Serve Mechanism:** You may cancel your subscription at any time by logging into your account, navigating to **Account Settings > Billing**, and clicking the **"Cancel Subscription"** link.
+* **No Forced Channels:** You shall never be required to call a phone number, wait on a support chat, submit a physical letter, or complete a multi-step survey to execute a cancellation.
+* **Notification Safeguard:** Company will programmatically transmit automated billing notices 3 to 7 days prior to any trial-to-paid conversion, and 14 to 30 days prior to any annual renewal, containing clear pricing data and direct, one-click cancellation links.
+
+### 5. Mandatory Dispute Resolution: Arbitration Agreement & Class-Action Waiver
+
+> **PLEASE READ THIS SECTION CAREFULLY. IT AFFECTS YOUR LEGAL RIGHTS, INCLUDING YOUR RIGHT TO FILE A LAWSUIT IN COURT.**
+
+* **Mandatory Binding Arbitration:** You and Company agree that any legal dispute, claim, or controversy arising out of or relating to the Platform, these Terms, or our billing practices shall be settled exclusively through binding, individual arbitration administered by `[AAA / JAMS]` under its consumer or commercial arbitration rules, rather than in a court of general jurisdiction.
+* **Class-Action Waiver:** YOU AND COMPANY AGREE THAT EACH MAY BRING CLAIMS AGAINST THE OTHER ONLY IN YOUR OR ITS INDIVIDUAL CAPACITY, AND NOT AS A PLAINTIFF OR CLASS MEMBER IN ANY PURPORTED CLASS, REPRESENTATIVE, OR COLLECTIVE PROCEEDING. The arbitrator may not consolidate more than one person's claims or preside over any form of a representative or class proceeding.
+
+### 6. Anti-Scraping, Data Ownership, and Authenticated Access Walls
+
+* **Proprietary Assets:** All structured data directories, interface code, database schemas, dynamic pricing configurations, and system assets displayed on or within the Platform are the exclusive intellectual property of Company.
+* **Explicit Prohibition on Automated Extraction:** You are strictly prohibited from utilizing automated scripts, bots, spiders, scrapers, crawler engines, or AI-driven extraction tools to pull data from the Platform.
+* **Contractual Breach:** Because high-value data and interface logic are strictly positioned behind authenticated user sessions, any automated scraping, indexing, or structural parsing of authenticated platform pages constitutes a material breach of contract, giving Company the right to seek immediate injunctive relief and liquidated damages.
+
+---
+
+## DOCUMENT 2: Data Privacy & Tracking Infrastructure Policy
+
+### 1. Privacy-by-Design & Zero-Classification Script Blocking
+
+Your data privacy is governed by a strict **Opt-In Default Pipeline**. When you land on our web application, all non-essential third-party marketing tags, behavioral tracking pixels (including the Meta Pixel, Google Analytics snippets), and session replay scripts are completely blocked from executing or dropping tracking cookies. No tracking scripts will execute until you provide explicit, affirmative consent via our localized Cookie Consent Management interface.
+
+### 2. Server-Side Analytics & PII Scrubbing Proxies
+
+To minimize data leakage risks and shield our users from predatory tracking arrays:
+
+* All analytics tracking is routed through our secure **Server-Side Tracking Proxy architecture**.
+* Rather than allowing external platforms to inject script trackers directly into your browser DOM, our server captures anonymized actions, explicitly scrubs away your Personally Identifiable Information (PII), and passes only aggregated, non-identifiable data tokens to downstream optimization partners.
+
+```
+[Browser Window Action] ──> [Our Encrypted Backend Proxy] ──(PII Masked)──> [Analytics Endpoint]
+
+```
+
+### 3. Precise Data Retention Lifecycles & Hard TTL Enforcement
+
+Company does not retain customer data indefinitely. Our data infrastructure enforces automated Time-To-Live (TTL) deletion tasks across our storage layers:
+
+* **System Log Files:** Automatically pruned or fully anonymized after 90 days.
+* **Behavioral Session Profiles:** Hard-deleted after 30 days of inactivity.
+* **Inactive Accounts:** Permanently purged or securely archived after 12 months of zero authentication activity, minimizing your data exposure footprint.
+
+### 4. Automated Data Subject Access Requests (DSAR) & Deletion
+
+In accordance with global and state frameworks (GDPR, CCPA/CPRA, etc.), you possess the absolute "Right to Be Forgotten" and the right to data portability.
+
+* **Self-Serve Export:** You may instantly download your complete transaction, profile, and system history in a structured, machine-readable format (`.json` or `.csv`) directly via **Account Settings > Privacy > Export My Data**.
+* **Cascading Deletion Queue:** When you submit a deletion request through our dashboard, our automated worker system triggers a cascading purge that safely deletes or entirely anonymizes your records from our live production databases, internal tracking shards, analytical warehouses, and distributed backup environments within 30 days.
+
+### 5. Masked Error Boundaries & Infrastructure Security
+
+To prevent unauthorized access, our engineering pipeline implements strict application error boundaries. If a system failure or exception occurs, the customer-facing interface is completely restricted from outputting internal stack traces, schema structures, internal microservice names, or environment directories. All user-facing error screens display a generic, sanitized tracking ID, ensuring malicious actors cannot use system logs to map our infrastructure.
+
+---
+
+## DOCUMENT 3: Responsible AI & Automated Agents Policy
+
+```
+================================================================================
+COMPLIANCE NOTE: This policy addresses the strict August 2026 and December 2026 
+transparency, watermarking, and logging provisions mandated by the European 
+Union AI Act and corresponding federal algorithmic accountability standards.
+================================================================================
+
+```
+
+### 1. Mandatory Transparency Disclosures & AI Notifications
+
+In strict compliance with global algorithmic mandates, including Article 50 of the EU AI Act:
+
+* Whenever you interact with an automated chat agent, generative search layer, or algorithmic support interface within this Platform, you will be provided an immediate, conspicuous visual notification stating **"Interacting with an AI Agent."**
+* You will never be led to believe an automated system is a human customer support agent or representative.
+
+### 2. Machine-Readable Synthetic Content Watermarking
+
+All synthetic content, automated text generation, dynamic audio/video media, and digital outputs engineered by our platform’s generative features are programmatically embedded with an immutable, machine-readable cryptographic watermark. This signature ensures our digital outputs are universally detectable as artificially generated, defending against deepfake distribution and information manipulation.
+
+### 3. Automated Agent Decision Logging & Traceability
+
+If you utilize our autonomous workflows, automated scheduling loops, or programmatic AI agents to execute business processes or process personal consumer data:
+
+* Our system writes an immutable execution trace to a dedicated data vault.
+* For every autonomous choice, the system logs: the execution trigger, the algorithmic step taken, the system's confidence score, and the structured underlying logic.
+* Users can audit these execution tracks via their management dashboards to ensure complete human-in-the-loop oversight and regulatory verifiability.
+
+### 4. Prohibition on Scraping for Core Model Training
+
+You are strictly prohibited from feeding proprietary datasets, systemic source code, or confidential operational data extracted from this Platform into external Large Language Models (LLMs) or public machine learning pipelines without an explicit enterprise license. Any ingestion of our core application interfaces to train competing consumer or B2B software systems will result in immediate API revocation and legal action.
+
+### 5. Algorithmic Quality Gates & Codebase Integrity
+
+To guarantee platform stability, data security, and compliance safety:
+
+* Company completely bans unverified "vibe coding" or the automated injection of unreviewed AI code into our runtime environment.
+* Every feature patch engineered or optimized by an AI copilot must pass through an automated testing harness, a strict dependency vuln scan, and an explicit peer review by a human staff engineer before reaching deployment pipelines. We guarantee that no autonomous system can unilaterally push modifications to our production environment.
