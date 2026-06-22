@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
+import { SchoolSignIn } from "@/components/SchoolSignIn";
 import {
   ShieldCheck,
   BookOpen,
@@ -115,13 +116,25 @@ export function RoleRoutedLanding() {
           </div>
           <span className="font-marker text-2xl text-slate-800">LYS</span>
         </div>
-        <a
-          href="/api/login"
-          className="text-sm font-medium text-slate-600 hover:text-lys-teal transition-colors"
-          data-testid="link-signin"
-        >
-          Sign in
-        </a>
+        <div className="flex items-center gap-5">
+          <SchoolSignIn
+            trigger={
+              <button
+                className="text-sm font-medium text-slate-600 hover:text-lys-teal transition-colors"
+                data-testid="link-school-signin"
+              >
+                Sign in with your school
+              </button>
+            }
+          />
+          <a
+            href="/api/login"
+            className="text-sm font-medium text-slate-600 hover:text-lys-teal transition-colors"
+            data-testid="link-signin"
+          >
+            Sign in
+          </a>
+        </div>
       </header>
       <main className="flex-1 flex flex-col items-center pt-12 pb-24 px-4 text-center max-w-5xl mx-auto w-full relative z-10">
         <div className="mb-10">

@@ -65,6 +65,7 @@ const MyJourney = lazy(() => import("@/pages/MyJourney"));
 const PortfolioBuilder = lazy(() => import("@/pages/PortfolioBuilder"));
 const PortfolioView = lazy(() => import("@/pages/PortfolioView"));
 const SISIntegration = lazy(() => import("@/pages/SISIntegration"));
+const SsoAdmin = lazy(() => import("@/pages/SsoAdmin"));
 const TransferApprovals = lazy(() => import("@/pages/TransferApprovals"));
 const Gradebook = lazy(() => import("@/pages/Gradebook"));
 const LessonAuthoring = lazy(() => import("@/pages/LessonAuthoring"));
@@ -259,6 +260,7 @@ const AuthCurriculumPlanning = withAuth(CurriculumPlanning);
 const AuthStandardsIngestionAdmin = withAuth(StandardsIngestionAdmin);
 const AuthSettings = withAuth(Settings);
 const AuthSISIntegration = withAuth(SISIntegration);
+const AuthSsoAdmin = withAuth(SsoAdmin);
 const AuthAnalytics = withAuth(Analytics);
 const AuthScopeEditor = withAuth(ScopeEditor);
 const AuthEducatorInfluence = withAuth(EducatorInfluence);
@@ -340,6 +342,7 @@ function Router() {
         <Route path="/admin/standards-ingestion" component={AuthStandardsIngestionAdmin} />
         <Route path="/settings" component={AuthSettings} />
         <Route path="/sis-integration" component={AuthSISIntegration} />
+        <Route path="/sso-admin" component={AuthSsoAdmin} />
         <Route path="/analytics" component={AuthAnalytics} />
         <Route path="/scope-sequence">
           <RedirectTo to="/curriculum-planning" />

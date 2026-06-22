@@ -1,3 +1,4 @@
 - [Retention purge grace window](retention-purge-grace.md) — inactive-account auto-delete must mark with a future grace date and re-verify staleness at delete time, never purge same-run.
 - [Idempotent scheduled-job writes](idempotent-job-writes.md) — sent-marker writes in daily jobs must be onConflictDoUpdate, not plain insert, or a failed-row retry crashes the whole tick.
 - [AI content-safety moderation](ai-content-safety.md) — omni-moderation has no profanity category so local scan must always run; gate every generate/stream route; crisis=200, block=422.
+- [Enterprise SSO (OIDC) design](sso-oidc.md) — per-org OIDC alongside Replit Auth; domain allowlist MUST be enforced server-side at provisioning, not just lookup.

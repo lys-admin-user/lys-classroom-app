@@ -217,7 +217,63 @@ const requireSystemAdmin = requireRole("system_admin");
 
 import { ANALYZER_CTAS, ANALYZER_IDENTITIES, ANALYZER_SESSION_REGEX, ANALYZER_URGENCIES, APPROVED_VIDEO_HOSTS, MAX_TRIALS_PER_IP, TRIAL_DURATION_DAYS, TRIAL_RESET_MONTHS, US_STATES, analyzerBindSchema, analyzerCtaClickSchema, analyzerSubmitSchema, autoMatchSchema, createJourneyEntrySchema, createSisConnectionSchema, educatorProfileSchema, entityShareBodySchema, entriesQuerySchema, foundationModuleUpdateSchema, foundationProgressBodySchema, foundationQuizQuestionSchema, generateInviteCode, getAdminManagedOrgIds, getAdminOrgIds, getStateNameFromAbbr, getTrialSinceDate, isApprovedVideoUrl, isSiteAdmin, pillarParamSchema, requireFoundationAdmin, requirePaidTier, requireRssAdmin, requireSiteAdminForStandards, requireStaffOrAdmin, validOrgTypes, verifyOrgAdminAccess, videoUrlSchema } from "./_helpers";
 import { sisService } from "../services/sisService";
-import { SIS_PROVIDERS } from "@shared/schema";
+import { SIS_PROVIDERS, type SisConnection } from "@shared/schema";
+import { encryptIfPossible, decryptIfPossible } from "../services/crypto";
+
+// Resolve credentials for a SIS connection and configure the shared sisService.
+// For OneRoster / ClassLink connections that use OAuth2 client-credentials, this
+// fetches (and caches) a bearer token; for all other providers it uses the
+// stored access token. Token + secret values are decrypted on read.
+async function configureSisServiceForConnection(connection: SisConnection): Promise<void> {
+  const meta = (connection.metadata as any) || {};
+  const provider = connection.provider as keyof typeof SIS_PROVIDERS;
+  const baseUrl = meta.baseUrl || SIS_PROVIDERS[provider]?.apiBase || "";
+
+  const usesClientCredentials =
+    (provider === "oneroster" || provider === "classlink") && meta.clientId && meta.clientSecret;
+
+  if (usesClientCredentials) {
+    let accessToken = connection.accessToken ? decryptIfPossible(connection.accessToken) : null;
+    const expired =
+      !connection.tokenExpiresAt ||
+      new Date(connection.tokenExpiresAt).getTime() < Date.now() + 60_000;
+
+    if (!accessToken || expired) {
+      const tokenUrl = meta.tokenUrl || `${baseUrl.replace(/\/$/, "")}/token`;
+      const token = await sisService.getOneRosterClientCredentialsToken(
+        tokenUrl,
+        meta.clientId,
+        decryptIfPossible(meta.clientSecret) as string,
+      );
+      accessToken = token.accessToken;
+      await storage.updateSisConnection(connection.id, {
+        accessToken: encryptIfPossible(token.accessToken),
+        tokenExpiresAt: token.expiresAt ?? null,
+        status: "connected",
+      });
+    }
+
+    sisService.setConfig(provider, { baseUrl, accessToken: accessToken as string });
+    return;
+  }
+
+  sisService.setConfig(provider, {
+    baseUrl,
+    accessToken: (decryptIfPossible(connection.accessToken) || "") as string,
+    refreshToken: connection.refreshToken ? decryptIfPossible(connection.refreshToken) || undefined : undefined,
+    districtId: connection.districtId || undefined,
+  });
+}
+
+// True when a connection has enough configuration to attempt a sync/test.
+function sisConnectionIsConfigured(connection: SisConnection): boolean {
+  const meta = (connection.metadata as any) || {};
+  const provider = connection.provider;
+  if ((provider === "oneroster" || provider === "classlink") && meta.clientId && meta.clientSecret) {
+    return true;
+  }
+  return !!connection.accessToken;
+}
 
 // AUTO-SPLIT from server/routes.ts -- domain: integrations (28 routes)
 export function registerIntegrationsRoutes(app: Express): void {
@@ -636,13 +692,25 @@ export function registerIntegrationsRoutes(app: Express): void {
       
       const validated = createSisConnectionSchema.parse(req.body);
       
+      const usesClientCredentials =
+        (validated.provider === "oneroster" || validated.provider === "classlink") &&
+        !!validated.clientId &&
+        !!validated.clientSecret;
+      
+      // Client secret is stored encrypted at rest in metadata; the access token
+      // (when supplied directly) is encrypted too.
+      const metadata: Record<string, any> = { baseUrl: validated.baseUrl };
+      if (validated.clientId) metadata.clientId = validated.clientId;
+      if (validated.clientSecret) metadata.clientSecret = encryptIfPossible(validated.clientSecret);
+      if (validated.tokenUrl) metadata.tokenUrl = validated.tokenUrl;
+      
       const connection = await storage.createSisConnection({
         userId,
         provider: validated.provider,
         providerName: validated.providerName || SIS_PROVIDERS[validated.provider].name,
         organizationId: validated.organizationId,
-        status: validated.accessToken ? "connected" : "pending",
-        accessToken: validated.accessToken,
+        status: validated.accessToken || usesClientCredentials ? "connected" : "pending",
+        accessToken: validated.accessToken ? encryptIfPossible(validated.accessToken) : undefined,
         districtId: validated.districtId,
         settings: validated.settings || {
           autoSync: false,
@@ -653,12 +721,13 @@ export function registerIntegrationsRoutes(app: Express): void {
           syncGrades: false,
           syncAttendance: false,
         },
-        metadata: { baseUrl: validated.baseUrl } as any,
+        metadata: metadata as any,
       } as any);
       
       res.json({
         ...connection,
         accessToken: connection.accessToken ? "[ENCRYPTED]" : null,
+        metadata: { ...(connection.metadata as any), clientSecret: metadata.clientSecret ? "[ENCRYPTED]" : undefined },
       });
     } catch (error) {
       if (error instanceof z.ZodError) {
@@ -747,17 +816,12 @@ export function registerIntegrationsRoutes(app: Express): void {
         return;
       }
       
-      if (!connection.accessToken) {
-        res.status(400).json({ error: "Connection not configured with access token" });
+      if (!sisConnectionIsConfigured(connection)) {
+        res.status(400).json({ error: "Connection not configured with credentials" });
         return;
       }
       
-      sisService.setConfig(connection.provider as any, {
-        baseUrl: (connection.metadata as any)?.baseUrl || SIS_PROVIDERS[connection.provider as keyof typeof SIS_PROVIDERS].apiBase,
-        accessToken: connection.accessToken,
-        refreshToken: connection.refreshToken || undefined,
-        districtId: connection.districtId || undefined,
-      });
+      await configureSisServiceForConnection(connection);
       
       const result = await sisService.testConnection();
       
@@ -793,7 +857,7 @@ export function registerIntegrationsRoutes(app: Express): void {
         return;
       }
       
-      if (!connection.accessToken) {
+      if (!sisConnectionIsConfigured(connection)) {
         res.status(400).json({ error: "Connection not configured" });
         return;
       }
@@ -812,13 +876,8 @@ export function registerIntegrationsRoutes(app: Express): void {
         status: "started",
       });
       
-      // Configure service
-      sisService.setConfig(connection.provider as any, {
-        baseUrl: (connection.metadata as any)?.baseUrl || SIS_PROVIDERS[connection.provider as keyof typeof SIS_PROVIDERS].apiBase,
-        accessToken: connection.accessToken,
-        refreshToken: connection.refreshToken || undefined,
-        districtId: connection.districtId || undefined,
-      });
+      // Configure service (resolves client-credentials token for OneRoster/ClassLink)
+      await configureSisServiceForConnection(connection);
       
       let recordsProcessed = 0;
       let recordsCreated = 0;
@@ -1177,7 +1236,7 @@ export function registerIntegrationsRoutes(app: Express): void {
       const userId = req.user?.claims?.sub;
       
       const initiateSchema = z.object({
-        provider: z.enum(["clever", "powerschool", "canvas", "infinite_campus", "skyward", "oneroster"]),
+        provider: z.enum(["clever", "powerschool", "canvas", "infinite_campus", "skyward", "oneroster", "classlink"]),
         organizationId: z.string().optional(),
       });
       

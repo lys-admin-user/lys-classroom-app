@@ -51,6 +51,7 @@ import {
   UserPlus,
   HelpCircle,
   Wand2,
+  KeyRound,
   type LucideIcon,
 } from "lucide-react";
 
@@ -170,6 +171,7 @@ export const navigationGroups: NavGroup[] = [
     items: [
       { title: "Campus Admin", url: "/admin", icon: Shield, requiresAuth: true },
       { title: "Standards", url: "/admin/standards", icon: Database, requiresAuth: true },
+      { title: "Enterprise SSO", url: "/sso-admin", icon: KeyRound, requiresAuth: true },
     ],
   },
   {

@@ -5,6 +5,63 @@ interface SisApiConfig {
   accessToken: string;
   refreshToken?: string;
   districtId?: string;
+  // OneRoster / ClassLink OAuth2 client-credentials (optional). When present and
+  // no accessToken is supplied, a bearer token is fetched on demand.
+  clientId?: string;
+  clientSecret?: string;
+  tokenUrl?: string;
+}
+
+// ── Pure OneRoster 1.1 mappers (exported for unit tests) ──────────────────────
+// ClassLink Roster Server and any OneRoster-compliant source return the same
+// shapes, so these mappers are reused for both the `oneroster` and `classlink`
+// providers. Keeping them pure (no network) makes them straightforward to test.
+
+export function mapOneRosterUser(user: any): SisStudent {
+  return {
+    sisId: user.sourcedId,
+    firstName: user.givenName || "",
+    lastName: user.familyName || "",
+    email: user.email,
+    gradeLevel: Array.isArray(user.grades) ? user.grades[0] : undefined,
+    schoolId: user.orgs?.[0]?.sourcedId,
+    enrollmentStatus: user.status || "active",
+    rawData: user,
+  };
+}
+
+export function mapOneRosterTeacher(user: any): SisTeacher {
+  return {
+    sisId: user.sourcedId,
+    firstName: user.givenName || "",
+    lastName: user.familyName || "",
+    email: user.email,
+    schoolIds: Array.isArray(user.orgs) ? user.orgs.map((org: any) => org.sourcedId) : [],
+    rawData: user,
+  };
+}
+
+export function mapOneRosterClass(cls: any): SisCourse {
+  return {
+    sisId: cls.sourcedId,
+    name: cls.title || "Unnamed Class",
+    courseCode: cls.classCode,
+    subject: Array.isArray(cls.subjects) ? cls.subjects[0] : undefined,
+    gradeLevel: Array.isArray(cls.grades) ? cls.grades[0] : undefined,
+    schoolId: cls.school?.sourcedId,
+    term: cls.terms?.[0]?.sourcedId,
+    status: cls.status || "active",
+    rawData: cls,
+  };
+}
+
+export function mapOneRosterOrg(org: any): SisSchool {
+  return {
+    sisId: org.sourcedId,
+    name: org.name,
+    districtId: org.parent?.sourcedId,
+    rawData: org,
+  };
 }
 
 interface SisStudent {
@@ -83,6 +140,7 @@ class SisService {
           return await this.testPowerSchoolConnection();
         case "canvas":
           return await this.testCanvasConnection();
+        case "classlink":
         case "oneroster":
           return await this.testOneRosterConnection();
         default:
@@ -175,6 +233,7 @@ class SisService {
         return await this.fetchPowerSchoolStudents(limit, offset);
       case "canvas":
         return await this.fetchCanvasStudents(limit, offset);
+      case "classlink":
       case "oneroster":
         return await this.fetchOneRosterStudents(limit, offset);
       default:
@@ -288,16 +347,7 @@ class SisService {
     }
 
     const data = await response.json();
-    return (data.users || []).map((user: any) => ({
-      sisId: user.sourcedId,
-      firstName: user.givenName || "",
-      lastName: user.familyName || "",
-      email: user.email,
-      gradeLevel: user.grades?.[0],
-      schoolId: user.orgs?.[0]?.sourcedId,
-      enrollmentStatus: user.status || "active",
-      rawData: user,
-    }));
+    return (data.users || []).map(mapOneRosterUser);
   }
 
   async fetchCourses(limit = 100, offset = 0): Promise<SisCourse[]> {
@@ -312,6 +362,7 @@ class SisService {
         return await this.fetchPowerSchoolCourses(limit, offset);
       case "canvas":
         return await this.fetchCanvasCourses(limit, offset);
+      case "classlink":
       case "oneroster":
         return await this.fetchOneRosterCourses(limit, offset);
       default:
@@ -430,17 +481,7 @@ class SisService {
     }
 
     const data = await response.json();
-    return (data.classes || []).map((cls: any) => ({
-      sisId: cls.sourcedId,
-      name: cls.title || "Unnamed Class",
-      courseCode: cls.classCode,
-      subject: cls.subjects?.[0],
-      gradeLevel: cls.grades?.[0],
-      schoolId: cls.school?.sourcedId,
-      term: cls.terms?.[0]?.sourcedId,
-      status: cls.status || "active",
-      rawData: cls,
-    }));
+    return (data.classes || []).map(mapOneRosterClass);
   }
 
   async fetchSchools(): Promise<SisSchool[]> {
@@ -451,6 +492,7 @@ class SisService {
     switch (this.provider) {
       case "clever":
         return await this.fetchCleverSchools();
+      case "classlink":
       case "oneroster":
         return await this.fetchOneRosterSchools();
       default:
@@ -495,12 +537,7 @@ class SisService {
     }
 
     const data = await response.json();
-    return (data.orgs || []).map((org: any) => ({
-      sisId: org.sourcedId,
-      name: org.name,
-      districtId: org.parent?.sourcedId,
-      rawData: org,
-    }));
+    return (data.orgs || []).map(mapOneRosterOrg);
   }
 
   async fetchTeachers(limit = 100, offset = 0): Promise<SisTeacher[]> {
@@ -511,6 +548,7 @@ class SisService {
     switch (this.provider) {
       case "clever":
         return await this.fetchCleverTeachers(limit, offset);
+      case "classlink":
       case "oneroster":
         return await this.fetchOneRosterTeachers(limit, offset);
       default:
@@ -564,14 +602,43 @@ class SisService {
     }
 
     const data = await response.json();
-    return (data.users || []).map((user: any) => ({
-      sisId: user.sourcedId,
-      firstName: user.givenName || "",
-      lastName: user.familyName || "",
-      email: user.email,
-      schoolIds: user.orgs?.map((org: any) => org.sourcedId) || [],
-      rawData: user,
-    }));
+    return (data.users || []).map(mapOneRosterTeacher);
+  }
+
+  // OneRoster / ClassLink use the OAuth2 client-credentials grant: exchange a
+  // client id + secret for a short-lived bearer token at the provider's token
+  // endpoint. Returns the access token and its expiry so callers can cache it.
+  async getOneRosterClientCredentialsToken(
+    tokenUrl: string,
+    clientId: string,
+    clientSecret: string,
+  ): Promise<{ accessToken: string; expiresAt?: Date }> {
+    if (!tokenUrl || !clientId || !clientSecret) {
+      throw new Error("OneRoster client credentials (tokenUrl, clientId, clientSecret) are required");
+    }
+
+    const response = await fetch(tokenUrl, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/x-www-form-urlencoded",
+        Authorization: `Basic ${Buffer.from(`${clientId}:${clientSecret}`).toString("base64")}`,
+        Accept: "application/json",
+      },
+      body: new URLSearchParams({ grant_type: "client_credentials" }),
+    });
+
+    if (!response.ok) {
+      throw new Error(`OneRoster token request failed: ${response.status}`);
+    }
+
+    const data = await response.json();
+    if (!data.access_token) {
+      throw new Error("OneRoster token response missing access_token");
+    }
+    return {
+      accessToken: data.access_token,
+      expiresAt: data.expires_in ? new Date(Date.now() + data.expires_in * 1000) : undefined,
+    };
   }
 
   getOAuthUrl(provider: SisProvider, redirectUri: string, state: string): string | null {

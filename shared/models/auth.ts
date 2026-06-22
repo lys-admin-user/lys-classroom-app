@@ -240,6 +240,38 @@ export const insertOrganizationSchema = createInsertSchema(organizations).omit({
 export type InsertOrganization = z.infer<typeof insertOrganizationSchema>;
 export type Organization = typeof organizations.$inferSelect;
 
+// ── Enterprise SSO (OIDC) ─────────────────────────────────────────────────────
+// Per-organization OpenID Connect single sign-on, alongside the platform's
+// default Replit Auth. Each row binds an org to an external identity provider
+// (the school/district's IdP) discovered via its OIDC issuer URL. The client
+// secret is stored encrypted at rest (AES-256-GCM, like other secrets).
+export const ssoConnections = pgTable("sso_connections", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  organizationId: varchar("organization_id").notNull().references(() => organizations.id),
+  // Display label, e.g. "Lincoln District Google Workspace"
+  displayName: varchar("display_name").notNull(),
+  // OIDC provider hint: "google", "azure", "okta", "onelogin", "generic"
+  provider: varchar("provider").default("generic").notNull(),
+  // OIDC issuer URL used for discovery (e.g. https://accounts.google.com)
+  issuerUrl: varchar("issuer_url").notNull(),
+  clientId: varchar("client_id").notNull(),
+  // Encrypted at rest.
+  clientSecret: text("client_secret").notNull(),
+  // Email domains that map to this connection, e.g. ["lincoln.edu"].
+  allowedDomains: text("allowed_domains").array().default(sql`ARRAY[]::text[]`),
+  // Role assigned to newly provisioned users (non-privileged only).
+  defaultRole: varchar("default_role").default("student").$type<UserRole>(),
+  // When true, unknown users are auto-created on first successful SSO login.
+  autoProvision: boolean("auto_provision").default(true),
+  enabled: boolean("enabled").default(true),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertSsoConnectionSchema = createInsertSchema(ssoConnections).omit({ id: true, createdAt: true, updatedAt: true });
+export type InsertSsoConnection = z.infer<typeof insertSsoConnectionSchema>;
+export type SsoConnection = typeof ssoConnections.$inferSelect;
+
 // Organization membership roles
 export type OrgMemberRole = "member" | "admin" | "owner";
 export type OrgMemberStatus = "active" | "invited" | "suspended";

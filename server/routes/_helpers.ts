@@ -460,12 +460,16 @@ const requireSystemAdmin = requireRole("system_admin");
 
   // Create a new SIS connection (manual configuration)
   export const createSisConnectionSchema = z.object({
-    provider: z.enum(["clever", "powerschool", "canvas", "infinite_campus", "skyward", "oneroster"]),
+    provider: z.enum(["clever", "powerschool", "canvas", "infinite_campus", "skyward", "oneroster", "classlink"]),
     providerName: z.string().optional(),
     organizationId: z.string().optional(),
     baseUrl: z.string().url().optional(),
     accessToken: z.string().optional(),
     districtId: z.string().optional(),
+    // OneRoster / ClassLink OAuth2 client-credentials
+    clientId: z.string().optional(),
+    clientSecret: z.string().optional(),
+    tokenUrl: z.string().url().optional(),
     settings: z.object({
       autoSync: z.boolean().default(false),
       syncFrequency: z.string().default("manual"),

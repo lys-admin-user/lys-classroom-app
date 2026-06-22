@@ -906,6 +906,14 @@ export interface IStorage {
   createSisConnection(connection: InsertSisConnection): Promise<SisConnection>;
   updateSisConnection(id: string, updates: Partial<SisConnection>): Promise<SisConnection | undefined>;
   deleteSisConnection(id: string, userId: string): Promise<boolean>;
+
+  // Enterprise SSO (OIDC)
+  getSsoConnection(id: string): Promise<SsoConnection | undefined>;
+  getSsoConnectionsByOrg(organizationId: string): Promise<SsoConnection[]>;
+  getEnabledSsoConnections(): Promise<SsoConnection[]>;
+  createSsoConnection(connection: InsertSsoConnection): Promise<SsoConnection>;
+  updateSsoConnection(id: string, updates: Partial<SsoConnection>): Promise<SsoConnection | undefined>;
+  deleteSsoConnection(id: string): Promise<boolean>;
   
   // SIS Sync History
   getSisSyncHistory(connectionId: string, limit?: number): Promise<SisSyncHistory[]>;

@@ -41,9 +41,12 @@ const providerIcons: Record<string, React.ReactNode> = {
   infinite_campus: <Building className="h-5 w-5" />,
   skyward: <Cloud className="h-5 w-5" />,
   oneroster: <Link2 className="h-5 w-5" />,
+  classlink: <Link2 className="h-5 w-5" />,
 };
 
-const COMING_SOON_PROVIDERS = ["powerschool", "canvas", "infinite_campus", "skyward", "oneroster"];
+const COMING_SOON_PROVIDERS = ["powerschool", "canvas", "infinite_campus", "skyward"];
+
+const CLIENT_CREDENTIALS_PROVIDERS = ["oneroster", "classlink"];
 
 const statusColors: Record<string, string> = {
   connected: "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200",
@@ -53,11 +56,14 @@ const statusColors: Record<string, string> = {
 };
 
 const connectionSchema = z.object({
-  provider: z.enum(["clever", "powerschool", "canvas", "infinite_campus", "skyward", "oneroster"]),
+  provider: z.enum(["clever", "powerschool", "canvas", "infinite_campus", "skyward", "oneroster", "classlink"]),
   providerName: z.string().optional(),
   baseUrl: z.string().url().optional().or(z.literal("")),
   accessToken: z.string().optional(),
   districtId: z.string().optional(),
+  clientId: z.string().optional(),
+  clientSecret: z.string().optional(),
+  tokenUrl: z.string().url().optional().or(z.literal("")),
 });
 
 type ConnectionFormData = z.infer<typeof connectionSchema>;
@@ -83,6 +89,9 @@ export default function SISIntegration() {
       baseUrl: "",
       accessToken: "",
       districtId: "",
+      clientId: "",
+      clientSecret: "",
+      tokenUrl: "",
     },
   });
 
@@ -325,6 +334,73 @@ export default function SISIntegration() {
                   )}
                 />
 
+                {CLIENT_CREDENTIALS_PROVIDERS.includes(form.watch("provider")) && (
+                  <div className="space-y-4 rounded-lg border border-border p-4" data-testid="section-client-credentials">
+                    <p className="text-sm font-medium">OAuth2 Client Credentials</p>
+                    <p className="text-xs text-muted-foreground">
+                      OneRoster and ClassLink use a client ID and secret to fetch an access token automatically. Get these from your roster server's developer console.
+                    </p>
+                    <FormField
+                      control={form.control}
+                      name="clientId"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Client ID</FormLabel>
+                          <FormControl>
+                            <Input
+                              placeholder="Your OneRoster/ClassLink client ID"
+                              {...field}
+                              data-testid="input-client-id"
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={form.control}
+                      name="clientSecret"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Client Secret</FormLabel>
+                          <FormControl>
+                            <Input
+                              type="password"
+                              placeholder="Your client secret"
+                              {...field}
+                              data-testid="input-client-secret"
+                            />
+                          </FormControl>
+                          <FormDescription>
+                            Stored encrypted at rest.
+                          </FormDescription>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={form.control}
+                      name="tokenUrl"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Token URL (Optional)</FormLabel>
+                          <FormControl>
+                            <Input
+                              placeholder="https://your-roster-server/token"
+                              {...field}
+                              data-testid="input-token-url"
+                            />
+                          </FormControl>
+                          <FormDescription>
+                            Defaults to <code>{"{Base URL}/token"}</code> if left blank.
+                          </FormDescription>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </div>
+                )}
+
                 <DialogFooter>
                   <Button type="button" variant="outline" onClick={() => setIsAddDialogOpen(false)}>
                     Cancel
@@ -343,9 +419,9 @@ export default function SISIntegration() {
       <div className="mb-6 p-4 rounded-lg border border-amber-200 bg-amber-50 dark:border-amber-900/50 dark:bg-amber-950/20 flex items-start gap-3" data-testid="banner-sis-coming-soon">
         <AlertCircle className="h-5 w-5 text-amber-600 dark:text-amber-400 flex-shrink-0 mt-0.5" />
         <div>
-          <p className="font-semibold text-amber-800 dark:text-amber-300 text-sm">Clever is fully supported</p>
+          <p className="font-semibold text-amber-800 dark:text-amber-300 text-sm">Clever, OneRoster, and ClassLink are fully supported</p>
           <p className="text-amber-700 dark:text-amber-400 text-sm">
-            PowerSchool, Canvas LMS, Infinite Campus, Skyward, and OneRoster integrations are <strong>coming soon</strong>. They appear in the provider list for planning purposes but will not successfully sync. Only Clever connections are live today.
+            Clever (OAuth) plus OneRoster 1.1 and ClassLink (OAuth2 client credentials) are live and will sync rosters today. PowerSchool, Canvas LMS, Infinite Campus, and Skyward are <strong>coming soon</strong> — they appear in the provider list for planning purposes but will not successfully sync yet.
           </p>
         </div>
       </div>

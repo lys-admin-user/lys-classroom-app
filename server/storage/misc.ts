@@ -277,6 +277,9 @@ import {
   type SisConnection,
   type InsertSisConnection,
   sisConnections,
+  type SsoConnection,
+  type InsertSsoConnection,
+  ssoConnections,
   type SisSyncHistory,
   type InsertSisSyncHistory,
   sisSyncHistory,
@@ -1033,6 +1036,43 @@ const miscMethods: ThisType<DatabaseStorage> = {
   async deleteSisConnection(id: string, userId: string): Promise<boolean> {
     await db.delete(sisConnections)
       .where(and(eq(sisConnections.id, id), eq(sisConnections.userId, userId)));
+    return true;
+  },
+
+
+  // Enterprise SSO (OIDC) Methods
+  async getSsoConnection(id: string): Promise<SsoConnection | undefined> {
+    const [connection] = await db.select().from(ssoConnections).where(eq(ssoConnections.id, id));
+    return connection || undefined;
+  },
+
+  async getSsoConnectionsByOrg(organizationId: string): Promise<SsoConnection[]> {
+    return await db.select().from(ssoConnections)
+      .where(eq(ssoConnections.organizationId, organizationId))
+      .orderBy(desc(ssoConnections.createdAt));
+  },
+
+  async getEnabledSsoConnections(): Promise<SsoConnection[]> {
+    return await db.select().from(ssoConnections)
+      .where(eq(ssoConnections.enabled, true))
+      .orderBy(desc(ssoConnections.createdAt));
+  },
+
+  async createSsoConnection(connection: InsertSsoConnection): Promise<SsoConnection> {
+    const [created] = await db.insert(ssoConnections).values(connection as any).returning();
+    return created;
+  },
+
+  async updateSsoConnection(id: string, updates: Partial<SsoConnection>): Promise<SsoConnection | undefined> {
+    const [updated] = await db.update(ssoConnections)
+      .set({ ...updates, updatedAt: new Date() })
+      .where(eq(ssoConnections.id, id))
+      .returning();
+    return updated || undefined;
+  },
+
+  async deleteSsoConnection(id: string): Promise<boolean> {
+    await db.delete(ssoConnections).where(eq(ssoConnections.id, id));
     return true;
   },
 

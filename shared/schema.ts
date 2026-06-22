@@ -3140,9 +3140,17 @@ export const SIS_PROVIDERS = {
   },
   oneroster: {
     name: "OneRoster",
-    description: "Industry standard API for interoperability",
+    description: "IMS Global OneRoster 1.1 — industry-standard rostering API",
     apiBase: "", // District-specific
-    authType: "oauth2",
+    authType: "oauth2_client_credentials",
+    supports: ["students", "teachers", "courses", "schools"],
+    icon: "link",
+  },
+  classlink: {
+    name: "ClassLink",
+    description: "ClassLink Roster Server (OneRoster 1.1) — SSO & rostering for 2,500+ districts",
+    apiBase: "", // District-specific
+    authType: "oauth2_client_credentials",
     supports: ["students", "teachers", "courses", "schools"],
     icon: "link",
   },

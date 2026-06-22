@@ -170,7 +170,18 @@ const docSections: DocSection[] = [
           rows: [
             ["parental_consents", "COPPA consent records", "id, studentUserId, parentEmail, consentGiven, verifiedAt"],
             ["safety_vault", "Intercepted PII and safety events", "id, userId, eventType, content, metadata"],
-            ["audit_logs", "Platform-wide audit trail", "id, userId, action, resourceType, resourceId, metadata, timestamp"],
+            ["audit_logs", "Platform-wide audit trail (SHA-256 hash chain)", "id, userId, action, resourceType, resourceId, metadata, timestamp, hash, prevHash"],
+          ],
+        },
+      },
+      {
+        heading: "Integration & SSO Tables",
+        body: "Tables backing SIS/rostering connections and per-organization enterprise single sign-on. Secrets (client secrets, access tokens) are encrypted at rest with AES-256-GCM.",
+        table: {
+          headers: ["Table", "Purpose", "Key Columns"],
+          rows: [
+            ["sis_connections", "SIS / rostering provider connections", "id, userId, provider (clever/oneroster/classlink/...), baseUrl, accessToken (enc), clientId, clientSecret (enc), tokenUrl"],
+            ["sso_connections", "Per-org enterprise SSO (OIDC) providers", "id, organizationId (FK), provider, issuerUrl, clientId, clientSecret (enc), allowedDomains[], defaultRole, autoProvision, enabled"],
           ],
         },
       },
@@ -219,6 +230,23 @@ const docSections: DocSection[] = [
         },
       },
       {
+        heading: "Enterprise SSO (OIDC) Endpoints",
+        body: "Per-organization single sign-on via OpenID Connect, running alongside the default Replit Auth. Each org admin registers their identity provider (Google Workspace, Azure AD, Okta, OneLogin, or generic OIDC). Users sign in with their school email, are matched to a connection by email domain, and are provisioned/linked with a non-privileged role. Degrades gracefully when no connection matches.",
+        table: {
+          headers: ["Method", "Path", "Auth", "Description"],
+          rows: [
+            ["GET", "/api/sso/lookup?email=", "No", "Resolve an email domain to an SSO connection (drives 'Sign in with your school')"],
+            ["GET", "/api/sso/login/:connectionId", "No", "Begin the OIDC authorization-code flow (PKCE + state + nonce)"],
+            ["GET", "/api/sso/callback/:connectionId", "No", "OIDC callback: verify, provision/link user, establish session"],
+            ["GET", "/api/organizations/:orgId/sso", "Org admin", "List SSO connections for an org (secrets masked)"],
+            ["POST", "/api/organizations/:orgId/sso", "Org admin", "Create an SSO connection (client secret encrypted at rest)"],
+            ["PATCH", "/api/sso/connections/:id", "Org admin", "Update an SSO connection"],
+            ["DELETE", "/api/sso/connections/:id", "Org admin", "Delete an SSO connection"],
+            ["POST", "/api/sso/connections/:id/test", "Org admin", "Verify the issuer is reachable and OIDC discovery succeeds"],
+          ],
+        },
+      },
+      {
         heading: "Lesson & AI Endpoints",
         body: "Manages lesson plans and AI-powered generation.",
         table: {
@@ -229,8 +257,30 @@ const docSections: DocSection[] = [
             ["GET", "/api/lessons/:id", "Yes", "Get a specific lesson by ID"],
             ["DELETE", "/api/lessons/:id", "Yes", "Delete a lesson"],
             ["POST", "/api/lessons/generate", "Yes", "Generate AI lesson plan (rate limited: 5/min)"],
-            ["POST", "/api/lessons/generate-guest", "No", "Guest AI generation (IP limited: 3 total)"],
+            ["POST", "/api/lessons/generate-stream", "Yes", "Generate AI lesson plan with SSE phase/delta streaming"],
+            ["POST", "/api/lessons/generate-guest", "No", "Guest AI generation (email-gated; 5/month shared with practice per guest bucket)"],
             ["POST", "/api/assignments/generate", "Yes", "Generate AI assignment (rate limited: 5/min)"],
+            ["POST", "/api/assignments/generate-stream", "Yes", "Generate AI assignment with SSE phase/delta streaming"],
+            ["POST", "/api/practice/generate", "No", "Generate student practice set (email-gated; shares the 5/month guest bucket)"],
+          ],
+        },
+      },
+      {
+        heading: "SIS & Rostering Endpoints",
+        body: "Student Information System integration and automated rostering. Clever is fully live; OneRoster 1.1 and ClassLink are supported via OAuth2 client-credentials (clientId/clientSecret/tokenUrl, secret encrypted at rest). PowerSchool, Canvas, Infinite Campus, and Skyward are Coming Soon.",
+        table: {
+          headers: ["Method", "Path", "Auth", "Description"],
+          rows: [
+            ["GET", "/api/integrations/sis/providers", "No", "List supported SIS/rostering providers and their status"],
+            ["GET", "/api/integrations/sis/connections", "Yes", "List the user's SIS connections (secrets masked)"],
+            ["POST", "/api/integrations/sis/connections", "Yes", "Create a SIS connection (client secret/access token encrypted)"],
+            ["PATCH", "/api/integrations/sis/connections/:id", "Yes", "Update a SIS connection"],
+            ["DELETE", "/api/integrations/sis/connections/:id", "Yes", "Delete a SIS connection"],
+            ["POST", "/api/integrations/sis/connections/:id/test", "Yes", "Test connectivity (resolves token for client-credentials providers)"],
+            ["POST", "/api/integrations/sis/connections/:id/sync", "Yes", "Run a roster sync (users, teachers, classes, orgs)"],
+            ["GET", "/api/integrations/sis/connections/:id/history", "Yes", "View sync history for a connection"],
+            ["GET", "/api/integrations/sis/connections/:id/students", "Yes", "List rostered students from the provider"],
+            ["GET", "/api/integrations/sis/connections/:id/courses", "Yes", "List rostered courses/classes from the provider"],
           ],
         },
       },
