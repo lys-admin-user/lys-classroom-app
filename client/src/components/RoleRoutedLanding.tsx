@@ -50,9 +50,9 @@ const ROLES: LandingRole[] = [
     label: "Student",
     icon: Lightbulb,
     proof: "Trusted by students in 50,000+ classrooms",
-    headline: "Actually understand it — tonight.",
+    headline: "Are you ready for success after highschool?",
     description:
-      "Stuck on homework? Get clear, step-by-step explanations and practice that meet you where you are — without just handing you the answer.",
+      "Stuck figuring out college vs. trades? Need help with scholarships? Get clear, step-by-step resources that meet you where you are — without just handing you the answer.",
     cta: "Try a practice set",
     benefits: [
       "Step-by-step hints, not just answers",
