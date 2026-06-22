@@ -4,6 +4,7 @@ import { storage } from "../storage";
 import { isAuthenticated } from "../replit_integrations/auth";
 import { generatePracticeRequestSchema } from "@shared/schema";
 import { generatePracticeSet } from "../practiceGenerator";
+import { moderateUserInput, safetyHttpResponse } from "../services/contentSafety";
 
 // Student Practice generation. Mirrors the lesson generator's guest model:
 // anonymous visitors get a small number of free practice sets per month, gated
@@ -25,6 +26,14 @@ export function registerPracticeRoutes(app: Express) {
   app.post("/api/practice/generate", isAuthenticated, async (req: any, res) => {
     try {
       const validated = generatePracticeRequestSchema.parse(req.body);
+
+      const verdict = await moderateUserInput([validated.topic, validated.subject]);
+      const unsafe = safetyHttpResponse(verdict);
+      if (unsafe) {
+        res.status(unsafe.status).json(unsafe.body);
+        return;
+      }
+
       const set = await generatePracticeSet(validated);
       res.json(set);
     } catch (error) {
@@ -43,6 +52,13 @@ export function registerPracticeRoutes(app: Express) {
   app.post("/api/practice/generate-guest", async (req: any, res) => {
     try {
       const validated = generatePracticeRequestSchema.parse(req.body);
+
+      const verdict = await moderateUserInput([validated.topic, validated.subject]);
+      const unsafe = safetyHttpResponse(verdict);
+      if (unsafe) {
+        res.status(unsafe.status).json(unsafe.body);
+        return;
+      }
 
       const lead = await storage.getGuestLead(guestKeyFromReq(req));
       if (!lead) {

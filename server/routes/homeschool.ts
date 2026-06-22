@@ -4,6 +4,7 @@ import { storage } from "../storage";
 import { isAuthenticated } from "../replit_integrations/auth";
 import { generateHomeschoolPlanRequestSchema } from "@shared/schema";
 import { generateHomeschoolPlan } from "../homeschoolPlanner";
+import { moderateUserInput, safetyHttpResponse } from "../services/contentSafety";
 
 // Homeschool Weekly Planner generation. Mirrors the practice/lesson guest model:
 // anonymous visitors get a small number of free plans per month, gated behind an
@@ -25,6 +26,18 @@ export function registerHomeschoolRoutes(app: Express) {
   app.post("/api/homeschool/generate", isAuthenticated, async (req: any, res) => {
     try {
       const validated = generateHomeschoolPlanRequestSchema.parse(req.body);
+
+      const verdict = await moderateUserInput([
+        validated.subjects.join(", "),
+        validated.interests,
+        validated.notes,
+      ]);
+      const unsafe = safetyHttpResponse(verdict);
+      if (unsafe) {
+        res.status(unsafe.status).json(unsafe.body);
+        return;
+      }
+
       const plan = await generateHomeschoolPlan(validated);
       res.json(plan);
     } catch (error) {
@@ -43,6 +56,17 @@ export function registerHomeschoolRoutes(app: Express) {
   app.post("/api/homeschool/generate-guest", async (req: any, res) => {
     try {
       const validated = generateHomeschoolPlanRequestSchema.parse(req.body);
+
+      const verdict = await moderateUserInput([
+        validated.subjects.join(", "),
+        validated.interests,
+        validated.notes,
+      ]);
+      const unsafe = safetyHttpResponse(verdict);
+      if (unsafe) {
+        res.status(unsafe.status).json(unsafe.body);
+        return;
+      }
 
       const lead = await storage.getGuestLead(guestKeyFromReq(req));
       if (!lead) {

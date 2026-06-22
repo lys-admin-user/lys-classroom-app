@@ -25,8 +25,20 @@ import {
   GraduationCap,
   Loader2,
   BookOpen,
+  HeartHandshake,
+  ShieldAlert,
 } from "lucide-react";
 import type { GeneratedPracticeSet, PracticeQuestion } from "@shared/schema";
+
+interface SafetyNotice {
+  crisis: boolean;
+  message?: string;
+  resources?: {
+    headline: string;
+    lines: string[];
+    note?: string;
+  };
+}
 
 const GRADE_LEVELS = [
   "Kindergarten",
@@ -162,6 +174,7 @@ export default function PracticeGenerator() {
     difficulty: "medium",
   });
   const [result, setResult] = useState<GeneratedPracticeSet | null>(null);
+  const [safetyNotice, setSafetyNotice] = useState<SafetyNotice | null>(null);
   const [emailModalOpen, setEmailModalOpen] = useState(false);
   const [guestModalOpen, setGuestModalOpen] = useState(false);
 
@@ -171,9 +184,26 @@ export default function PracticeGenerator() {
         ? "/api/practice/generate"
         : "/api/practice/generate-guest";
       const res = await apiRequest("POST", endpoint, form);
-      return (await res.json()) as GeneratedPracticeSet;
+      return (await res.json()) as GeneratedPracticeSet & {
+        blocked?: boolean;
+        crisis?: boolean;
+        message?: string;
+        resources?: SafetyNotice["resources"];
+      };
     },
     onSuccess: (data) => {
+      // A crisis verdict comes back as a 200 with a supportive payload instead
+      // of a practice set — surface resources, never questions.
+      if (data?.blocked || data?.crisis) {
+        setResult(null);
+        setSafetyNotice({
+          crisis: !!data.crisis,
+          message: data.message,
+          resources: data.resources,
+        });
+        return;
+      }
+      setSafetyNotice(null);
       setResult(data);
     },
     onError: (error: any) => {
@@ -183,6 +213,13 @@ export default function PracticeGenerator() {
       }
       if (error?.requiresSignup) {
         setGuestModalOpen(true);
+        return;
+      }
+      // A content-block verdict comes back as a 422 — show an inline notice
+      // rather than a generic error toast.
+      if (error?.blocked) {
+        setResult(null);
+        setSafetyNotice({ crisis: !!error.crisis, message: error.message });
         return;
       }
       toast({
@@ -202,6 +239,7 @@ export default function PracticeGenerator() {
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!canSubmit) return;
+    setSafetyNotice(null);
     generate.mutate();
   };
 
@@ -337,6 +375,50 @@ export default function PracticeGenerator() {
             Creating questions and step-by-step hints just for you…
           </p>
         </div>
+      )}
+
+      {safetyNotice && !generate.isPending && (
+        safetyNotice.crisis ? (
+          <Card
+            className="mb-8 border-lys-red/40 bg-lys-red/5"
+            data-testid="notice-crisis"
+          >
+            <CardContent className="space-y-3 pt-6">
+              <div className="flex items-center gap-2">
+                <HeartHandshake className="h-5 w-5 shrink-0 text-lys-red" />
+                <h2 className="font-oswald text-lg font-semibold">
+                  {safetyNotice.resources?.headline ?? "Help is available right now."}
+                </h2>
+              </div>
+              <ul className="space-y-2">
+                {(safetyNotice.resources?.lines ?? []).map((line, i) => (
+                  <li
+                    key={i}
+                    className="rounded-md border border-lys-red/20 bg-background px-3 py-2 font-roboto text-sm"
+                    data-testid={`text-crisis-resource-${i}`}
+                  >
+                    {line}
+                  </li>
+                ))}
+              </ul>
+              {safetyNotice.resources?.note && (
+                <p className="font-roboto text-sm text-muted-foreground">
+                  {safetyNotice.resources.note}
+                </p>
+              )}
+            </CardContent>
+          </Card>
+        ) : (
+          <Card className="mb-8 border-border" data-testid="notice-blocked">
+            <CardContent className="flex items-start gap-2 pt-6">
+              <ShieldAlert className="mt-0.5 h-5 w-5 shrink-0 text-muted-foreground" />
+              <p className="font-roboto text-sm" data-testid="text-blocked-message">
+                {safetyNotice.message ||
+                  "We can't create practice for that. Please try an academic topic."}
+              </p>
+            </CardContent>
+          </Card>
+        )
       )}
 
       {result && !generate.isPending && (

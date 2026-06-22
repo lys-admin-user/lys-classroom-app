@@ -3,6 +3,7 @@ import { createServer, type Server } from "http";
 import { storage } from "../storage";
 import { generateLessonPlan, generateLessonPlanStreaming } from "../openai";
 import { setupSSE, makeEmitter } from "../services/generationStream";
+import { moderateUserInput, safetyHttpResponse } from "../services/contentSafety";
 import { detectAfricanCountryFromText } from "@shared/africaContext";
 import { calculateLessonQualityScore, getQualityLevel } from "../lessonQualityScorer";
 import { parseDocument } from "../documentParser";
@@ -287,6 +288,14 @@ export function registerLessonsRoutes(app: Express): void {
   app.post("/api/lessons/generate-guest", async (req: any, res) => {
     try {
       const validated = generateLessonRequestSchema.parse(req.body);
+
+      const safetyVerdict = await moderateUserInput([validated.topic, validated.course, validated.unit]);
+      const safetyResp = safetyHttpResponse(safetyVerdict);
+      if (safetyResp) {
+        res.status(safetyResp.status).json(safetyResp.body);
+        return;
+      }
+
       const lead = await storage.getGuestLead(guestKeyFromReq(req));
       if (!lead) {
         res.status(403).json({
@@ -344,6 +353,12 @@ export function registerLessonsRoutes(app: Express): void {
     }
 
     try {
+      const safetyVerdict = await moderateUserInput([validated.topic, validated.course, validated.unit]);
+      const safetyResp = safetyHttpResponse(safetyVerdict);
+      if (safetyResp) {
+        return res.status(safetyResp.status).json(safetyResp.body);
+      }
+
       const lead = await storage.getGuestLead(guestKeyFromReq(req));
       if (!lead) {
         return res.status(403).json({
@@ -547,6 +562,13 @@ export function registerLessonsRoutes(app: Express): void {
         });
       }
       
+      const safetyVerdict = await moderateUserInput([validated.topic, validated.course, validated.unit]);
+      const safetyResp = safetyHttpResponse(safetyVerdict);
+      if (safetyResp) {
+        res.status(safetyResp.status).json(safetyResp.body);
+        return;
+      }
+
       const { checkFraudStrikes } = await import("../services/dataGovernance");
       const fraudCheck = await checkFraudStrikes(userId);
       if (fraudCheck.blocked) {
@@ -634,6 +656,12 @@ export function registerLessonsRoutes(app: Express): void {
           severity: topicCheck.severity,
           status: "pending_review",
         });
+      }
+
+      const safetyVerdict = await moderateUserInput([validated.topic, validated.course, validated.unit]);
+      const safetyResp = safetyHttpResponse(safetyVerdict);
+      if (safetyResp) {
+        return res.status(safetyResp.status).json(safetyResp.body);
       }
 
       const { checkFraudStrikes } = await import("../services/dataGovernance");
@@ -1005,6 +1033,13 @@ export function registerLessonsRoutes(app: Express): void {
         res.status(403).json({ error: "You can only generate assignments from your own lessons" });
         return;
       }
+
+      const safetyVerdict = await moderateUserInput([lesson.topic, accommodationNotes]);
+      const safetyResp = safetyHttpResponse(safetyVerdict);
+      if (safetyResp) {
+        res.status(safetyResp.status).json(safetyResp.body);
+        return;
+      }
       
       // Auto-detect African country from the saved lesson's STRUCTURED
       // standards string only (never the user-authored topic, which would
@@ -1046,6 +1081,12 @@ export function registerLessonsRoutes(app: Express): void {
       if (!lesson) return res.status(404).json({ error: "Lesson not found" });
       if (lesson.userId !== userId) {
         return res.status(403).json({ error: "You can only generate assignments from your own lessons" });
+      }
+
+      const safetyVerdict = await moderateUserInput([lesson.topic, accommodationNotes]);
+      const safetyResp = safetyHttpResponse(safetyVerdict);
+      if (safetyResp) {
+        return res.status(safetyResp.status).json(safetyResp.body);
       }
 
       const resolvedCountry = country || detectAfricanCountryFromText(lesson.standards) || undefined;
