@@ -36,7 +36,7 @@ const ROLES: LandingRole[] = [
     proof: "Join 50,000+ teachers leaving work at work",
     headline: "Get your weekends back.",
     description:
-      "Stop sacrificing your Sundays. Generate rigorous, standards-aligned lessons, quizzes, and rubrics in seconds — not hours.",
+      "Stop sacrificing your Sundays. Generate rigorous, standards-aligned supplemental character lessons, assignments and quizzes in seconds — not hours.",
     cta: "Generate a free lesson",
     benefits: [
       "6 hrs of planning saved every week",
@@ -108,7 +108,6 @@ export function RoleRoutedLanding() {
     <div className="min-h-screen bg-slate-50 flex flex-col font-roboto relative overflow-hidden" data-testid="landing-role-routed">
       <div className="absolute top-0 right-0 w-1/3 h-full bg-lys-yellow/5 -skew-x-12 transform origin-top right-[-10%]" />
       <div className="absolute bottom-0 left-0 w-1/4 h-1/2 bg-lys-teal/5 rounded-tr-full" />
-
       <header className="flex items-center justify-between px-8 py-6 relative z-10 max-w-7xl mx-auto w-full">
         <div className="flex items-center gap-2">
           <div className="h-10 w-10 bg-lys-red rounded-lg flex items-center justify-center transform -rotate-6 shadow-md shadow-lys-red/20">
@@ -124,12 +123,9 @@ export function RoleRoutedLanding() {
           Sign in
         </a>
       </header>
-
       <main className="flex-1 flex flex-col items-center pt-12 pb-24 px-4 text-center max-w-5xl mx-auto w-full relative z-10">
         <div className="mb-10">
-          <h1 className="font-oswald text-4xl md:text-5xl font-bold text-slate-900 tracking-tight mb-4">
-            Who are you building for today?
-          </h1>
+          <h1 className="font-oswald text-4xl md:text-5xl font-bold text-slate-900 tracking-tight mb-4">Are you ready to prepare students for success for today?</h1>
           <p className="text-lg text-slate-600 max-w-2xl mx-auto">
             Pick your role to see exactly how LYS helps you.
           </p>
@@ -267,7 +263,6 @@ export function RoleRoutedLanding() {
           </div>
         </div>
       </main>
-
       <style>{`
         @keyframes lysFadeIn {
           from { opacity: 0; transform: translateY(6px); }
