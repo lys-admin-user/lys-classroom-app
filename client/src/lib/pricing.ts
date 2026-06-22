@@ -18,6 +18,11 @@ export const SEAT_MINIMUMS = {
   enterprise: 30,
 } as const;
 
+// Enterprise networks (ISDs, charter networks) are charged the Campus tier price
+// for each campus in their network, since each location typically has its own
+// campus administrator. This is added on top of the Enterprise base + seat pricing.
+export const ENTERPRISE_PER_CAMPUS_PRICE = PLAN_PRICES.campus;
+
 export const FREE_LESSON_LIMIT = 5;
 
 export type PlanId = keyof typeof PLAN_PRICES;

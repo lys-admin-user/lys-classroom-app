@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useAuth } from "@/hooks/use-auth";
-import { PLAN_PRICES } from "@/lib/pricing";
+import { PLAN_PRICES, SEAT_PRICES, SEAT_MINIMUMS, ENTERPRISE_PER_CAMPUS_PRICE } from "@/lib/pricing";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -736,9 +736,9 @@ PATCH  /api/admin/orgs/:orgId/ai-training // editCaptureEnabled per org`,
           headers: ["Client Structure", "Org Type", "Tier", "Description"],
           rows: [
             ["Single-Campus Charter", "school / campus", `Campus ($${PLAN_PRICES.campus}/mo)`, "Independent 'boutique' school. No parent org. Full customization, makes own rules."],
-            ["Traditional ISD", "district > school/campus", `Enterprise ($${PLAN_PRICES.enterprise}/mo)`, "Geographically bound, locally governed by elected board. Standardized calendar/curriculum. All districts are Enterprise tier regardless of size."],
-            ["Charter Network (CMO/EMO)", "charter_network > school/campus", `Enterprise ($${PLAN_PRICES.enterprise}/mo)`, "Central HQ managing schools across states (e.g., KIPP, IDEA, Green Dot). CMOs are non-profit, EMOs are for-profit. Supports unified master dashboard OR per-state management."],
-            ["General Network", "network > district/school", `Enterprise ($${PLAN_PRICES.enterprise}/mo)`, "Multi-school networks not charter-specific (e.g., university systems, consortiums)."],
+            ["Traditional ISD", "district > school/campus", `Enterprise ($${PLAN_PRICES.enterprise}/mo + $${SEAT_PRICES.enterprise}/seat, ${SEAT_MINIMUMS.enterprise} seat min, + $${ENTERPRISE_PER_CAMPUS_PRICE}/mo per campus)`, "Geographically bound, locally governed by elected board. Standardized calendar/curriculum. All districts are Enterprise tier regardless of size. Per-campus charge covers each campus admin."],
+            ["Charter Network (CMO/EMO)", "charter_network > school/campus", `Enterprise ($${PLAN_PRICES.enterprise}/mo + $${SEAT_PRICES.enterprise}/seat, ${SEAT_MINIMUMS.enterprise} seat min, + $${ENTERPRISE_PER_CAMPUS_PRICE}/mo per campus)`, "Central HQ managing schools across states (e.g., KIPP, IDEA, Green Dot). CMOs are non-profit, EMOs are for-profit. Supports unified master dashboard OR per-state management. Per-campus charge covers each campus admin."],
+            ["General Network", "network > district/school", `Enterprise ($${PLAN_PRICES.enterprise}/mo + $${SEAT_PRICES.enterprise}/seat, ${SEAT_MINIMUMS.enterprise} seat min, + $${ENTERPRISE_PER_CAMPUS_PRICE}/mo per campus)`, "Multi-school networks not charter-specific (e.g., university systems, consortiums). Per-campus charge covers each campus admin."],
           ],
         },
       },

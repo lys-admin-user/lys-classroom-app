@@ -1,6 +1,6 @@
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/use-auth";
-import { PLAN_PRICES, SEAT_PRICES, SEAT_MINIMUMS } from "@/lib/pricing";
+import { PLAN_PRICES, SEAT_PRICES, SEAT_MINIMUMS, ENTERPRISE_PER_CAMPUS_PRICE } from "@/lib/pricing";
 import { useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -766,7 +766,7 @@ export default function SiteAdminPage() {
                   {(newOrg.type === "network" || newOrg.type === "charter_network") && (
                     <div className="p-3 rounded-md bg-primary/10 border border-primary/20">
                       <p className="text-sm font-medium">{newOrg.type === "charter_network" ? "Charter Network (CMO/EMO)" : "Multi-School Network"}</p>
-                      <p className="text-xs text-muted-foreground mt-1">{`This organization manages multiple campuses${newOrg.type === "charter_network" ? " across states (e.g., KIPP, IDEA, Green Dot)" : ""}. Child campuses can be added under this organization. Enterprise tier ($${PLAN_PRICES.enterprise}/mo + $${SEAT_PRICES.enterprise}/seat/mo, ${SEAT_MINIMUMS.enterprise} seat minimum) is recommended for unified master dashboard and per-state management capabilities.`}</p>
+                      <p className="text-xs text-muted-foreground mt-1">{`This organization manages multiple campuses${newOrg.type === "charter_network" ? " across states (e.g., KIPP, IDEA, Green Dot)" : ""}. Child campuses can be added under this organization. Enterprise tier ($${PLAN_PRICES.enterprise}/mo + $${SEAT_PRICES.enterprise}/seat/mo, ${SEAT_MINIMUMS.enterprise} seat minimum, + $${ENTERPRISE_PER_CAMPUS_PRICE}/mo per campus for each campus admin) is recommended for unified master dashboard and per-state management capabilities.`}</p>
                     </div>
                   )}
                   <div className="grid gap-2">

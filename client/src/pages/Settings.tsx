@@ -18,7 +18,7 @@ import {
 import { Settings as SettingsIcon, User, Crown, Loader2, Shield, Building2, Users as UsersIcon, ChevronRight, CreditCard } from "lucide-react";
 import { Link, useLocation } from "wouter";
 import { hasMinRole } from "@/components/AppSidebar";
-import { PLAN_PRICES, SEAT_PRICES, SEAT_MINIMUMS } from "@/lib/pricing";
+import { PLAN_PRICES, SEAT_PRICES, SEAT_MINIMUMS, ENTERPRISE_PER_CAMPUS_PRICE } from "@/lib/pricing";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import EducatorProfileForm from "@/components/EducatorProfileForm";
@@ -207,7 +207,7 @@ export default function Settings() {
     pro: "Full features for individual educators.",
     paid: "Full features for individual educators.",
     campus: `Single-campus license — $${PLAN_PRICES.campus}/mo base + $${SEAT_PRICES.campus}/seat/mo per Pro educator (${SEAT_MINIMUMS.campus} seat minimum).`,
-    enterprise: `Multi-campus/district plan — $${PLAN_PRICES.enterprise}/mo base + $${SEAT_PRICES.enterprise}/seat/mo per Pro educator (${SEAT_MINIMUMS.enterprise} seat minimum).`,
+    enterprise: `Multi-campus/district plan — $${PLAN_PRICES.enterprise}/mo base + $${SEAT_PRICES.enterprise}/seat/mo per Pro educator (${SEAT_MINIMUMS.enterprise} seat minimum) + $${ENTERPRISE_PER_CAMPUS_PRICE}/mo per campus for each campus admin.`,
   };
 
   return (

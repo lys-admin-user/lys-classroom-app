@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { PLAN_PRICES, SEAT_PRICES, SEAT_MINIMUMS, FREE_LESSON_LIMIT } from "@/lib/pricing";
+import { PLAN_PRICES, SEAT_PRICES, SEAT_MINIMUMS, FREE_LESSON_LIMIT, ENTERPRISE_PER_CAMPUS_PRICE } from "@/lib/pricing";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { VisuallyHidden } from "@radix-ui/react-visually-hidden";
 import { Button } from "@/components/ui/button";
@@ -291,7 +291,7 @@ const slides: DemoSlide[] = [
       "Simple, equitable pricing. Free to start. Pro for individuals. Campus and Enterprise plans for teams — with global income-adjusted pricing.",
     eyebrow: "Simple, Equitable Pricing",
     title: "Free to start. Built to scale.",
-    body: `Pro at $${PLAN_PRICES.pro}/mo. Campus from $${PLAN_PRICES.campus}/mo + $${SEAT_PRICES.campus}/seat. Enterprise from $${PLAN_PRICES.enterprise}/mo + $${SEAT_PRICES.enterprise}/seat.`,
+    body: `Pro at $${PLAN_PRICES.pro}/mo. Campus from $${PLAN_PRICES.campus}/mo + $${SEAT_PRICES.campus}/seat. Enterprise from $${PLAN_PRICES.enterprise}/mo + $${SEAT_PRICES.enterprise}/seat + $${ENTERPRISE_PER_CAMPUS_PRICE}/mo per campus.`,
     accent: "text-lys-red",
     accentBg: "bg-lys-red",
     bg: "from-lys-red/20 via-lys-yellow/10 to-lys-teal/15",
@@ -315,7 +315,7 @@ const slides: DemoSlide[] = [
             { name: "Free", price: "$0", note: `${FREE_LESSON_LIMIT} AI lessons/mo`, color: "border-l-muted" },
             { name: "Pro", price: `$${PLAN_PRICES.pro}/mo`, note: "Unlimited, no ads", color: "border-l-lys-red" },
             { name: "Campus", price: `$${PLAN_PRICES.campus}/mo + $${SEAT_PRICES.campus}/seat`, note: `${SEAT_MINIMUMS.campus} seat min`, color: "border-l-lys-teal" },
-            { name: "Enterprise", price: `$${PLAN_PRICES.enterprise}/mo + $${SEAT_PRICES.enterprise}/seat`, note: `${SEAT_MINIMUMS.enterprise} seat min`, color: "border-l-lys-yellow" },
+            { name: "Enterprise", price: `$${PLAN_PRICES.enterprise}/mo + $${SEAT_PRICES.enterprise}/seat`, note: `${SEAT_MINIMUMS.enterprise} seat min + $${ENTERPRISE_PER_CAMPUS_PRICE}/campus`, color: "border-l-lys-yellow" },
           ].map((tier, i) => (
             <motion.div
               key={tier.name}

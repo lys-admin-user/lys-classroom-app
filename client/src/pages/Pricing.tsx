@@ -12,7 +12,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Check, X, Building2, GraduationCap, AlertCircle, Eye, Globe, Info, TrendingDown, CreditCard, FileText, Landmark, Loader2, Sparkles, Users } from "lucide-react";
 import { SiPaypal } from "react-icons/si";
 import { useAuth } from "@/hooks/use-auth";
-import { PLAN_PRICES, SEAT_PRICES, SEAT_MINIMUMS, FREE_LESSON_LIMIT, PRO_REGULAR_PRICE, PRO_PROMO_END_DATE } from "@/lib/pricing";
+import { PLAN_PRICES, SEAT_PRICES, SEAT_MINIMUMS, FREE_LESSON_LIMIT, PRO_REGULAR_PRICE, PRO_PROMO_END_DATE, ENTERPRISE_PER_CAMPUS_PRICE } from "@/lib/pricing";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
@@ -157,13 +157,14 @@ const baseTiers = [
     seatPrice: SEAT_PRICES.enterprise,
     seatMinimum: SEAT_MINIMUMS.enterprise,
     period: "/month base",
-    description: `For ISDs, charter networks (CMOs/EMOs), and multi-site orgs. $${PLAN_PRICES.enterprise}/mo base + $${SEAT_PRICES.enterprise}/seat/mo (${SEAT_MINIMUMS.enterprise} seat minimum).`,
+    description: `For ISDs, charter networks (CMOs/EMOs), and multi-site orgs. $${PLAN_PRICES.enterprise}/mo base + $${SEAT_PRICES.enterprise}/seat/mo (${SEAT_MINIMUMS.enterprise} seat minimum) + $${ENTERPRISE_PER_CAMPUS_PRICE}/mo per campus (covers each campus admin).`,
     icon: Building2,
     seatBased: true,
     features: [
       { name: "Everything in Campus", included: true, highlight: true },
       { name: `$${SEAT_PRICES.enterprise}/seat/mo for Pro Educators`, included: true, highlight: true },
       { name: `${SEAT_MINIMUMS.enterprise} seat minimum`, included: true, note: `starts at $${PLAN_PRICES.enterprise + SEAT_MINIMUMS.enterprise * SEAT_PRICES.enterprise}/mo` },
+      { name: `+ $${ENTERPRISE_PER_CAMPUS_PRICE}/mo per campus`, included: true, highlight: true, note: "covers each campus's campus admin" },
       { name: "Multi-District & Charter Network Management", included: true },
       { name: "Master Dashboard across all campuses", included: true },
       { name: "Per-State Management for multi-state networks", included: true },

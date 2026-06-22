@@ -1,6 +1,6 @@
 import { useState, useMemo } from "react";
 import { useAuth } from "@/hooks/use-auth";
-import { PLAN_PRICES, SEAT_PRICES, SEAT_MINIMUMS } from "@/lib/pricing";
+import { PLAN_PRICES, SEAT_PRICES, SEAT_MINIMUMS, ENTERPRISE_PER_CAMPUS_PRICE } from "@/lib/pricing";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -634,17 +634,17 @@ const helpArticles: HelpArticle[] = [
     tags: ["multi-tenant", "organizations", "hierarchy", "district", "campus", "school", "isolation", "charter network", "CMO", "EMO", "ISD", "network"],
     severity: "info",
     symptom: "You need to understand how multi-tenancy, organization hierarchy, and data isolation work.",
-    explanation: `LYS supports three client structures: (1) Single-Campus Charters — independent schools (type='school'/'campus', Campus tier at $${PLAN_PRICES.campus}/mo + $${SEAT_PRICES.campus}/seat with ${SEAT_MINIMUMS.campus} seat minimum), (2) Traditional ISDs — public school districts (type='district' with child schools, Enterprise tier at $${PLAN_PRICES.enterprise}/mo + $${SEAT_PRICES.enterprise}/seat with ${SEAT_MINIMUMS.enterprise} seat minimum), and (3) Multi-State Charter Networks — CMOs/EMOs like KIPP, IDEA, or Charter Schools USA (type='charter_network'/'network' with child orgs, Enterprise tier at $${PLAN_PRICES.enterprise}/mo + $${SEAT_PRICES.enterprise}/seat with ${SEAT_MINIMUMS.enterprise} seat minimum). Each organization has its own members, settings, and resources. Data isolation ensures users in one organization cannot access another's data unless explicitly shared. Charter networks support both unified master dashboard and per-state management views.`,
+    explanation: `LYS supports three client structures: (1) Single-Campus Charters — independent schools (type='school'/'campus', Campus tier at $${PLAN_PRICES.campus}/mo + $${SEAT_PRICES.campus}/seat with ${SEAT_MINIMUMS.campus} seat minimum), (2) Traditional ISDs — public school districts (type='district' with child schools, Enterprise tier at $${PLAN_PRICES.enterprise}/mo + $${SEAT_PRICES.enterprise}/seat with ${SEAT_MINIMUMS.enterprise} seat minimum, plus $${ENTERPRISE_PER_CAMPUS_PRICE}/mo per campus for each campus admin), and (3) Multi-State Charter Networks — CMOs/EMOs like KIPP, IDEA, or Charter Schools USA (type='charter_network'/'network' with child orgs, Enterprise tier at $${PLAN_PRICES.enterprise}/mo + $${SEAT_PRICES.enterprise}/seat with ${SEAT_MINIMUMS.enterprise} seat minimum, plus $${ENTERPRISE_PER_CAMPUS_PRICE}/mo per campus for each campus admin). Each organization has its own members, settings, and resources. Data isolation ensures users in one organization cannot access another's data unless explicitly shared. Charter networks support both unified master dashboard and per-state management views.`,
     steps: [
       "Organization types: school/campus (single sites), district (ISDs), charter_network/network (CMOs/EMOs), university — linked via parentOrganizationId",
       `Single-Campus Charters: type='school' or 'campus', no parent org, full customization, Campus tier ($${PLAN_PRICES.campus}/mo + $${SEAT_PRICES.campus}/seat, ${SEAT_MINIMUMS.campus} seat min)`,
-      `Traditional ISDs: type='district' with child 'school'/'campus' orgs, locally governed, Enterprise tier ($${PLAN_PRICES.enterprise}/mo + $${SEAT_PRICES.enterprise}/seat, ${SEAT_MINIMUMS.enterprise} seat min)`,
-      `Charter Networks (CMOs/EMOs): type='charter_network' or 'network' with child orgs across states, Enterprise tier ($${PLAN_PRICES.enterprise}/mo + $${SEAT_PRICES.enterprise}/seat, ${SEAT_MINIMUMS.enterprise} seat min)`,
+      `Traditional ISDs: type='district' with child 'school'/'campus' orgs, locally governed, Enterprise tier ($${PLAN_PRICES.enterprise}/mo + $${SEAT_PRICES.enterprise}/seat, ${SEAT_MINIMUMS.enterprise} seat min, + $${ENTERPRISE_PER_CAMPUS_PRICE}/mo per campus for each campus admin)`,
+      `Charter Networks (CMOs/EMOs): type='charter_network' or 'network' with child orgs across states, Enterprise tier ($${PLAN_PRICES.enterprise}/mo + $${SEAT_PRICES.enterprise}/seat, ${SEAT_MINIMUMS.enterprise} seat min, + $${ENTERPRISE_PER_CAMPUS_PRICE}/mo per campus for each campus admin)`,
       "Charter networks support unified master dashboard OR per-state management based on admin preference",
       "Data isolation: queries are scoped to the user's organization memberships by default",
       "Resources cascade: district/network-level resources are available to all child campuses",
       "SIS integrations cascade: a district or charter network SIS connection is available to all campus educators",
-      `Organization tiers: free, pro, campus ($${PLAN_PRICES.campus}/mo + $${SEAT_PRICES.campus}/seat with ${SEAT_MINIMUMS.campus} seat min), enterprise ($${PLAN_PRICES.enterprise}/mo + $${SEAT_PRICES.enterprise}/seat with ${SEAT_MINIMUMS.enterprise} seat min) — all districts and networks are Enterprise`,
+      `Organization tiers: free, pro, campus ($${PLAN_PRICES.campus}/mo + $${SEAT_PRICES.campus}/seat with ${SEAT_MINIMUMS.campus} seat min), enterprise ($${PLAN_PRICES.enterprise}/mo + $${SEAT_PRICES.enterprise}/seat with ${SEAT_MINIMUMS.enterprise} seat min, + $${ENTERPRISE_PER_CAMPUS_PRICE}/mo per campus for each campus admin) — all districts and networks are Enterprise`,
       "Creating a new org: POST /api/organizations with type, name, and optional parentOrganizationId",
       "System admins can view and manage all organizations from the Admin > Organizations tab",
     ],
