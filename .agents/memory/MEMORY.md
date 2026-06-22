@@ -1,1 +1,2 @@
 - [grep output garbling](tooling-grep-output-garbling.md) — bash rg/grep can garble literal tokens in output; trust the `read` tool for exact string/enum values.
+- [org-admin access helper caveat](org-admin-access-helper-caveat.md) — verifyOrgAdminAccess/getAdminManagedOrgIds ignore membership role for district admins; gate sensitive org disclosure with a direct admin/owner check.

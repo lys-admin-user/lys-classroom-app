@@ -12,7 +12,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Check, X, Building2, GraduationCap, AlertCircle, Eye, Globe, Info, TrendingDown, CreditCard, FileText, Landmark, Loader2, Sparkles, Users } from "lucide-react";
 import { SiPaypal } from "react-icons/si";
 import { useAuth } from "@/hooks/use-auth";
-import { PLAN_PRICES, SEAT_PRICES, SEAT_MINIMUMS, FREE_LESSON_LIMIT, PRO_REGULAR_PRICE, PRO_PROMO_END_DATE, ENTERPRISE_PER_CAMPUS_PRICE } from "@/lib/pricing";
+import { PLAN_PRICES, SEAT_PRICES, SEAT_MINIMUMS, FREE_LESSON_LIMIT, PRO_REGULAR_PRICE, PRO_PROMO_END_DATE, ENTERPRISE_PER_CAMPUS_PRICE, computeEnterpriseQuote } from "@/lib/pricing";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
@@ -208,6 +208,18 @@ export default function Pricing() {
   const [billingAuthorized, setBillingAuthorized] = useState(false);
   const [downgradeDialogOpen, setDowngradeDialogOpen] = useState(false);
   const [downgradeTo, setDowngradeTo] = useState<string>("");
+  const [estimatorSeats, setEstimatorSeats] = useState<number>(SEAT_MINIMUMS.enterprise);
+  const [estimatorCampuses, setEstimatorCampuses] = useState<number>(1);
+
+  const { data: enterpriseQuote } = useQuery<{
+    hasOrg: boolean;
+    organizationName?: string;
+    organizationType?: string;
+    quote?: { campusCount: number };
+  }>({
+    queryKey: ["/api/pricing/enterprise-quote"],
+    enabled: isAuthenticated,
+  });
 
   // Handle return from Stripe Checkout
   useEffect(() => {
@@ -442,6 +454,10 @@ export default function Pricing() {
       ? `Starts at $${seatMinTotal}`
       : selectedTierData ? `$${selectedTierData.basePrice}` : "$0";
   const isPending = upgradeMutation.isPending || downgradeMutation.isPending || poMutation.isPending || bankTransferMutation.isPending || stripeLoading;
+
+  const hasNetworkQuote = !!enterpriseQuote?.hasOrg && enterpriseQuote.quote !== undefined;
+  const estimatorCampusCount = hasNetworkQuote ? enterpriseQuote!.quote!.campusCount : estimatorCampuses;
+  const enterpriseEstimate = computeEnterpriseQuote({ campusCount: estimatorCampusCount, seatCount: estimatorSeats });
 
   const downgradeToData = baseTiers.find(t => t.id === downgradeTo);
   const currentTierData = baseTiers.find(t => t.id === currentTier);
@@ -790,6 +806,88 @@ export default function Pricing() {
                   </div>
                 </div>
               </div>
+            </CardContent>
+          </Card>
+        </div>
+
+        <div className="max-w-2xl mx-auto mb-16">
+          <Card data-testid="card-enterprise-estimator">
+            <CardHeader>
+              <CardTitle className="font-oswald text-xl flex items-center gap-2">
+                <Building2 className="h-5 w-5 text-primary" />
+                Estimate your Enterprise price
+              </CardTitle>
+              <CardDescription>
+                {hasNetworkQuote
+                  ? `We found your network "${enterpriseQuote!.organizationName}". Your price is calculated from the campuses in it.`
+                  : "Enterprise is priced from the number of campuses in your network. Enter your numbers below for an estimate."}
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-5">
+              <div className="grid sm:grid-cols-2 gap-4">
+                <div className="space-y-1.5">
+                  <Label htmlFor="estimator-campuses">Campuses</Label>
+                  {hasNetworkQuote ? (
+                    <div
+                      className="flex items-center h-10 px-3 rounded-md border bg-muted text-sm"
+                      data-testid="text-estimator-campus-count"
+                    >
+                      {estimatorCampusCount} {estimatorCampusCount === 1 ? "campus" : "campuses"} in your network
+                    </div>
+                  ) : (
+                    <Input
+                      id="estimator-campuses"
+                      type="number"
+                      min={0}
+                      value={estimatorCampuses}
+                      onChange={(e) => setEstimatorCampuses(Math.max(0, Number(e.target.value) || 0))}
+                      data-testid="input-estimator-campuses"
+                    />
+                  )}
+                </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor="estimator-seats">Educator seats</Label>
+                  <Input
+                    id="estimator-seats"
+                    type="number"
+                    min={SEAT_MINIMUMS.enterprise}
+                    value={estimatorSeats}
+                    onChange={(e) => setEstimatorSeats(Math.max(0, Number(e.target.value) || 0))}
+                    data-testid="input-estimator-seats"
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Minimum {SEAT_MINIMUMS.enterprise} seats
+                  </p>
+                </div>
+              </div>
+
+              <div className="rounded-lg border bg-muted/40 p-4 space-y-2 text-sm">
+                <div className="flex justify-between" data-testid="row-estimate-base">
+                  <span className="text-muted-foreground">Enterprise base</span>
+                  <span className="font-mono">${enterpriseEstimate.basePrice}/mo</span>
+                </div>
+                <div className="flex justify-between" data-testid="row-estimate-seats">
+                  <span className="text-muted-foreground">
+                    {enterpriseEstimate.billableSeats} seats × ${enterpriseEstimate.seatPrice}
+                  </span>
+                  <span className="font-mono">${enterpriseEstimate.seatSubtotal}/mo</span>
+                </div>
+                <div className="flex justify-between" data-testid="row-estimate-campuses">
+                  <span className="text-muted-foreground">
+                    {enterpriseEstimate.campusCount} {enterpriseEstimate.campusCount === 1 ? "campus" : "campuses"} × ${enterpriseEstimate.perCampusPrice}
+                  </span>
+                  <span className="font-mono">${enterpriseEstimate.campusSubtotal}/mo</span>
+                </div>
+                <div className="flex justify-between pt-2 border-t font-semibold text-base">
+                  <span>Estimated total</span>
+                  <span className="font-mono text-primary" data-testid="text-estimate-total">
+                    ${enterpriseEstimate.total}/mo
+                  </span>
+                </div>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                This is an estimate. Enterprise plans are finalized with our team — reach out for your exact quote.
+              </p>
             </CardContent>
           </Card>
         </div>

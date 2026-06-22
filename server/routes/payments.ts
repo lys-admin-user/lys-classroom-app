@@ -4,6 +4,7 @@ import { storage } from "../storage";
 import { recordBillingAuthorization, consentRequestMeta } from "../services/consentService";
 import { generateLessonPlan } from "../openai";
 import { detectAfricanCountryFromText } from "@shared/africaContext";
+import { computeEnterpriseQuote } from "@shared/pricing";
 import { calculateLessonQualityScore, getQualityLevel } from "../lessonQualityScorer";
 import { parseDocument } from "../documentParser";
 import { 
@@ -852,6 +853,96 @@ export function registerPaymentsRoutes(app: Express): void {
     } catch (error) {
       console.error("Purchase order error:", error);
       res.status(500).json({ error: "Failed to submit purchase order" });
+    }
+  });
+
+
+  // Auto-calculated Enterprise quote: prices a network from the ACTUAL number of
+  // campuses nested beneath the org(s) the requesting admin manages, plus base +
+  // seats. Returns hasOrg=false when the user manages no eligible network so the
+  // client can fall back to a manual estimator.
+  app.get("/api/pricing/enterprise-quote", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user?.claims?.sub;
+      const seatCountRaw = req.query.seats;
+      const seatCount = seatCountRaw !== undefined ? Number(seatCountRaw) : undefined;
+      const seatCountValid = seatCount !== undefined && Number.isFinite(seatCount) ? seatCount : undefined;
+      const requestedOrgId = typeof req.query.organizationId === "string" ? req.query.organizationId : undefined;
+
+      const ENTERPRISE_ORG_TYPES = ["network", "charter_network", "district"];
+
+      // A quote exposes an org's name + campus count, so it requires a DIRECT
+      // admin/owner membership on that org (or a platform admin). This is stricter
+      // than the shared verifyOrgAdminAccess helper, which also grants district
+      // admins access via plain (non-admin) membership on a parent org.
+      const isPlatformAdmin = await storage.isSiteAdmin(userId);
+      const isOrgAdmin = async (orgId: string): Promise<boolean> => {
+        if (isPlatformAdmin) return true;
+        const membership = await storage.getOrgMembership(orgId, userId);
+        return !!membership && (membership.role === "admin" || membership.role === "owner");
+      };
+
+      const buildResponse = async (org: { id: string; name: string; type: string }) => {
+        const campuses = await storage.getSchoolsInHierarchy(org.id);
+        const quote = computeEnterpriseQuote({ campusCount: campuses.length, seatCount: seatCountValid });
+        return {
+          hasOrg: true,
+          organizationId: org.id,
+          organizationName: org.name,
+          organizationType: org.type,
+          quote,
+        };
+      };
+
+      // When the caller names a specific org, verify they administer it before
+      // exposing its name + campus count.
+      if (requestedOrgId) {
+        if (!(await isOrgAdmin(requestedOrgId))) {
+          res.status(403).json({ error: "You do not manage this organization" });
+          return;
+        }
+        const org = await storage.getOrganization(requestedOrgId);
+        if (!org || !ENTERPRISE_ORG_TYPES.includes(org.type as string)) {
+          res.json({ hasOrg: false });
+          return;
+        }
+        res.json(await buildResponse(org as any));
+        return;
+      }
+
+      // Otherwise auto-discover the enterprise-eligible orgs the user administers.
+      const managedOrgIds = await getAdminManagedOrgIds(userId);
+      const managedOrgs = (
+        await Promise.all(managedOrgIds.map((id) => storage.getOrganization(id)))
+      ).filter((o): o is NonNullable<typeof o> => !!o);
+
+      const adminEligibleOrgs: typeof managedOrgs = [];
+      for (const org of managedOrgs) {
+        if (!ENTERPRISE_ORG_TYPES.includes(org.type as string)) continue;
+        if (await isOrgAdmin(org.id)) {
+          adminEligibleOrgs.push(org);
+        }
+      }
+
+      if (adminEligibleOrgs.length === 0) {
+        res.json({ hasOrg: false });
+        return;
+      }
+
+      // Default to the largest network when the caller didn't pick one; the
+      // response includes the org name so the UI shows which network was priced.
+      let best: { org: typeof adminEligibleOrgs[number]; campusCount: number } | null = null;
+      for (const org of adminEligibleOrgs) {
+        const campuses = await storage.getSchoolsInHierarchy(org.id);
+        if (!best || campuses.length > best.campusCount) {
+          best = { org, campusCount: campuses.length };
+        }
+      }
+
+      res.json(await buildResponse(best!.org as any));
+    } catch (error) {
+      console.error("Enterprise quote error:", error);
+      res.status(500).json({ error: "Failed to compute enterprise quote" });
     }
   });
 
