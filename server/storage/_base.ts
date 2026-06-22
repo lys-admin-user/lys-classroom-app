@@ -280,6 +280,8 @@ import {
   contextualSponsorships,
   type SisConnection,
   type InsertSisConnection,
+  type SsoConnection,
+  type InsertSsoConnection,
   sisConnections,
   type SisSyncHistory,
   type InsertSisSyncHistory,

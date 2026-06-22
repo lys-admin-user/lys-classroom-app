@@ -218,7 +218,7 @@ export function registerSsoRoutes(app: Express): void {
       await logAuditEvent({
         userId,
         action: "sso.connection_created",
-        category: "admin",
+        category: "admin_action",
         severity: "info",
         resourceType: "sso_connection",
         resourceId: created.id,
@@ -270,7 +270,7 @@ export function registerSsoRoutes(app: Express): void {
       await logAuditEvent({
         userId,
         action: "sso.connection_updated",
-        category: "admin",
+        category: "admin_action",
         severity: "info",
         resourceType: "sso_connection",
         resourceId: id,
@@ -306,7 +306,7 @@ export function registerSsoRoutes(app: Express): void {
       await logAuditEvent({
         userId,
         action: "sso.connection_deleted",
-        category: "admin",
+        category: "admin_action",
         severity: "warning",
         resourceType: "sso_connection",
         resourceId: id,
