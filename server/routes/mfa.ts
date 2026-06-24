@@ -42,6 +42,15 @@ function emailDeliverable(user: { email?: string | null } | null | undefined): b
   return isEmailConfigured() || process.env.NODE_ENV !== "production";
 }
 
+// Dev convenience: until a real email provider is configured, skip the
+// login-time 2FA gate in development so the app is freely usable without fishing
+// verification codes out of the server console. Re-enables automatically in
+// production, or as soon as an email provider (e.g. Resend / SMTP / Gmail) is
+// configured. Step-up MFA for sensitive actions (requireFreshMfa) is unaffected.
+function loginMfaBypassed(): boolean {
+  return process.env.NODE_ENV !== "production" && !isEmailConfigured();
+}
+
 type FreshMfaResult =
   | { ok: true }
   | { ok: false; status: number; body: Record<string, unknown> };
@@ -119,6 +128,7 @@ function isLoginMfaExempt(path: string): boolean {
 // and no deliverable email) the gate steps aside rather than locking them out.
 export const requireLoginMfa: RequestHandler = async (req: any, res, next) => {
   try {
+    if (loginMfaBypassed()) return next();
     const method = req.method.toUpperCase();
     if (method === "GET" || method === "HEAD" || method === "OPTIONS") return next();
     const userId = getUserId(req);
@@ -168,7 +178,8 @@ export function registerMfaRoutes(app: Express): void {
         emailConfigured: isEmailConfigured(),
         // True when this user must complete a second factor before mutating, and
         // hasn't yet this session. Drives the client's login-MFA challenge.
-        loginMfaRequired: subjectToLoginMfa && !fresh && (hasTotp || emailOk),
+        loginMfaRequired:
+          !loginMfaBypassed() && subjectToLoginMfa && !fresh && (hasTotp || emailOk),
       });
     } catch (err) {
       res.status(500).json({ error: "Failed to load MFA status" });
