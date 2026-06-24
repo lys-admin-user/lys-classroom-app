@@ -6,6 +6,7 @@ import { useAuth } from "@/hooks/use-auth";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { Progress } from "@/components/ui/progress";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
@@ -323,25 +324,43 @@ function AchievementsSection({ progress, milestones, activities, savedCareersCou
             const config = categoryConfig[achievement.category as keyof typeof categoryConfig];
             
             return (
-              <div 
-                key={achievement.id}
-                className={`relative p-3 rounded-lg text-center transition-all ${
-                  unlocked 
-                    ? `${config.lightBg} border ${config.borderColor}` 
-                    : "bg-muted/30 opacity-50"
-                }`}
-                data-testid={`achievement-${achievement.id}`}
-              >
-                <div className={`w-10 h-10 mx-auto rounded-full flex items-center justify-center mb-2 ${
-                  unlocked ? config.bgColor : "bg-muted"
-                }`}>
-                  <Icon className={`w-5 h-5 ${unlocked ? "text-white" : "text-muted-foreground"}`} />
-                </div>
-                <p className="text-xs font-medium truncate">{achievement.title}</p>
-                {unlocked && (
-                  <CheckCircle2 className="absolute top-1 right-1 w-4 h-4 text-emerald-500" />
-                )}
-              </div>
+              <Tooltip key={achievement.id}>
+                <TooltipTrigger asChild>
+                  <div
+                    className={`relative p-3 rounded-lg text-center transition-all cursor-help ${
+                      unlocked
+                        ? `${config.lightBg} border ${config.borderColor}`
+                        : "bg-muted/30 opacity-50"
+                    }`}
+                    data-testid={`achievement-${achievement.id}`}
+                  >
+                    <div className={`w-10 h-10 mx-auto rounded-full flex items-center justify-center mb-2 ${
+                      unlocked ? config.bgColor : "bg-muted"
+                    }`}>
+                      <Icon className={`w-5 h-5 ${unlocked ? "text-white" : "text-muted-foreground"}`} />
+                    </div>
+                    <p className="text-xs font-medium truncate">{achievement.title}</p>
+                    {unlocked && (
+                      <CheckCircle2 className="absolute top-1 right-1 w-4 h-4 text-emerald-500" />
+                    )}
+                  </div>
+                </TooltipTrigger>
+                <TooltipContent className="max-w-[220px]" data-testid={`tooltip-achievement-${achievement.id}`}>
+                  <p className="font-semibold flex items-center gap-1.5">
+                    {achievement.title}
+                    {unlocked ? (
+                      <span className="text-emerald-500 font-normal">· Unlocked</span>
+                    ) : (
+                      <span className="text-muted-foreground font-normal">· Locked</span>
+                    )}
+                  </p>
+                  <p className="text-xs mt-1 text-muted-foreground">
+                    {unlocked
+                      ? achievement.description
+                      : `How to unlock: ${achievement.description}.`}
+                  </p>
+                </TooltipContent>
+              </Tooltip>
             );
           })}
         </div>

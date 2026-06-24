@@ -15,8 +15,11 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
-import { Settings as SettingsIcon, User, Crown, Loader2, Shield, Building2, Users as UsersIcon, ChevronRight, CreditCard } from "lucide-react";
+import { Settings as SettingsIcon, User, Crown, Loader2, Shield, Building2, Users as UsersIcon, ChevronRight, CreditCard, Eye } from "lucide-react";
 import { Link, useLocation } from "wouter";
+import { Switch } from "@/components/ui/switch";
+import { Label } from "@/components/ui/label";
+import { useViewAs } from "@/hooks/use-view-as";
 import { hasMinRole } from "@/components/AppSidebar";
 import { PLAN_PRICES, SEAT_PRICES, SEAT_MINIMUMS, ENTERPRISE_PER_CAMPUS_PRICE } from "@/lib/pricing";
 import { apiRequest, queryClient } from "@/lib/queryClient";
@@ -121,6 +124,39 @@ function BillingCard({ tier }: { tier: string }) {
               </AlertDialogContent>
             </AlertDialog>
           )}
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+function StudentViewCard() {
+  const { viewAsStudent, setViewAsStudent } = useViewAs();
+  return (
+    <Card data-testid="card-student-view">
+      <CardHeader>
+        <div className="flex items-center gap-3">
+          <Eye className="h-5 w-5 text-lys-teal" />
+          <div>
+            <CardTitle className="font-oswald">Student View</CardTitle>
+            <CardDescription className="font-roboto">
+              See the app the way your students do
+            </CardDescription>
+          </div>
+        </div>
+      </CardHeader>
+      <CardContent>
+        <div className="flex items-center justify-between gap-4 rounded-md border p-3">
+          <Label htmlFor="toggle-student-view" className="font-roboto text-sm leading-snug">
+            Switch your navigation to the student layout. This is just a preview —
+            it doesn't change what you're allowed to do, and you can turn it off any time.
+          </Label>
+          <Switch
+            id="toggle-student-view"
+            checked={viewAsStudent}
+            onCheckedChange={setViewAsStudent}
+            data-testid="switch-student-view"
+          />
         </div>
       </CardContent>
     </Card>
@@ -277,6 +313,13 @@ export default function Settings() {
           <Separator />
 
           <NotificationSettings />
+
+          {hasMinRole(userRole, "educator") && (
+            <>
+              <Separator />
+              <StudentViewCard />
+            </>
+          )}
 
           <Separator />
 

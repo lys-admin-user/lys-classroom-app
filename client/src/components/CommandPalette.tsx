@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useLocation } from "wouter";
 import { useAuth } from "@/hooks/use-auth";
+import { useViewAs } from "@/hooks/use-view-as";
 import {
   CommandDialog,
   CommandInput,
@@ -32,7 +33,12 @@ export function CommandPalette() {
   const [open, setOpen] = useState(false);
   const [, setLocation] = useLocation();
   const { user, isAuthenticated } = useAuth();
-  const userRole = user?.role || "student";
+  const { viewAsStudent } = useViewAs();
+  const actualRole = user?.role || "student";
+  // Mirror AppSidebar: when an educator+ turns on student view, the palette
+  // lists the same student destinations so the two nav surfaces never drift.
+  const isEducatorPlus = hasMinRole(actualRole, "educator");
+  const userRole = viewAsStudent && isEducatorPlus ? "student" : actualRole;
 
   useEffect(() => {
     const down = (e: KeyboardEvent) => {
@@ -41,8 +47,15 @@ export function CommandPalette() {
         setOpen((o) => !o);
       }
     };
+    // Lets a visible "Search" button (in the header) open the palette so it's
+    // discoverable for users who don't know the keyboard shortcut.
+    const openPalette = () => setOpen(true);
     document.addEventListener("keydown", down);
-    return () => document.removeEventListener("keydown", down);
+    window.addEventListener("open-command-palette", openPalette);
+    return () => {
+      document.removeEventListener("keydown", down);
+      window.removeEventListener("open-command-palette", openPalette);
+    };
   }, []);
 
   const showItem = (item: NavItem) => {

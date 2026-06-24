@@ -166,7 +166,9 @@ export default function StrengthsInventory() {
             </DialogHeader>
             <div className="space-y-4">
               <div>
-                <Label htmlFor="strengthName">Strength Name</Label>
+                <Label htmlFor="strengthName">
+                  Strength Name <span className="text-destructive">*</span>
+                </Label>
                 <Input
                   id="strengthName"
                   value={form.strengthName}
@@ -209,7 +211,9 @@ export default function StrengthsInventory() {
                 </Select>
               </div>
               <div>
-                <Label htmlFor="evidence">Evidence</Label>
+                <Label htmlFor="evidence">
+                  Evidence <span className="text-destructive">*</span>
+                </Label>
                 <Textarea
                   id="evidence"
                   value={form.evidence}

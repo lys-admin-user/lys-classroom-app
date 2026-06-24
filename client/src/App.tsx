@@ -14,6 +14,7 @@ import { TrialBanner } from "@/components/TrialBanner";
 import { ImpersonationBanner } from "@/components/ImpersonationBanner";
 import { OnboardingTour } from "@/components/OnboardingTour";
 import { CommandPalette } from "@/components/CommandPalette";
+import { ViewAsProvider, ViewAsStudentBanner } from "@/hooks/use-view-as";
 import { PolicyReacceptModal } from "@/components/PolicyReacceptModal";
 import { RoleRoutedLanding } from "@/components/RoleRoutedLanding";
 import { MfaStepUpDialog } from "@/components/MfaStepUpDialog";
@@ -488,6 +489,7 @@ function AppShell() {
         <AppSidebar />
         <SidebarInset className="flex flex-col flex-1">
           <ImpersonationBanner />
+          <ViewAsStudentBanner />
           <TrialBanner />
           <OnboardingReminderBanner />
           <Header />
@@ -509,12 +511,14 @@ function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>
-        <OnboardingGuard>
-          <AppShell />
-        </OnboardingGuard>
-        <NeedsAnalyzerModal />
-        <Toaster />
-        <ConsentBanner />
+        <ViewAsProvider>
+          <OnboardingGuard>
+            <AppShell />
+          </OnboardingGuard>
+          <NeedsAnalyzerModal />
+          <Toaster />
+          <ConsentBanner />
+        </ViewAsProvider>
       </TooltipProvider>
     </QueryClientProvider>
   );

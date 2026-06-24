@@ -31,7 +31,8 @@ import {
   Send,
   CheckSquare,
   Circle,
-  FileText
+  FileText,
+  Quote
 } from "lucide-react";
 import { Link } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
@@ -663,6 +664,63 @@ function NewEducatorChecklist({ lessonsCount, goalsCount }: { lessonsCount: numb
   );
 }
 
+// ─── Testimonials ──────────────────────────────────────────────────────────────
+
+type Testimonial = { quote: string; name: string; role: string };
+
+function TestimonialsSection({ audience }: { audience: "student" | "educator" }) {
+  // Real testimonials are collected over time; until then we show a clean,
+  // on-brand empty state instead of fake reviews.
+  const testimonials: Testimonial[] = [];
+
+  return (
+    <section className="py-8 lg:py-12 bg-muted/20" data-testid="section-testimonials">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6">
+        <div className="text-center mb-8">
+          <h2 className="font-oswald font-semibold tracking-tight text-2xl sm:text-3xl text-foreground mb-2">
+            What People Are Saying
+          </h2>
+          <p className="font-roboto text-muted-foreground max-w-2xl mx-auto">
+            {audience === "student"
+              ? "Stories from students climbing their own ladder to success."
+              : "Stories from educators and families using LYS every day."}
+          </p>
+        </div>
+
+        {testimonials.length === 0 ? (
+          <Card className="max-w-2xl mx-auto" data-testid="card-testimonials-empty">
+            <CardContent className="flex flex-col items-center text-center gap-3 py-10">
+              <div className="w-12 h-12 rounded-full bg-lys-teal/10 flex items-center justify-center">
+                <Quote className="h-6 w-6 text-lys-teal" />
+              </div>
+              <p className="font-oswald font-medium text-lg">Your story could be here</p>
+              <p className="font-roboto text-sm text-muted-foreground max-w-md">
+                We're gathering reviews from our community. As people share how LYS
+                helped them, their stories will appear right here.
+              </p>
+            </CardContent>
+          </Card>
+        ) : (
+          <div className="grid md:grid-cols-3 gap-6">
+            {testimonials.map((t, i) => (
+              <Card key={i} data-testid={`card-testimonial-${i}`}>
+                <CardContent className="p-6 flex flex-col gap-4 h-full">
+                  <Quote className="h-6 w-6 text-lys-teal shrink-0" />
+                  <p className="font-roboto text-sm text-foreground flex-1">"{t.quote}"</p>
+                  <div>
+                    <p className="font-oswald font-medium text-sm">{t.name}</p>
+                    <p className="font-roboto text-xs text-muted-foreground">{t.role}</p>
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        )}
+      </div>
+    </section>
+  );
+}
+
 // ─── Student Dashboard ─────────────────────────────────────────────────────────
 
 function StudentDashboard() {
@@ -1028,6 +1086,8 @@ function StudentDashboard() {
           </div>
         </div>
       </section>
+
+      <TestimonialsSection audience="student" />
     </div>
   );
 }
@@ -1430,6 +1490,8 @@ function EducatorDashboard() {
           </div>
         </div>
       </section>
+
+      <TestimonialsSection audience="educator" />
 
       <DemoVideoModal open={showDemo} onOpenChange={setShowDemo} />
     </div>

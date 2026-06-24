@@ -1,8 +1,12 @@
+import { useState } from "react";
 import { Link, useLocation } from "wouter";
 import { useQuery } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/use-auth";
+import { useViewAs } from "@/hooks/use-view-as";
 import { ROLE_HIERARCHY, type UserRole } from "@shared/models/auth";
 import { Badge } from "@/components/ui/badge";
+import { ChevronDown } from "lucide-react";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import {
   Sidebar,
   SidebarContent,
@@ -15,6 +19,7 @@ import {
   SidebarHeader,
   SidebarFooter,
   SidebarSeparator,
+  useSidebar,
 } from "@/components/ui/sidebar";
 import {
   LayoutDashboard,
@@ -76,6 +81,11 @@ export interface NavGroup {
   minRole?: UserRole;
   exactRole?: UserRole;
   colorClass?: string;
+  // Student-facing groups (Be-Know-Do). For educators+ these are moved below the
+  // educator tools and collapsed by default so educators aren't scrolling past
+  // student-only items — while still available for "I do / you do / we do"
+  // modeling and the optional student view.
+  studentFocused?: boolean;
 }
 
 export const navigationGroups: NavGroup[] = [
@@ -89,6 +99,7 @@ export const navigationGroups: NavGroup[] = [
   {
     label: "BE - Self Discovery",
     colorClass: "text-lys-red",
+    studentFocused: true,
     items: [
       { title: "Self Discovery", url: "/self-discovery", icon: Heart },
       { title: "Strengths Inventory", url: "/strengths-inventory", icon: Sparkles, requiresAuth: true },
@@ -100,6 +111,7 @@ export const navigationGroups: NavGroup[] = [
   {
     label: "KNOW - Career Paths",
     colorClass: "text-[hsl(45,93%,38%)]",
+    studentFocused: true,
     items: [
       { title: "Career Explorer", url: "/careers", icon: Briefcase },
       { title: "Resources", url: "/resources", icon: Library },
@@ -110,6 +122,7 @@ export const navigationGroups: NavGroup[] = [
   {
     label: "DO - Take Action",
     colorClass: "text-lys-teal",
+    studentFocused: true,
     items: [
       { title: "Action Plans", url: "/action-plans", icon: Target, requiresAuth: true },
       { title: "Campus Activities", url: "/campus-activities", icon: Trophy, requiresAuth: true },
@@ -195,10 +208,104 @@ export const navigationGroups: NavGroup[] = [
   },
 ];
 
+function SidebarNavGroup({
+  group,
+  visibleItems,
+  isActiveRoute,
+  pendingCount,
+  defaultOpen,
+  isLast,
+}: {
+  group: NavGroup;
+  visibleItems: NavItem[];
+  isActiveRoute: (url: string) => boolean;
+  pendingCount: number;
+  defaultOpen: boolean;
+  isLast: boolean;
+}) {
+  const { state } = useSidebar();
+  const iconMode = state === "collapsed";
+  const storageKey = `lys:nav-group:${group.label}`;
+
+  const [userOpen, setUserOpen] = useState<boolean>(() => {
+    if (typeof window === "undefined") return defaultOpen;
+    const saved = window.localStorage.getItem(storageKey);
+    return saved === null ? defaultOpen : saved === "true";
+  });
+
+  const handleOpenChange = (open: boolean) => {
+    setUserOpen(open);
+    try {
+      window.localStorage.setItem(storageKey, String(open));
+    } catch {
+      /* ignore storage failures */
+    }
+  };
+
+  // In icon (collapsed) mode group labels are hidden and items render as icons,
+  // so always show the items there regardless of the collapse preference.
+  const open = iconMode ? true : userOpen;
+
+  return (
+    <SidebarGroup>
+      <Collapsible open={open} onOpenChange={handleOpenChange}>
+        <CollapsibleTrigger asChild>
+          <SidebarGroupLabel
+            className={`group/label flex items-center justify-between cursor-pointer text-[10px] uppercase tracking-widest font-semibold ${group.colorClass ?? ""}`}
+            data-testid={`nav-group-toggle-${group.label.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "")}`}
+          >
+            <span>{group.label}</span>
+            <ChevronDown
+              className={`h-3.5 w-3.5 shrink-0 opacity-60 transition-transform duration-200 ${open ? "" : "-rotate-90"}`}
+              strokeWidth={2}
+            />
+          </SidebarGroupLabel>
+        </CollapsibleTrigger>
+        <CollapsibleContent>
+          <SidebarGroupContent>
+            <SidebarMenu>
+              {visibleItems.map((item) => {
+                const Icon = item.icon;
+                const isActive = isActiveRoute(item.url);
+                return (
+                  <SidebarMenuItem key={`${group.label}-${item.url}`}>
+                    <SidebarMenuButton
+                      asChild
+                      isActive={isActive}
+                      tooltip={item.title}
+                      className="rounded-lg data-[active=true]:bg-lys-red/10 data-[active=true]:text-lys-red data-[active=true]:font-medium"
+                    >
+                      <Link href={item.url} data-testid={`nav-${item.title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '')}`}>
+                        <Icon className="h-4 w-4" strokeWidth={1.75} />
+                        <span>{item.title}</span>
+                        {item.title === "System Dashboard" && pendingCount > 0 && (
+                          <Badge variant="destructive" className="ml-auto text-xs px-1.5 py-0" data-testid="badge-pending-rss-count">
+                            {pendingCount}
+                          </Badge>
+                        )}
+                      </Link>
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+                );
+              })}
+            </SidebarMenu>
+          </SidebarGroupContent>
+        </CollapsibleContent>
+      </Collapsible>
+      {!isLast && <SidebarSeparator className="my-2" />}
+    </SidebarGroup>
+  );
+}
+
 export function AppSidebar() {
   const [location] = useLocation();
   const { user, isAuthenticated } = useAuth();
-  const userRole = user?.role || "student";
+  const { viewAsStudent } = useViewAs();
+  const actualRole = user?.role || "student";
+  // When an educator+ turns on "student view", navigation is gated as if they
+  // were a student. This never changes real permissions — only what's shown.
+  const isEducatorPlus = hasMinRole(actualRole, "educator");
+  const userRole = viewAsStudent && isEducatorPlus ? "student" : actualRole;
 
   const { data: pendingCountData } = useQuery<{ count: number }>({
     queryKey: ['/api/admin/rss-content/pending-count'],
@@ -235,6 +342,24 @@ export function AppSidebar() {
     return true;
   };
 
+  // Build the visible groups, then (for educators+ not in student view) float
+  // educator/admin tools above the student Be-Know-Do groups so the most-used
+  // items are reachable without scrolling.
+  const reorderForEducator =
+    hasMinRole(userRole, "educator") && !(viewAsStudent && isEducatorPlus);
+
+  const visibleGroups = navigationGroups.filter(
+    (group) => shouldShowGroup(group) && group.items.some(shouldShowItem),
+  );
+
+  const orderedGroups = reorderForEducator
+    ? [
+        ...visibleGroups.filter((g) => g.label === "Overview"),
+        ...visibleGroups.filter((g) => g.label !== "Overview" && !g.studentFocused),
+        ...visibleGroups.filter((g) => g.label !== "Overview" && g.studentFocused),
+      ]
+    : visibleGroups;
+
   return (
     <Sidebar collapsible="icon">
       <SidebarHeader className="p-3">
@@ -252,49 +377,19 @@ export function AppSidebar() {
       </SidebarHeader>
       
       <SidebarContent>
-        {navigationGroups.map((group, groupIndex) => {
-          if (!shouldShowGroup(group)) return null;
-          
-          const visibleItems = group.items.filter(shouldShowItem);
-          if (visibleItems.length === 0) return null;
-
-          return (
-            <SidebarGroup key={group.label}>
-              <SidebarGroupLabel className={`text-[10px] uppercase tracking-widest font-semibold ${group.colorClass ?? ""}`}>
-                {group.label}
-              </SidebarGroupLabel>
-              <SidebarGroupContent>
-                <SidebarMenu>
-                  {visibleItems.map((item) => {
-                    const Icon = item.icon;
-                    const isActive = isActiveRoute(item.url);
-                    return (
-                      <SidebarMenuItem key={`${group.label}-${item.url}`}>
-                        <SidebarMenuButton
-                          asChild
-                          isActive={isActive}
-                          tooltip={item.title}
-                          className="rounded-lg data-[active=true]:bg-lys-red/10 data-[active=true]:text-lys-red data-[active=true]:font-medium"
-                        >
-                          <Link href={item.url} data-testid={`nav-${item.title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '')}`}>
-                            <Icon className="h-4 w-4" strokeWidth={1.75} />
-                            <span>{item.title}</span>
-                            {item.title === "System Dashboard" && pendingCount > 0 && (
-                              <Badge variant="destructive" className="ml-auto text-xs px-1.5 py-0" data-testid="badge-pending-rss-count">
-                                {pendingCount}
-                              </Badge>
-                            )}
-                          </Link>
-                        </SidebarMenuButton>
-                      </SidebarMenuItem>
-                    );
-                  })}
-                </SidebarMenu>
-              </SidebarGroupContent>
-              {groupIndex < navigationGroups.length - 1 && <SidebarSeparator className="my-2" />}
-            </SidebarGroup>
-          );
-        })}
+        {orderedGroups.map((group, groupIndex) => (
+          <SidebarNavGroup
+            key={group.label}
+            group={group}
+            visibleItems={group.items.filter(shouldShowItem)}
+            isActiveRoute={isActiveRoute}
+            pendingCount={pendingCount}
+            // Educators get the student Be-Know-Do groups collapsed by default so
+            // their own tools sit up top; everyone else sees groups expanded.
+            defaultOpen={!(reorderForEducator && group.studentFocused)}
+            isLast={groupIndex === orderedGroups.length - 1}
+          />
+        ))}
       </SidebarContent>
 
       <SidebarFooter className="p-2">

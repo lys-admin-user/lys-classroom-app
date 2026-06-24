@@ -24,3 +24,11 @@ ordering the sidebar uses (`hasMinRole` / `ROLE_HIERARCHY` from `@shared/models/
 The command palette (`CommandPalette.tsx`) already reuses the exported
 `navigationGroups` + `hasMinRole` from `AppSidebar` for exactly this reason — prefer
 reusing that single source over re-deriving role visibility by hand.
+
+**Effective-role override (View as Student):** `useViewAs()` lets an educator+ preview
+the student nav. Both `AppSidebar` AND `CommandPalette` derive an *effective role*
+(`viewAsStudent && hasMinRole(actualRole,"educator") ? "student" : actualRole`) and
+gate on that. A code review caught the palette still gating on raw `user.role` after
+the sidebar was switched to the override — they drifted. Any third surface that lists
+role-gated nav must apply the same effective-role derivation, not the raw auth role.
+It changes nav visibility ONLY; real permissions stay server-enforced.

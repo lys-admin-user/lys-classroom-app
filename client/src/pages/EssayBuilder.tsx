@@ -193,7 +193,9 @@ function EssayForm({
     <form onSubmit={handleSave} className="space-y-6" data-testid="form-essay">
       <div className="grid gap-4 sm:grid-cols-2">
         <div className="space-y-2">
-          <Label htmlFor="essay-title">Title</Label>
+          <Label htmlFor="essay-title">
+            Title <span className="text-destructive">*</span>
+          </Label>
           <Input
             id="essay-title"
             placeholder="My Scholarship Essay"

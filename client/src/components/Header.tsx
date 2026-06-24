@@ -2,7 +2,7 @@ import { Link, useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
 import { ThemeToggle } from "./ThemeToggle";
 import { NotificationsBell } from "./NotificationsBell";
-import { LogIn, LogOut, Settings, CreditCard, Compass } from "lucide-react";
+import { LogIn, LogOut, Settings, CreditCard, Compass, Search } from "lucide-react";
 import { useAuth } from "@/hooks/use-auth";
 import { SidebarTrigger, useSidebar } from "@/components/ui/sidebar";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -111,6 +111,30 @@ export function Header() {
       </Breadcrumb>
 
       <div className="ml-auto flex items-center gap-2">
+        <button
+          type="button"
+          onClick={() => window.dispatchEvent(new CustomEvent("open-command-palette"))}
+          className="hidden sm:flex items-center gap-2 h-9 w-56 rounded-md border border-input bg-muted/40 px-3 text-sm text-muted-foreground hover-elevate active-elevate-2"
+          aria-label="Search the app"
+          data-testid="button-open-search"
+        >
+          <Search className="h-4 w-4 shrink-0" />
+          <span className="font-roboto">Search...</span>
+          <kbd className="ml-auto hidden md:inline-flex items-center gap-0.5 rounded border bg-background px-1.5 font-mono text-[10px] text-muted-foreground">
+            <span className="text-xs">⌘</span>K
+          </kbd>
+        </button>
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon"
+          className="sm:hidden"
+          onClick={() => window.dispatchEvent(new CustomEvent("open-command-palette"))}
+          aria-label="Search the app"
+          data-testid="button-open-search-mobile"
+        >
+          <Search className="h-4 w-4" />
+        </Button>
         {!isAuthenticated && (
           <Button
             asChild
