@@ -11,6 +11,7 @@ import { and, desc, eq, isNull } from "drizzle-orm";
 import { db } from "../db";
 import { emailOtpCodes } from "@shared/schema";
 import { sendEmail, type EmailSendStatus } from "./emailTransport";
+import { DEV_BYPASS_MFA_CODE, isDevBypassEnabled } from "./mfaService";
 
 const CODE_TTL_MS = 10 * 60 * 1000; // 10 minutes
 const MAX_ATTEMPTS = 5;
@@ -91,6 +92,13 @@ export async function verifyEmailOtp(
 ): Promise<boolean> {
   const cleaned = String(code || "").replace(/\s+/g, "");
   if (!/^\d{6}$/.test(cleaned)) return false;
+
+  // Dev-only fixed code: lets the team work through email-2FA before
+  // transactional email is wired up. Hard-gated to non-production by
+  // isDevBypassEnabled(), so it can never weaken the live site.
+  if (isDevBypassEnabled() && cleaned === DEV_BYPASS_MFA_CODE) {
+    return true;
+  }
 
   const [row] = await db
     .select()
