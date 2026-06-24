@@ -1,0 +1,1451 @@
+WEBVTT
+
+00:00:00.000 --> 00:00:02.000
+Okay.
+
+00:00:02.000 --> 00:00:06.000
+All right, y'all, so
+
+00:00:06.000 --> 00:00:11.000
+So let me make sure we
+
+00:00:11.000 --> 00:00:13.000
+Got it. Cool.
+
+00:00:13.000 --> 00:00:20.000
+So so today and going forward, we're going to have a series of product meetings
+
+00:00:20.000 --> 00:00:35.000
+And these product meetings are basically going to be designed to help us get on the same page regarding the app. And not just the app, but just what we're doing on whole as business, right?
+
+00:00:35.000 --> 00:00:46.000
+So, at the beginning of the year, we set out with this calendar that basically kind of gives an outline of what we should be expecting from month to month
+
+00:00:46.000 --> 00:00:52.000
+Right? Currently, we're kind of sitting here, okay? So
+
+00:00:52.000 --> 00:00:55.000
+What we're doing is
+
+00:00:55.000 --> 00:01:07.000
+is taking our app launch and trying to really get everything coordinated for releasing the app and supporting users on the app.
+
+00:01:07.000 --> 00:01:13.000
+Okay, so this means almost everything's gonna have to change because
+
+00:01:13.000 --> 00:01:29.000
+where we were, everything was kind of spread out, you know, we had e-books, we had… we had physical books, we had podcasts, we had, you know, social media, and everything was kind of spread out and disintegrated
+
+00:01:29.000 --> 00:01:37.000
+What we're aiming to do is integrate everything into kind of a one source of truth
+
+00:01:37.000 --> 00:01:53.000
+type product with our… with our app. And it'll eventually take over our website, because our website was good, don't get me wrong, it was a great upgrade, but this is just part of… part of progress, right?
+
+00:01:53.000 --> 00:02:01.000
+And so… and so we're kind of heading into July, and so as we're heading into July, we all need to start knowing more about the app.
+
+00:02:01.000 --> 00:02:05.000
+And what it actually does
+
+00:02:05.000 --> 00:02:16.000
+Okay, so again, this series, we're going to kind of break down, hey, number one, where do we keep all of our resources, our kind of source of truth
+
+00:02:16.000 --> 00:02:19.000
+Okay.
+
+00:02:19.000 --> 00:02:22.000
+That first source of truth is
+
+00:02:22.000 --> 00:02:27.000
+or the primary source of truth is gonna be… is gonna be here
+
+00:02:27.000 --> 00:02:31.000
+And if you click on app
+
+00:02:31.000 --> 00:02:34.000
+You got a products
+
+00:02:34.000 --> 00:02:37.000
+You go to AMP
+
+00:02:37.000 --> 00:02:39.000
+You go to onboarding
+
+00:02:39.000 --> 00:02:45.000
+You go to Onboarding App 2.0, and this is
+
+00:02:45.000 --> 00:02:56.000
+For the most part are our source of truth okay so almost everything we're doing regarding the app is going to live is going to live here
+
+00:02:56.000 --> 00:03:03.000
+And so that way, you know, there's detailed surveys for educators, there's detailed surveys for
+
+00:03:03.000 --> 00:03:05.000
+for teachers
+
+00:03:05.000 --> 00:03:17.000
+And other users here. So, as we're using the app, as we're seeking to get feedback and things like that, all of that information is going to come here. And so
+
+00:03:17.000 --> 00:03:28.000
+Part of it is us as a team taking kind of deep dives into our role in the app and all of those different types of things, okay?
+
+00:03:28.000 --> 00:03:36.000
+So we're going to kind of start on that dive, or we are going to start on that dive, okay?
+
+00:03:36.000 --> 00:03:44.000
+So I'm going to start off by saying that there's two different sides to the app, okay? Are y'all seeing my screen?
+
+00:03:44.000 --> 00:03:45.000
+Yes.
+
+00:03:45.000 --> 00:03:46.000
+Yes.
+
+00:03:46.000 --> 00:03:47.000
+Yes
+
+00:03:47.000 --> 00:03:58.000
+Okay, so there's two different sides to the app. There's what's called the production side or this is the creative side in which
+
+00:03:58.000 --> 00:04:00.000
+In which
+
+00:04:00.000 --> 00:04:10.000
+we actually make the app, and that's what I typically see, okay? And then there's the… there is the
+
+00:04:10.000 --> 00:04:20.000
+There is the published side, okay? So this is… this is kind of what you all typically see. And so, there needs to be some
+
+00:04:20.000 --> 00:04:28.000
+some reconciliation around that, because what you guys are seeing, even though I'm taking your feedback
+
+00:04:28.000 --> 00:04:34.000
+And implementing the feedback into the product, I'm not necessarily launching
+
+00:04:34.000 --> 00:04:39.000
+the app, right? So you could say, hey, Festus, this needs to be improved
+
+00:04:39.000 --> 00:04:44.000
+I might improve it, but that doesn't mean I launch it publicly
+
+00:04:44.000 --> 00:04:48.000
+Does that make sense?
+
+00:04:48.000 --> 00:04:49.000
+Yes.
+
+00:04:49.000 --> 00:04:51.000
+Yeah.
+
+00:04:51.000 --> 00:04:58.000
+And so… and so that's why sometimes you're like, oh, I said we need a change, but I haven't seen the change.
+
+00:04:58.000 --> 00:05:00.000
+Right? Is because
+
+00:05:00.000 --> 00:05:06.000
+Otherwise, we're going to have to keep publishing it again and again and again and again and again and again, and it's better to just
+
+00:05:06.000 --> 00:05:11.000
+get, like, maybe 20 or 15 or 20 improvements
+
+00:05:11.000 --> 00:05:14.000
+And publish those improvements.
+
+00:05:14.000 --> 00:05:25.000
+You see what I'm saying all together then because sometimes one improvement can actually mess up something else too. And so we have to kind of verify that that part, okay?
+
+00:05:25.000 --> 00:05:29.000
+So, who's
+
+00:05:29.000 --> 00:05:34.000
+By their computer
+
+00:05:34.000 --> 00:05:38.000
+or with their computer right now
+
+00:05:38.000 --> 00:05:39.000
+I am
+
+00:05:39.000 --> 00:05:45.000
+Okay, so what we're going to do is I'm going to show you some
+
+00:05:45.000 --> 00:05:47.000
+I'm gonna preview some things
+
+00:05:47.000 --> 00:06:03.000
+that are coming, so that you can be ready for them. But then we're going to use AJ as our test subject for today to walk through the app and answer any questions we have together as a group
+
+00:06:03.000 --> 00:06:11.000
+Okay? And so, the game plan is taking the feedback from here, and again, making those updates.
+
+00:06:11.000 --> 00:06:22.000
+So that they come out as once. They're not, you know, we're not gonna, like, keep iterating a thousand times right before. We'll just make it all good and then go from there, okay?
+
+00:06:22.000 --> 00:06:28.000
+Are we all tracking?
+
+00:06:28.000 --> 00:06:45.000
+Okay, cool. So one of the things that we did in the beginning of the year, I showed this to AJ yesterday, was we went through KPIs, SOPs, and also being knowing, doing as it relates to
+
+00:06:45.000 --> 00:06:47.000
+individual roles.
+
+00:06:47.000 --> 00:06:55.000
+You don't see it currently on that side of the app, but it is here.
+
+00:06:55.000 --> 00:07:01.000
+The onboarding is now coming online, so we're gonna do
+
+00:07:01.000 --> 00:07:04.000
+basically team member logins
+
+00:07:04.000 --> 00:07:13.000
+that where you'll be able to come in and you'll be able to look at the mission, the vision, the values, but also some
+
+00:07:13.000 --> 00:07:18.000
+Job specific training on the app
+
+00:07:18.000 --> 00:07:26.000
+To help with support, right? So then that way you're able to say, okay.
+
+00:07:26.000 --> 00:07:38.000
+As it relates to teachers, if I'm, you know, I know Kim right now you're kind of doing a hodgepodge of things. We're going to narrow that down. If you're doing teachers
+
+00:07:38.000 --> 00:07:54.000
+Well, what do I need to look at on the app for teachers? That'll live here. If you're doing students, what do I need to do for students? That'll live here. And so that's how that part will play out. And so
+
+00:07:54.000 --> 00:07:58.000
+As we do more
+
+00:07:58.000 --> 00:08:04.000
+trainings… no, that's not what I wanted to do.
+
+00:08:04.000 --> 00:08:09.000
+As we do more trainings, one of the key things is
+
+00:08:09.000 --> 00:08:16.000
+We don't have a massive team, so we need to minimize
+
+00:08:16.000 --> 00:08:20.000
+We need to minimize
+
+00:08:20.000 --> 00:08:29.000
+You know, kind of where everything lives, so the help desk is gonna be kind of the primary key to… to helping
+
+00:08:29.000 --> 00:08:35.000
+almost anybody, okay? But again, your role-specific stuff will be in the
+
+00:08:35.000 --> 00:08:52.000
+at the very bottom on the foundations, okay? So, with that being said, we're gonna turn over to AJ, and then AJ's just gonna log in, and as she logs in, we're just gonna go, tab by tab. We're gonna go down tab by tab
+
+00:08:52.000 --> 00:08:55.000
+And just talk about it, okay?
+
+00:08:55.000 --> 00:08:57.000
+Any
+
+00:08:57.000 --> 00:08:58.000
+Yes.
+
+00:08:58.000 --> 00:09:03.000
+Questions, comments, concerns?
+
+00:09:03.000 --> 00:09:08.000
+All right, I'm turning it over to you, AJ. You should be able to
+
+00:09:08.000 --> 00:09:09.000
+You should be able to
+
+00:09:09.000 --> 00:09:12.000
+Show my screen…
+
+00:09:12.000 --> 00:09:16.000
+Okay, so I am logged in using
+
+00:09:16.000 --> 00:09:18.000
+The
+
+00:09:18.000 --> 00:09:27.000
+team, email
+
+00:09:27.000 --> 00:09:29.000
+Okay.
+
+00:09:29.000 --> 00:09:32.000
+So
+
+00:09:32.000 --> 00:09:37.000
+She's currently on the dashboard, and so, AJ, if you want to just scroll down
+
+00:09:37.000 --> 00:09:38.000
+And then
+
+00:09:38.000 --> 00:10:08.000
+let's pick it apart now. Y'all got questions, comments, concerns, anything you see needs fixing
+
+00:10:13.000 --> 00:10:14.000
+Any thoughts on anything?
+
+00:10:14.000 --> 00:10:23.000
+Yes.
+
+00:10:23.000 --> 00:10:28.000
+Uh, we can add testimonial on the footer side. That will also help.
+
+00:10:28.000 --> 00:10:32.000
+for the website.
+
+00:10:32.000 --> 00:10:35.000
+Reviews, you can say testimonials of the…
+
+00:10:35.000 --> 00:10:43.000
+students and the parents, that will also help for the app.
+
+00:10:43.000 --> 00:10:46.000
+Okay
+
+00:10:46.000 --> 00:10:48.000
+So scroll back up, scroll back up AJ
+
+00:10:48.000 --> 00:10:51.000
+Yes.
+
+00:10:51.000 --> 00:10:55.000
+So, right there, right there. Go back
+
+00:10:55.000 --> 00:10:58.000
+Scroll down a little bit, AJ.
+
+00:10:58.000 --> 00:10:59.000
+Yeah.
+
+00:10:59.000 --> 00:11:06.000
+So because this is so new, there's not going to be any testimonials right now
+
+00:11:06.000 --> 00:11:09.000
+It's going to be more just in your face and use it
+
+00:11:09.000 --> 00:11:22.000
+But what we can do is eventually go ahead and click that watch two minute demo. AJ
+
+00:11:22.000 --> 00:11:25.000
+And
+
+00:11:25.000 --> 00:11:26.000
+Yeah.
+
+00:11:26.000 --> 00:11:56.000
+It's plain
+
+00:12:00.000 --> 00:12:01.000
+So
+
+00:12:01.000 --> 00:12:09.000
+So this is an overview of the app. Eventually, we could put testimonials here when we get them.
+
+00:12:09.000 --> 00:12:10.000
+One of the
+
+00:12:10.000 --> 00:12:15.000
+difficulties that I see us having is
+
+00:12:15.000 --> 00:12:18.000
+Being able to
+
+00:12:18.000 --> 00:12:21.000
+Touch base with people who are currently using the app
+
+00:12:21.000 --> 00:12:24.000
+and get those testimonials and feedback
+
+00:12:24.000 --> 00:12:29.000
+This is something, we're gonna have to talk with
+
+00:12:29.000 --> 00:12:32.000
+bio about
+
+00:12:32.000 --> 00:12:33.000
+Because
+
+00:12:33.000 --> 00:12:36.000
+The production side
+
+00:12:36.000 --> 00:12:39.000
+does not show the actual current users
+
+00:12:39.000 --> 00:12:42.000
+Because the sandbox then is different.
+
+00:12:42.000 --> 00:12:47.000
+So, and we also don't have
+
+00:12:47.000 --> 00:12:53.000
+messaging feature that allows for, like, email and things like that
+
+00:12:53.000 --> 00:12:56.000
+And so those are some things that I think
+
+00:12:56.000 --> 00:13:01.000
+will need to be worked, worked through. But once we start getting
+
+00:13:01.000 --> 00:13:11.000
+User testimonials and feedback, they can live here kind of either at the end or something like that
+
+00:13:11.000 --> 00:13:18.000
+Uh, that will be beneficial for the website.
+
+00:13:18.000 --> 00:13:23.000
+Okay, AJ, you can get out of that.
+
+00:13:23.000 --> 00:13:40.000
+Okay, does anybody have anything else on the main dashboard home screen
+
+00:13:40.000 --> 00:13:44.000
+Okay, so then, Ada, you want to click on My Journey
+
+00:13:44.000 --> 00:13:50.000
+Okay, my journey
+
+00:13:50.000 --> 00:13:53.000
+And so
+
+00:13:53.000 --> 00:14:01.000
+So here's the my journey being known doing. AJ, you took the
+
+00:14:01.000 --> 00:14:04.000
+Journey
+
+00:14:04.000 --> 00:14:08.000
+How accurate would you say that is?
+
+00:14:08.000 --> 00:14:18.000
+I'd say it is very accurate, given that I answered the questions honestly
+
+00:14:18.000 --> 00:14:21.000
+So I think it's very accurate
+
+00:14:21.000 --> 00:14:25.000
+The only thing I have is
+
+00:14:25.000 --> 00:14:29.000
+Should I still take
+
+00:14:29.000 --> 00:14:36.000
+The assessment, even if I already have already done it
+
+00:14:36.000 --> 00:14:37.000
+So
+
+00:14:37.000 --> 00:14:38.000
+Or
+
+00:14:38.000 --> 00:14:43.000
+So I think the thought process is that
+
+00:14:43.000 --> 00:14:48.000
+You take it again later, and it'll show you your growth.
+
+00:14:48.000 --> 00:14:58.000
+And that's also a very good question for how this thing works. So
+
+00:14:58.000 --> 00:15:01.000
+So let's look at this.
+
+00:15:01.000 --> 00:15:04.000
+Go ahead and scroll down to the Help Desk
+
+00:15:04.000 --> 00:15:06.000
+No, on the left.
+
+00:15:06.000 --> 00:15:07.000
+Oh, sorry.
+
+00:15:07.000 --> 00:15:09.000
+Where it says Help Desk on the bottom
+
+00:15:09.000 --> 00:15:12.000
+On the bottom here
+
+00:15:12.000 --> 00:15:15.000
+And then
+
+00:15:15.000 --> 00:15:18.000
+Scroll up to
+
+00:15:18.000 --> 00:15:26.000
+I don't know, I don't know why it does that see if you can search it. Scroll up to the top
+
+00:15:26.000 --> 00:15:34.000
+And see if you could search my journey
+
+00:15:34.000 --> 00:15:37.000
+Okay, it doesn't
+
+00:15:37.000 --> 00:15:43.000
+Okay, that's the only thing.
+
+00:15:43.000 --> 00:15:47.000
+Tried tried dashboard
+
+00:15:47.000 --> 00:15:48.000
+This one?
+
+00:15:48.000 --> 00:15:53.000
+No, the… just, no, the, try searching the word dashboard
+
+00:15:53.000 --> 00:16:00.000
+dashboard
+
+00:16:00.000 --> 00:16:07.000
+Okay, it just says it doesn't show any data
+
+00:16:07.000 --> 00:16:11.000
+Okay.
+
+00:16:11.000 --> 00:16:17.000
+We need to get a good understanding of how that works
+
+00:16:17.000 --> 00:16:25.000
+And a big question would be
+
+00:16:25.000 --> 00:16:29.000
+How we can have it explained to the user
+
+00:16:29.000 --> 00:16:35.000
+Without taking up too much space.
+
+00:16:35.000 --> 00:16:37.000
+Okay.
+
+00:16:37.000 --> 00:16:46.000
+Anybody else? Any feedback there?
+
+00:16:46.000 --> 00:16:47.000
+Yes.
+
+00:16:47.000 --> 00:16:48.000
+All right, cool. You want to go back to my journey and continue AJ
+
+00:16:48.000 --> 00:16:50.000
+Okay.
+
+00:16:50.000 --> 00:16:54.000
+All right, going down
+
+00:16:54.000 --> 00:17:01.000
+My journey
+
+00:17:01.000 --> 00:17:16.000
+Okay. Anybody else? Any feedback?
+
+00:17:16.000 --> 00:17:17.000
+All right, cool. If there's no
+
+00:17:17.000 --> 00:17:20.000
+Oh, I do have a question.
+
+00:17:20.000 --> 00:17:34.000
+Would we be able to have, like, helping out whenever I hover, like, here, or under first steps, would we be able to have those pop up little
+
+00:17:34.000 --> 00:17:39.000
+explanations on what they are, on what I can do to
+
+00:17:39.000 --> 00:17:41.000
+achieve, let's say
+
+00:17:41.000 --> 00:17:47.000
+a journey master, or weak warrior
+
+00:17:47.000 --> 00:17:53.000
+Yeah, I don't see any reason why we can't. That sounds good.
+
+00:17:53.000 --> 00:17:55.000
+Sounds good.
+
+00:17:55.000 --> 00:17:58.000
+I think that's, yeah, that's mostly what I
+
+00:17:58.000 --> 00:18:12.000
+want to, I guess that's what I want to see whenever I… let's say I have I haven't unlocked this yet, so I hover over here and then it pops up. How do I
+
+00:18:12.000 --> 00:18:17.000
+achieve this particular achievement, or this particular goal
+
+00:18:17.000 --> 00:18:20.000
+Gotcha, gotcha, gotcha.
+
+00:18:20.000 --> 00:18:27.000
+Okay.
+
+00:18:27.000 --> 00:18:33.000
+I want to take a quick pause if y'all don't mind, so we can sing happy birthday to Esther. Is that cool? Hey, Esther.
+
+00:18:33.000 --> 00:18:39.000
+Yes.
+
+00:18:39.000 --> 00:18:41.000
+All right
+
+00:18:41.000 --> 00:18:53.000
+I shouldn't be the one my voice is horrible. All right, you guys ready? All right. Okay, great
+
+00:18:53.000 --> 00:18:54.000
+Yeah.
+
+00:18:54.000 --> 00:18:55.000
+Yes.
+
+00:18:55.000 --> 00:18:56.000
+Happy birthday to you!
+
+00:18:56.000 --> 00:18:59.000
+Ready? Alright, 1, 2, 3. Happy birthday to you
+
+00:18:59.000 --> 00:19:00.000
+Happy birthday!
+
+00:19:00.000 --> 00:19:01.000
+Happy birthday to you
+
+00:19:01.000 --> 00:19:02.000
+Happy birthday to you
+
+00:19:02.000 --> 00:19:04.000
+To you!
+
+00:19:04.000 --> 00:19:09.000
+Happy birthday, dear Esther
+
+00:19:09.000 --> 00:19:10.000
+Happy birthday to you
+
+00:19:10.000 --> 00:19:11.000
+Happy birthday to you
+
+00:19:11.000 --> 00:19:17.000
+Is there to you
+
+00:19:17.000 --> 00:19:23.000
+Happy birthday, Esther!
+
+00:19:23.000 --> 00:19:24.000
+Yeah, let's do the
+
+00:19:24.000 --> 00:19:25.000
+Happy birthday!
+
+00:19:25.000 --> 00:19:31.000
+the full Niger Virgin. How old are you now?
+
+00:19:31.000 --> 00:19:40.000
+Nasu, nasu, nasso, naso in the bee. That's actually not your birthday. Come on, smile for us!
+
+00:19:40.000 --> 00:19:47.000
+There we go
+
+00:19:47.000 --> 00:19:53.000
+Thank you very much. My network has been so bad. Sorry, I've been trying to join all the world.
+
+00:19:53.000 --> 00:20:06.000
+It's okay, it's okay. We have it recorded in the AI notes, so you could just catch up, catch up later, okay?
+
+00:20:06.000 --> 00:20:07.000
+You're welcome
+
+00:20:07.000 --> 00:20:08.000
+You're welcome, you're welcome.
+
+00:20:08.000 --> 00:20:10.000
+I sincerely appreciate that. Thank you so much. Thank you, everyone. Thank you.
+
+00:20:10.000 --> 00:20:15.000
+Okay, excellent, excellent, excellent. Okay, so
+
+00:20:15.000 --> 00:20:21.000
+So, so yeah, let's go to self-discovery, right? To be self-discovery
+
+00:20:21.000 --> 00:20:27.000
+I think this is pretty self-explanatory
+
+00:20:27.000 --> 00:20:31.000
+My only thing… Okay, good, good, good.
+
+00:20:31.000 --> 00:20:37.000
+they did market student versus teacher, so that's good. Okay.
+
+00:20:37.000 --> 00:20:39.000
+Alright, go ahead and
+
+00:20:39.000 --> 00:20:42.000
+Sorry, what did you mean? This one?
+
+00:20:42.000 --> 00:20:45.000
+Yeah, so if you look at the top, it says for students
+
+00:20:45.000 --> 00:20:47.000
+Yes.
+
+00:20:47.000 --> 00:20:56.000
+So one of the things that we did, and this is gonna, we'll see this a little bit later
+
+00:20:56.000 --> 00:21:03.000
+It had the being known doing assessment, but it didn't specify for educator versus for student
+
+00:21:03.000 --> 00:21:06.000
+So, if you took it as an educator
+
+00:21:06.000 --> 00:21:13.000
+It should help you as an educator, you see what I'm saying? And that was a difference that we made
+
+00:21:13.000 --> 00:21:17.000
+So, if you look on the left side
+
+00:21:17.000 --> 00:21:24.000
+The left tab, scroll down on the left, yeah, scroll down
+
+00:21:24.000 --> 00:21:27.000
+So
+
+00:21:27.000 --> 00:21:30.000
+So see where it says professional development
+
+00:21:30.000 --> 00:21:41.000
+Professional development
+
+00:21:41.000 --> 00:21:51.000
+So see how on the top, scroll back up. On the top bar where it says be no due self-assessment
+
+00:21:51.000 --> 00:21:55.000
+BKD self-assessment
+
+00:21:55.000 --> 00:21:59.000
+So
+
+00:21:59.000 --> 00:22:04.000
+So see, it's supposed to differentiate. See how that one says educator being on do self-assessment
+
+00:22:04.000 --> 00:22:06.000
+Yes.
+
+00:22:06.000 --> 00:22:09.000
+It's supposed to differentiate the two
+
+00:22:09.000 --> 00:22:11.000
+Oh…
+
+00:22:11.000 --> 00:22:12.000
+And so
+
+00:22:12.000 --> 00:22:15.000
+So this is what I should be answering
+
+00:22:15.000 --> 00:22:18.000
+Correct. As an educator, you see what I'm saying?
+
+00:22:18.000 --> 00:22:20.000
+Yes.
+
+00:22:20.000 --> 00:22:24.000
+And so… and so what it's supposed to do
+
+00:22:24.000 --> 00:22:30.000
+Is see how this one says for educators only, not visible to students
+
+00:22:30.000 --> 00:22:35.000
+It's supposed to help you become better as a teacher, as an educator
+
+00:22:35.000 --> 00:22:42.000
+Okay, okay.
+
+00:22:42.000 --> 00:22:43.000
+Yes.
+
+00:22:43.000 --> 00:22:49.000
+And talk about more of your teaching style and the way that you impact students. And ultimately, ultimately where we want to eventually go with it
+
+00:22:49.000 --> 00:22:51.000
+Is that
+
+00:22:51.000 --> 00:23:03.000
+it's gonna tie into your professional development and educators are going to be able to offer their professional development courses
+
+00:23:03.000 --> 00:23:08.000
+Here. So let's say, for example.
+
+00:23:08.000 --> 00:23:13.000
+You have a teacher
+
+00:23:13.000 --> 00:23:20.000
+India, who is very good at explaining math
+
+00:23:20.000 --> 00:23:26.000
+As a no tool for subject and pedagogical mastery
+
+00:23:26.000 --> 00:23:31.000
+You need to get better at math. That teacher can now say, hey.
+
+00:23:31.000 --> 00:23:36.000
+You could take my course for teachers on how to explain math better
+
+00:23:36.000 --> 00:23:42.000
+And pay me directly and work with me directly. So now you get better at
+
+00:23:42.000 --> 00:23:44.000
+Math instead of
+
+00:23:44.000 --> 00:23:49.000
+You know, most let me not say most a lot of
+
+00:23:49.000 --> 00:23:57.000
+schools don't have the resources to develop individual teachers sometimes
+
+00:23:57.000 --> 00:24:07.000
+So, that's how that will work. We haven't built that out yet, and I think there's a long way to go because there's a lot of discussions that need to happen there
+
+00:24:07.000 --> 00:24:10.000
+Ole, any thoughts on that
+
+00:24:10.000 --> 00:24:13.000
+And then also in any other team member.
+
+00:24:13.000 --> 00:24:17.000
+I think that's really good
+
+00:24:17.000 --> 00:24:21.000
+the ability that… I think there are a lot of great teachers who don't have
+
+00:24:21.000 --> 00:24:31.000
+the platform
+
+00:24:31.000 --> 00:24:32.000
+Yeah.
+
+00:24:32.000 --> 00:24:36.000
+To be able to showcase and take advantage of that. I think it goes along really well also with the affiliate section. It gives educators a lot of opportunities to make
+
+00:24:36.000 --> 00:24:40.000
+To make, you know, money, residual income
+
+00:24:40.000 --> 00:24:44.000
+And I had a thought about
+
+00:24:44.000 --> 00:24:48.000
+Well, how do we make money off of them using our platform? But
+
+00:24:48.000 --> 00:24:52.000
+This is gonna be based off of the monthly
+
+00:24:52.000 --> 00:24:58.000
+membership, or the monthly membership fee that they pay, so… I think for them
+
+00:24:58.000 --> 00:25:05.000
+It's not necessarily, oh, I'm paying this amount, it's I'm paying this amount, but I'm basically hosting my stuff here.
+
+00:25:05.000 --> 00:25:13.000
+So I can then make more money off of that, right? So I like it from that aspect. And of course, you know, we have people in our
+
+00:25:13.000 --> 00:25:22.000
+In our circle, who we can talk to about that, right? The Doctor Hugos, the Dr. Crawfords and stuff. But I think the idea is really, really good.
+
+00:25:22.000 --> 00:25:23.000
+Yes
+
+00:25:23.000 --> 00:25:27.000
+And especially from an international standpoint, I really love that idea.
+
+00:25:27.000 --> 00:25:39.000
+Yes. Yes, yes. And that's where I think as we just develop out the marketplace sign, it'll be good and it'll offer
+
+00:25:39.000 --> 00:25:53.000
+master educators who have decades of experience, opportunities to teach those educators who are up and coming. I think that there's some key things that we're going to have to look at is
+
+00:25:53.000 --> 00:25:56.000
+you know, the course review process
+
+00:25:56.000 --> 00:26:01.000
+the, you know, the quality, those things, who's kind of overseeing those things
+
+00:26:01.000 --> 00:26:05.000
+But, you know, for now, it's
+
+00:26:05.000 --> 00:26:11.000
+Those features aren't necessary right now, you know.
+
+00:26:11.000 --> 00:26:15.000
+AJ feedback, Niha
+
+00:26:15.000 --> 00:26:20.000
+I do have feedback. If I don't need
+
+00:26:20.000 --> 00:26:24.000
+Where is this? If I don't need this as an educator
+
+00:26:24.000 --> 00:26:27.000
+Why is it here
+
+00:26:27.000 --> 00:26:33.000
+Good question. So part of it is overseeing your students
+
+00:26:33.000 --> 00:26:34.000
+Okay
+
+00:26:34.000 --> 00:26:38.000
+So if you scroll down
+
+00:26:38.000 --> 00:26:40.000
+Yes,
+
+00:26:40.000 --> 00:26:41.000
+Oh, here
+
+00:26:41.000 --> 00:26:42.000
+I'm sorry, on the left side
+
+00:26:42.000 --> 00:26:43.000
+Yes
+
+00:26:43.000 --> 00:26:49.000
+Okay, scroll down, scroll down, right there. So where it says, classroom
+
+00:26:49.000 --> 00:26:56.000
+Classroom
+
+00:26:56.000 --> 00:26:58.000
+you click new class
+
+00:26:58.000 --> 00:27:01.000
+A new class
+
+00:27:01.000 --> 00:27:06.000
+So, as you build out your class
+
+00:27:06.000 --> 00:27:10.000
+You should be able to see your students
+
+00:27:10.000 --> 00:27:12.000
+Who are
+
+00:27:12.000 --> 00:27:14.000
+who are there
+
+00:27:14.000 --> 00:27:21.000
+Right? And that's something that, again, needs to be really flushed out is
+
+00:27:21.000 --> 00:27:26.000
+How you see your students be no due progress
+
+00:27:26.000 --> 00:27:31.000
+I don't think that's correlated well.
+
+00:27:31.000 --> 00:27:33.000
+Well, okay.
+
+00:27:33.000 --> 00:27:40.000
+Because there would be… I'm thinking as a teacher, if I go through the left
+
+00:27:40.000 --> 00:27:43.000
+Sidebar
+
+00:27:43.000 --> 00:27:44.000
+Yay.
+
+00:27:44.000 --> 00:27:51.000
+And I don't need self-discovery, and I keep on clicking it, because I'm thinking this is self-discovery. Would it be
+
+00:27:51.000 --> 00:27:57.000
+Better if we have, like, different types of sidebars for
+
+00:27:57.000 --> 00:28:02.000
+educators, which would have their professional development
+
+00:28:02.000 --> 00:28:06.000
+Questions in there instead
+
+00:28:06.000 --> 00:28:08.000
+Rather than
+
+00:28:08.000 --> 00:28:14.000
+Keeping on clicking on self-discovery and seeing student assessment
+
+00:28:14.000 --> 00:28:16.000
+Because I'm not gonna use this.
+
+00:28:16.000 --> 00:28:18.000
+Agree, agree.
+
+00:28:18.000 --> 00:28:23.000
+740 buzzer.
+
+00:28:23.000 --> 00:28:29.000
+Federal change for another one.
+
+00:28:29.000 --> 00:28:30.000
+Aniha, you had something?
+
+00:28:30.000 --> 00:28:34.000
+No, not for me.
+
+00:28:34.000 --> 00:28:49.000
+Okay.
+
+00:28:49.000 --> 00:28:56.000
+And then, do we go to strength inventory
+
+00:28:56.000 --> 00:29:05.000
+Okay.
+
+00:29:05.000 --> 00:29:09.000
+I haven't added anything yet
+
+00:29:09.000 --> 00:29:11.000
+No, that's good. Yeah, just keep walking through it. That's fine.
+
+00:29:11.000 --> 00:29:14.000
+Okay, let's do test
+
+00:29:14.000 --> 00:29:15.000
+Just
+
+00:29:15.000 --> 00:29:19.000
+Do I need it? Do I need anything? Okay, I
+
+00:29:19.000 --> 00:29:23.000
+Oh, I need name and evidence
+
+00:29:23.000 --> 00:29:26.000
+test
+
+00:29:26.000 --> 00:29:32.000
+And that
+
+00:29:32.000 --> 00:29:53.000
+Okay, it aired
+
+00:29:53.000 --> 00:29:54.000
+Aaron? Okay, got you.
+
+00:29:54.000 --> 00:29:57.000
+Yes.
+
+00:29:57.000 --> 00:30:01.000
+And then earlier it says optional
+
+00:30:01.000 --> 00:30:05.000
+If I delete this
+
+00:30:05.000 --> 00:30:08.000
+It would show me
+
+00:30:08.000 --> 00:30:11.000
+Sorry, okay, let me just delete this again.
+
+00:30:11.000 --> 00:30:16.000
+So, it says name and evidence is required. So
+
+00:30:16.000 --> 00:30:20.000
+If it's required, should this word be deleted
+
+00:30:20.000 --> 00:30:28.000
+Got you.
+
+00:30:28.000 --> 00:30:34.000
+Okay.
+
+00:30:34.000 --> 00:30:41.000
+Okay, essay
+
+00:30:41.000 --> 00:30:49.000
+So I'm not sure if an educator would need this
+
+00:30:49.000 --> 00:30:53.000
+Or… do I need this if it's about
+
+00:30:53.000 --> 00:30:57.000
+Sorry.
+
+00:30:57.000 --> 00:31:03.000
+If it's about scholarship essays, or
+
+00:31:03.000 --> 00:31:04.000
+Yeah, so real quick, I think
+
+00:31:04.000 --> 00:31:07.000
+That… is that for educator?
+
+00:31:07.000 --> 00:31:10.000
+My account is using educators
+
+00:31:10.000 --> 00:31:12.000
+Oh, okay, okay.
+
+00:31:12.000 --> 00:31:17.000
+Yeah, so I think in regards to educator
+
+00:31:17.000 --> 00:31:18.000
+Yes.
+
+00:31:18.000 --> 00:31:24.000
+I'm trying to think of what would be more efficient if
+
+00:31:24.000 --> 00:31:25.000
+Sidebar. Yes.
+
+00:31:25.000 --> 00:31:32.000
+If the educator has its own menu sidebar, or if there's the ability, because the educators should have access
+
+00:31:32.000 --> 00:31:37.000
+to everything a student can do
+
+00:31:37.000 --> 00:31:38.000
+Why do I say that?
+
+00:31:38.000 --> 00:31:42.000
+Well, okay. Well, I agree, but the thing is
+
+00:31:42.000 --> 00:31:48.000
+If I would be using this, and I would not use these 5
+
+00:31:48.000 --> 00:31:52.000
+And I would just go and scroll down to here
+
+00:31:52.000 --> 00:31:58.000
+I think that would be too much of a work, especially, again, I don't need
+
+00:31:58.000 --> 00:32:02.000
+Let's say these ones
+
+00:32:02.000 --> 00:32:11.000
+Totally agree. Totally agree. All I'm saying is the educator should have the option to add anything the student has access to
+
+00:32:11.000 --> 00:32:16.000
+Because if a teacher is still using, if an educator is still using the
+
+00:32:16.000 --> 00:32:22.000
+The modeling, the… I do, you do, we do approach for this
+
+00:32:22.000 --> 00:32:26.000
+Some educators are going to want to show the students how to do it
+
+00:32:26.000 --> 00:32:27.000
+Okay.
+
+00:32:27.000 --> 00:32:30.000
+Right? So they should have access. So I agree with you. I think
+
+00:32:30.000 --> 00:32:31.000
+Yes.
+
+00:32:31.000 --> 00:32:39.000
+Whatever the educator does or needs, it should be on that sidebar, but there should be an option maybe for educators to say
+
+00:32:39.000 --> 00:32:42.000
+let me do this, or give me student view
+
+00:32:42.000 --> 00:32:43.000
+Yes.
+
+00:32:43.000 --> 00:32:45.000
+Or something like that. Yeah.
+
+00:32:45.000 --> 00:32:47.000
+Yes.
+
+00:32:47.000 --> 00:32:48.000
+So
+
+00:32:48.000 --> 00:32:49.000
+Probably under Settings
+
+00:32:49.000 --> 00:32:57.000
+I like that student. I like that student view concept.
+
+00:32:57.000 --> 00:33:05.000
+And then, I'm thinking, if I would be a student, if I would be an educator, I would leave
+
+00:33:05.000 --> 00:33:12.000
+I don't think I need this
+
+00:33:12.000 --> 00:33:13.000
+What's that?
+
+00:33:13.000 --> 00:33:14.000
+As a… as an educator. I'm thinking… I'm not sure if I need it right now
+
+00:33:14.000 --> 00:33:16.000
+The B, self-discovery
+
+00:33:16.000 --> 00:33:17.000
+Yeah, gotcha.
+
+00:33:17.000 --> 00:33:19.000
+Right now, as an educator
+
+00:33:19.000 --> 00:33:29.000
+I need mentor, but I'm not sure if I need all three. So I'm thinking maybe we can have educator tools
+
+00:33:29.000 --> 00:33:34.000
+Somewhere higher
+
+00:33:34.000 --> 00:33:36.000
+Or
+
+00:33:36.000 --> 00:33:45.000
+But that would remove the B no due part
+
+00:33:45.000 --> 00:33:50.000
+Or maybe, okay. Or maybe we could have, like
+
+00:33:50.000 --> 00:33:54.000
+The buttons wherein we can hide
+
+00:33:54.000 --> 00:33:56.000
+These
+
+00:33:56.000 --> 00:34:05.000
+So, it will just be B, know, and do, and then Educator Tools.
+
+00:34:05.000 --> 00:34:08.000
+So like again
+
+00:34:08.000 --> 00:34:14.000
+The arrows that would… when I click on it, it will hide all of these
+
+00:34:14.000 --> 00:34:16.000
+I think I would
+
+00:34:16.000 --> 00:34:24.000
+Make it easier.
+
+00:34:24.000 --> 00:34:27.000
+No, this is
+
+00:34:27.000 --> 00:34:37.000
+Very key dialogue. Very key dialogue, okay? Cool, cool, cool, cool, cool. And I know this is supposed to be a 30-minute meeting
+
+00:34:37.000 --> 00:34:49.000
+So we'll have to
+
+00:34:49.000 --> 00:34:53.000
+We'll have to
+
+00:34:53.000 --> 00:35:01.000
+Come back to it. So we're kind of still up high, but what we said, basically everything needs to be a lot more role-specific
+
+00:35:01.000 --> 00:35:03.000
+to what people need to use
+
+00:35:03.000 --> 00:35:04.000
+Yes.
+
+00:35:04.000 --> 00:35:11.000
+We need to do more
+
+00:35:11.000 --> 00:35:17.000
+To make sure that those fields that are missing
+
+00:35:17.000 --> 00:35:19.000
+They say that
+
+00:35:19.000 --> 00:35:25.000
+they're not required, but they are required. They need to… that needs to be corrected.
+
+00:35:25.000 --> 00:35:28.000
+We need to
+
+00:35:28.000 --> 00:35:32.000
+Look at
+
+00:35:32.000 --> 00:35:40.000
+Well, self-discovery, that's that's okay. They just need a student view for that
+
+00:35:40.000 --> 00:35:49.000
+Okay. Dashboard's good. We'll add some space for some testimonials later. Okay, cool, cool, cool, cool, cool.
+
+00:35:49.000 --> 00:35:54.000
+Are there any other questions, comments, concerns, thoughts
+
+00:35:54.000 --> 00:36:02.000
+Before we close out.
+
+00:36:02.000 --> 00:36:12.000
+Yeah, real quick, I'll say this. If everyone can, if you have some extra time. 5 minutes, five minutes.
+
+00:36:12.000 --> 00:36:14.000
+Just
+
+00:36:14.000 --> 00:36:18.000
+go on the app on your… on your own
+
+00:36:18.000 --> 00:36:20.000
+And just play around
+
+00:36:20.000 --> 00:36:23.000
+try to create a goal
+
+00:36:23.000 --> 00:36:25.000
+Try to do an essay
+
+00:36:25.000 --> 00:36:37.000
+You know, get used to it. My recommendation would be whoever you service, right? Whoever your role is most geared towards go there 5 minutes, 3 minutes
+
+00:36:37.000 --> 00:36:41.000
+Three to five minutes and just play around there.
+
+00:36:41.000 --> 00:36:51.000
+And just try to do a couple things. Put yourself in the mind of someone who's using it. I think that'll really help. I spent about an hour and a half
+
+00:36:51.000 --> 00:37:07.000
+Over the weekend doing it, it was just… it was really fun, actually, just looking at it, taking notes. And I was just on student. I didn't even get a chance to go to educator yet, so this was really good today. But I would highly recommend that for everyone. I think it's going to be really, really beneficial
+
+00:37:07.000 --> 00:37:17.000
+Yeah, yeah.
+
+00:37:17.000 --> 00:37:19.000
+Okay, anybody else?
+
+00:37:19.000 --> 00:37:23.000
+Before we close out
+
+00:37:23.000 --> 00:37:25.000
+Okay.
+
+00:37:25.000 --> 00:37:34.000
+And Niha, just as an aside, I know you're doing some of the outreach where you're creating blogs and blurbs
+
+00:37:34.000 --> 00:37:40.000
+So… so those… those changes need to focus in on where we're going
+
+00:37:40.000 --> 00:37:45.000
+Right? So it shouldn't just be generic. It should be, hey
+
+00:37:45.000 --> 00:37:49.000
+we have this app coming. Here are some of the features in the app
+
+00:37:49.000 --> 00:38:01.000
+but focus in on early adopter and be no due, right? So, if you're doing something, for example, for parents, then say, you know, parents, great tool
+
+00:38:01.000 --> 00:38:04.000
+for your student to know what their purpose is and
+
+00:38:04.000 --> 00:38:10.000
+Also, have resources for graduation, and you do it that way.
+
+00:38:10.000 --> 00:38:24.000
+Okay. Anybody else? Anything else?
+
+00:38:24.000 --> 00:38:28.000
+All right, great, great, great, great, great. So.
+
+00:38:28.000 --> 00:38:31.000
+Obviously, this type of meeting
+
+00:38:31.000 --> 00:38:39.000
+is a very… it's much needed, because this is going to provide the clarity for each person's role going forward
+
+00:38:39.000 --> 00:38:43.000
+And so we're… we wanted to do
+
+00:38:43.000 --> 00:38:48.000
+Evening, but I know from a time zone standpoint, it's horrible
+
+00:38:48.000 --> 00:38:52.000
+Because if we do it in
+
+00:38:52.000 --> 00:38:57.000
+at 9.30 at night for us, it means
+
+00:38:57.000 --> 00:39:02.000
+You know, 2 o'clock in the morning for those in Nigeria, for
+
+00:39:02.000 --> 00:39:08.000
+for Neha, I think it will interrupt your taking your daughter to school
+
+00:39:08.000 --> 00:39:15.000
+So we're going to need to play around with some times. The challenge is
+
+00:39:15.000 --> 00:39:27.000
+that, you know, again, we're all gonna have to make some kind of sacrifice or sacrifice and commitment for a period of time until this is really dialed in
+
+00:39:27.000 --> 00:39:42.000
+The more often we have… I don't really want to spread these meetings over weeks. I think even if we did it in a, you know, two, three-week period, where we're just really iterative, that's going to help us out versus saying, okay, let's do it every Monday
+
+00:39:42.000 --> 00:39:45.000
+Right?
+
+00:39:45.000 --> 00:39:52.000
+it would be helpful to do it once a week like that, but we kind of need to move a little bit faster, because as
+
+00:39:52.000 --> 00:39:56.000
+As Ole and I go out
+
+00:39:56.000 --> 00:39:59.000
+to do outreach, and this is
+
+00:39:59.000 --> 00:40:03.000
+not even so much Olay and I, Remy and Arch
+
+00:40:03.000 --> 00:40:08.000
+When they start trying to show it to principals or principal says.
+
+00:40:08.000 --> 00:40:11.000
+I'm going to take a look during my coffee break
+
+00:40:11.000 --> 00:40:26.000
+We don't know when that time that they're going to take a look is, right? And so what they see matters, right? So if, you know, when we make these changes, again, it's iterative. So if we do, if we wait two weeks to make a change versus, hey, let's make those changes
+
+00:40:26.000 --> 00:40:35.000
+You know, in one week it matters. So so just all that being said, get with AJ, and AJ is going to be reaching out to everybody
+
+00:40:35.000 --> 00:40:46.000
+To try to lock in sometimes it's going to be sacrificial. It is going to be sacrificial. I'm being honest. Okay, so just be ready for that. Okay, but this is going to help us move a lot
+
+00:40:46.000 --> 00:40:56.000
+faster, further, together than oh I don't know what's going on. I'm reaching out to this person. I don't know what to say. You know, all of those different types of things
+
+00:40:56.000 --> 00:41:05.000
+on a whole other note, I was showing this to AJ yesterday
+
+00:41:05.000 --> 00:41:16.000
+And I'm going to send out a email. Dang it. I'm going to send out an email. One of the
+
+00:41:16.000 --> 00:41:18.000
+The things that we're doing
+
+00:41:18.000 --> 00:41:25.000
+That's in line with this is we're updating our team engine
+
+00:41:25.000 --> 00:41:34.000
+Okay, and this is why I was asking for pictures. I'm also going to send out an email in line with this
+
+00:41:34.000 --> 00:41:39.000
+So this is the rough draft
+
+00:41:39.000 --> 00:41:50.000
+of our new engine
+
+00:41:50.000 --> 00:41:54.000
+And so we need team photos
+
+00:41:54.000 --> 00:42:10.000
+Okay, I think I have most of the photos, but I still need you to review your photo to make sure that, hey, this is the photo I want. It's okay if you do like an AI touch-up, but just your best team photo. Right now, most of the team photos
+
+00:42:10.000 --> 00:42:15.000
+aren't black shirts, so if you have something where you're wearing black, that would be good.
+
+00:42:15.000 --> 00:42:22.000
+That would be good for us to use, okay? So, other than that, that's it for today. Thanks so much.
+
+00:42:22.000 --> 00:42:31.000
+I will… I'll press out, unless somebody has something else.
+
+00:42:31.000 --> 00:42:50.000
+Okay, Heavenly fathers, we come to you today. We just thank you for this time we've been able to share together, that we've been able to work on the app, that we've been able to get more clarity in terms of our focus for this period and this season. Lord, we just pray for any questions that anybody has, anything that they want to bring up
+
+00:42:50.000 --> 00:42:52.000
+in regard to
+
+00:42:52.000 --> 00:43:12.000
+what we're doing, or how we're doing it, bring it to their remembrance. Let us be unified and on the same page, that you're glorified, and that, others are impacted and uplifted in Christ's holy name we pray. Amen.
+
