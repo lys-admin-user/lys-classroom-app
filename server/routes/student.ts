@@ -68,6 +68,7 @@ import * as wordpressService from "../services/wordpressService";
 import { fetchAndProcessFeed, fetchAllActiveFeeds, startRssFeedScheduler } from "../services/rssFeedService";
 import { startScholarshipScheduler, runScholarshipSync, detectSeasonFromDeadline } from "../services/scholarshipService";
 import { insertRssFeedSchema } from "@shared/schema";
+import type { Student } from "@shared/schema";
 import { db } from "../db";
 import { logAuditEvent, getAuditLogs, getClientIP } from "../services/auditLog";
 import { filterChatMessage } from "../services/contentFilter";
@@ -215,6 +216,49 @@ const requireDistrictAdmin = requireRole("district_admin", "site_admin", "system
 const requireSiteAdmin = requireRole("site_admin", "system_admin");
 const requireSystemAdmin = requireRole("system_admin");
 
+// Authorize access to a single student's sensitive records (grades, matriculation).
+// A logged-in user may only read a student record if they are: the record owner
+// (the student's own login or the educator who owns it), an admin/owner over the
+// student's organization sub-tree, or a platform (site/system) admin. Any other
+// authenticated user is denied and the denial is audited. Returns the student on
+// success, or null after writing the appropriate 401/403/404 response.
+async function ensureStudentRecordAccess(
+  req: any,
+  res: any,
+  studentId: string,
+): Promise<Student | null> {
+  const userId = req.user?.claims?.sub;
+  if (!userId) {
+    res.status(401).json({ error: "Not authenticated" });
+    return null;
+  }
+  const student = await storage.getStudent(studentId);
+  if (!student) {
+    res.status(404).json({ error: "Student not found" });
+    return null;
+  }
+  const isPlatformAdmin = await storage.isSiteAdmin(userId);
+  const allowed =
+    isPlatformAdmin ||
+    student.userId === userId ||
+    (!!student.organizationId && (await verifyOrgAdminAccess(userId, student.organizationId)));
+  if (!allowed) {
+    await logAuditEvent({
+      userId,
+      action: "student_record.access_denied",
+      category: "security",
+      severity: "warning",
+      resourceType: "student",
+      resourceId: studentId,
+      ipAddress: getClientIP(req),
+      userAgent: req.get("user-agent"),
+    });
+    res.status(403).json({ error: "You are not authorized to view this student's records" });
+    return null;
+  }
+  return student;
+}
+
 import { ANALYZER_CTAS, ANALYZER_IDENTITIES, ANALYZER_SESSION_REGEX, ANALYZER_URGENCIES, APPROVED_VIDEO_HOSTS, MAX_TRIALS_PER_IP, TRIAL_DURATION_DAYS, TRIAL_RESET_MONTHS, US_STATES, analyzerBindSchema, analyzerCtaClickSchema, analyzerSubmitSchema, autoMatchSchema, createJourneyEntrySchema, createSisConnectionSchema, educatorProfileSchema, entityShareBodySchema, entriesQuerySchema, foundationModuleUpdateSchema, foundationProgressBodySchema, foundationQuizQuestionSchema, generateInviteCode, getAdminManagedOrgIds, getAdminOrgIds, getStateNameFromAbbr, getTrialSinceDate, isApprovedVideoUrl, isSiteAdmin, pillarParamSchema, requireFoundationAdmin, requirePaidTier, requireRssAdmin, requireSiteAdminForStandards, requireStaffOrAdmin, validOrgTypes, verifyOrgAdminAccess, videoUrlSchema } from "./_helpers";
 
 // AUTO-SPLIT from server/routes.ts -- domain: student (46 routes)
@@ -255,6 +299,8 @@ export function registerStudentRoutes(app: Express): void {
   app.get("/api/students/:studentId/grades", isAuthenticated, async (req: any, res) => {
     try {
       const { studentId } = req.params;
+      const student = await ensureStudentRecordAccess(req, res, studentId);
+      if (!student) return;
       const gradesList = await storage.getStudentGradesByStudent(studentId);
       res.json(gradesList);
     } catch (error) {
@@ -480,6 +526,8 @@ export function registerStudentRoutes(app: Express): void {
   app.get("/api/students/:studentId/matriculation", isAuthenticated, async (req: any, res) => {
     try {
       const { studentId } = req.params;
+      const student = await ensureStudentRecordAccess(req, res, studentId);
+      if (!student) return;
       const history = await storage.getStudentMatriculationHistory(studentId);
       res.json(history);
     } catch (error) {

@@ -492,8 +492,12 @@ const requireSystemAdmin = requireRole("system_admin");
     const membership = await storage.getOrgMembership(orgId, userId);
     if (membership && (membership.role === "admin" || membership.role === "owner")) return true;
     if (user.role === "district_admin") {
+      // Only expand scope to child orgs from memberships where the user is an
+      // admin/owner — a plain member role grants no administrative scope
+      // (aligned with the DSR tenant-scoping rule in the threat model).
       const userOrgs = await storage.getUserOrganizations(userId);
       for (const uOrg of userOrgs) {
+        if (uOrg.role !== "admin" && uOrg.role !== "owner") continue;
         const children = await storage.getChildOrganizations(uOrg.organizationId);
         if (children.some(c => c.id === orgId)) return true;
       }

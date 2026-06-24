@@ -56,6 +56,7 @@ import {
 } from "@shared/schema";
 import { z } from "zod";
 import { setupAuth, registerAuthRoutes, isAuthenticated } from "../replit_integrations/auth";
+import { requireFreshMfa } from "./mfa";
 import { randomUUID } from "crypto";
 import multer from "multer";
 import { syncJurisdictionsFromCSP, syncStandardSetFromCSP, getSyncStatus, fetchCSPJurisdictions, syncAllStandardsFromCSP, getImportProgress } from "../services/cspService";
@@ -1322,7 +1323,7 @@ export function registerOrgRoutes(app: Express): void {
 
 
   // Bulk invite members to organization (CSV data)
-  app.post("/api/organizations/:id/bulk-invite", isAuthenticated, async (req: any, res) => {
+  app.post("/api/organizations/:id/bulk-invite", isAuthenticated, requireFreshMfa, async (req: any, res) => {
     try {
       const { id } = req.params;
       const { people } = req.body;
@@ -1399,7 +1400,7 @@ export function registerOrgRoutes(app: Express): void {
 
 
   // Bulk remove members from organization
-  app.post("/api/organizations/:orgId/bulk-remove", isAuthenticated, async (req: any, res) => {
+  app.post("/api/organizations/:orgId/bulk-remove", isAuthenticated, requireFreshMfa, async (req: any, res) => {
     try {
       const { orgId } = req.params;
       const { memberIds } = req.body;
@@ -1662,7 +1663,7 @@ export function registerOrgRoutes(app: Express): void {
   });
 
 
-  app.patch("/api/org-admin/orgs/:orgId/members/:memberId/role", isAuthenticated, requireCampusAdmin, async (req: any, res) => {
+  app.patch("/api/org-admin/orgs/:orgId/members/:memberId/role", isAuthenticated, requireCampusAdmin, requireFreshMfa, async (req: any, res) => {
     try {
       const userId = req.user?.claims?.sub;
       const { orgId, memberId } = req.params;

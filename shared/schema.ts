@@ -4663,3 +4663,30 @@ export const billingReminderLog = pgTable(
   }),
 );
 export type BillingReminderLog = typeof billingReminderLog.$inferSelect;
+
+// Email-based one-time codes for second-factor verification. Used both for
+// login-time 2FA (educators-and-up) and as an alternative to authenticator-app
+// step-up. The plaintext code is never stored — only a SHA-256 hash. Codes are
+// short-lived, single-use, and attempt-capped to resist guessing.
+export const emailOtpCodes = pgTable(
+  "email_otp_codes",
+  {
+    id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+    userId: varchar("user_id").notNull(),
+    codeHash: text("code_hash").notNull(),
+    purpose: text("purpose").notNull().default("mfa"), // "mfa" | "login"
+    expiresAt: timestamp("expires_at").notNull(),
+    consumedAt: timestamp("consumed_at"),
+    attempts: integer("attempts").notNull().default(0),
+    createdAt: timestamp("created_at").defaultNow(),
+  },
+  (t) => ({
+    byUser: index("email_otp_user_idx").on(t.userId),
+  }),
+);
+export const insertEmailOtpCodeSchema = createInsertSchema(emailOtpCodes).omit({
+  id: true,
+  createdAt: true,
+});
+export type InsertEmailOtpCode = z.infer<typeof insertEmailOtpCodeSchema>;
+export type EmailOtpCode = typeof emailOtpCodes.$inferSelect;

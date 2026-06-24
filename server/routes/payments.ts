@@ -58,6 +58,7 @@ import {
 } from "@shared/schema";
 import { z } from "zod";
 import { setupAuth, registerAuthRoutes, isAuthenticated } from "../replit_integrations/auth";
+import { requireFreshMfa } from "./mfa";
 import { randomUUID } from "crypto";
 import multer from "multer";
 import { syncJurisdictionsFromCSP, syncStandardSetFromCSP, getSyncStatus, fetchCSPJurisdictions, syncAllStandardsFromCSP, getImportProgress } from "../services/cspService";
@@ -709,7 +710,7 @@ export function registerPaymentsRoutes(app: Express): void {
   // must be as simple as sign-up: one click, no retention hoops. Cancels at the
   // end of the paid period (so the user keeps what they paid for) and reverts to
   // the free tier afterward.
-  app.post("/api/subscription/cancel", isAuthenticated, async (req: any, res) => {
+  app.post("/api/subscription/cancel", isAuthenticated, requireFreshMfa, async (req: any, res) => {
     try {
       const userId = req.user?.claims?.sub;
       const userRecord = await db.select().from(users).where(eq(users.id, userId)).limit(1);

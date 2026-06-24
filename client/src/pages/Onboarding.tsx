@@ -14,6 +14,7 @@ import { GraduationCap, BookOpen, Building2, ChevronRight, ChevronLeft, Sparkles
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { COUNTRIES, codeToCountryName } from "@/lib/countries";
+import { TurnstileWidget, isCaptchaEnabled } from "@/components/TurnstileWidget";
 
 const LANGUAGES = [
   // Top 25 most spoken languages in the world
@@ -133,6 +134,7 @@ export default function Onboarding() {
   const [language, setLanguage] = useState("en");
   const [country, setCountry] = useState("");
   const [stateValue, setStateValue] = useState("");
+  const [captchaToken, setCaptchaToken] = useState("");
 
   const { data: statesData } = useQuery<{ state: string; abbreviation: string; standardsName: string }[]>({
     queryKey: ["/api/standards/states", codeToCountryName(country)],
@@ -278,6 +280,7 @@ export default function Onboarding() {
       role,
       birthdate,
       agreedToTerms,
+      captchaToken,
       preferences: {
         language,
         country: codeToCountryName(country),
@@ -694,6 +697,11 @@ export default function Onboarding() {
               </Label>
             </div>
           )}
+          {step === "location" && isCaptchaEnabled() && (
+            <div className="flex justify-center w-full" data-testid="container-onboarding-captcha">
+              <TurnstileWidget onToken={setCaptchaToken} />
+            </div>
+          )}
           <div className="flex justify-between gap-4 w-full">
             <Button
               variant="outline"
@@ -708,7 +716,7 @@ export default function Onboarding() {
             {step === "location" ? (
               <Button
                 onClick={handleComplete}
-                disabled={!canProceed() || completeMutation.isPending}
+                disabled={!canProceed() || completeMutation.isPending || (isCaptchaEnabled() && !captchaToken)}
                 data-testid="button-get-started"
               >
                 {completeMutation.isPending ? "Setting up..." : "Get Started"}

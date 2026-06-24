@@ -1,6 +1,7 @@
 import type { Express } from "express";
 import { z } from "zod";
 import { isAuthenticated } from "../replit_integrations/auth";
+import { requireFreshMfa } from "./mfa";
 import { storage } from "../storage";
 import { logAuditEvent, getClientIP } from "../services/auditLog";
 import {
@@ -22,7 +23,7 @@ const deleteSchema = z.object({
 export function registerDsrRoutes(app: Express): void {
   // Export a subject's data (GDPR/CCPA right of access). Defaults to the caller;
   // a parent/guardian or admin may export another subject's data.
-  app.get("/api/dsr/export", isAuthenticated, async (req: any, res) => {
+  app.get("/api/dsr/export", isAuthenticated, requireFreshMfa, async (req: any, res) => {
     try {
       const actorId = req.user?.claims?.sub;
       const actor = await storage.getUser(actorId);
@@ -76,7 +77,7 @@ export function registerDsrRoutes(app: Express): void {
   // Delete a subject's data (GDPR/CCPA right to erasure). Self-serve accounts are
   // hard-deleted; school-owned student records are anonymized. When the subject
   // is a student, the school admin(s) and parent(s) are alerted.
-  app.post("/api/dsr/delete", isAuthenticated, async (req: any, res) => {
+  app.post("/api/dsr/delete", isAuthenticated, requireFreshMfa, async (req: any, res) => {
     try {
       const actorId = req.user?.claims?.sub;
       const actor = await storage.getUser(actorId);

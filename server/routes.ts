@@ -173,7 +173,7 @@ import { registerAccountRoutes } from "./routes/account";
 import { registerAnalyticsRoutes } from "./routes/analytics";
 import { registerMiscRoutes } from "./routes/misc";
 import { registerNotificationsRoutes } from "./routes/notifications";
-import { registerMfaRoutes } from "./routes/mfa";
+import { registerMfaRoutes, requireLoginMfa } from "./routes/mfa";
 import { registerDsrRoutes } from "./routes/dsr";
 import { registerConsentRoutes } from "./routes/consent";
 import { registerSsoRoutes } from "./routes/sso";
@@ -189,6 +189,12 @@ export async function registerRoutes(
   await setupAuth(app);
 
   registerAuthRoutes(app);
+
+  // Login-MFA gate: educators-and-up must complete a second factor (TOTP or
+  // email code) before mutating anything via the API. Mounted after auth so the
+  // session/user is populated; reads pass through, and it degrades safely when a
+  // user has no usable second factor. Must precede the protected route modules.
+  app.use("/api", requireLoginMfa);
 
 
   // ================================

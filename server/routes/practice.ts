@@ -1,6 +1,7 @@
 import type { Express } from "express";
 import { z } from "zod";
 import { storage } from "../storage";
+import { requireCaptcha } from "../services/captcha";
 import { isAuthenticated } from "../replit_integrations/auth";
 import { generatePracticeRequestSchema } from "@shared/schema";
 import { generatePracticeSet } from "../practiceGenerator";
@@ -49,7 +50,7 @@ export function registerPracticeRoutes(app: Express) {
   });
 
   // Guest practice generation — email gate, then a shared monthly free quota.
-  app.post("/api/practice/generate-guest", async (req: any, res) => {
+  app.post("/api/practice/generate-guest", requireCaptcha(), async (req: any, res) => {
     try {
       const validated = generatePracticeRequestSchema.parse(req.body);
 

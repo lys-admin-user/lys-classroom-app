@@ -1,6 +1,7 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "../storage";
+import { requireCaptcha } from "../services/captcha";
 import { generateLessonPlan, generateLessonPlanStreaming } from "../openai";
 import { setupSSE, makeEmitter } from "../services/generationStream";
 import { moderateUserInput, safetyHttpResponse } from "../services/contentSafety";
@@ -285,7 +286,7 @@ export function registerLessonsRoutes(app: Express): void {
     ipAddress: (req.ip || req.headers['x-forwarded-for'] || req.connection?.remoteAddress || 'unknown') as string,
   });
 
-  app.post("/api/lessons/generate-guest", async (req: any, res) => {
+  app.post("/api/lessons/generate-guest", requireCaptcha(), async (req: any, res) => {
     try {
       const validated = generateLessonRequestSchema.parse(req.body);
 
@@ -341,7 +342,7 @@ export function registerLessonsRoutes(app: Express): void {
   // authed endpoint so the GenerationCountdown UI works identically. Quota
   // check runs before opening the SSE stream so we can return a proper 403
   // with `requiresSignup: true` instead of half-streaming.
-  app.post("/api/lessons/generate-guest-stream", async (req: any, res) => {
+  app.post("/api/lessons/generate-guest-stream", requireCaptcha(), async (req: any, res) => {
     let validated: z.infer<typeof generateLessonRequestSchema>;
     try {
       validated = generateLessonRequestSchema.parse(req.body);
@@ -438,7 +439,7 @@ export function registerLessonsRoutes(app: Express): void {
   // email is stored as a lead (contact list); browser/guestId tracking still
   // enforces the monthly ceiling.
   const guestEmailSchema = z.object({ email: z.string().email() });
-  app.post("/api/lessons/guest-email", async (req: any, res) => {
+  app.post("/api/lessons/guest-email", requireCaptcha(), async (req: any, res) => {
     try {
       const { email } = guestEmailSchema.parse(req.body);
       await storage.saveGuestLead(guestKeyFromReq(req), email);

@@ -1,6 +1,7 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "../storage";
+import { requireCaptcha } from "../services/captcha";
 import { recordBundleAcceptance, consentRequestMeta } from "../services/consentService";
 import { generateLessonPlan } from "../openai";
 import { detectAfricanCountryFromText } from "@shared/africaContext";
@@ -418,7 +419,7 @@ export function registerAccountRoutes(app: Express): void {
 
 
   // Complete onboarding
-  app.post("/api/onboarding/complete", isAuthenticated, async (req: any, res) => {
+  app.post("/api/onboarding/complete", isAuthenticated, requireCaptcha(), async (req: any, res) => {
     try {
       const userId = req.user?.claims?.sub;
 

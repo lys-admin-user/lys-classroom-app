@@ -56,6 +56,7 @@ import {
 } from "@shared/schema";
 import { z } from "zod";
 import { setupAuth, registerAuthRoutes, isAuthenticated } from "../replit_integrations/auth";
+import { requireFreshMfa } from "./mfa";
 import { randomUUID } from "crypto";
 import multer from "multer";
 import { syncJurisdictionsFromCSP, syncStandardSetFromCSP, getSyncStatus, fetchCSPJurisdictions, syncAllStandardsFromCSP, getImportProgress } from "../services/cspService";
@@ -481,7 +482,7 @@ export function registerClassroomRoutes(app: Express): void {
 
 
   // Export grades as CSV
-  app.get("/api/classes/:classId/grades/export", isAuthenticated, async (req: any, res) => {
+  app.get("/api/classes/:classId/grades/export", isAuthenticated, requireFreshMfa, async (req: any, res) => {
     try {
       const { classId } = req.params;
       const requesterId = req.user?.claims?.sub;

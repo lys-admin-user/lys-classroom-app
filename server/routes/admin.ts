@@ -393,7 +393,7 @@ export function registerAdminRoutes(app: Express): void {
   });
 
 
-  app.post("/api/admin/scholarship-scrape/run", isAuthenticated, requireSystemAdmin, async (req: any, res) => {
+  app.post("/api/admin/scholarship-scrape/run", isAuthenticated, requireSystemAdmin, requireFreshMfa, async (req: any, res) => {
     try {
       const userId = req.user?.id || req.user?.claims?.sub;
       const { triggerScrape, isScrapeRunning } = await import("../scholarshipScraper/scheduler");
@@ -1343,7 +1343,7 @@ export function registerAdminRoutes(app: Express): void {
 
 
   // Delete organization (site admin only)
-  app.delete("/api/admin/organizations/:id", isAuthenticated, isSiteAdmin, async (req: any, res) => {
+  app.delete("/api/admin/organizations/:id", isAuthenticated, isSiteAdmin, requireFreshMfa, async (req: any, res) => {
     try {
       const { id } = req.params;
       await storage.deleteOrganization(id);

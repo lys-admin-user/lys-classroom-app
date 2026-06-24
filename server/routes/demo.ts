@@ -1,11 +1,12 @@
 import type { Express } from "express";
 import { z } from "zod";
 import { storage } from "../storage";
+import { requireCaptcha } from "../services/captcha";
 import { demoRequestSchema } from "@shared/schema";
 
 // Public "Request a demo" capture for the school-admin /for-schools page.
 export function registerDemoRoutes(app: Express) {
-  app.post("/api/demo-requests", async (req, res) => {
+  app.post("/api/demo-requests", requireCaptcha(), async (req, res) => {
     try {
       const validated = demoRequestSchema.parse(req.body);
       await storage.createDemoRequest(validated);

@@ -16,6 +16,8 @@ import { OnboardingTour } from "@/components/OnboardingTour";
 import { CommandPalette } from "@/components/CommandPalette";
 import { PolicyReacceptModal } from "@/components/PolicyReacceptModal";
 import { RoleRoutedLanding } from "@/components/RoleRoutedLanding";
+import { MfaStepUpDialog } from "@/components/MfaStepUpDialog";
+import { useMfaStatus, invalidateMfaStatus } from "@/hooks/use-mfa";
 import { useAuth } from "@/hooks/use-auth";
 import { useEffect, useState, lazy, Suspense } from "react";
 import { Button } from "@/components/ui/button";
@@ -426,6 +428,34 @@ function TourManager() {
   );
 }
 
+// Educator-and-up accounts must clear a second factor (authenticator app OR an
+// emailed code) before they can mutate data this session. The server enforces
+// this; this gate surfaces a non-dismissable challenge so the user can satisfy
+// it. It no-ops when login MFA isn't required (students/parents, or already
+// verified), and when login MFA isn't configured server-side (loginMfaRequired
+// stays false), so it degrades gracefully without any keys.
+function LoginMfaGate() {
+  const { isAuthenticated } = useAuth();
+  const { data: status } = useMfaStatus(isAuthenticated);
+
+  const required = !!status?.loginMfaRequired;
+  if (!required) return null;
+
+  return (
+    <MfaStepUpDialog
+      open
+      enrollmentRequired={false}
+      dismissable={false}
+      purpose="login"
+      methods={status?.methods}
+      title="Two-factor verification required"
+      description="Your role requires a second factor each session. Verify with your authenticator app or an emailed code to continue."
+      onClose={() => {}}
+      onVerified={() => invalidateMfaStatus()}
+    />
+  );
+}
+
 function AppShell() {
   const { isAuthenticated, isLoading } = useAuth();
   const [location] = useLocation();
@@ -470,6 +500,7 @@ function AppShell() {
       <TourManager />
       <CommandPalette />
       <PolicyReacceptModal />
+      <LoginMfaGate />
     </SidebarProvider>
   );
 }

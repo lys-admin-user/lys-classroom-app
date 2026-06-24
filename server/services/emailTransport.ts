@@ -15,6 +15,17 @@ import nodemailer, { type Transporter } from "nodemailer";
 
 export type EmailSendStatus = "sent" | "logged_no_transport" | "failed";
 
+// True when at least one real outbound email provider is configured. Used by the
+// 2FA layer to decide whether email-code delivery can actually reach a user
+// (so we never lock an educator out of login by requiring a code we can't send).
+export function isEmailConfigured(): boolean {
+  return !!(
+    process.env.RESEND_API_KEY ||
+    (process.env.GMAIL_USER && process.env.GMAIL_APP_PASSWORD) ||
+    (process.env.SMTP_HOST && process.env.SMTP_PORT)
+  );
+}
+
 export function getBaseUrl(): string {
   const domains = process.env.REPLIT_DOMAINS?.split(",")[0];
   if (domains) return `https://${domains}`;

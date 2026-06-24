@@ -1,6 +1,7 @@
 import type { Express } from "express";
 import { z } from "zod";
 import { storage } from "../storage";
+import { requireCaptcha } from "../services/captcha";
 import { isAuthenticated } from "../replit_integrations/auth";
 import { generateHomeschoolPlanRequestSchema } from "@shared/schema";
 import { generateHomeschoolPlan } from "../homeschoolPlanner";
@@ -53,7 +54,7 @@ export function registerHomeschoolRoutes(app: Express) {
   });
 
   // Guest plan generation — email gate, then a shared monthly free quota.
-  app.post("/api/homeschool/generate-guest", async (req: any, res) => {
+  app.post("/api/homeschool/generate-guest", requireCaptcha(), async (req: any, res) => {
     try {
       const validated = generateHomeschoolPlanRequestSchema.parse(req.body);
 
