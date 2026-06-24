@@ -1,1 +1,1 @@
-- [Express mounted-middleware paths](express-mount-path.md) — middleware on `app.use("/api", mw)` sees `req.path` relative to mount; rebuild absolute path before matching exempt lists.
+- [Standards ingestion (full & real)](standards-ingestion.md) — CSP is the authoritative full/real pipeline; override CSP's generic "CTE (2010-)" subject so courses surface distinctly; never hand-type standards.

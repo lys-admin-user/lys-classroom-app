@@ -48,6 +48,33 @@ function countBulletPoints(text: string): number {
   return Math.max(count, Math.floor(lines.length * 0.3));
 }
 
+// Split text into chunks on line boundaries so we can feed an ENTIRE document
+// to the LLM across multiple calls instead of silently truncating it. A single
+// oversized line is hard-split as a last resort.
+function chunkTextByLines(text: string, chunkSize: number): string[] {
+  if (text.length <= chunkSize) return [text];
+  const lines = text.split("\n");
+  const chunks: string[] = [];
+  let current = "";
+  for (const line of lines) {
+    if (line.length > chunkSize) {
+      if (current) { chunks.push(current); current = ""; }
+      for (let i = 0; i < line.length; i += chunkSize) {
+        chunks.push(line.slice(i, i + chunkSize));
+      }
+      continue;
+    }
+    if (current.length + line.length + 1 > chunkSize) {
+      chunks.push(current);
+      current = line;
+    } else {
+      current = current ? `${current}\n${line}` : line;
+    }
+  }
+  if (current) chunks.push(current);
+  return chunks;
+}
+
 export async function extractStandardsFromText(
   rawText: string,
   jurisdictionName: string,
@@ -91,74 +118,124 @@ Return ONLY valid JSON in this exact format:
   "confidence": 85
 }`;
 
-  const userPrompt = `Extract educational standards from the following ${jurisdictionName} curriculum document${subject ? ` for ${subject}` : ""}${gradeLevel ? ` (Grade ${gradeLevel})` : ""}:
+  // Process the ENTIRE document in line-aligned chunks. The previous
+  // implementation sliced rawText to 15k chars and sent a single call, which
+  // silently dropped every standard past the cutoff for long curriculum
+  // documents — the exact "partial ingestion" failure we must never ship.
+  const CHUNK_SIZE = 12000;
+  const MAX_CHUNKS = 40; // hard ceiling (~480k chars) to bound API cost
+  const allChunks = chunkTextByLines(rawText, CHUNK_SIZE);
+  const chunks = allChunks.slice(0, MAX_CHUNKS);
+  const exceededChunkLimit = allChunks.length > MAX_CHUNKS;
+
+  const byKey = new Map<string, ExtractedStandard>();
+  const ordered: ExtractedStandard[] = [];
+  let confidenceSum = 0;
+  let chunkSuccesses = 0;
+  let chunkFailures = 0;
+
+  for (let i = 0; i < chunks.length; i++) {
+    const partLabel =
+      chunks.length > 1 ? ` This is part ${i + 1} of ${chunks.length}; extract EVERY standard in this part.` : "";
+    const userPrompt = `Extract educational standards from the following ${jurisdictionName} curriculum document${subject ? ` for ${subject}` : ""}${gradeLevel ? ` (Grade ${gradeLevel})` : ""}.${partLabel}
 
 ---
-${rawText.slice(0, 15000)}
-${rawText.length > 15000 ? "\n\n[Document truncated due to length...]" : ""}
+${chunks[i]}
 ---
 
 Return the JSON array of standards:`;
 
-  try {
-    const response = await openai.chat.completions.create({
-      model: "gpt-5",
-      messages: [
-        { role: "system", content: systemPrompt },
-        { role: "user", content: userPrompt },
-      ],
-      response_format: { type: "json_object" },
-      max_completion_tokens: 4000,
-      reasoning_effort: "minimal",
-    });
+    try {
+      const response = await openai.chat.completions.create({
+        model: "gpt-5",
+        messages: [
+          { role: "system", content: systemPrompt },
+          { role: "user", content: userPrompt },
+        ],
+        response_format: { type: "json_object" },
+        max_completion_tokens: 8000,
+        reasoning_effort: "minimal",
+      });
 
-    const content = response.choices[0]?.message?.content;
-    if (!content) {
-      return {
-        standards: [],
-        rawBulletCount,
-        extractedCount: 0,
-        confidence: 0,
-        validationPassed: false,
-        validationMessage: "No response from AI model",
-      };
+      const content = response.choices[0]?.message?.content;
+      if (!content) {
+        chunkFailures++;
+        continue;
+      }
+
+      const parsed = JSON.parse(content);
+      const chunkStandards: ExtractedStandard[] = parsed.standards || [];
+      confidenceSum += parsed.confidence || 50;
+      chunkSuccesses++;
+
+      for (const std of chunkStandards) {
+        // Composite key (code + statement). A code reused across chunks — the
+        // model often re-numbers per chunk — must NOT clobber a distinct
+        // statement, or we silently drop real standards during the merge.
+        const codeKey = (std.code || "").trim().toLowerCase();
+        const statementKey = (std.statement || "").trim().toLowerCase();
+        const key = `${codeKey}|${statementKey}`;
+        if (key === "|" || byKey.has(key)) continue;
+        byKey.set(key, std);
+        ordered.push(std);
+      }
+    } catch (error) {
+      console.error(`LLM extraction error (chunk ${i + 1}/${chunks.length}):`, error);
+      chunkFailures++;
     }
+  }
 
-    const parsed = JSON.parse(content);
-    const standards: ExtractedStandard[] = parsed.standards || [];
-    const aiConfidence = parsed.confidence || 50;
-
-    const extractedCount = standards.length;
-    const toleranceRange = 0.2;
-    const minExpected = Math.floor(rawBulletCount * (1 - toleranceRange));
-    const maxExpected = Math.ceil(rawBulletCount * (1 + toleranceRange));
-    
-    const validationPassed = extractedCount >= minExpected && extractedCount <= maxExpected;
-    const validationMessage = validationPassed
-      ? `Validation passed: ${extractedCount} standards extracted (expected ~${rawBulletCount})`
-      : `Validation warning: ${extractedCount} standards extracted but ${rawBulletCount} bullet points detected. Review recommended.`;
-
-    const confidence = validationPassed ? aiConfidence : Math.floor(aiConfidence * 0.7);
-
-    return {
-      standards,
-      rawBulletCount,
-      extractedCount,
-      confidence,
-      validationPassed,
-      validationMessage,
-    };
-  } catch (error) {
-    console.error("LLM extraction error:", error);
+  if (chunkSuccesses === 0) {
     return {
       standards: [],
       rawBulletCount,
       extractedCount: 0,
       confidence: 0,
       validationPassed: false,
-      validationMessage: `Extraction failed: ${error}`,
+      validationMessage:
+        chunkFailures > 0
+          ? `Extraction failed across all ${chunkFailures} chunk(s)`
+          : "No response from AI model",
     };
   }
+
+  const standards = ordered;
+  const extractedCount = standards.length;
+  const aiConfidence = Math.floor(confidenceSum / chunkSuccesses);
+
+  const toleranceRange = 0.2;
+  const minExpected = Math.floor(rawBulletCount * (1 - toleranceRange));
+  // Completeness is what matters: flag when we extracted FEWER than expected
+  // (possible partial extraction). Extracting more fine-grained sub-standards
+  // than the rough bullet heuristic predicted is not a failure.
+  const completeEnough = extractedCount >= minExpected;
+  const allChunksProcessed = chunkFailures === 0 && !exceededChunkLimit;
+  const validationPassed = completeEnough && allChunksProcessed;
+
+  let validationMessage: string;
+  if (!allChunksProcessed) {
+    validationMessage =
+      `Validation warning: incomplete ingestion — ${chunkFailures} chunk(s) failed` +
+      `${exceededChunkLimit ? `, document exceeded the ${MAX_CHUNKS}-chunk limit` : ""}. ` +
+      `${extractedCount} standards extracted (expected ~${rawBulletCount}). Review required before publishing.`;
+  } else if (!completeEnough) {
+    validationMessage =
+      `Validation warning: ${extractedCount} standards extracted but ~${rawBulletCount} expected. ` +
+      `Possible partial extraction — review recommended.`;
+  } else {
+    validationMessage = `Validation passed: ${extractedCount} standards extracted across ${chunkSuccesses} chunk(s) (expected ~${rawBulletCount})`;
+  }
+
+  const confidence = validationPassed ? aiConfidence : Math.floor(aiConfidence * 0.7);
+
+  return {
+    standards,
+    rawBulletCount,
+    extractedCount,
+    confidence,
+    validationPassed,
+    validationMessage,
+  };
 }
 
 export async function processPdfImport(pdfImportId: string): Promise<{
@@ -230,6 +307,24 @@ export async function processPdfImport(pdfImportId: string): Promise<{
     }));
 
     const created = await storage.bulkCreateStagingStandards(stagingRecords);
+
+    // Never auto-complete a partial ingestion. If validation did not pass
+    // (failed chunks, exceeded chunk ceiling, or fewer standards than expected)
+    // the staged rows still exist for manual review, but the import job is
+    // marked "failed" with a loud message so incomplete data is never treated
+    // as a finished, publishable set.
+    if (!result.validationPassed) {
+      await storage.updatePdfImport(pdfImportId, {
+        status: "failed",
+        errorMessage: `Incomplete ingestion — manual review required before publishing. ${result.validationMessage}`,
+        processedAt: new Date(),
+      });
+      return {
+        success: false,
+        stagingCount: created.length,
+        message: `${created.length} standards staged but ingestion is INCOMPLETE — manual review required. ${result.validationMessage}`,
+      };
+    }
 
     await storage.updatePdfImport(pdfImportId, {
       status: "completed",
