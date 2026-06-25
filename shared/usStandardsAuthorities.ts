@@ -15,10 +15,13 @@
 //     admin has manually verified it.
 //
 // The official-domain list is a best-effort ALLOW-LIST, not an authority of
-// record. To avoid wrongly demoting a real official link we did not list, the
-// link check ALSO accepts generic government / public-education domain patterns
-// (.gov, k12.*.us, *.state.*.us). Anything that still does not clear the check
-// stays "backup" until a site admin verifies it — never fabricated as official.
+// record. A link only clears the check when its host matches THE SELECTED
+// STATE's official domain(s), or a state-scoped public-school host for that same
+// state (`*.k12.<abbr>.us` / `*.state.<abbr>.us`). A generic federal `.gov` or
+// another state's domain is deliberately NOT treated as official — that would
+// over-promote cross-state / non-authority links. Anything that does not clear
+// the check stays "backup" until a site admin verifies it — never fabricated as
+// official.
 
 export interface StateAuthority {
   /** USPS abbreviation, e.g. "TX". */
@@ -126,23 +129,24 @@ function hostMatches(host: string, domain: string): boolean {
 }
 
 /**
- * Generic government / public-education host patterns that signal an official
- * source even when a state's specific domain is not in our allow-list. Kept
- * conservative on purpose — these are domains only governments/public schools
- * can hold.
+ * State-scoped public-school host patterns (`*.k12.<abbr>.us`,
+ * `*.state.<abbr>.us`) for THIS state only. These are domains only that state's
+ * public schools/government can hold, so they count as official for that state —
+ * but a different state's `k12`/`state.us` host does not. A bare federal `.gov`
+ * is intentionally excluded: it cannot be scoped to a state and the allow-list
+ * already carries each state's real `.gov` authority domain.
  */
-function isGovEducationHost(host: string): boolean {
-  if (host.endsWith(".gov")) return true; // any US government domain
-  // State public-school domains: foo.k12.tx.us, foo.state.tx.us
-  if (/\.k12\.[a-z]{2}\.us$/.test(host)) return true;
-  if (/\.state\.[a-z]{2}\.us$/.test(host)) return true;
-  return false;
+function isStateScopedPublicHost(host: string, abbr: string): boolean {
+  const a = abbr.toLowerCase();
+  if (!/^[a-z]{2}$/.test(a)) return false;
+  return hostMatches(host, `k12.${a}.us`) || hostMatches(host, `state.${a}.us`);
 }
 
 /**
  * True when `url` is an official DOE source for the given state. A standard set
  * only counts as authoritative ("Official (DOE)") when this returns true OR a
- * site admin has manually verified it.
+ * site admin has manually verified it. Matching is STATE-SCOPED: the host must
+ * belong to the selected state's authority, not merely be a government domain.
  */
 export function isOfficialDoeLink(
   url: string | null | undefined,
@@ -151,8 +155,9 @@ export function isOfficialDoeLink(
   const host = hostOf(url);
   if (!host) return false;
   const authority = getStateAuthority(abbrOrName);
-  if (authority && authority.officialDomains.some((d) => hostMatches(host, d))) {
+  if (!authority) return false;
+  if (authority.officialDomains.some((d) => hostMatches(host, d))) {
     return true;
   }
-  return isGovEducationHost(host);
+  return isStateScopedPublicHost(host, authority.abbr);
 }

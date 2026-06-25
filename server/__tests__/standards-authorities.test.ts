@@ -29,10 +29,19 @@ describe("isOfficialDoeLink", () => {
     expect(isOfficialDoeLink("https://tea.texas.gov/curriculum/teks", "TX")).toBe(true);
   });
 
-  it("accepts generic government / public-education domains", () => {
-    expect(isOfficialDoeLink("https://www.somestate.gov/standards", "TX")).toBe(true);
+  it("accepts a state-scoped public-school host for THAT state", () => {
     expect(isOfficialDoeLink("https://foo.k12.ca.us/x", "CA")).toBe(true);
     expect(isOfficialDoeLink("https://foo.state.ny.us/x", "NY")).toBe(true);
+  });
+
+  it("rejects cross-state and generic government domains (state-scoped policy)", () => {
+    // Another state's .gov is NOT official for TX.
+    expect(isOfficialDoeLink("https://cde.ca.gov/standards", "TX")).toBe(false);
+    // A generic / federal .gov is not state-scopeable -> not official.
+    expect(isOfficialDoeLink("https://www.somestate.gov/standards", "TX")).toBe(false);
+    // A state-scoped public-school host for the WRONG state is rejected.
+    expect(isOfficialDoeLink("https://foo.k12.ca.us/x", "TX")).toBe(false);
+    expect(isOfficialDoeLink("https://foo.state.ny.us/x", "TX")).toBe(false);
   });
 
   it("rejects a non-official third-party link", () => {

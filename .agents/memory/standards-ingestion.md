@@ -46,11 +46,15 @@ manual/PDF upload must NOT masquerade as official until a human confirms it.
 
 **How to apply:**
 - US states pass `enforceOfficialLink: true` — a `csp`/`case` set is `official`
-  ONLY if its `documentUrl` clears `isOfficialDoeLink(url, abbr)` (state's
-  official domains OR generic `.gov` / `k12.*.us` / `state.*.us`) OR a site admin
+  ONLY if its `documentUrl` clears `isOfficialDoeLink(url, abbr)` OR a site admin
   stamped `lastVerifiedAt`. Otherwise `backup`. A null `documentUrl` => `backup`
   by design (never fabricate official). Do NOT "fix" this by falling back to the
   jurisdiction URL — that would over-promote.
+- `isOfficialDoeLink` is STATE-SCOPED: the host must match the SELECTED state's
+  own `officialDomains`, or a state-scoped public host for that state
+  (`*.k12.<abbr>.us` / `*.state.<abbr>.us`). A bare federal `.gov` or another
+  state's domain is NOT official — a generic `.gov` shortcut over-promotes
+  cross-state / non-authority links. `lastVerifiedAt` is the only override.
 - International (non-US) passes `enforceOfficialLink: false` so ministry CSP syncs
   STAY `official` (no DOE-link reference exists). Don't regress this to backup.
 - `manual`/`pdf_import` sets are `unverified` until `lastVerifiedAt` (the existing
