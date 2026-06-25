@@ -34,7 +34,6 @@ import {
   Layers,
   Search,
   Bell,
-  MoreVertical,
   ChevronDown,
   Shield,
   Database,
@@ -339,9 +338,37 @@ export function IconRailAdaptive() {
           )}
         </div>
 
-        {/* Single user presence */}
-        <div className="p-4 border-t border-slate-100 bg-slate-50/50 mt-auto">
-          <button className="w-full flex items-center gap-3 p-2 rounded-xl hover:bg-white hover:shadow-sm border border-transparent hover:border-slate-200 transition-all duration-200 group text-left">
+        {/* Single user presence — also the quiet view switcher. In the real app a
+            person has one role, so this lives in the account/settings menu here,
+            not as a prominent global toggle. */}
+        <div className="p-4 border-t border-slate-100 bg-slate-50/50 mt-auto relative">
+          {isRoleDropdownOpen && (
+            <div className="absolute bottom-[calc(100%-4px)] left-4 right-4 bg-white border border-slate-200 rounded-xl shadow-lg py-1 z-50">
+              <div className="px-3 py-1.5 text-[10px] font-bold uppercase tracking-widest text-slate-400">
+                Preview as · demo
+              </div>
+              {roles.map((role) => (
+                <button
+                  key={role}
+                  onClick={() => {
+                    setActiveRole(role);
+                    setIsRoleDropdownOpen(false);
+                  }}
+                  className={`w-full text-left px-3 py-2 mx-0 text-[13px] rounded-lg hover:bg-slate-50 transition-colors flex items-center justify-between
+                    ${activeRole === role ? "font-bold text-[hsl(45,93%,38%)] bg-[hsl(var(--lys-yellow))]/10" : "font-medium text-slate-600"}`}
+                >
+                  {role}
+                  {(role === "Campus Admin" || role === "District Admin") && (
+                    <span className="text-[9px] font-bold uppercase tracking-wide text-slate-400 bg-slate-100 rounded px-1.5 py-0.5">Dark</span>
+                  )}
+                </button>
+              ))}
+            </div>
+          )}
+          <button
+            onClick={() => setIsRoleDropdownOpen(!isRoleDropdownOpen)}
+            className="w-full flex items-center gap-3 p-2 rounded-xl hover:bg-white hover:shadow-sm border border-transparent hover:border-slate-200 transition-all duration-200 group text-left"
+          >
             <div className="w-9 h-9 rounded-full overflow-hidden bg-slate-200 ring-2 ring-white shadow-sm flex-shrink-0">
               <img src={currentUser.img} alt={currentUser.name} className="w-full h-full object-cover" />
             </div>
@@ -349,14 +376,14 @@ export function IconRailAdaptive() {
               <span className="text-[13px] font-bold text-slate-900 truncate">{currentUser.name}</span>
               <span className="text-[11px] text-slate-500 font-medium truncate">{currentUser.subtitle}</span>
             </div>
-            <MoreVertical className="w-4 h-4 text-slate-400 ml-auto opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0" />
+            <ChevronDown className={`w-4 h-4 text-slate-400 ml-auto transition-transform flex-shrink-0 ${isRoleDropdownOpen ? "rotate-180" : ""}`} />
           </button>
         </div>
       </div>
 
       {/* 3. MAIN CONTENT SHELL (greeked, quiet) */}
       <main className="flex-1 flex flex-col min-w-0 overflow-hidden relative bg-[#F8FAFC]">
-        {/* Top Bar + Role Switcher */}
+        {/* Top Bar (clean — view switching lives in the profile menu, not here) */}
         <header className="h-[72px] border-b border-slate-200/60 bg-white/70 backdrop-blur-md flex items-center justify-between px-8 z-10 sticky top-0">
           <div className="flex items-center gap-4">
             <div className="w-64 h-9 bg-slate-100 rounded-lg flex items-center px-3 border border-slate-200/60 transition-colors hover:bg-slate-100/80 cursor-text">
@@ -365,45 +392,12 @@ export function IconRailAdaptive() {
             </div>
           </div>
           <div className="flex items-center gap-4">
-            {/* ROLE SWITCHER */}
-            <div className="relative">
-              <button
-                onClick={() => setIsRoleDropdownOpen(!isRoleDropdownOpen)}
-                className="flex items-center gap-2 h-9 px-3 bg-white border border-slate-200 rounded-lg hover:bg-slate-50 transition-colors shadow-sm text-[13px] font-semibold text-slate-700"
-              >
-                <span className="text-slate-400 font-medium">Viewing as:</span>
-                <span className="text-slate-900">{activeRole}</span>
-                <ChevronDown className={`w-4 h-4 text-slate-400 transition-transform ${isRoleDropdownOpen ? "rotate-180" : ""}`} />
-              </button>
-
-              {isRoleDropdownOpen && (
-                <div className="absolute right-0 top-[calc(100%+8px)] w-52 bg-white border border-slate-200 rounded-xl shadow-lg py-1 z-50">
-                  {roles.map((role) => (
-                    <button
-                      key={role}
-                      onClick={() => {
-                        setActiveRole(role);
-                        setIsRoleDropdownOpen(false);
-                      }}
-                      className={`w-full text-left px-4 py-2 text-[13px] hover:bg-slate-50 transition-colors flex items-center justify-between
-                        ${activeRole === role ? "font-bold text-[hsl(45,93%,38%)] bg-[hsl(var(--lys-yellow))]/10" : "font-medium text-slate-600"}`}
-                    >
-                      {role}
-                      {(role === "Campus Admin" || role === "District Admin") && (
-                        <span className="text-[9px] font-bold uppercase tracking-wide text-slate-400 bg-slate-100 rounded px-1.5 py-0.5">Dark</span>
-                      )}
-                    </button>
-                  ))}
-                </div>
-              )}
-            </div>
-
-            <div className="h-6 w-px bg-slate-200" />
-
             <div className="w-9 h-9 rounded-full bg-slate-100 flex items-center justify-center cursor-pointer hover:bg-slate-200 transition-colors">
               <Bell className="w-4 h-4 text-slate-400" />
             </div>
-            <div className="w-24 h-8 bg-[hsl(var(--lys-red))] rounded-lg opacity-20" />
+            <div className="w-9 h-9 rounded-full overflow-hidden bg-slate-200 ring-2 ring-white shadow-sm cursor-pointer">
+              <img src={currentUser.img} alt={currentUser.name} className="w-full h-full object-cover" />
+            </div>
           </div>
         </header>
 
