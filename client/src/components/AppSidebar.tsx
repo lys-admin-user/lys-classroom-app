@@ -8,6 +8,7 @@ import { ROLE_HIERARCHY, type UserRole } from "@shared/models/auth";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Sidebar, useSidebar } from "@/components/ui/sidebar";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import {
   LayoutDashboard,
   Compass,
@@ -352,9 +353,6 @@ export function AppSidebar() {
     ? "text-slate-400 hover:bg-white/10 hover:text-white border border-transparent hover:scale-105 active:scale-95"
     : "text-slate-400 hover:bg-slate-100 hover:text-slate-700 border border-transparent hover:scale-105 active:scale-95";
   const activeIconColor = isDark ? "text-lys-yellow" : "text-[hsl(45,93%,38%)]";
-  const tooltipClass =
-    "absolute left-[calc(100%+12px)] px-3 py-1.5 bg-slate-800 text-white text-xs font-semibold rounded-md opacity-0 -translate-x-2 pointer-events-none group-hover:opacity-100 group-hover:translate-x-0 group-focus-visible:opacity-100 group-focus-visible:translate-x-0 transition-all duration-200 whitespace-nowrap z-50 shadow-lg border border-slate-700";
-
   // When collapsed to the rail (desktop), a category click can't reveal its
   // flyout (it's unmounted), so expand the sidebar first; otherwise just preview.
   const handleCategoryClick = (id: string) => {
@@ -439,32 +437,34 @@ export function AppSidebar() {
               const isActive = cat.id === activeCat;
               const Icon = cat.icon;
               return (
-                <button
-                  key={cat.id}
-                  type="button"
-                  onClick={() => handleCategoryClick(cat.id)}
-                  aria-label={cat.label}
-                  aria-current={isActive ? "true" : undefined}
-                  title={cat.label}
-                  className={`relative group flex items-center justify-center w-full aspect-square rounded-xl transition-colors duration-300 ${
-                    isActive ? railBtnActive : railBtnIdle
-                  }`}
-                  data-testid={`rail-${slug(cat.label)}`}
-                >
-                  {isActive && (
-                    <motion.div
-                      layoutId="rail-active-indicator"
-                      className="absolute -left-3 top-1/2 -translate-y-1/2 w-[4px] h-[22px] bg-lys-yellow rounded-r-full shadow-[1px_0_8px_rgba(250,204,21,0.5)]"
-                      transition={{ type: "spring", stiffness: 500, damping: 38 }}
-                    />
-                  )}
-                  <Icon
-                    className={`w-[22px] h-[22px] stroke-[1.75] transition-transform duration-300 ${
-                      isActive ? `scale-110 ${activeIconColor}` : ""
-                    }`}
-                  />
-                  <span className={tooltipClass}>{cat.label}</span>
-                </button>
+                <Tooltip key={cat.id}>
+                  <TooltipTrigger asChild>
+                    <button
+                      type="button"
+                      onClick={() => handleCategoryClick(cat.id)}
+                      aria-label={cat.label}
+                      aria-current={isActive ? "true" : undefined}
+                      className={`relative group flex items-center justify-center w-full aspect-square rounded-xl transition-colors duration-300 ${
+                        isActive ? railBtnActive : railBtnIdle
+                      }`}
+                      data-testid={`rail-${slug(cat.label)}`}
+                    >
+                      {isActive && (
+                        <motion.div
+                          layoutId="rail-active-indicator"
+                          className="absolute -left-3 top-1/2 -translate-y-1/2 w-[4px] h-[22px] bg-lys-yellow rounded-r-full shadow-[1px_0_8px_rgba(250,204,21,0.5)]"
+                          transition={{ type: "spring", stiffness: 500, damping: 38 }}
+                        />
+                      )}
+                      <Icon
+                        className={`w-[22px] h-[22px] stroke-[1.75] transition-transform duration-300 ${
+                          isActive ? `scale-110 ${activeIconColor}` : ""
+                        }`}
+                      />
+                    </button>
+                  </TooltipTrigger>
+                  <TooltipContent side="right">{cat.label}</TooltipContent>
+                </Tooltip>
               );
             })}
           </div>
@@ -473,18 +473,20 @@ export function AppSidebar() {
             {footerActions.map((action) => {
               const Icon = action.icon;
               return (
-                <Link
-                  key={action.url}
-                  href={action.url}
-                  onClick={() => isMobile && setOpenMobile(false)}
-                  aria-label={action.label}
-                  title={action.label}
-                  className={`relative group flex items-center justify-center w-full aspect-square rounded-xl transition-colors duration-300 ${railBtnIdle}`}
-                  data-testid={`rail-${slug(action.label)}`}
-                >
-                  <Icon className="w-5 h-5 stroke-[1.75]" />
-                  <span className={tooltipClass}>{action.label}</span>
-                </Link>
+                <Tooltip key={action.url}>
+                  <TooltipTrigger asChild>
+                    <Link
+                      href={action.url}
+                      onClick={() => isMobile && setOpenMobile(false)}
+                      aria-label={action.label}
+                      className={`relative group flex items-center justify-center w-full aspect-square rounded-xl transition-colors duration-300 ${railBtnIdle}`}
+                      data-testid={`rail-${slug(action.label)}`}
+                    >
+                      <Icon className="w-5 h-5 stroke-[1.75]" />
+                    </Link>
+                  </TooltipTrigger>
+                  <TooltipContent side="right">{action.label}</TooltipContent>
+                </Tooltip>
               );
             })}
           </div>
