@@ -1,1 +1,1 @@
-- [Standards ingestion (full & real)](standards-ingestion.md) — CSP is the authoritative full/real pipeline; override CSP's generic "CTE (2010-)" subject so courses surface distinctly; never hand-type standards.
+- [Sidebar rail+flyout](sidebar-rail-flyout.md) — AppSidebar is an icon-rail+flyout inside shadcn `<Sidebar collapsible="icon">`; collapse = rail-only; exports must stay stable.

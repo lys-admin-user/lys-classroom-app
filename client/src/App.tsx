@@ -462,8 +462,10 @@ function AppShell() {
   const [location] = useLocation();
 
   const sidebarStyle = {
-    "--sidebar-width": "16rem",
-    "--sidebar-width-icon": "3.5rem",
+    // Wide enough for the 72px icon rail + 280px category flyout. Collapsing
+    // (via the header toggle) shrinks to just the rail (--sidebar-width-icon).
+    "--sidebar-width": "22rem",
+    "--sidebar-width-icon": "4.5rem",
   };
 
   // Anonymous visitors landing on "/" get the full-screen role-routed landing
