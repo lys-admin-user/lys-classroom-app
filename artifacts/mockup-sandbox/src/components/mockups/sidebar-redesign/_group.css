@@ -1,0 +1,34 @@
+/* LYS brand tokens for the sidebar-redesign mockup group.
+   Mirrors the main app's light-mode :root so mockups match the real theme.
+   Each component in this group imports './_group.css'. */
+.lys-scope {
+  --background: 0 0% 100%;
+  --foreground: 0 0% 9%;
+  --border: 0 0% 92%;
+  --card: 0 0% 98%;
+  --card-foreground: 0 0% 9%;
+  --muted: 0 3% 88%;
+  --muted-foreground: 0 0% 35%;
+  --accent: 45 18% 86%;
+  --accent-foreground: 0 0% 9%;
+  --primary: 7 84% 54%;
+  --primary-foreground: 0 0% 98%;
+  --sidebar: 0 0% 100%;
+  --sidebar-foreground: 0 0% 9%;
+  --sidebar-border: 0 0% 92%;
+
+  --lys-red: 7 84% 54%;
+  --lys-yellow: 45 93% 62%;
+  --lys-teal: 186 98% 23%;
+
+  --radius: 0.75rem;
+  color: hsl(var(--foreground));
+}
+
+/* Convenience color helpers (use Tailwind arbitrary values too) */
+.lys-red { color: hsl(var(--lys-red)); }
+.lys-yellow { color: hsl(45 93% 38%); } /* darkened yellow for legible text */
+.lys-teal { color: hsl(var(--lys-teal)); }
+.bg-lys-red { background-color: hsl(var(--lys-red)); }
+.bg-lys-teal { background-color: hsl(var(--lys-teal)); }
+.bg-lys-yellow { background-color: hsl(var(--lys-yellow)); }

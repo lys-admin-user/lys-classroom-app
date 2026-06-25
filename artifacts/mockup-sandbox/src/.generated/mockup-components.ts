@@ -10,6 +10,10 @@ export const modules: ModuleMap = {
   "./components/mockups/onboarding-flow/Home.tsx": () => import("../components/mockups/onboarding-flow/Home.tsx"),
   "./components/mockups/onboarding-flow/Landing.tsx": () => import("../components/mockups/onboarding-flow/Landing.tsx"),
   "./components/mockups/onboarding-flow/Setup.tsx": () => import("../components/mockups/onboarding-flow/Setup.tsx"),
+  "./components/mockups/sidebar-redesign/BeKnowDoEditorial.tsx": () => import("../components/mockups/sidebar-redesign/BeKnowDoEditorial.tsx"),
+  "./components/mockups/sidebar-redesign/IconRailFlyout.tsx": () => import("../components/mockups/sidebar-redesign/IconRailFlyout.tsx"),
+  "./components/mockups/sidebar-redesign/PinnedFavorites.tsx": () => import("../components/mockups/sidebar-redesign/PinnedFavorites.tsx"),
+  "./components/mockups/sidebar-redesign/ThreeZones.tsx": () => import("../components/mockups/sidebar-redesign/ThreeZones.tsx"),
   "./components/mockups/student-merge/MenuBeforeAfter.tsx": () => import("../components/mockups/student-merge/MenuBeforeAfter.tsx"),
   "./components/mockups/student-merge/UnifiedStudentPage.tsx": () => import("../components/mockups/student-merge/UnifiedStudentPage.tsx")
 };
