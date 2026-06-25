@@ -15,21 +15,27 @@ import {
   type NotificationKind,
   type DigestCadence,
 } from "@shared/schema";
+import { sendEmail } from "./emailTransport";
 import { and, desc, eq, inArray, count } from "drizzle-orm";
 
 const SYSTEM_ADMIN_ROLE = "system_admin";
+// Roles allowed to verify/promote standards (POST .../verify is requireSiteAdmin).
+// Manual-upload alerts go to these so whoever can confirm a source is notified.
+const STANDARDS_REVIEW_ROLES = ["site_admin", "system_admin"];
 
 // In-app notification recipients for a specific event kind. An admin is
 // excluded if they disabled in-app notifications entirely OR muted this
 // particular kind (Task #17). Missing preferences rows default to receiving
-// everything.
+// everything. `roles` defaults to system_admin only (back-compat); pass a wider
+// set (e.g. site_admin) for events those roles must act on.
 async function getOptInSystemAdmins(
   kind: NotificationKind,
+  roles: string[] = [SYSTEM_ADMIN_ROLE],
 ): Promise<{ id: string; email: string | null }[]> {
   const admins = await db
     .select({ id: users.id, email: users.email })
     .from(users)
-    .where(eq(users.role, SYSTEM_ADMIN_ROLE));
+    .where(inArray(users.role, roles as any[]));
   if (admins.length === 0) return [];
   const prefs = await db
     .select({
@@ -97,9 +103,12 @@ interface CreatePayload {
   relatedEntityId?: string;
 }
 
-async function fanOutToAdmins(payload: CreatePayload): Promise<void> {
+async function fanOutToAdmins(
+  payload: CreatePayload,
+  roles: string[] = [SYSTEM_ADMIN_ROLE],
+): Promise<void> {
   try {
-    const admins = await getOptInSystemAdmins(payload.kind);
+    const admins = await getOptInSystemAdmins(payload.kind, roles);
     if (admins.length === 0) return;
     await db.insert(adminNotifications).values(
       admins.map((a) => ({
@@ -230,4 +239,53 @@ export async function notifyPendingStandardsReady(input: {
     link: "/admin/standards-ingestion",
     relatedEntityId: input.syncRunId,
   });
+}
+
+// Manual / PDF DOE upload landed in staging. Until a site admin verifies it,
+// those standards surface as "Unverified". Alert the review roles both in-app
+// AND by direct email (not just the digest) so the source gets confirmed and
+// promoted to Official promptly. Fire-and-forget — never blocks the upload.
+export async function notifyManualStandardsUploaded(input: {
+  jurisdictionLabel: string;
+  subject?: string | null;
+  uploadedBy?: string | null;
+  stagedCount: number;
+  relatedEntityId?: string;
+}): Promise<void> {
+  if (input.stagedCount <= 0) return;
+  const subjectPart = input.subject ? ` (${input.subject})` : "";
+  const title = `${input.stagedCount} uploaded standards need verification`;
+  const body =
+    `${input.stagedCount} standard${input.stagedCount === 1 ? "" : "s"} for ` +
+    `${input.jurisdictionLabel}${subjectPart} were uploaded` +
+    `${input.uploadedBy ? ` by ${input.uploadedBy}` : ""} and are marked ` +
+    `Unverified until a site admin confirms the official source.`;
+  const link = "/admin/standards-ingestion";
+
+  await fanOutToAdmins(
+    { kind: "manual_standards_uploaded", title, body, link, relatedEntityId: input.relatedEntityId },
+    STANDARDS_REVIEW_ROLES,
+  );
+
+  // Direct email on top of the in-app bell — this event is time-sensitive.
+  try {
+    const recipients = await getOptInSystemAdmins(
+      "manual_standards_uploaded",
+      STANDARDS_REVIEW_ROLES,
+    );
+    await Promise.all(
+      recipients
+        .filter((r) => r.email)
+        .map((r) =>
+          sendEmail(
+            { email: r.email },
+            title,
+            `${body}\n\nReview & verify: ${link}`,
+            { logPrefix: "manual-standards-upload" },
+          ),
+        ),
+    );
+  } catch (err) {
+    console.error("[notifications] manual-upload email failed:", err);
+  }
 }

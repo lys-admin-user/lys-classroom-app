@@ -32,3 +32,35 @@ ingestion that teachers would mistake for full standards.
   keys drop distinct standards when the model re-numbers per chunk), and treat
   incomplete extraction as a HARD failure (don't auto-complete) so partial data
   is never published.
+
+# Official-DOE-vs-backup trust policy (labeling/ranking only)
+
+The catalog ranks each `standard_sets` row into a trust tier via
+`classifySetSource()` (`shared/standards.ts`) and the runtime cascade
+(`standardsCatalog.ts`) picks the **highest** `catalogTierRank` set per subject
+(DOE wins, the CSP duplicate is hidden). Tiers: official > backup/curated >
+unverified > fallback.
+
+**Why:** Official state DOE sources are authoritative; CSP is a backup. A
+manual/PDF upload must NOT masquerade as official until a human confirms it.
+
+**How to apply:**
+- US states pass `enforceOfficialLink: true` — a `csp`/`case` set is `official`
+  ONLY if its `documentUrl` clears `isOfficialDoeLink(url, abbr)` (state's
+  official domains OR generic `.gov` / `k12.*.us` / `state.*.us`) OR a site admin
+  stamped `lastVerifiedAt`. Otherwise `backup`. A null `documentUrl` => `backup`
+  by design (never fabricate official). Do NOT "fix" this by falling back to the
+  jurisdiction URL — that would over-promote.
+- International (non-US) passes `enforceOfficialLink: false` so ministry CSP syncs
+  STAY `official` (no DOE-link reference exists). Don't regress this to backup.
+- `manual`/`pdf_import` sets are `unverified` until `lastVerifiedAt` (the existing
+  `POST /api/admin/standards/sets/:id/verify`, requireSiteAdmin) flips them to
+  `official` — that endpoint is the "verify" action; no separate promote step.
+- On manual upload staging, `notifyManualStandardsUploaded` (notificationsService)
+  fans out in-app to **site_admin + system_admin** AND sends a direct email
+  (the only standards trigger that emails immediately vs. digest-only).
+- 50-state+DC reference data lives in `shared/usStandardsAuthorities.ts`; seed the
+  existing `authorities` table from it via `npx tsx scripts/seed-us-authorities.ts`
+  (official domains stored in `authorities.metadata` jsonb — no new table/column).
+- Tests are hermetic (no DB); cover the policy at the `classifySetSource` /
+  `isOfficialDoeLink` / `catalogTierRank` level, not via DB integration.

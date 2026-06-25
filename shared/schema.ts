@@ -4573,6 +4573,7 @@ export const NOTIFICATION_KINDS = [
   "sync_run_failed",
   "verbatim_rejection_spike",
   "pending_standards_ready",
+  "manual_standards_uploaded",
 ] as const;
 export type NotificationKind = (typeof NOTIFICATION_KINDS)[number];
 

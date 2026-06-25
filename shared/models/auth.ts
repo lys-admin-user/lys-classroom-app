@@ -395,6 +395,18 @@ export const authorities = pgTable("authorities", {
     examBoard?: string;
     gatekeeperExams?: string[];
     languageOfInstruction?: string[];
+    // US DOE authority seed (see shared/usStandardsAuthorities.ts + scripts/seed-us-authorities.ts).
+    // Lets the catalog/admin surfaces know the expected official source per state.
+    stateAbbr?: string;
+    agency?: string;
+    standardsName?: string;
+    officialDomains?: string[];
+    frameworks?: {
+      ela?: string;
+      math?: string;
+      science?: string;
+      cte?: string;
+    };
   }>(),
   isActive: boolean("is_active").default(true),
   createdAt: timestamp("created_at").defaultNow(),

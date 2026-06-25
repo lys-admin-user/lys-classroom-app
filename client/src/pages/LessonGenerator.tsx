@@ -318,7 +318,7 @@ export default function LessonGenerator() {
   });
   const subjects = subjectsData || [];
 
-  const { data: standardCodesData } = useQuery<(StandardCode & { source?: "official" | "curated" | "fallback"; sourceUrl?: string | null })[]>({
+  const { data: standardCodesData } = useQuery<(StandardCode & { source?: "official" | "backup" | "curated" | "unverified" | "fallback"; sourceUrl?: string | null })[]>({
     queryKey: ["/api/standards/codes", selectedCountry, selectedState, selectedSubject],
     enabled: !!selectedCountry && !!selectedState && !!selectedSubject,
   });

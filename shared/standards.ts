@@ -1,3 +1,5 @@
+import { isOfficialDoeLink } from "./usStandardsAuthorities";
+
 export interface StandardCode {
   code: string;
   description: string;
@@ -420,14 +422,28 @@ export function isCoverageOptionalCountry(country: string): boolean {
 }
 
 /**
- * Public-facing source classification used by the standards catalog. Maps
- * the internal `source` column ('csp', 'case', 'manual', 'pdf_import') and
- * the static-fallback path onto a three-tier badge a teacher can reason
- * about: official ministry/consortium data, admin-curated entries, or the
- * starter library when no real source is available yet.
+ * Public-facing source classification used by the standards catalog.
+ *
+ * Tiers (highest trust first):
+ *   - `official`  — authoritative DOE data: the set carries a real official DOE
+ *                   link (host matches the state's authority) OR a site admin
+ *                   verified it. This is what teachers should rely on.
+ *   - `backup`    — aggregated/consortium data (CSP/CASE) with no confirmed
+ *                   official DOE link yet. Still shown, clearly marked.
+ *   - `unverified`— a manual / PDF-imported upload awaiting site-admin
+ *                   verification. Shown immediately, clearly marked.
+ *   - `curated`   — legacy label for admin-curated entries (kept for back-compat
+ *                   with `classifyDbSource`).
+ *   - `fallback`  — the static starter library when no real source exists yet.
  */
-export type CatalogSourceTier = "official" | "curated" | "fallback";
+export type CatalogSourceTier = "official" | "backup" | "unverified" | "curated" | "fallback";
 
+/**
+ * Legacy jurisdiction-level classifier (looks only at the internal `source`
+ * column). Kept for back-compat — `listStates` still uses it for the
+ * state-level badge. Set-level ranking now uses {@link classifySetSource},
+ * which is link- and verification-aware.
+ */
 export function classifyDbSource(internalSource: string | null | undefined): CatalogSourceTier {
   switch (internalSource) {
     case "csp":
@@ -439,4 +455,61 @@ export function classifyDbSource(internalSource: string | null | undefined): Cat
     default:
       return "fallback";
   }
+}
+
+/**
+ * Link- and verification-aware classifier for an individual standard SET. This
+ * is the authoritative "Official DOE vs. backup" policy:
+ *
+ *   - manual / pdf_import upload  -> `official` once verified, else `unverified`
+ *   - csp / case (aggregated)     -> `official` when it has a real official DOE
+ *                                    link OR has been verified, else `backup`
+ *   - anything else               -> `fallback`
+ *
+ * `lastVerifiedAt` (a human site-admin confirmation) always promotes to
+ * `official`, which is how an admin "verifies" an unverified upload or a backup
+ * whose link we could not auto-recognize.
+ */
+export function classifySetSource(input: {
+  source: string | null | undefined;
+  documentUrl?: string | null;
+  lastVerifiedAt?: Date | string | null;
+  stateAbbr?: string | null;
+  /**
+   * When true (US states), an aggregated CSP/CASE set must carry a real
+   * official DOE link (or be verified) to count as `official`, otherwise it is
+   * `backup`. When false (international, where we have no DOE-link reference),
+   * CSP/CASE stays `official` — its ministry sync is the authoritative source.
+   */
+  enforceOfficialLink?: boolean;
+}): CatalogSourceTier {
+  const verified = !!input.lastVerifiedAt;
+  switch (input.source) {
+    case "manual":
+    case "pdf_import":
+      // A manual / PDF upload is "unverified" everywhere until a site admin
+      // confirms it — that confirmation stamps lastVerifiedAt -> "official".
+      return verified ? "official" : "unverified";
+    case "csp":
+    case "case": {
+      if (verified) return "official";
+      if (!input.enforceOfficialLink) return "official";
+      return isOfficialDoeLink(input.documentUrl, input.stateAbbr) ? "official" : "backup";
+    }
+    default:
+      return "fallback";
+  }
+}
+
+/** Trust ranking for dedup: higher wins when two sets cover the same subject. */
+const TIER_RANK: Record<CatalogSourceTier, number> = {
+  official: 4,
+  backup: 3,
+  curated: 3,
+  unverified: 2,
+  fallback: 1,
+};
+
+export function catalogTierRank(tier: CatalogSourceTier): number {
+  return TIER_RANK[tier] ?? 0;
 }

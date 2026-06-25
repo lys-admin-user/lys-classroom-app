@@ -16,10 +16,11 @@ import { useAuth } from "@/hooks/use-auth";
 import type { StandardCode } from "@shared/standards";
 
 export interface CatalogCodeClient extends StandardCode {
-  source?: "official" | "curated" | "fallback";
+  source?: "official" | "backup" | "curated" | "unverified" | "fallback";
   sourceUrl?: string | null;
   jurisdictionName?: string | null;
   standardsName?: string | null;
+  authorityName?: string | null;
   lastVerifiedAt?: string | null;
   gradeLevel?: string | null;
 }
@@ -49,7 +50,7 @@ interface FavoriteRow {
   gradeLevel: string | null;
   standardsName: string | null;
   jurisdictionName: string | null;
-  source: "official" | "curated" | "fallback" | null;
+  source: "official" | "backup" | "curated" | "unverified" | "fallback" | null;
   sourceUrl: string | null;
 }
 
@@ -61,21 +62,34 @@ interface RecentRow {
   description: string;
   gradeLevel: string | null;
   standardsName: string | null;
-  source: "official" | "curated" | "fallback" | null;
+  source: "official" | "backup" | "curated" | "unverified" | "fallback" | null;
   sourceUrl: string | null;
   lastUsedAt: string | null;
 }
 
 function tierLabel(tier?: string | null): string {
   if (tier === "official") return "Official";
+  if (tier === "backup") return "Backup";
+  if (tier === "unverified") return "Unverified";
   if (tier === "curated") return "Curated";
   return "Starter";
 }
 
 function tierExplain(tier?: string | null): string {
-  if (tier === "official") return "Sourced from an official ministry or standards-consortium feed.";
-  if (tier === "curated") return "Admin-curated entry — not yet verified against an official ministry feed.";
+  if (tier === "official") return "From the official Department of Education source for this state.";
+  if (tier === "backup") return "From a trusted standards database (Common Standards Project). Used as a backup until the official source is confirmed.";
+  if (tier === "unverified") return "Uploaded by an admin and waiting on a site admin to confirm the source. Use with care until it's verified.";
+  if (tier === "curated") return "Admin-curated entry — not yet verified against an official source.";
   return "Starter library entry — used when no official source is available yet.";
+}
+
+// Clean, simple color treatment per trust tier.
+function tierBadgeClass(tier?: string | null): string {
+  if (tier === "official") return "border-lys-teal/40 text-lys-teal";
+  if (tier === "backup") return "border-lys-blue/40 text-lys-blue";
+  if (tier === "unverified") return "border-lys-red/40 text-lys-red";
+  if (tier === "curated") return "border-lys-yellow/50 text-lys-yellow";
+  return "border-muted-foreground/30 text-muted-foreground";
 }
 
 function formatVerified(ts?: string | null): string {
@@ -108,13 +122,7 @@ export function StandardsSourcePopover({
         >
           <Badge
             variant="outline"
-            className={`ml-2 text-[10px] font-roboto align-middle cursor-pointer hover-elevate ${
-              tier === "official"
-                ? "border-lys-teal/40 text-lys-teal"
-                : tier === "curated"
-                ? "border-lys-yellow/50 text-lys-yellow"
-                : "border-muted-foreground/30 text-muted-foreground"
-            }`}
+            className={`ml-2 text-[10px] font-roboto align-middle cursor-pointer hover-elevate ${tierBadgeClass(tier)}`}
           >
             {tierLabel(tier).toLowerCase()}
           </Badge>
@@ -130,13 +138,7 @@ export function StandardsSourcePopover({
           <span className="font-oswald text-sm font-semibold">{tierLabel(tier)}</span>
           <Badge
             variant="outline"
-            className={
-              tier === "official"
-                ? "border-lys-teal/40 text-lys-teal text-[10px]"
-                : tier === "curated"
-                ? "border-lys-yellow/50 text-lys-yellow text-[10px]"
-                : "border-muted-foreground/30 text-muted-foreground text-[10px]"
-            }
+            className={`text-[10px] ${tierBadgeClass(tier)}`}
           >
             {tier ?? "fallback"}
           </Badge>
@@ -147,6 +149,14 @@ export function StandardsSourcePopover({
             <p className="font-semibold text-foreground">Jurisdiction</p>
             <p className="text-muted-foreground">
               {[code.jurisdictionName, code.standardsName].filter(Boolean).join(" — ")}
+            </p>
+          </div>
+        )}
+        {code.authorityName && (
+          <div>
+            <p className="font-semibold text-foreground">Authority</p>
+            <p className="text-muted-foreground" data-testid={testId ? `${testId}-authority` : undefined}>
+              {code.authorityName}
             </p>
           </div>
         )}

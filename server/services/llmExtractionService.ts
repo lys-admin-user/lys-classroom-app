@@ -1,6 +1,7 @@
 import OpenAI from "openai";
 import { storage } from "../storage";
 import type { InsertStandardsStaging } from "@shared/schema";
+import { notifyManualStandardsUploaded } from "./notificationsService";
 import crypto from "crypto";
 
 function getOpenAI(): OpenAI | null {
@@ -307,6 +308,18 @@ export async function processPdfImport(pdfImportId: string): Promise<{
     }));
 
     const created = await storage.bulkCreateStagingStandards(stagingRecords);
+
+    // Alert site/system admins that an uploaded set is waiting to be verified.
+    // Fire-and-forget so a notification hiccup never fails the import.
+    if (created.length > 0) {
+      void notifyManualStandardsUploaded({
+        jurisdictionLabel: jurisdiction.name,
+        subject: pdfImport.subject,
+        uploadedBy: pdfImport.userId,
+        stagedCount: created.length,
+        relatedEntityId: pdfImportId,
+      });
+    }
 
     // Never auto-complete a partial ingestion. If validation did not pass
     // (failed chunks, exceeded chunk ceiling, or fewer standards than expected)

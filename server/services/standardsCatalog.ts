@@ -20,9 +20,12 @@ import {
 } from "@shared/schema";
 import {
   classifyDbSource,
+  classifySetSource,
+  catalogTierRank,
   isCoverageOptionalCountry,
   type CatalogSourceTier,
 } from "@shared/standards";
+import { getStateAuthority } from "@shared/usStandardsAuthorities";
 import {
   US_STATES,
   getStateNameFromAbbr,
@@ -43,6 +46,7 @@ export interface CatalogSubject {
   subject: string;
   source: CatalogSourceTier;
   sourceUrl?: string | null;
+  authorityName?: string | null;
 }
 
 export interface CatalogCode {
@@ -53,6 +57,7 @@ export interface CatalogCode {
   sourceUrl?: string | null;
   jurisdictionName?: string | null;
   standardsName?: string | null;
+  authorityName?: string | null;
   lastVerifiedAt?: string | null;
 }
 
@@ -191,12 +196,38 @@ export async function listSubjects(
   const sets = jurisdiction ? await storage.getStandardSets(jurisdiction.id) : [];
 
   if (jurisdiction && sets.length > 0) {
-    const dbSourceTier = classifyDbSource(jurisdiction.source);
-    const unique = Array.from(new Set(sets.map((s) => s.subject)));
-    return unique.map((subject) => ({
+    // For US states we require a real official DOE link before calling an
+    // aggregated CSP set "official"; international ministry syncs stay official.
+    const enforceOfficialLink = country === "United States";
+    const authority = enforceOfficialLink ? getStateAuthority(stateAbbr) : undefined;
+
+    // One entry per subject, tagged with the HIGHEST-trust set covering it.
+    // This is the "DOE wins, hide the CSP duplicate" rule at the subject level.
+    const bySubject = new Map<
+      string,
+      { tier: CatalogSourceTier; sourceUrl?: string | null }
+    >();
+    for (const set of sets) {
+      const tier = classifySetSource({
+        source: set.source,
+        documentUrl: set.documentUrl,
+        lastVerifiedAt: (set as any).lastVerifiedAt,
+        stateAbbr,
+        enforceOfficialLink,
+      });
+      const existing = bySubject.get(set.subject);
+      if (!existing || catalogTierRank(tier) > catalogTierRank(existing.tier)) {
+        bySubject.set(set.subject, {
+          tier,
+          sourceUrl: set.documentUrl || jurisdiction.sourceUrl,
+        });
+      }
+    }
+    return Array.from(bySubject.entries()).map(([subject, best]) => ({
       subject,
-      source: dbSourceTier,
-      sourceUrl: jurisdiction.sourceUrl,
+      source: best.tier,
+      sourceUrl: best.sourceUrl,
+      authorityName: authority?.agency ?? null,
     }));
   }
 
@@ -240,19 +271,40 @@ export async function listCodes(
   const gradeLevels = opts.gradeLevels ?? [];
   const jurisdiction = await resolveJurisdiction(country, stateAbbr);
   const sets = jurisdiction ? await storage.getStandardSets(jurisdiction.id) : [];
-  const subjectSet = sets.find((s) => s.subject === subject);
 
-  if (jurisdiction && subjectSet) {
-    const dbSourceTier = classifyDbSource(jurisdiction.source);
+  // When more than one set covers this subject (e.g. an official DOE upload AND
+  // a CSP backup), pick the HIGHEST-trust one and hide the duplicate.
+  const enforceOfficialLink = country === "United States";
+  let subjectSet: (typeof sets)[number] | undefined;
+  let subjectTier: CatalogSourceTier | undefined;
+  for (const set of sets) {
+    if (set.subject !== subject) continue;
+    const tier = classifySetSource({
+      source: set.source,
+      documentUrl: set.documentUrl,
+      lastVerifiedAt: (set as any).lastVerifiedAt,
+      stateAbbr,
+      enforceOfficialLink,
+    });
+    if (!subjectSet || catalogTierRank(tier) > catalogTierRank(subjectTier!)) {
+      subjectSet = set;
+      subjectTier = tier;
+    }
+  }
+
+  if (jurisdiction && subjectSet && subjectTier) {
+    const chosenSet = subjectSet;
+    const chosenTier = subjectTier;
+    const authority = enforceOfficialLink ? getStateAuthority(stateAbbr) : undefined;
     const standards = gradeLevels.length > 0
-      ? await storage.getEducationalStandardsByGradeLevels(subjectSet.id, gradeLevels)
-      : await storage.getEducationalStandards(subjectSet.id);
+      ? await storage.getEducationalStandardsByGradeLevels(chosenSet.id, gradeLevels)
+      : await storage.getEducationalStandards(chosenSet.id);
     // Use the real human-confirmed verification timestamp. Set-level
     // verification wins over jurisdiction-level. We deliberately do NOT fall
     // back to lastSyncedAt — "we ingested this" is not the same as "a human
     // confirmed the source still publishes it." Null surfaces as "Not yet
     // verified" in the source popover.
-    const lastVerifiedRaw = (subjectSet as any).lastVerifiedAt || (jurisdiction as any).lastVerifiedAt || null;
+    const lastVerifiedRaw = (chosenSet as any).lastVerifiedAt || (jurisdiction as any).lastVerifiedAt || null;
     const lastVerifiedAt: string | null = lastVerifiedRaw
       ? (lastVerifiedRaw instanceof Date ? lastVerifiedRaw.toISOString() : String(lastVerifiedRaw))
       : null;
@@ -260,10 +312,11 @@ export async function listCodes(
       code: s.humanCoding,
       description: s.statement,
       gradeLevel: s.gradeLevel,
-      source: dbSourceTier,
-      sourceUrl: subjectSet.documentUrl || jurisdiction.sourceUrl,
+      source: chosenTier,
+      sourceUrl: chosenSet.documentUrl || jurisdiction.sourceUrl,
       jurisdictionName: jurisdiction.name,
       standardsName: jurisdiction.standardsName,
+      authorityName: authority?.agency ?? null,
       lastVerifiedAt,
     }));
   }
