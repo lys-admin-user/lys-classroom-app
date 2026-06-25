@@ -232,9 +232,9 @@ export function IconRailAdaptive() {
     <div className="lys-scope min-h-screen w-full flex bg-[#F8FAFC] font-sans overflow-hidden">
       {/* 1. ICON RAIL (adapts: charcoal for admins, warm/light for everyone else) */}
       <nav className={`w-[72px] flex-shrink-0 flex flex-col items-center py-5 z-30 relative transition-colors duration-500 ${navClass}`}>
-        {/* Logo */}
-        <div className="w-11 h-11 mb-8 rounded-xl bg-[hsl(var(--lys-red))] shadow-[0_4px_12px_rgba(0,0,0,0.15)] flex items-center justify-center transform -rotate-3 cursor-pointer hover:rotate-0 hover:scale-105 transition-all duration-300">
-          <span className="font-['Permanent_Marker'] text-white text-2xl translate-y-[2px] -translate-x-[1px]">L</span>
+        {/* Logo — matches the current LYS design's mark (clean, centered, -rotate-6) */}
+        <div className="h-9 w-9 mb-8 shrink-0 rounded-xl bg-[hsl(var(--lys-red))] shadow-sm flex items-center justify-center transform -rotate-6 cursor-pointer hover:rotate-0 transition-transform duration-300">
+          <span className="text-white font-['Permanent_Marker'] text-lg leading-none">L</span>
         </div>
 
         {/* Top Rail Items */}
