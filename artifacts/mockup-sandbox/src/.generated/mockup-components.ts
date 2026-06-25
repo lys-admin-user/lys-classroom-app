@@ -14,6 +14,8 @@ export const modules: ModuleMap = {
   "./components/mockups/sidebar-redesign/IconRailFlyout.tsx": () => import("../components/mockups/sidebar-redesign/IconRailFlyout.tsx"),
   "./components/mockups/sidebar-redesign/PinnedFavorites.tsx": () => import("../components/mockups/sidebar-redesign/PinnedFavorites.tsx"),
   "./components/mockups/sidebar-redesign/ThreeZones.tsx": () => import("../components/mockups/sidebar-redesign/ThreeZones.tsx"),
+  "./components/mockups/sidebar-redesign/ThreeZonesRefinedA.tsx": () => import("../components/mockups/sidebar-redesign/ThreeZonesRefinedA.tsx"),
+  "./components/mockups/sidebar-redesign/ThreeZonesRefinedB.tsx": () => import("../components/mockups/sidebar-redesign/ThreeZonesRefinedB.tsx"),
   "./components/mockups/student-merge/MenuBeforeAfter.tsx": () => import("../components/mockups/student-merge/MenuBeforeAfter.tsx"),
   "./components/mockups/student-merge/UnifiedStudentPage.tsx": () => import("../components/mockups/student-merge/UnifiedStudentPage.tsx")
 };
