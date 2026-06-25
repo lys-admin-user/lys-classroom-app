@@ -11,6 +11,7 @@ export const modules: ModuleMap = {
   "./components/mockups/onboarding-flow/Landing.tsx": () => import("../components/mockups/onboarding-flow/Landing.tsx"),
   "./components/mockups/onboarding-flow/Setup.tsx": () => import("../components/mockups/onboarding-flow/Setup.tsx"),
   "./components/mockups/sidebar-redesign/BeKnowDoEditorial.tsx": () => import("../components/mockups/sidebar-redesign/BeKnowDoEditorial.tsx"),
+  "./components/mockups/sidebar-redesign/IconRailAdaptive.tsx": () => import("../components/mockups/sidebar-redesign/IconRailAdaptive.tsx"),
   "./components/mockups/sidebar-redesign/IconRailCharcoal.tsx": () => import("../components/mockups/sidebar-redesign/IconRailCharcoal.tsx"),
   "./components/mockups/sidebar-redesign/IconRailFlyout.tsx": () => import("../components/mockups/sidebar-redesign/IconRailFlyout.tsx"),
   "./components/mockups/sidebar-redesign/IconRailFlyoutRefinedA.tsx": () => import("../components/mockups/sidebar-redesign/IconRailFlyoutRefinedA.tsx"),
