@@ -46,6 +46,7 @@ import {
   KeyRound,
   Home,
   Layers,
+  Star,
   ChevronRight,
   type LucideIcon,
 } from "lucide-react";
@@ -221,6 +222,53 @@ const ROLE_LABELS: Record<string, string> = {
 const slug = (s: string) =>
   s.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "");
 
+// Flat lookup so a pinned URL can resolve back to its title + icon for the rail.
+// First match wins (some URLs appear in multiple role groups with different labels).
+const NAV_ITEM_BY_URL = new globalThis.Map<string, { title: string; icon: LucideIcon }>();
+for (const group of navigationGroups) {
+  for (const item of group.items) {
+    if (!NAV_ITEM_BY_URL.has(item.url)) {
+      NAV_ITEM_BY_URL.set(item.url, { title: item.title, icon: item.icon });
+    }
+  }
+}
+
+// Per-account pinned nav, persisted in localStorage (a lightweight user preference,
+// no backend round-trip). Keyed by account so a shared device doesn't bleed pins.
+function usePinnedNav(accountKey?: string | null) {
+  const storageKey = `lys:pinned-nav:${accountKey ?? "guest"}`;
+  const [pinned, setPinned] = useState<string[]>([]);
+
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem(storageKey);
+      const parsed = raw ? JSON.parse(raw) : [];
+      setPinned(
+        Array.isArray(parsed)
+          ? Array.from(new Set(parsed.filter((u): u is string => typeof u === "string")))
+          : [],
+      );
+    } catch {
+      setPinned([]);
+    }
+  }, [storageKey]);
+
+  const persist = (next: string[]) => {
+    setPinned(next);
+    try {
+      localStorage.setItem(storageKey, JSON.stringify(next));
+    } catch {
+      /* ignore quota / unavailable storage */
+    }
+  };
+
+  const togglePin = (url: string) =>
+    persist(pinned.includes(url) ? pinned.filter((u) => u !== url) : [...pinned, url]);
+  const isPinned = (url: string) => pinned.includes(url);
+
+  return { pinned, togglePin, isPinned };
+}
+
 // A rail entry: either a single nav group, or the combined Be-Know-Do bucket.
 interface RailCategory {
   id: string;
@@ -235,6 +283,7 @@ export function AppSidebar() {
   const { user, isAuthenticated } = useAuth();
   const { viewAsStudent } = useViewAs();
   const { state, isMobile, setOpenMobile, setOpen } = useSidebar();
+  const { pinned, togglePin, isPinned } = usePinnedNav(user?.email);
 
   const actualRole = user?.role || "student";
   // When an educator+ turns on "student view", navigation is gated as if they
@@ -283,6 +332,14 @@ export function AppSidebar() {
   const visibleGroups = navigationGroups.filter(
     (group) => shouldShowGroup(group) && group.items.some(shouldShowItem),
   );
+
+  // Only surface pinned shortcuts the current role/view can actually reach, so a
+  // stale pin (e.g. an admin page pinned earlier, or while "viewing as student")
+  // never leaks back into the rail.
+  const visibleUrls = new globalThis.Set(
+    visibleGroups.flatMap((g) => g.items.filter(shouldShowItem).map((it) => it.url)),
+  );
+  const visiblePinned = pinned.filter((url) => visibleUrls.has(url));
 
   // Build rail categories: the three Be-Know-Do groups collapse into one rail
   // entry (color-coded sections in the flyout); every other group is its own.
@@ -353,6 +410,7 @@ export function AppSidebar() {
     ? "text-slate-400 hover:bg-white/10 hover:text-white border border-transparent hover:scale-105 active:scale-95"
     : "text-slate-400 hover:bg-slate-100 hover:text-slate-700 border border-transparent hover:scale-105 active:scale-95";
   const activeIconColor = isDark ? "text-lys-yellow" : "text-[hsl(45,93%,38%)]";
+  const railDivider = isDark ? "border-white/10" : "border-slate-200/80";
   // When collapsed to the rail (desktop), a category click can't reveal its
   // flyout (it's unmounted), so expand the sidebar first; otherwise just preview.
   const handleCategoryClick = (id: string) => {
@@ -380,39 +438,64 @@ export function AppSidebar() {
     const Icon = item.icon;
     const isActive = isActiveRoute(item.url);
     const showBadge = item.title === "System Dashboard" && pendingCount > 0;
+    const pinnedNow = isPinned(item.url);
     return (
-      <Link
+      <div
         key={`${item.title}-${item.url}`}
-        href={item.url}
-        onClick={() => isMobile && setOpenMobile(false)}
-        className={`group/item w-full flex items-center gap-3 px-3 py-2.5 rounded-[10px] text-[13px] transition-all duration-200 ${
+        className={`group/item flex items-center pr-2 rounded-[10px] border transition-all duration-200 ${
           isActive
-            ? "bg-lys-yellow/15 text-slate-900 border border-lys-yellow/30 shadow-sm"
-            : "text-slate-600 hover:bg-slate-100 hover:text-slate-900 border border-transparent"
+            ? "bg-lys-yellow/15 border-lys-yellow/30 shadow-sm"
+            : "border-transparent hover:bg-slate-100"
         }`}
-        data-testid={`nav-${slug(item.title)}`}
       >
-        <Icon
-          className={`w-[18px] h-[18px] stroke-[1.75] shrink-0 ${
-            isActive ? "text-[hsl(45,93%,38%)]" : "text-slate-400 group-hover/item:text-slate-600"
-          }`}
-        />
-        <span className={isActive ? "font-bold tracking-wide" : "font-semibold tracking-wide"}>
-          {item.title}
-        </span>
-        {showBadge && (
+        <Link
+          href={item.url}
+          onClick={() => isMobile && setOpenMobile(false)}
+          className="flex-1 min-w-0 flex items-center gap-3 pl-3 py-2.5 text-[13px]"
+          data-testid={`nav-${slug(item.title)}`}
+        >
+          <Icon
+            className={`w-[18px] h-[18px] stroke-[1.75] shrink-0 ${
+              isActive ? "text-[hsl(45,93%,38%)]" : "text-slate-400 group-hover/item:text-slate-600"
+            }`}
+          />
+          <span
+            className={`truncate ${
+              isActive
+                ? "text-slate-900 font-bold tracking-wide"
+                : "text-slate-600 group-hover/item:text-slate-900 font-semibold tracking-wide"
+            }`}
+          >
+            {item.title}
+          </span>
+        </Link>
+        {showBadge ? (
           <Badge
             variant="destructive"
-            className="ml-auto text-xs px-1.5 py-0"
+            className="ml-1 shrink-0 text-xs px-1.5 py-0"
             data-testid="badge-pending-rss-count"
           >
             {pendingCount}
           </Badge>
-        )}
-        {isActive && !showBadge && (
-          <div className="ml-auto w-1.5 h-1.5 rounded-full bg-lys-yellow shadow-[0_0_4px_rgba(250,204,21,0.6)]" />
-        )}
-      </Link>
+        ) : isAuthenticated ? (
+          <button
+            type="button"
+            onClick={() => togglePin(item.url)}
+            aria-label={pinnedNow ? `Unpin ${item.title}` : `Pin ${item.title} to rail`}
+            title={pinnedNow ? "Unpin from rail" : "Pin to rail"}
+            className={`shrink-0 p-1 rounded-md transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-lys-yellow/50 ${
+              pinnedNow
+                ? "text-lys-yellow opacity-100"
+                : "text-slate-300 opacity-0 group-hover/item:opacity-100 group-focus-within/item:opacity-100 focus-visible:opacity-100 hover:text-slate-500"
+            }`}
+            data-testid={`pin-${slug(item.title)}`}
+          >
+            <Star className={`w-3.5 h-3.5 ${pinnedNow ? "fill-current" : ""}`} />
+          </button>
+        ) : isActive ? (
+          <div className="shrink-0 w-1.5 h-1.5 rounded-full bg-lys-yellow shadow-[0_0_4px_rgba(250,204,21,0.6)]" />
+        ) : null}
+      </div>
     );
   };
 
@@ -432,6 +515,38 @@ export function AppSidebar() {
             <span className="text-white font-marker text-lg leading-none">L</span>
           </Link>
 
+          {isAuthenticated && visiblePinned.length > 0 && (
+            <div className={`w-full px-3 flex flex-col gap-1.5 pb-3 mb-1 border-b ${railDivider}`}>
+              {visiblePinned.map((url) => {
+                const meta = NAV_ITEM_BY_URL.get(url);
+                if (!meta) return null;
+                const PinnedIcon = meta.icon;
+                const active = isActiveRoute(url);
+                return (
+                  <Tooltip key={url}>
+                    <TooltipTrigger asChild>
+                      <Link
+                        href={url}
+                        onClick={() => isMobile && setOpenMobile(false)}
+                        aria-label={meta.title}
+                        className={`relative group flex items-center justify-center w-full aspect-square rounded-xl transition-colors duration-300 ${
+                          active ? railBtnActive : railBtnIdle
+                        }`}
+                        data-testid={`pinned-${slug(meta.title)}`}
+                      >
+                        <PinnedIcon
+                          className={`w-5 h-5 stroke-[1.75] ${active ? activeIconColor : ""}`}
+                        />
+                        <span className="absolute -top-0.5 -right-0.5 w-2 h-2 rounded-full bg-lys-yellow shadow-[0_0_4px_rgba(250,204,21,0.6)]" />
+                      </Link>
+                    </TooltipTrigger>
+                    <TooltipContent side="right">{meta.title}</TooltipContent>
+                  </Tooltip>
+                );
+              })}
+            </div>
+          )}
+
           <div className="flex-1 w-full px-3 flex flex-col gap-1.5 overflow-y-auto no-scrollbar">
             {categories.map((cat) => {
               const isActive = cat.id === activeCat;
@@ -442,6 +557,8 @@ export function AppSidebar() {
                     <button
                       type="button"
                       onClick={() => handleCategoryClick(cat.id)}
+                      onMouseEnter={() => setActiveCat(cat.id)}
+                      onFocus={() => setActiveCat(cat.id)}
                       aria-label={cat.label}
                       aria-current={isActive ? "true" : undefined}
                       className={`relative group flex items-center justify-center w-full aspect-square rounded-xl transition-colors duration-300 ${
