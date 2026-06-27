@@ -4,6 +4,7 @@ import { storage } from "./storage";
 import { lessons } from "@shared/schema";
 import { z } from "zod";
 import { setupAuth, registerAuthRoutes } from "./replit_integrations/auth";
+import { registerDevLogin } from "./devLogin";
 import multer from "multer";
 import { startBlsScheduler } from "./services/blsService";
 import { startRssFeedScheduler } from "./services/rssFeedService";
@@ -189,6 +190,10 @@ export async function registerRoutes(
   await setupAuth(app);
 
   registerAuthRoutes(app);
+
+  // Development-only login switcher (hard-disabled on the deployed site).
+  // Mounted before the MFA gate so the pre-auth login POST isn't intercepted.
+  registerDevLogin(app);
 
   // Login-MFA gate: educators-and-up must complete a second factor (TOTP or
   // email code) before mutating anything via the API. Mounted after auth so the
