@@ -355,6 +355,7 @@ import {
   type RssContentStatus,
   type RssPlacement,
 } from "@shared/schema";
+import { generatedCareers } from "./careersGenerated";
 import { db } from "../db";
 import { eq, desc, and, asc, gte, sql, or, inArray } from "drizzle-orm";
 import { randomUUID } from "crypto";
@@ -3168,6 +3169,19 @@ export let seedCareers: Career[] = [
     blsLastUpdated: "2024-09"
   }
 ];
+
+// Merge in the full BLS/O*NET-generated occupation list (~800 careers).
+// Dedupe by SOC code so the curated entries above (whose stable ids are
+// referenced by saved_careers) always win and are never duplicated.
+{
+  const existingBls = new Set(seedCareers.map((c) => c.blsCode).filter(Boolean));
+  const existingTitles = new Set(seedCareers.map((c) => c.title.toLowerCase()));
+  seedCareers.push(
+    ...generatedCareers.filter(
+      (c) => !existingBls.has(c.blsCode) && !existingTitles.has(c.title.toLowerCase()),
+    ),
+  );
+}
 
 export const seedResources: Resource[] = [
   {

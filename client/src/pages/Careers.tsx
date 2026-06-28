@@ -52,14 +52,26 @@ const categories = [
   { value: "all", label: "All Categories", icon: Briefcase },
   { value: "technology", label: "Computer & IT", icon: Code },
   { value: "healthcare", label: "Healthcare", icon: Stethoscope },
+  { value: "healthcare_support", label: "Healthcare Support", icon: Stethoscope },
   { value: "business", label: "Business & Management", icon: Building2 },
+  { value: "financial", label: "Business & Finance", icon: Building2 },
+  { value: "engineering", label: "Architecture & Engineering", icon: Wrench },
   { value: "science", label: "Science & Environment", icon: FlaskConical },
   { value: "creative", label: "Arts & Design", icon: Palette },
   { value: "trades", label: "Construction & Trades", icon: Wrench },
+  { value: "production", label: "Manufacturing & Production", icon: Wrench },
+  { value: "maintenance", label: "Building & Grounds", icon: Wrench },
+  { value: "transportation", label: "Transportation & Logistics", icon: Briefcase },
+  { value: "agriculture", label: "Agriculture & Farming", icon: FlaskConical },
   { value: "public_safety", label: "Protective Service", icon: Shield },
+  { value: "community_social", label: "Community & Social Service", icon: BookOpen },
   { value: "personal_services", label: "Personal Care", icon: Scissors },
+  { value: "food_service", label: "Food & Hospitality", icon: Briefcase },
+  { value: "sales", label: "Sales & Retail", icon: Building2 },
+  { value: "office_admin", label: "Office & Admin Support", icon: Briefcase },
   { value: "legal", label: "Legal", icon: Scale },
   { value: "education", label: "Education & Training", icon: BookOpen },
+  { value: "military", label: "Military", icon: Shield },
 ];
 
 const educationPathways = [
@@ -81,22 +93,57 @@ const gradeLevels = [
 
 const usStates = [
   { value: "all", label: "National Average" },
-  { value: "TX", label: "Texas" },
-  { value: "CA", label: "California" },
-  { value: "NY", label: "New York" },
-  { value: "FL", label: "Florida" },
-  { value: "WA", label: "Washington" },
-  { value: "VA", label: "Virginia" },
+  { value: "AL", label: "Alabama" },
+  { value: "AK", label: "Alaska" },
   { value: "AZ", label: "Arizona" },
+  { value: "AR", label: "Arkansas" },
+  { value: "CA", label: "California" },
   { value: "CO", label: "Colorado" },
+  { value: "CT", label: "Connecticut" },
+  { value: "DE", label: "Delaware" },
+  { value: "DC", label: "District of Columbia" },
+  { value: "FL", label: "Florida" },
+  { value: "GA", label: "Georgia" },
+  { value: "HI", label: "Hawaii" },
+  { value: "ID", label: "Idaho" },
+  { value: "IL", label: "Illinois" },
+  { value: "IN", label: "Indiana" },
   { value: "IA", label: "Iowa" },
+  { value: "KS", label: "Kansas" },
+  { value: "KY", label: "Kentucky" },
+  { value: "LA", label: "Louisiana" },
+  { value: "ME", label: "Maine" },
+  { value: "MD", label: "Maryland" },
   { value: "MA", label: "Massachusetts" },
   { value: "MI", label: "Michigan" },
+  { value: "MN", label: "Minnesota" },
+  { value: "MS", label: "Mississippi" },
+  { value: "MO", label: "Missouri" },
+  { value: "MT", label: "Montana" },
+  { value: "NE", label: "Nebraska" },
+  { value: "NV", label: "Nevada" },
+  { value: "NH", label: "New Hampshire" },
   { value: "NJ", label: "New Jersey" },
+  { value: "NM", label: "New Mexico" },
+  { value: "NY", label: "New York" },
+  { value: "NC", label: "North Carolina" },
+  { value: "ND", label: "North Dakota" },
   { value: "OH", label: "Ohio" },
-  { value: "LA", label: "Louisiana" },
-  { value: "PA", label: "Pennsylvania" },
   { value: "OK", label: "Oklahoma" },
+  { value: "OR", label: "Oregon" },
+  { value: "PA", label: "Pennsylvania" },
+  { value: "RI", label: "Rhode Island" },
+  { value: "SC", label: "South Carolina" },
+  { value: "SD", label: "South Dakota" },
+  { value: "TN", label: "Tennessee" },
+  { value: "TX", label: "Texas" },
+  { value: "UT", label: "Utah" },
+  { value: "VT", label: "Vermont" },
+  { value: "VA", label: "Virginia" },
+  { value: "WA", label: "Washington" },
+  { value: "WV", label: "West Virginia" },
+  { value: "WI", label: "Wisconsin" },
+  { value: "WY", label: "Wyoming" },
 ];
 
 const pathwayTypes = {
@@ -124,14 +171,26 @@ const demandLabels: Record<string, { label: string; color: string }> = {
 const categoryLabels: Record<string, string> = {
   technology: "Computer & IT",
   healthcare: "Healthcare",
+  healthcare_support: "Healthcare Support",
   business: "Business & Management",
+  financial: "Business & Finance",
+  engineering: "Architecture & Engineering",
   science: "Science & Environment",
   creative: "Arts & Design",
   trades: "Construction & Trades",
+  production: "Manufacturing & Production",
+  maintenance: "Building & Grounds",
+  transportation: "Transportation & Logistics",
+  agriculture: "Agriculture & Farming",
   public_safety: "Protective Service",
+  community_social: "Community & Social Service",
   personal_services: "Personal Care",
+  food_service: "Food & Hospitality",
+  sales: "Sales & Retail",
+  office_admin: "Office & Admin Support",
   legal: "Legal",
   education: "Education & Training",
+  military: "Military",
 };
 
 interface RecommendedCareersResponse {
@@ -561,8 +620,9 @@ export default function Careers() {
 
               <div className="pt-4 border-t text-center text-sm text-muted-foreground font-roboto">
                 <p>
-                  Data sourced from the U.S. Bureau of Labor Statistics (BLS) Occupational Outlook Handbook.
-                  Visit <a href="https://www.bls.gov/ooh/" target="_blank" rel="noopener noreferrer" className="text-lys-teal underline">bls.gov/ooh</a> for more information.
+                  Salaries, growth, openings, and education come from the U.S. Bureau of Labor Statistics (BLS) and O*NET.
+                  Be-Know-Do fit, pathway cost ranges, and getting-started tips are LYS guidance based on that data.
+                  Visit <a href="https://www.bls.gov/ooh/" target="_blank" rel="noopener noreferrer" className="text-lys-teal underline">bls.gov/ooh</a> for the official source.
                 </p>
               </div>
             </CardContent>
@@ -585,7 +645,7 @@ export default function Careers() {
                 KNOW: Career Pathways
               </h1>
               <p className="font-roboto text-muted-foreground">
-                40+ careers across tech, healthcare, trades, science, and more — powered by Bureau of Labor Statistics data
+                800+ careers across tech, healthcare, trades, science, and more — powered by Bureau of Labor Statistics data
               </p>
             </div>
           </div>
@@ -1117,7 +1177,7 @@ export default function Careers() {
             <div className="flex-1 min-w-[200px]">
               <h2 className="font-oswald text-xl font-semibold mb-2">Every Path Leads Somewhere Great</h2>
               <p className="font-roboto text-muted-foreground text-sm">
-                From AI engineering to welding, drone piloting to nursing — explore 40+ careers with real salary data,
+                From AI engineering to welding, drone piloting to nursing — explore 800+ careers with real salary data,
                 growth projections, and multiple pathways including trade school, certifications, and military service. College isn't the only way!
               </p>
             </div>

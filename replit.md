@@ -28,6 +28,7 @@ _Populate as you build_
 -   **Scholarship Scraper**: `server/scholarshipScraper/`
 -   **Standards Ingestion (authoritative)**: `server/services/cspService.ts` (Common Standards Project sync — full/real data), `server/services/standardsCatalog.ts` (runtime cascade), `server/services/llmExtractionService.ts` (PDF/text extraction, chunked), routes in `server/routes/org.ts` (`/api/standards/*`)
 -   **Texas Agriculture TEKS Seed**: `server/services/agricultureTeksSeed.ts` (`seedTexasAgricultureTeks`) + `scripts/seed-texas-ag-teks.ts` (run `npx tsx scripts/seed-texas-ag-teks.ts`)
+-   **Career Explorer Catalog (~830 careers)**: 42 hand-curated entries in `seedCareers` (`server/storage/_base.ts`, stable ids "1".."42" referenced by `saved_careers`) + ~800 auto-generated occupations in `server/storage/careersGenerated.ts` (ids `soc-<SOC>`), merged into `seedCareers` (deduped by `blsCode`/title). Regenerate the generated file with `npx tsx scripts/ingest-bls-careers.ts`. UI: `client/src/pages/Careers.tsx` (`categories` + `categoryLabels` keyed by SOC major group; `usStates` covers all 50 + DC).
 -   **Database Schema**: Refer to Drizzle ORM schema files.
 -   **Embedded Routes**: `client/src/pages/EmbedRouter.tsx`, `client/src/components/EmbedWrapper.tsx`, `client/src/components/EmbedSidebar.tsx`
 -   **Global Command Palette (jump-to search)**: `client/src/components/CommandPalette.tsx` (reuses `navigationGroups` + `hasMinRole` exported from `client/src/components/AppSidebar.tsx`)
