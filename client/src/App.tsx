@@ -83,6 +83,7 @@ const StrengthsInventory = lazy(() => import("@/pages/StrengthsInventory"));
 const MentorConnect = lazy(() => import("@/pages/MentorConnect"));
 const DistrictAdmin = lazy(() => import("@/pages/DistrictAdmin"));
 const HelpDesk = lazy(() => import("@/pages/HelpDesk"));
+const TeamHub = lazy(() => import("@/pages/TeamHub"));
 const DevDocs = lazy(() => import("@/pages/DevDocs"));
 const Terms = lazy(() => import("@/pages/Terms"));
 const Privacy = lazy(() => import("@/pages/Privacy"));
@@ -295,6 +296,7 @@ const AuthDistrictAdmin = withAuth(DistrictAdmin);
 const AuthStandardsAdmin = withAuth(StandardsAdmin);
 const AuthOnboarding = withAuth(Onboarding);
 const AuthDevDocs = withAuth(DevDocs);
+const AuthTeamHub = withAuth(TeamHub);
 
 function RedirectTo({ to }: { to: string }) {
   const [, navigate] = useLocation();
@@ -381,6 +383,8 @@ function Router() {
         <Route path="/alignment-dashboard" component={AuthAlignmentDashboard} />
         <Route path="/essay-builder" component={AuthEssayBuilder} />
         <Route path="/campus-activities" component={AuthCampusActivities} />
+        <Route path="/team/:tab" component={AuthTeamHub} />
+        <Route path="/team" component={AuthTeamHub} />
         <Route path="/district-admin" component={AuthDistrictAdmin} />
         <Route path="/district-admin/campuses" component={AuthDistrictAdmin} />
         <Route path="/dev-docs" component={AuthDevDocs} />

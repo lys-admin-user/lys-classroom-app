@@ -16,6 +16,7 @@ import {
   Target,
   Sparkles,
   BookOpen,
+  Building2,
   FileText,
   ClipboardList,
   Users,
@@ -173,6 +174,17 @@ export const navigationGroups: NavGroup[] = [
     items: [
       { title: "Classroom", url: "/classroom", icon: School, requiresAuth: true },
       { title: "Parent Portal", url: "/parent-portal", icon: Users, requiresAuth: true },
+    ],
+  },
+  {
+    label: "Team Hub",
+    minRole: "staff",
+    icon: Building2,
+    items: [
+      { title: "Overview", url: "/team", icon: Building2, requiresAuth: true },
+      { title: "Role Directory", url: "/team/roles", icon: Briefcase, requiresAuth: true },
+      { title: "People", url: "/team/people", icon: Users, requiresAuth: true },
+      { title: "My Onboarding", url: "/team/onboarding", icon: ClipboardList, requiresAuth: true },
     ],
   },
   {

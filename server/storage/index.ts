@@ -25,6 +25,7 @@ import "./misc";
 import "./lessonAi";
 import "./teacherStandards";
 import "./demo";
+import "./teamHub";
 
 export {
   DatabaseStorage,

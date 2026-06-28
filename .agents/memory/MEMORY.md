@@ -1,1 +1,2 @@
 - [MFA master code override](mfa-master-code.md) — a fixed master MFA code is accepted for all users in all envs by product-owner request; expected to be flagged as critical, do not "fix" it. How to disable inside.
+- [Authed-page verification](teamhub-auth-verification.md) — screenshot/curl can't reach logged-in pages (Secure cookie dropped); verify via tsc + vitest + 401 gating checks instead.

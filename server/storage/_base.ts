@@ -4293,4 +4293,23 @@ export interface DatabaseStorage extends IStorage {
   rejectTransfer( id: string, level: "campus" | "district" | "system_admin", rejectedBy: string, reason: string ): Promise<StudentTransferRequest | undefined>;
   cancelTransferRequest(id: string): Promise<StudentTransferRequest | undefined>;
   executeTransfer(id: string): Promise<StudentTransferRequest | undefined>;
+
+  // ----- Team Hub (internal HR) -----
+  getHrRoles(filters?: { status?: string; horizon?: string; department?: string }): Promise<import("@shared/schema").HrRole[]>;
+  getHrRole(id: string): Promise<import("@shared/schema").HrRole | undefined>;
+  createHrRole(data: import("@shared/schema").InsertHrRole & { id?: string }): Promise<import("@shared/schema").HrRole>;
+  updateHrRole(id: string, updates: Partial<import("@shared/schema").InsertHrRole>): Promise<import("@shared/schema").HrRole | undefined>;
+  getEmployees(filters?: { status?: string; roleId?: string; managerId?: string }): Promise<import("@shared/schema").Employee[]>;
+  getEmployee(id: string): Promise<import("@shared/schema").Employee | undefined>;
+  getEmployeeByUserId(userId: string): Promise<import("@shared/schema").Employee | undefined>;
+  getDirectReports(managerId: string): Promise<import("@shared/schema").Employee[]>;
+  createEmployee(data: import("@shared/schema").InsertEmployee): Promise<import("@shared/schema").Employee>;
+  updateEmployee(id: string, updates: Partial<import("@shared/schema").InsertEmployee>): Promise<import("@shared/schema").Employee | undefined>;
+  deleteEmployee(id: string): Promise<boolean>;
+  getOnboardingTasks(employeeId: string): Promise<import("@shared/schema").HrOnboardingTask[]>;
+  getOnboardingTask(id: string): Promise<import("@shared/schema").HrOnboardingTask | undefined>;
+  createOnboardingTask(data: import("@shared/schema").InsertHrOnboardingTask): Promise<import("@shared/schema").HrOnboardingTask>;
+  updateOnboardingTask(id: string, updates: Partial<import("@shared/schema").InsertHrOnboardingTask> & { status?: string }): Promise<import("@shared/schema").HrOnboardingTask | undefined>;
+  deleteOnboardingTask(id: string): Promise<boolean>;
+  generateOnboardingForEmployee(employeeId: string): Promise<import("@shared/schema").HrOnboardingTask[]>;
 }
