@@ -1,0 +1,56 @@
+## Product Vision: Project Pulse (Working Title)
+
+This system serves as a unified, data-driven operations engine designed for a scaling organization. By sitting directly between **HubSpot** and **Google Workspace**, it bridges external customer acquisition with internal team execution.
+
+Unlike rigid project management tools, this platform treats internal team onboarding, role progression, and customer success journeys as interconnected workflows, ensuring no context is lost as the team grows.
+
+---
+
+### Core Architecture & The "Handshake" Engine
+
+The system relies on real-time automated data pipelines to remove manual administrative overhead during critical growth inflection points:
+
+* **The Customer Onboarding Pipeline:** The moment a deal is marked **"Closed Won" in HubSpot**, the system intercepts the webhook, parses the associated company data, and automatically provisions a role-specific customer onboarding board. This ensures the delivery team instantly inherits the exact context established during the sales cycle.
+* **The Internal HR Pipeline:** The creation of a new user account in **Google Admin / the LYS App** serves as the single source of truth for headcount. It instantly triggers a standardized, role-specific employee onboarding timeline. Simultaneously, it maps the new hire to their respective team and individual dashboards, completely automating the Day 1 provisioning experience.
+
+---
+
+### Modular Visual Hierarchy
+
+Instead of forcing a single data structure into restrictive layouts, the platform uses an independent, multi-module database layer. This allows teams to track progress through completely different operational lenses while keeping statuses synchronized.
+
+```
+                  ┌──────────────────────────────┐
+                  │   Central Database Engine    │
+                  └──────────────┬───────────────┘
+         ┌───────────────────────┼───────────────────────┐
+         ▼                       ▼                       ▼
+┌─────────────────┐     ┌─────────────────┐     ┌─────────────────┐
+│  Journey Map    │     │  Kanban Boards  │     │ Master Calendar │
+│ (Milestones &   │     │  (Day-to-Day    │     │ (Macro Targets  │
+│  Phases View)   │     │  Task Delivery) │     │  & Deadlines)   │
+└─────────────────┘     └─────────────────┘     └─────────────────┘
+
+```
+
+* **The Customer/Employee Journey Map:** A high-level, linear phase view (e.g., *Phase 1: Discovery/Orientation → Phase 2: Technical Integration → Phase 3: Adoption*). It tracks macro milestones, client sentiment, and overall health scores rather than minor daily tasks.
+* **The Kanban Boards:** The granular execution layer. This is the day-to-day workspace where tasks are moved through custom pipelines (e.g., *Backlog, In Progress, In Review, Done*). While independent, a "Blocker" task on a Kanban board can automatically flag a corresponding phase on the Journey Map as "At Risk."
+* **The Master Calendar:** A time-bound visual grid highlighting critical delivery deadlines, launch dates, and company-wide compliance timelines, establishing a predictable operational rhythm.
+
+---
+
+### Tri-Level Visibility Framework
+
+To protect team focus while maintaining organizational alignment, the interface uses a responsive toggle framework that instantly filters noise based on the user's immediate needs:
+
+| View Level | Primary Target Audience | Core Functionality |
+| --- | --- | --- |
+| **1. The Zoom-Out View** | Founders & Leadership | A birds-eye, macro perspective of the annual calendar, high-level journey maps for all clients, and aggregated team health metrics. |
+| **2. The Team View** | Department / Project Leads | Filters data down to a specific cross-functional group. Focuses on the group's active Kanban boards, shared milestones, and workload balancing. |
+| **3. The Individual View** | Individual Contributors | A hyper-focused, distraction-free cockpit showing only the specific user's daily tasks, personal onboarding milestones, and immediate deadlines. |
+
+---
+
+### Strategic Next Steps
+
+To move this from concept to technical execution, we need to map out the exact data schemas and integration footprints.
