@@ -4691,3 +4691,130 @@ export const insertEmailOtpCodeSchema = createInsertSchema(emailOtpCodes).omit({
 });
 export type InsertEmailOtpCode = z.infer<typeof insertEmailOtpCodeSchema>;
 export type EmailOtpCode = typeof emailOtpCodes.$inferSelect;
+
+// ============================================================================
+// TEAM HUB (Internal HR + Operations) — "Project Pulse"
+// ----------------------------------------------------------------------------
+// An internal-only HR/operations layer for LYS's own staff. This is kept
+// DELIBERATELY SEPARATE from the platform login role hierarchy
+// (student → system_admin in shared/models/auth.ts). A person's *job role*
+// here (e.g. "Chief Marketing Officer") is org/HR metadata, not an app
+// permission. Access to these surfaces is gated to staff/admins in the routes.
+// Designed to start MANUAL and later be populated by HubSpot / Google Workspace
+// (see `source` / `hubspotId` / `googleId` provenance columns).
+// ============================================================================
+
+// The 38-role company directory. Roles are flexible: they can be added,
+// adapted, or archived (status="archived") without deleting history. Seeded
+// from the company role directory but editable at runtime, so seeded rows are
+// marked isSeed=true and given stable slug ids so `reportsToId` resolves.
+export const hrRoles = pgTable(
+  "hr_roles",
+  {
+    id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+    title: text("title").notNull(),
+    department: text("department").notNull(), // org section, e.g. "Executive & Administrative Leadership"
+    horizon: text("horizon").notNull().default("active"), // "active" | "near_future" | "future"
+    employmentType: text("employment_type").notNull().default("Full-time"), // e.g. "Full-time (W-2)", "Contractor (1099)", "Intern"
+    reportsToId: varchar("reports_to_id"), // -> hr_roles.id (nullable for the top of the chart)
+    summary: text("summary").notNull().default(""), // Executive Summary
+    bkdBe: text("bkd_be").notNull().default(""), // BE-KNOW-DO framework
+    bkdKnow: text("bkd_know").notNull().default(""),
+    bkdDo: text("bkd_do").notNull().default(""),
+    kpis: jsonb("kpis").notNull().default(sql`'[]'::jsonb`).$type<{ name: string; target?: string }[]>(),
+    sops: jsonb("sops").notNull().default(sql`'{}'::jsonb`).$type<{
+      daily: string[];
+      weekly: string[];
+      monthly: string[];
+      semester: string[];
+      yearly: string[];
+    }>(),
+    tools: jsonb("tools").notNull().default(sql`'[]'::jsonb`).$type<string[]>(),
+    evaluationChecklist: jsonb("evaluation_checklist").notNull().default(sql`'[]'::jsonb`).$type<string[]>(),
+    // Optional per-role onboarding template; when empty, onboarding tasks are
+    // auto-derived from the role's tools + first SOP duties.
+    onboardingTemplate: jsonb("onboarding_template").notNull().default(sql`'[]'::jsonb`).$type<
+      { phase: string; category: string; title: string; description?: string; dueOffsetDays: number }[]
+    >(),
+    status: text("status").notNull().default("active"), // "active" | "archived"
+    sortOrder: integer("sort_order").notNull().default(0),
+    isSeed: boolean("is_seed").notNull().default(false),
+    createdAt: timestamp("created_at").defaultNow(),
+    updatedAt: timestamp("updated_at").defaultNow(),
+  },
+  (t) => ({
+    byDept: index("hr_roles_department_idx").on(t.department),
+    byStatus: index("hr_roles_status_idx").on(t.status),
+  }),
+);
+export const insertHrRoleSchema = createInsertSchema(hrRoles).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+export type InsertHrRole = z.infer<typeof insertHrRoleSchema>;
+export type HrRole = typeof hrRoles.$inferSelect;
+
+// Internal team members (employees). Optionally linked to a platform `users`
+// account (userId) so a logged-in staffer can see their own focused view.
+export const employees = pgTable(
+  "employees",
+  {
+    id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+    userId: varchar("user_id"), // -> users.id (nullable; set when they have an app login)
+    name: text("name").notNull(),
+    email: text("email").notNull(),
+    roleId: varchar("role_id").notNull(), // -> hr_roles.id
+    managerId: varchar("manager_id"), // -> employees.id (actual reporting person)
+    startDate: timestamp("start_date"),
+    status: text("status").notNull().default("onboarding"), // "onboarding" | "active" | "offboarding" | "inactive"
+    employmentType: text("employment_type"),
+    source: text("source").notNull().default("manual"), // "manual" | "hubspot" | "google_workspace"
+    hubspotId: text("hubspot_id"),
+    googleId: text("google_id"),
+    notes: text("notes"),
+    createdAt: timestamp("created_at").defaultNow(),
+    updatedAt: timestamp("updated_at").defaultNow(),
+  },
+  (t) => ({
+    byRole: index("employees_role_idx").on(t.roleId),
+    byManager: index("employees_manager_idx").on(t.managerId),
+    byUser: index("employees_user_idx").on(t.userId),
+  }),
+);
+export const insertEmployeeSchema = createInsertSchema(employees).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+export type InsertEmployee = z.infer<typeof insertEmployeeSchema>;
+export type Employee = typeof employees.$inferSelect;
+
+// Per-employee onboarding tasks, auto-generated from their role on creation
+// but fully editable afterward.
+export const hrOnboardingTasks = pgTable(
+  "hr_onboarding_tasks",
+  {
+    id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+    employeeId: varchar("employee_id").notNull(), // -> employees.id
+    title: text("title").notNull(),
+    description: text("description"),
+    phase: text("phase").notNull().default("Week 1"), // e.g. "Week 1: Orientation"
+    category: text("category").notNull().default("General"), // "Accounts & Access" | "BE-KNOW-DO" | "Tools" | "First Deliverables"
+    status: text("status").notNull().default("todo"), // "todo" | "in_progress" | "done"
+    dueOffsetDays: integer("due_offset_days").notNull().default(0), // days after start date
+    sortOrder: integer("sort_order").notNull().default(0),
+    completedAt: timestamp("completed_at"),
+    createdAt: timestamp("created_at").defaultNow(),
+  },
+  (t) => ({
+    byEmployee: index("hr_onboarding_employee_idx").on(t.employeeId),
+  }),
+);
+export const insertHrOnboardingTaskSchema = createInsertSchema(hrOnboardingTasks).omit({
+  id: true,
+  createdAt: true,
+  completedAt: true,
+});
+export type InsertHrOnboardingTask = z.infer<typeof insertHrOnboardingTaskSchema>;
+export type HrOnboardingTask = typeof hrOnboardingTasks.$inferSelect;
