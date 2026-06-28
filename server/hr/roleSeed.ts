@@ -1,17 +1,22 @@
 import type { InsertHrRole } from "@shared/schema";
+import { GENERATED_HR_ROLES } from "./rolesGenerated";
 
 // Seed roles for the Team Hub directory.
 //
 // IMPORTANT: Only roles we have REAL, source documentation for are seeded here.
 // We do NOT fabricate duties, KPIs, or evaluation criteria for roles we lack
-// source material for — those are added by an admin through the in-app
-// "Add Role" form (or transcribed when the source document is provided).
+// source material for. The full 38-role set is transcribed faithfully from the
+// LYS Comprehensive Roles & Operational Directory and lives in
+// `rolesGenerated.ts` (regenerate with `npx tsx scripts/ingest-lys-roles.ts`).
+// Admins can still add new roles, and adjust/increase KPIs and SOPs, through the
+// in-app role editor — those edits live in the DB and are never overwritten by
+// re-seeding (the seeder is idempotent by stable id).
 //
 // Seeded rows carry stable slug ids so `reportsToId` can reference them, and
 // are marked isSeed=true by the seeder.
 export type SeedHrRole = InsertHrRole & { id: string };
 
-export const SEED_HR_ROLES: SeedHrRole[] = [
+const MANUAL_SEED_HR_ROLES: SeedHrRole[] = [
   {
     id: "study-abroad-srm",
     title: "Sales & Relationship Manager — Study Abroad",
@@ -94,4 +99,12 @@ export const SEED_HR_ROLES: SeedHrRole[] = [
     ],
     onboardingTemplate: [],
   },
+];
+
+// Full directory = the manually-curated role(s) above + the 38 roles transcribed
+// from the source document. Deduped by stable id (manual entries win).
+const seen = new Set(MANUAL_SEED_HR_ROLES.map((r) => r.id));
+export const SEED_HR_ROLES: SeedHrRole[] = [
+  ...MANUAL_SEED_HR_ROLES,
+  ...GENERATED_HR_ROLES.filter((r) => !seen.has(r.id)),
 ];
