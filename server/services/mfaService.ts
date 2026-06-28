@@ -22,6 +22,17 @@ export function isDevBypassEnabled(): boolean {
   return process.env.REPLIT_DEPLOYMENT !== "1" && process.env.NODE_ENV !== "production";
 }
 
+// Master MFA code: a single fixed code accepted for EVERY user in EVERY
+// environment, by product-owner request ("default 123456 for all users until
+// told otherwise"). This is intentionally broader than the dev-only bypass
+// above. To turn it off and return to real per-user TOTP/email verification,
+// set MASTER_MFA_CODE_ENABLED to false (or delete this block + its call sites).
+export const MASTER_MFA_CODE = "123456";
+export const MASTER_MFA_CODE_ENABLED = true;
+export function isMasterMfaCode(code: string): boolean {
+  return MASTER_MFA_CODE_ENABLED && code.replace(/\s+/g, "") === MASTER_MFA_CODE;
+}
+
 export function generateMfaSecret(): string {
   return generateSecret();
 }
@@ -36,8 +47,9 @@ export async function buildQrDataUrl(otpauthUri: string): Promise<string> {
 
 export function verifyToken(token: string, secret: string): boolean {
   const normalized = token.replace(/\s+/g, "");
-  // Dev-only fixed code (never active in production — see isDevBypassEnabled).
-  if (isDevBypassEnabled() && normalized === DEV_BYPASS_MFA_CODE) {
+  // Master MFA code: accepted for every user in every environment until
+  // disabled (MASTER_MFA_CODE_ENABLED). Product-owner override.
+  if (isMasterMfaCode(normalized)) {
     return true;
   }
   try {

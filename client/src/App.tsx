@@ -17,6 +17,7 @@ import { CommandPalette } from "@/components/CommandPalette";
 import { ViewAsProvider, ViewAsStudentBanner } from "@/hooks/use-view-as";
 import { PolicyReacceptModal } from "@/components/PolicyReacceptModal";
 import { RoleRoutedLanding } from "@/components/RoleRoutedLanding";
+import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { MfaStepUpDialog } from "@/components/MfaStepUpDialog";
 import { useMfaStatus, invalidateMfaStatus } from "@/hooks/use-mfa";
 import { useAuth } from "@/hooks/use-auth";
@@ -511,18 +512,20 @@ function AppShell() {
 
 function App() {
   return (
-    <QueryClientProvider client={queryClient}>
-      <TooltipProvider>
-        <ViewAsProvider>
-          <OnboardingGuard>
-            <AppShell />
-          </OnboardingGuard>
-          <NeedsAnalyzerModal />
-          <Toaster />
-          <ConsentBanner />
-        </ViewAsProvider>
-      </TooltipProvider>
-    </QueryClientProvider>
+    <ErrorBoundary>
+      <QueryClientProvider client={queryClient}>
+        <TooltipProvider>
+          <ViewAsProvider>
+            <OnboardingGuard>
+              <AppShell />
+            </OnboardingGuard>
+            <NeedsAnalyzerModal />
+            <Toaster />
+            <ConsentBanner />
+          </ViewAsProvider>
+        </TooltipProvider>
+      </QueryClientProvider>
+    </ErrorBoundary>
   );
 }
 

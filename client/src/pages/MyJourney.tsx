@@ -107,6 +107,41 @@ const roleDescriptions = {
     journeyTitle: "Your Leadership Journey",
     journeySubtitle: "Track your growth across Be-Know-Do as you develop your leadership, expand expertise, and drive impact",
   },
+  district_admin: {
+    be: "Leadership style and district vision",
+    know: "Educational management and policy expertise",
+    do: "District-wide initiatives and systemic growth",
+    journeyTitle: "Your Leadership Journey",
+    journeySubtitle: "Track your growth across Be-Know-Do as you lead campuses, expand expertise, and drive district impact",
+  },
+  site_admin: {
+    be: "Platform leadership and organizational vision",
+    know: "Operational expertise and policy oversight",
+    do: "Platform initiatives and organizational growth",
+    journeyTitle: "Your Leadership Journey",
+    journeySubtitle: "Track your growth across Be-Know-Do as you steward the platform, expand expertise, and drive impact",
+  },
+  system_admin: {
+    be: "Platform leadership and organizational vision",
+    know: "Operational expertise and policy oversight",
+    do: "Platform initiatives and organizational growth",
+    journeyTitle: "Your Leadership Journey",
+    journeySubtitle: "Track your growth across Be-Know-Do as you steward the platform, expand expertise, and drive impact",
+  },
+  staff: {
+    be: "Professional identity and team contribution",
+    know: "Role expertise and program knowledge",
+    do: "Day-to-day impact and goal achievement",
+    journeyTitle: "Your Professional Journey",
+    journeySubtitle: "Track your growth across Be-Know-Do as you develop your practice, expand knowledge, and create impact",
+  },
+  homeschool_parent: {
+    be: "Teaching philosophy and family vision",
+    know: "Curriculum knowledge and learning strategies",
+    do: "Lesson delivery and learner goal achievement",
+    journeyTitle: "Your Teaching Journey",
+    journeySubtitle: "Track your growth across Be-Know-Do as you guide your learners, expand knowledge, and create opportunities",
+  },
 };
 
 // Function to get role-specific category config

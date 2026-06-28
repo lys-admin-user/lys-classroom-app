@@ -73,6 +73,18 @@ function configForRole(role: string | undefined): RoleConfig {
         ],
       };
     case "site_admin":
+      return {
+        greeting: "Welcome back, site admin",
+        subtitle: "Platform controls and organization management.",
+        links: [
+          { label: "Site Admin", href: "/admin", icon: Building2 },
+          { label: "System Admin", href: "/system-admin", icon: ShieldCheck },
+          { label: "Analytics", href: "/analytics", icon: BarChart3 },
+          { label: "Standards", href: "/admin/standards", icon: ClipboardList },
+          { label: "Resource Library", href: "/resource-library", icon: Library },
+          { label: "Settings", href: "/settings", icon: SettingsIcon },
+        ],
+      };
     case "system_admin":
       return {
         greeting: "Welcome back, system admin",
@@ -84,6 +96,19 @@ function configForRole(role: string | undefined): RoleConfig {
           { label: "Standards", href: "/admin/standards", icon: ClipboardList },
           { label: "Resource Library", href: "/resource-library", icon: Library },
           { label: "Settings", href: "/settings", icon: SettingsIcon },
+        ],
+      };
+    case "staff":
+      return {
+        greeting: "Welcome back",
+        subtitle: "Your tools and resources, ready when you are.",
+        links: [
+          { label: "AI Lesson Planner", href: "/lesson-generator", icon: Sparkles },
+          { label: "My Lessons", href: "/my-lessons", icon: BookOpen },
+          { label: "Assignments", href: "/assignments", icon: ClipboardList },
+          { label: "Resources", href: "/resources", icon: Library },
+          { label: "Collaboration", href: "/collaboration", icon: Users },
+          { label: "Analytics", href: "/analytics", icon: BarChart3 },
         ],
       };
     case "educator":
