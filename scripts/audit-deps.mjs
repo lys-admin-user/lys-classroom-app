@@ -3,10 +3,13 @@
  * Standalone dependency-audit gate.
  *
  * Runs `npm audit --json` and fails (exit 1) when high or critical advisories
- * are present, EXCEPT for an explicit allow-list of advisories that require a
- * major upgrade of the pre-configured build/ORM toolchain (vite, esbuild,
- * drizzle-kit, drizzle-orm). Those are tracked as accepted residual risks and
- * must be revisited during a dedicated upgrade pass.
+ * are present, EXCEPT for an explicit allow-list of advisories that either
+ * require a major upgrade of the pre-configured build/ORM toolchain (vite,
+ * esbuild, drizzle-kit, drizzle-orm) or have no upstream fix and are confined
+ * to offline dev tooling (xlsx — used only by scripts/ingest-bls-careers.ts to
+ * regenerate the career catalog; never imported by the server runtime / request
+ * path). Those are tracked as accepted residual risks and must be revisited
+ * during a dedicated upgrade pass.
  *
  * Usage: node scripts/audit-deps.mjs
  *
@@ -17,7 +20,7 @@ import { execSync } from "node:child_process";
 
 // Package names whose remaining high/critical advisories are knowingly deferred
 // because the only fix is a major bump of pre-configured tooling.
-const ALLOWED = new Set(["vite", "esbuild", "drizzle-kit", "drizzle-orm", "@esbuild-kit/core-utils", "@esbuild-kit/esm-loader"]);
+const ALLOWED = new Set(["vite", "esbuild", "drizzle-kit", "drizzle-orm", "@esbuild-kit/core-utils", "@esbuild-kit/esm-loader", "xlsx"]);
 
 let raw = "";
 try {
