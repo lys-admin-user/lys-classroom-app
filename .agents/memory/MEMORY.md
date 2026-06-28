@@ -1,1 +1,1 @@
-- [MFA master code override](mfa-master-code.md) — 123456 accepted for all users in all envs by product-owner request; expected to be flagged as critical, do not "fix" it. How to disable inside.
+- [MFA master code override](mfa-master-code.md) — a fixed master MFA code is accepted for all users in all envs by product-owner request; expected to be flagged as critical, do not "fix" it. How to disable inside.
