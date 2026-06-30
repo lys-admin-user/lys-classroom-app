@@ -18,3 +18,9 @@ id = "Rlxaju7iZVInkg4HD652n"
 uri = "file://attached_assets/lys_demo/prompt_AFTER.txt"
 type = "text"
 title = "AFTER — what the AI sees now (with LYS canon)"
+
+[[outputs]]
+id = "V4mHwFw5G1JV6pXB1jgQ-"
+uri = "file://exports/LYS_Role_Access_Levels.xlsx"
+type = "table"
+title = "LYS Role Access Levels"
