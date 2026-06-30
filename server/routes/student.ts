@@ -215,6 +215,7 @@ const requireCampusAdmin = requireRole("campus_admin", "district_admin", "site_a
 const requireDistrictAdmin = requireRole("district_admin", "site_admin", "system_admin");
 const requireSiteAdmin = requireRole("site_admin", "system_admin");
 const requireSystemAdmin = requireRole("system_admin");
+const requireTeacher = requireRole("homeschool_parent", "educator", "staff", "campus_admin", "district_admin", "site_admin", "system_admin");
 
 // Authorize access to a single student's sensitive records (grades, matriculation).
 // A logged-in user may only read a student record if they are: the record owner
@@ -279,7 +280,7 @@ export function registerStudentRoutes(app: Express): void {
 
 
   // Get students with specific accommodation types (for accommodation group targeting)
-  app.post("/api/students/by-accommodations", isAuthenticated, async (req: any, res) => {
+  app.post("/api/students/by-accommodations", isAuthenticated, requireTeacher, async (req: any, res) => {
     try {
       const { accommodationTypes, classId } = req.body;
       if (!accommodationTypes || !Array.isArray(accommodationTypes) || accommodationTypes.length === 0) {
@@ -311,7 +312,7 @@ export function registerStudentRoutes(app: Express): void {
 
 
   // Students management
-  app.get("/api/students", isAuthenticated, async (req: any, res) => {
+  app.get("/api/students", isAuthenticated, requireTeacher, async (req: any, res) => {
     try {
       const userId = req.user?.claims?.sub;
       const studentsList = await storage.getStudents(userId);
@@ -322,7 +323,7 @@ export function registerStudentRoutes(app: Express): void {
   });
 
 
-  app.post("/api/students", isAuthenticated, async (req: any, res) => {
+  app.post("/api/students", isAuthenticated, requireTeacher, async (req: any, res) => {
     try {
       const userId = req.user?.claims?.sub;
       const student = await storage.createStudent({
@@ -351,7 +352,7 @@ export function registerStudentRoutes(app: Express): void {
   });
 
 
-  app.patch("/api/students/:id", isAuthenticated, async (req: any, res) => {
+  app.patch("/api/students/:id", isAuthenticated, requireTeacher, async (req: any, res) => {
     try {
       const userId = req.user?.claims?.sub;
       const { id } = req.params;
@@ -367,7 +368,7 @@ export function registerStudentRoutes(app: Express): void {
   });
 
 
-  app.delete("/api/students/:id", isAuthenticated, async (req: any, res) => {
+  app.delete("/api/students/:id", isAuthenticated, requireTeacher, async (req: any, res) => {
     try {
       const userId = req.user?.claims?.sub;
       const { id } = req.params;
@@ -384,7 +385,7 @@ export function registerStudentRoutes(app: Express): void {
 
 
   // Student Notes
-  app.get("/api/students/:studentId/notes", isAuthenticated, async (req: any, res) => {
+  app.get("/api/students/:studentId/notes", isAuthenticated, requireTeacher, async (req: any, res) => {
     try {
       const userId = req.user?.claims?.sub;
       const { studentId } = req.params;
@@ -396,7 +397,7 @@ export function registerStudentRoutes(app: Express): void {
   });
 
 
-  app.post("/api/students/:studentId/notes", isAuthenticated, async (req: any, res) => {
+  app.post("/api/students/:studentId/notes", isAuthenticated, requireTeacher, async (req: any, res) => {
     try {
       const userId = req.user?.claims?.sub;
       const { studentId } = req.params;
@@ -412,7 +413,7 @@ export function registerStudentRoutes(app: Express): void {
   });
 
 
-  app.patch("/api/student-notes/:id", isAuthenticated, async (req: any, res) => {
+  app.patch("/api/student-notes/:id", isAuthenticated, requireTeacher, async (req: any, res) => {
     try {
       const userId = req.user?.claims?.sub;
       const { id } = req.params;
@@ -428,7 +429,7 @@ export function registerStudentRoutes(app: Express): void {
   });
 
 
-  app.delete("/api/student-notes/:id", isAuthenticated, async (req: any, res) => {
+  app.delete("/api/student-notes/:id", isAuthenticated, requireTeacher, async (req: any, res) => {
     try {
       const userId = req.user?.claims?.sub;
       const { id } = req.params;
@@ -447,6 +448,8 @@ export function registerStudentRoutes(app: Express): void {
   app.get("/api/students/:studentId/attendance", isAuthenticated, async (req: any, res) => {
     try {
       const { studentId } = req.params;
+      const student = await ensureStudentRecordAccess(req, res, studentId);
+      if (!student) return;
       const { startDate, endDate } = req.query;
       const records = await storage.getAttendanceByStudent(
         studentId,
@@ -461,7 +464,7 @@ export function registerStudentRoutes(app: Express): void {
 
 
   // Student groups
-  app.get("/api/student-groups", isAuthenticated, async (req: any, res) => {
+  app.get("/api/student-groups", isAuthenticated, requireTeacher, async (req: any, res) => {
     try {
       const userId = req.user?.claims?.sub;
       const groups = await storage.getStudentGroups(userId);
@@ -472,7 +475,7 @@ export function registerStudentRoutes(app: Express): void {
   });
 
 
-  app.post("/api/student-groups", isAuthenticated, async (req: any, res) => {
+  app.post("/api/student-groups", isAuthenticated, requireTeacher, async (req: any, res) => {
     try {
       const userId = req.user?.claims?.sub;
       const group = await storage.createStudentGroup({
@@ -486,7 +489,7 @@ export function registerStudentRoutes(app: Express): void {
   });
 
 
-  app.patch("/api/student-groups/:id", isAuthenticated, async (req: any, res) => {
+  app.patch("/api/student-groups/:id", isAuthenticated, requireTeacher, async (req: any, res) => {
     try {
       const userId = req.user?.claims?.sub;
       const { id } = req.params;
@@ -502,7 +505,7 @@ export function registerStudentRoutes(app: Express): void {
   });
 
 
-  app.delete("/api/student-groups/:id", isAuthenticated, async (req: any, res) => {
+  app.delete("/api/student-groups/:id", isAuthenticated, requireTeacher, async (req: any, res) => {
     try {
       const userId = req.user?.claims?.sub;
       const { id } = req.params;
@@ -541,6 +544,8 @@ export function registerStudentRoutes(app: Express): void {
   app.get("/api/students/:studentId/achievements", isAuthenticated, async (req: any, res) => {
     try {
       const { studentId } = req.params;
+      const student = await ensureStudentRecordAccess(req, res, studentId);
+      if (!student) return;
       const achievements = await storage.getStudentAchievements(studentId);
       res.json(achievements);
     } catch (error) {
@@ -551,7 +556,7 @@ export function registerStudentRoutes(app: Express): void {
 
 
   // Award achievement to student (educator/admin)
-  app.post("/api/students/:studentId/achievements", isAuthenticated, async (req: any, res) => {
+  app.post("/api/students/:studentId/achievements", isAuthenticated, requireTeacher, async (req: any, res) => {
     try {
       const user = req.user;
       const role = user?.role || user?.claims?.role;
@@ -871,7 +876,7 @@ export function registerStudentRoutes(app: Express): void {
 
 
   // Get all student journeys for an educator
-  app.get("/api/student-journeys", isAuthenticated, async (req: any, res) => {
+  app.get("/api/student-journeys", isAuthenticated, requireTeacher, async (req: any, res) => {
     try {
       const userId = req.user?.claims?.sub;
       const journeys = await storage.getStudentJourneyProgressByEducator(userId);
@@ -884,7 +889,7 @@ export function registerStudentRoutes(app: Express): void {
 
 
   // Create or initialize student journey progress
-  app.post("/api/student-journey", isAuthenticated, async (req: any, res) => {
+  app.post("/api/student-journey", isAuthenticated, requireTeacher, async (req: any, res) => {
     try {
       const userId = req.user?.claims?.sub;
       const { studentId, studentName, classId, grade } = req.body;
@@ -936,7 +941,7 @@ export function registerStudentRoutes(app: Express): void {
 
 
   // Update student journey progress (scores, etc.)
-  app.patch("/api/student-journey/:id", isAuthenticated, async (req: any, res) => {
+  app.patch("/api/student-journey/:id", isAuthenticated, requireTeacher, async (req: any, res) => {
     try {
       const userId = req.user?.claims?.sub;
       const { id } = req.params;
@@ -967,7 +972,7 @@ export function registerStudentRoutes(app: Express): void {
 
 
   // Record a student journey activity (assessment, assignment, reflection, etc.)
-  app.post("/api/student-journey/:id/activity", isAuthenticated, async (req: any, res) => {
+  app.post("/api/student-journey/:id/activity", isAuthenticated, requireTeacher, async (req: any, res) => {
     try {
       const userId = req.user?.claims?.sub;
       const { id: journeyProgressId } = req.params;
@@ -1017,7 +1022,7 @@ export function registerStudentRoutes(app: Express): void {
 
 
   // Add a milestone to student journey
-  app.post("/api/student-journey/:id/milestone", isAuthenticated, async (req: any, res) => {
+  app.post("/api/student-journey/:id/milestone", isAuthenticated, requireTeacher, async (req: any, res) => {
     try {
       const { id: journeyProgressId } = req.params;
       const { category, title, description, targetDate } = req.body;
@@ -1048,7 +1053,7 @@ export function registerStudentRoutes(app: Express): void {
 
 
   // Update milestone status (with ownership check)
-  app.patch("/api/student-journey/milestones/:id", isAuthenticated, async (req: any, res) => {
+  app.patch("/api/student-journey/milestones/:id", isAuthenticated, requireTeacher, async (req: any, res) => {
     try {
       const userId = req.user?.claims?.sub;
       const { id } = req.params;
@@ -1096,7 +1101,7 @@ export function registerStudentRoutes(app: Express): void {
 
 
   // Record self-discovery assessment result for a student
-  app.post("/api/student-journey/:id/assessment", isAuthenticated, async (req: any, res) => {
+  app.post("/api/student-journey/:id/assessment", isAuthenticated, requireTeacher, async (req: any, res) => {
     try {
       const { id: journeyProgressId } = req.params;
       const { beScore, knowScore, doScore, assessmentResult, studentId } = req.body;

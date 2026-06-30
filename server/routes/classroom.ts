@@ -215,6 +215,7 @@ const requireCampusAdmin = requireRole("campus_admin", "district_admin", "site_a
 const requireDistrictAdmin = requireRole("district_admin", "site_admin", "system_admin");
 const requireSiteAdmin = requireRole("site_admin", "system_admin");
 const requireSystemAdmin = requireRole("system_admin");
+const requireTeacher = requireRole("homeschool_parent", "educator", "staff", "campus_admin", "district_admin", "site_admin", "system_admin");
 
 import { ANALYZER_CTAS, ANALYZER_IDENTITIES, ANALYZER_SESSION_REGEX, ANALYZER_URGENCIES, APPROVED_VIDEO_HOSTS, MAX_TRIALS_PER_IP, TRIAL_DURATION_DAYS, TRIAL_RESET_MONTHS, US_STATES, analyzerBindSchema, analyzerCtaClickSchema, analyzerSubmitSchema, autoMatchSchema, createJourneyEntrySchema, createSisConnectionSchema, educatorProfileSchema, entityShareBodySchema, entriesQuerySchema, foundationModuleUpdateSchema, foundationProgressBodySchema, foundationQuizQuestionSchema, generateInviteCode, getAdminManagedOrgIds, getAdminOrgIds, getStateNameFromAbbr, getTrialSinceDate, isApprovedVideoUrl, isSiteAdmin, pillarParamSchema, requireFoundationAdmin, requirePaidTier, requireRssAdmin, requireSiteAdminForStandards, requireStaffOrAdmin, validOrgTypes, verifyOrgAdminAccess, videoUrlSchema } from "./_helpers";
 
@@ -223,7 +224,7 @@ export function registerClassroomRoutes(app: Express): void {
 
 
   // Class BKD Insights for educators — aggregate + per-student breakdown
-  app.get("/api/class/bkd-insights", isAuthenticated, async (req: any, res) => {
+  app.get("/api/class/bkd-insights", isAuthenticated, requireTeacher, async (req: any, res) => {
     try {
       const userId = req.user?.claims?.sub;
       const userRole = req.user?.claims?.role || "";
@@ -327,7 +328,7 @@ export function registerClassroomRoutes(app: Express): void {
 
 
   // Get assignments for a specific class
-  app.get("/api/classes/:classId/assignments", isAuthenticated, async (req: any, res) => {
+  app.get("/api/classes/:classId/assignments", isAuthenticated, requireTeacher, async (req: any, res) => {
     try {
       const { classId } = req.params;
       const assignmentsList = await storage.getAssignmentsByClass(classId);
@@ -344,7 +345,7 @@ export function registerClassroomRoutes(app: Express): void {
   // ================================
 
   // Get grade categories for a class
-  app.get("/api/classes/:classId/grade-categories", isAuthenticated, async (req: any, res) => {
+  app.get("/api/classes/:classId/grade-categories", isAuthenticated, requireTeacher, async (req: any, res) => {
     try {
       const { classId } = req.params;
       const categoriesList = await storage.getGradeCategories(classId);
@@ -357,7 +358,7 @@ export function registerClassroomRoutes(app: Express): void {
 
 
   // Create grade category
-  app.post("/api/grade-categories", isAuthenticated, async (req: any, res) => {
+  app.post("/api/grade-categories", isAuthenticated, requireTeacher, async (req: any, res) => {
     try {
       const userId = req.user?.claims?.sub;
       const category = await storage.createGradeCategory({ ...req.body, userId });
@@ -370,7 +371,7 @@ export function registerClassroomRoutes(app: Express): void {
 
 
   // Update grade category
-  app.patch("/api/grade-categories/:id", isAuthenticated, async (req: any, res) => {
+  app.patch("/api/grade-categories/:id", isAuthenticated, requireTeacher, async (req: any, res) => {
     try {
       const userId = req.user?.claims?.sub;
       const { id } = req.params;
@@ -387,7 +388,7 @@ export function registerClassroomRoutes(app: Express): void {
 
 
   // Delete grade category
-  app.delete("/api/grade-categories/:id", isAuthenticated, async (req: any, res) => {
+  app.delete("/api/grade-categories/:id", isAuthenticated, requireTeacher, async (req: any, res) => {
     try {
       const userId = req.user?.claims?.sub;
       const { id } = req.params;
@@ -404,7 +405,7 @@ export function registerClassroomRoutes(app: Express): void {
 
 
   // Get grades for a class
-  app.get("/api/classes/:classId/grades", isAuthenticated, async (req: any, res) => {
+  app.get("/api/classes/:classId/grades", isAuthenticated, requireTeacher, async (req: any, res) => {
     try {
       const { classId } = req.params;
       const gradesList = await storage.getStudentGrades(classId);
@@ -417,7 +418,7 @@ export function registerClassroomRoutes(app: Express): void {
 
 
   // Create grade entry
-  app.post("/api/grades", isAuthenticated, async (req: any, res) => {
+  app.post("/api/grades", isAuthenticated, requireTeacher, async (req: any, res) => {
     try {
       const userId = req.user?.claims?.sub;
       const grade = await storage.createStudentGrade({ ...req.body, userId });
@@ -430,7 +431,7 @@ export function registerClassroomRoutes(app: Express): void {
 
 
   // Update grade entry
-  app.patch("/api/grades/:id", isAuthenticated, async (req: any, res) => {
+  app.patch("/api/grades/:id", isAuthenticated, requireTeacher, async (req: any, res) => {
     try {
       const userId = req.user?.claims?.sub;
       const { id } = req.params;
@@ -447,7 +448,7 @@ export function registerClassroomRoutes(app: Express): void {
 
 
   // Bulk update grades
-  app.post("/api/grades/bulk-update", isAuthenticated, async (req: any, res) => {
+  app.post("/api/grades/bulk-update", isAuthenticated, requireTeacher, async (req: any, res) => {
     try {
       const userId = req.user?.claims?.sub;
       const { grades } = req.body;
@@ -465,7 +466,7 @@ export function registerClassroomRoutes(app: Express): void {
 
 
   // Delete grade entry
-  app.delete("/api/grades/:id", isAuthenticated, async (req: any, res) => {
+  app.delete("/api/grades/:id", isAuthenticated, requireTeacher, async (req: any, res) => {
     try {
       const userId = req.user?.claims?.sub;
       const { id } = req.params;
@@ -482,7 +483,7 @@ export function registerClassroomRoutes(app: Express): void {
 
 
   // Export grades as CSV
-  app.get("/api/classes/:classId/grades/export", isAuthenticated, requireFreshMfa, async (req: any, res) => {
+  app.get("/api/classes/:classId/grades/export", isAuthenticated, requireTeacher, requireFreshMfa, async (req: any, res) => {
     try {
       const { classId } = req.params;
       const requesterId = req.user?.claims?.sub;
@@ -564,7 +565,7 @@ export function registerClassroomRoutes(app: Express): void {
 
 
   // Create grading period
-  app.post("/api/grading-periods", isAuthenticated, async (req: any, res) => {
+  app.post("/api/grading-periods", isAuthenticated, requireTeacher, async (req: any, res) => {
     try {
       const userId = req.user?.claims?.sub;
       const period = await storage.createGradingPeriod({ ...req.body, userId });
@@ -577,7 +578,7 @@ export function registerClassroomRoutes(app: Express): void {
 
 
   // Update grading period
-  app.patch("/api/grading-periods/:id", isAuthenticated, async (req: any, res) => {
+  app.patch("/api/grading-periods/:id", isAuthenticated, requireTeacher, async (req: any, res) => {
     try {
       const userId = req.user?.claims?.sub;
       const { id } = req.params;
@@ -594,7 +595,7 @@ export function registerClassroomRoutes(app: Express): void {
 
 
   // Delete grading period
-  app.delete("/api/grading-periods/:id", isAuthenticated, async (req: any, res) => {
+  app.delete("/api/grading-periods/:id", isAuthenticated, requireTeacher, async (req: any, res) => {
     try {
       const userId = req.user?.claims?.sub;
       const { id } = req.params;
@@ -615,7 +616,7 @@ export function registerClassroomRoutes(app: Express): void {
   // ================================
 
   // Create a new transfer request
-  app.post("/api/transfers", isAuthenticated, async (req: any, res) => {
+  app.post("/api/transfers", isAuthenticated, requireTeacher, async (req: any, res) => {
     try {
       const userId = req.user?.claims?.sub;
       const { studentId, transferType, targetEducatorId, targetOrganizationId, reason, notes } = req.body;
@@ -654,7 +655,7 @@ export function registerClassroomRoutes(app: Express): void {
 
 
   // Get transfer requests for a student
-  app.get("/api/transfers/student/:studentId", isAuthenticated, async (req: any, res) => {
+  app.get("/api/transfers/student/:studentId", isAuthenticated, requireTeacher, async (req: any, res) => {
     try {
       const { studentId } = req.params;
       const requests = await storage.getTransferRequestsByStudent(studentId);
@@ -860,7 +861,7 @@ export function registerClassroomRoutes(app: Express): void {
   });
 
 
-  app.post("/api/classes", isAuthenticated, async (req: any, res) => {
+  app.post("/api/classes", isAuthenticated, requireTeacher, async (req: any, res) => {
     try {
       const userId = req.user?.claims?.sub;
       const newClass = await storage.createClass({
@@ -874,7 +875,7 @@ export function registerClassroomRoutes(app: Express): void {
   });
 
 
-  app.patch("/api/classes/:id", isAuthenticated, async (req: any, res) => {
+  app.patch("/api/classes/:id", isAuthenticated, requireTeacher, async (req: any, res) => {
     try {
       const userId = req.user?.claims?.sub;
       const { id } = req.params;
@@ -890,7 +891,7 @@ export function registerClassroomRoutes(app: Express): void {
   });
 
 
-  app.delete("/api/classes/:id", isAuthenticated, async (req: any, res) => {
+  app.delete("/api/classes/:id", isAuthenticated, requireTeacher, async (req: any, res) => {
     try {
       const userId = req.user?.claims?.sub;
       const { id } = req.params;
@@ -907,7 +908,7 @@ export function registerClassroomRoutes(app: Express): void {
 
 
   // Class-student enrollment
-  app.get("/api/classes/:id/students", isAuthenticated, async (req: any, res) => {
+  app.get("/api/classes/:id/students", isAuthenticated, requireTeacher, async (req: any, res) => {
     try {
       const { id } = req.params;
       const studentsList = await storage.getClassStudents(id);
@@ -918,7 +919,7 @@ export function registerClassroomRoutes(app: Express): void {
   });
 
 
-  app.post("/api/classes/:id/students", isAuthenticated, async (req: any, res) => {
+  app.post("/api/classes/:id/students", isAuthenticated, requireTeacher, async (req: any, res) => {
     try {
       const { id } = req.params;
       const { studentId } = req.body;
@@ -934,7 +935,7 @@ export function registerClassroomRoutes(app: Express): void {
   });
 
 
-  app.delete("/api/classes/:classId/students/:studentId", isAuthenticated, async (req: any, res) => {
+  app.delete("/api/classes/:classId/students/:studentId", isAuthenticated, requireTeacher, async (req: any, res) => {
     try {
       const { classId, studentId } = req.params;
       await storage.removeStudentFromClass(classId, studentId);
@@ -945,7 +946,7 @@ export function registerClassroomRoutes(app: Express): void {
   });
 
 
-  app.get("/api/classes/:classId/notes", isAuthenticated, async (req: any, res) => {
+  app.get("/api/classes/:classId/notes", isAuthenticated, requireTeacher, async (req: any, res) => {
     try {
       const userId = req.user?.claims?.sub;
       const { classId } = req.params;
@@ -958,7 +959,7 @@ export function registerClassroomRoutes(app: Express): void {
 
 
   // Attendance Records
-  app.get("/api/classes/:classId/attendance", isAuthenticated, async (req: any, res) => {
+  app.get("/api/classes/:classId/attendance", isAuthenticated, requireTeacher, async (req: any, res) => {
     try {
       const { classId } = req.params;
       const { date } = req.query;
@@ -971,7 +972,7 @@ export function registerClassroomRoutes(app: Express): void {
   });
 
 
-  app.post("/api/classes/:classId/attendance", isAuthenticated, async (req: any, res) => {
+  app.post("/api/classes/:classId/attendance", isAuthenticated, requireTeacher, async (req: any, res) => {
     try {
       const userId = req.user?.claims?.sub;
       const { classId } = req.params;
@@ -987,7 +988,7 @@ export function registerClassroomRoutes(app: Express): void {
   });
 
 
-  app.post("/api/classes/:classId/attendance/bulk", isAuthenticated, async (req: any, res) => {
+  app.post("/api/classes/:classId/attendance/bulk", isAuthenticated, requireTeacher, async (req: any, res) => {
     try {
       const userId = req.user?.claims?.sub;
       const { classId } = req.params;
@@ -1005,7 +1006,7 @@ export function registerClassroomRoutes(app: Express): void {
   });
 
 
-  app.patch("/api/attendance/:id", isAuthenticated, async (req: any, res) => {
+  app.patch("/api/attendance/:id", isAuthenticated, requireTeacher, async (req: any, res) => {
     try {
       const { id } = req.params;
       const record = await storage.updateAttendanceRecord(id, req.body);
@@ -1021,7 +1022,7 @@ export function registerClassroomRoutes(app: Express): void {
 
 
   // Enroll a student in a class with validation
-  app.post("/api/classes/:classId/enroll", isAuthenticated, async (req: any, res) => {
+  app.post("/api/classes/:classId/enroll", isAuthenticated, requireTeacher, async (req: any, res) => {
     try {
       const userId = req.user?.claims?.sub;
       const { classId } = req.params;

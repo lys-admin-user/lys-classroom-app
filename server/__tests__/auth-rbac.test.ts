@@ -22,3 +22,34 @@ describe("RBAC (hasRolePrivilege)", () => {
     expect(ROLE_HIERARCHY.site_admin).toBeLessThan(ROLE_HIERARCHY.system_admin);
   });
 });
+
+describe("Teacher-tools access boundary (requireTeacher)", () => {
+  const TEACHER_ROLES = [
+    "homeschool_parent",
+    "educator",
+    "staff",
+    "campus_admin",
+    "district_admin",
+    "site_admin",
+    "system_admin",
+  ] as const;
+
+  it("blocks the student role from teacher tools", () => {
+    expect(hasRolePrivilege("student", "homeschool_parent")).toBe(false);
+    expect((TEACHER_ROLES as readonly string[]).includes("student")).toBe(false);
+  });
+
+  it("allows homeschool parents and everyone above them through", () => {
+    for (const role of TEACHER_ROLES) {
+      expect(hasRolePrivilege(role, "homeschool_parent")).toBe(true);
+    }
+  });
+
+  it("covers every non-student role (no role is silently locked out)", () => {
+    const everyNonStudentRole = (Object.keys(ROLE_HIERARCHY) as Array<keyof typeof ROLE_HIERARCHY>)
+      .filter((r) => r !== "student");
+    for (const role of everyNonStudentRole) {
+      expect((TEACHER_ROLES as readonly string[]).includes(role)).toBe(true);
+    }
+  });
+});

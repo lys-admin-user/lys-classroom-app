@@ -239,6 +239,7 @@ const requireCampusAdmin = requireRole("campus_admin", "district_admin", "site_a
 const requireDistrictAdmin = requireRole("district_admin", "site_admin", "system_admin");
 const requireSiteAdmin = requireRole("site_admin", "system_admin");
 const requireSystemAdmin = requireRole("system_admin");
+const requireTeacher = requireRole("homeschool_parent", "educator", "staff", "campus_admin", "district_admin", "site_admin", "system_admin");
 
 import { ANALYZER_CTAS, ANALYZER_IDENTITIES, ANALYZER_SESSION_REGEX, ANALYZER_URGENCIES, APPROVED_VIDEO_HOSTS, MAX_TRIALS_PER_IP, TRIAL_DURATION_DAYS, TRIAL_RESET_MONTHS, US_STATES, analyzerBindSchema, analyzerCtaClickSchema, analyzerSubmitSchema, autoMatchSchema, createJourneyEntrySchema, createSisConnectionSchema, educatorProfileSchema, entityShareBodySchema, entriesQuerySchema, foundationModuleUpdateSchema, foundationProgressBodySchema, foundationQuizQuestionSchema, generateInviteCode, getAdminManagedOrgIds, getAdminOrgIds, getStateNameFromAbbr, getTrialSinceDate, isApprovedVideoUrl, isSiteAdmin, pillarParamSchema, requireFoundationAdmin, requirePaidTier, requireRssAdmin, requireSiteAdminForStandards, requireStaffOrAdmin, validOrgTypes, verifyOrgAdminAccess, videoUrlSchema } from "./_helpers";
 
@@ -540,7 +541,7 @@ export function registerLessonsRoutes(app: Express): void {
 
 
   // Lesson Plans - Generate (requires auth, free users limited to 3/month)
-  app.post("/api/lessons/generate", isAuthenticated, async (req: any, res) => {
+  app.post("/api/lessons/generate", isAuthenticated, requireTeacher, async (req: any, res) => {
     try {
       const userId = req.user?.claims?.sub;
       const validated = generateLessonRequestSchema.parse(req.body);
@@ -629,7 +630,7 @@ export function registerLessonsRoutes(app: Express): void {
   // Streaming variant — same auth + tier checks as /api/lessons/generate, but
   // pushes Server-Sent Events (phase / delta / done / error) so the UI can
   // render the GenerationCountdown experience.
-  app.post("/api/lessons/generate-stream", isAuthenticated, async (req: any, res) => {
+  app.post("/api/lessons/generate-stream", isAuthenticated, requireTeacher, async (req: any, res) => {
     const userId = req.user?.claims?.sub;
     let validated: z.infer<typeof generateLessonRequestSchema>;
     try {
@@ -756,7 +757,7 @@ export function registerLessonsRoutes(app: Express): void {
   });
 
 
-  app.post("/api/lessons/save", isAuthenticated, async (req: any, res) => {
+  app.post("/api/lessons/save", isAuthenticated, requireTeacher, async (req: any, res) => {
     try {
       const userId = req.user?.claims?.sub;
       const validated = saveLessonSchema.parse(req.body);
@@ -796,7 +797,7 @@ export function registerLessonsRoutes(app: Express): void {
   });
 
 
-  app.delete("/api/lessons/:id", isAuthenticated, async (req: any, res) => {
+  app.delete("/api/lessons/:id", isAuthenticated, requireTeacher, async (req: any, res) => {
     try {
       const userId = req.user?.claims?.sub;
       const deleted = await storage.deleteLesson(req.params.id, userId);
@@ -812,7 +813,7 @@ export function registerLessonsRoutes(app: Express): void {
 
 
   // Toggle lesson sharing (authenticated users only)
-  app.post("/api/lessons/:id/share", isAuthenticated, async (req: any, res) => {
+  app.post("/api/lessons/:id/share", isAuthenticated, requireTeacher, async (req: any, res) => {
     try {
       const userId = req.user?.claims?.sub;
       const result = await storage.toggleLessonShare(req.params.id, userId);
@@ -982,7 +983,7 @@ export function registerLessonsRoutes(app: Express): void {
 
 
   // Save existing lesson as template
-  app.post("/api/lessons/:id/save-as-template", isAuthenticated, async (req: any, res) => {
+  app.post("/api/lessons/:id/save-as-template", isAuthenticated, requireTeacher, async (req: any, res) => {
     try {
       const userId = req.user?.claims?.sub;
       const lesson = await storage.getLesson(req.params.id);
@@ -1019,7 +1020,7 @@ export function registerLessonsRoutes(app: Express): void {
 
 
   // Generate assignment from lesson (PAID FEATURE)
-  app.post("/api/assignments/generate", isAuthenticated, requirePaidTier, async (req: any, res) => {
+  app.post("/api/assignments/generate", isAuthenticated, requireTeacher, requirePaidTier, async (req: any, res) => {
     try {
       const userId = req.user?.claims?.sub;
       const { lessonId, assignmentType, questionCount, difficulty, includeBeKnowDo, accommodationTypes, accommodationNotes, projectTemplate, country, language } = req.body;
@@ -1073,7 +1074,7 @@ export function registerLessonsRoutes(app: Express): void {
 
 
   // Streaming variant — same auth + tier checks, SSE phase/delta/done/error.
-  app.post("/api/assignments/generate-stream", isAuthenticated, requirePaidTier, async (req: any, res) => {
+  app.post("/api/assignments/generate-stream", isAuthenticated, requireTeacher, requirePaidTier, async (req: any, res) => {
     try {
       const userId = req.user?.claims?.sub;
       const { lessonId, assignmentType, questionCount, difficulty, includeBeKnowDo, accommodationTypes, accommodationNotes, projectTemplate, country, language } = req.body;
@@ -1127,7 +1128,7 @@ export function registerLessonsRoutes(app: Express): void {
 
 
   // Save assignment (PAID FEATURE)
-  app.post("/api/assignments", isAuthenticated, requirePaidTier, async (req: any, res) => {
+  app.post("/api/assignments", isAuthenticated, requireTeacher, requirePaidTier, async (req: any, res) => {
     try {
       const userId = req.user?.claims?.sub;
       const assignment = await storage.createAssignment({
@@ -1171,7 +1172,7 @@ export function registerLessonsRoutes(app: Express): void {
 
 
   // Update assignment
-  app.patch("/api/assignments/:id", isAuthenticated, async (req: any, res) => {
+  app.patch("/api/assignments/:id", isAuthenticated, requireTeacher, async (req: any, res) => {
     try {
       const userId = req.user?.claims?.sub;
       const { id } = req.params;
@@ -1188,7 +1189,7 @@ export function registerLessonsRoutes(app: Express): void {
 
 
   // Delete assignment
-  app.delete("/api/assignments/:id", isAuthenticated, async (req: any, res) => {
+  app.delete("/api/assignments/:id", isAuthenticated, requireTeacher, async (req: any, res) => {
     try {
       const userId = req.user?.claims?.sub;
       const { id } = req.params;
@@ -1205,7 +1206,7 @@ export function registerLessonsRoutes(app: Express): void {
 
 
   // Assign to recipients (student, group, or class)
-  app.post("/api/assignments/:id/assign", isAuthenticated, requirePaidTier, async (req: any, res) => {
+  app.post("/api/assignments/:id/assign", isAuthenticated, requireTeacher, requirePaidTier, async (req: any, res) => {
     try {
       const userId = req.user?.claims?.sub;
       const { id } = req.params;
@@ -1255,7 +1256,7 @@ export function registerLessonsRoutes(app: Express): void {
 
 
   // Generate share URL with referral code
-  app.post("/api/lessons/:id/share-link", isAuthenticated, async (req: any, res) => {
+  app.post("/api/lessons/:id/share-link", isAuthenticated, requireTeacher, async (req: any, res) => {
     try {
       const userId = req.user?.claims?.sub;
       const { id } = req.params;

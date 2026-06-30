@@ -214,6 +214,7 @@ const requireCampusAdmin = requireRole("campus_admin", "district_admin", "site_a
 const requireDistrictAdmin = requireRole("district_admin", "site_admin", "system_admin");
 const requireSiteAdmin = requireRole("site_admin", "system_admin");
 const requireSystemAdmin = requireRole("system_admin");
+const requireTeacher = requireRole("homeschool_parent", "educator", "staff", "campus_admin", "district_admin", "site_admin", "system_admin");
 
 import { ANALYZER_CTAS, ANALYZER_IDENTITIES, ANALYZER_SESSION_REGEX, ANALYZER_URGENCIES, APPROVED_VIDEO_HOSTS, MAX_TRIALS_PER_IP, TRIAL_DURATION_DAYS, TRIAL_RESET_MONTHS, US_STATES, analyzerBindSchema, analyzerCtaClickSchema, analyzerSubmitSchema, autoMatchSchema, createJourneyEntrySchema, createSisConnectionSchema, educatorProfileSchema, entityShareBodySchema, entriesQuerySchema, foundationModuleUpdateSchema, foundationProgressBodySchema, foundationQuizQuestionSchema, generateInviteCode, getAdminManagedOrgIds, getAdminOrgIds, getStateNameFromAbbr, getTrialSinceDate, isApprovedVideoUrl, isSiteAdmin, pillarParamSchema, requireFoundationAdmin, requirePaidTier, requireRssAdmin, requireSiteAdminForStandards, requireStaffOrAdmin, validOrgTypes, verifyOrgAdminAccess, videoUrlSchema } from "./_helpers";
 
@@ -412,7 +413,7 @@ export function registerCurriculumRoutes(app: Express): void {
   });
 
 
-  app.post("/api/scopes", isAuthenticated, async (req: any, res) => {
+  app.post("/api/scopes", isAuthenticated, requireTeacher, async (req: any, res) => {
     try {
       const userId = req.user?.claims?.sub;
       const validated = insertScopeSequenceSchema.parse(req.body);
@@ -432,7 +433,7 @@ export function registerCurriculumRoutes(app: Express): void {
   });
 
 
-  app.patch("/api/scopes/:id", isAuthenticated, async (req: any, res) => {
+  app.patch("/api/scopes/:id", isAuthenticated, requireTeacher, async (req: any, res) => {
     try {
       const { id } = req.params;
       const userId = req.user?.claims?.sub;
@@ -450,7 +451,7 @@ export function registerCurriculumRoutes(app: Express): void {
   });
 
 
-  app.delete("/api/scopes/:id", isAuthenticated, async (req: any, res) => {
+  app.delete("/api/scopes/:id", isAuthenticated, requireTeacher, async (req: any, res) => {
     try {
       const { id } = req.params;
       const userId = req.user?.claims?.sub;
@@ -468,7 +469,7 @@ export function registerCurriculumRoutes(app: Express): void {
 
 
   // Import Scope from Document with file parsing
-  app.post("/api/scopes/import", isAuthenticated, upload.single("file"), async (req: any, res) => {
+  app.post("/api/scopes/import", isAuthenticated, requireTeacher, upload.single("file"), async (req: any, res) => {
     try {
       const userId = req.user?.claims?.sub;
       const file = req.file;
@@ -547,7 +548,7 @@ export function registerCurriculumRoutes(app: Express): void {
 
 
   // Sequence Units
-  app.post("/api/scopes/:scopeId/units", isAuthenticated, async (req: any, res) => {
+  app.post("/api/scopes/:scopeId/units", isAuthenticated, requireTeacher, async (req: any, res) => {
     try {
       const { scopeId } = req.params;
       const userId = req.user?.claims?.sub;
@@ -578,7 +579,7 @@ export function registerCurriculumRoutes(app: Express): void {
   });
 
 
-  app.patch("/api/units/:id", isAuthenticated, async (req: any, res) => {
+  app.patch("/api/units/:id", isAuthenticated, requireTeacher, async (req: any, res) => {
     try {
       const { id } = req.params;
       const userId = req.user?.claims?.sub;
@@ -603,7 +604,7 @@ export function registerCurriculumRoutes(app: Express): void {
   });
 
 
-  app.delete("/api/units/:id", isAuthenticated, async (req: any, res) => {
+  app.delete("/api/units/:id", isAuthenticated, requireTeacher, async (req: any, res) => {
     try {
       const { id } = req.params;
       const userId = req.user?.claims?.sub;
@@ -620,7 +621,7 @@ export function registerCurriculumRoutes(app: Express): void {
   });
 
 
-  app.post("/api/scopes/:scopeId/sync-standards", isAuthenticated, async (req: any, res) => {
+  app.post("/api/scopes/:scopeId/sync-standards", isAuthenticated, requireTeacher, async (req: any, res) => {
     try {
       const { scopeId } = req.params;
       const userId = req.user?.claims?.sub;
