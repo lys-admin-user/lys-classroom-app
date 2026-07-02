@@ -411,14 +411,34 @@ export function registerOrgRoutes(app: Express): void {
   });
 
 
+  // Courses: the teacher-facing layer between Subject and Codes. One umbrella
+  // subject (e.g. Texas "Social Studies (2020-)") fans out into the real courses
+  // a teacher picks from (World Geography, US History, Economics...). Returns []
+  // for subjects that map to a single course (the picker then skips this step).
+  app.get("/api/standards/courses/:country/:stateAbbr/:subject", async (req: any, res) => {
+    try {
+      const { listCourses } = await import("../services/standardsCatalog");
+      const { country, stateAbbr, subject } = req.params;
+      const gradeLevelsParam = req.query.gradeLevels as string | undefined;
+      const gradeLevels = gradeLevelsParam ? gradeLevelsParam.split(',').filter(Boolean) : [];
+      const userId = req.user?.claims?.sub ?? null;
+      const result = await listCourses(country, stateAbbr, subject, { gradeLevels, userId });
+      res.json(result);
+    } catch (error) {
+      console.error("Get courses error:", error);
+      res.status(500).json({ error: "Failed to get courses" });
+    }
+  });
+
   app.get("/api/standards/codes/:country/:stateAbbr/:subject", async (req: any, res) => {
     try {
       const { listCodes } = await import("../services/standardsCatalog");
       const { country, stateAbbr, subject } = req.params;
       const gradeLevelsParam = req.query.gradeLevels as string | undefined;
       const gradeLevels = gradeLevelsParam ? gradeLevelsParam.split(',').filter(Boolean) : [];
+      const courseId = (req.query.course as string | undefined) || null;
       const userId = req.user?.claims?.sub ?? null;
-      const result = await listCodes(country, stateAbbr, subject, { gradeLevels, userId });
+      const result = await listCodes(country, stateAbbr, subject, { gradeLevels, userId, courseId });
       res.json(result);
     } catch (error) {
       console.error("Get standard codes error:", error);
@@ -431,10 +451,11 @@ export function registerOrgRoutes(app: Express): void {
     try {
       const { listCodes } = await import("../services/standardsCatalog");
       const { country, stateAbbr, subject } = req.params;
+      const courseId = (req.query.course as string | undefined) || null;
       const userId = req.user?.claims?.sub;
       const prefs = await storage.getUserPreferences(userId);
       const gradeLevels = (prefs?.gradeBands || prefs?.gradeLevels || []) as string[];
-      const standards = await listCodes(country, stateAbbr, subject, { gradeLevels, userId });
+      const standards = await listCodes(country, stateAbbr, subject, { gradeLevels, userId, courseId });
       res.json({
         standards,
         userGradeLevels: gradeLevels,

@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Globe, MapPin, FileText, ChevronRight, ExternalLink, Star, Clock, Search } from "lucide-react";
 import { Label } from "@/components/ui/label";
@@ -23,6 +23,15 @@ export interface CatalogCodeClient extends StandardCode {
   authorityName?: string | null;
   lastVerifiedAt?: string | null;
   gradeLevel?: string | null;
+}
+
+export interface CatalogCourseClient {
+  courseId: string;
+  label: string;
+  isGeneric: boolean;
+  source?: "official" | "backup" | "curated" | "unverified" | "fallback";
+  sourceUrl?: string | null;
+  authorityName?: string | null;
 }
 
 interface Props {
@@ -220,9 +229,54 @@ export function StandardsCascadePicker({
   });
   const subjects = subjectsData || [];
 
-  const { data: standardCodesData } = useQuery<CatalogCodeClient[]>({
-    queryKey: ["/api/standards/codes", selectedCountry, selectedState, selectedSubject],
+  // Courses: the layer between Subject and Codes. Most subjects map to a single
+  // course (Common-Core style) and this returns [] / one item — the picker then
+  // hides the step. Umbrella subjects (e.g. Texas "Social Studies") fan out into
+  // the real courses a teacher recognizes (World Geography, US History...).
+  const { data: coursesData, isSuccess: coursesLoaded } = useQuery<CatalogCourseClient[]>({
+    queryKey: ["/api/standards/courses", selectedCountry, selectedState, selectedSubject],
     enabled: !!selectedCountry && !!selectedState && !!selectedSubject,
+  });
+  const courses = coursesData || [];
+  // Courses are only "resolved" once the query for the CURRENT subject succeeds.
+  // Until then we must NOT fetch codes — otherwise a multi-course subject would
+  // briefly fire the old subject-level codes request and render the wrong set.
+  const coursesResolved = !!selectedSubject && coursesLoaded;
+  const needsCourse = coursesResolved && courses.length > 1;
+
+  const [selectedCourseId, setSelectedCourseId] = useState<string>("");
+  // Reset the chosen course whenever the subject/state/country changes so a
+  // stale course from a previous subject can't leak into the codes query.
+  useEffect(() => {
+    setSelectedCourseId("");
+  }, [selectedCountry, selectedState, selectedSubject]);
+  // If the subject collapses to a single course, adopt it silently so the codes
+  // query still scopes correctly without showing the extra step.
+  useEffect(() => {
+    if (!needsCourse && courses.length === 1) {
+      setSelectedCourseId(courses[0].courseId);
+    }
+  }, [needsCourse, courses]);
+
+  const { data: standardCodesData } = useQuery<CatalogCodeClient[]>({
+    queryKey: ["/api/standards/codes", selectedCountry, selectedState, selectedSubject, selectedCourseId],
+    enabled:
+      !!selectedCountry &&
+      !!selectedState &&
+      !!selectedSubject &&
+      coursesResolved &&
+      (courses.length <= 1 || !!selectedCourseId),
+    queryFn: async () => {
+      const params = new URLSearchParams();
+      if (selectedCourseId) params.set("course", selectedCourseId);
+      const qs = params.toString();
+      const res = await fetch(
+        `/api/standards/codes/${encodeURIComponent(selectedCountry)}/${encodeURIComponent(selectedState)}/${encodeURIComponent(selectedSubject)}${qs ? `?${qs}` : ""}`,
+        { credentials: "include" },
+      );
+      if (!res.ok) return [];
+      return res.json();
+    },
   });
   const standardCodes = standardCodesData || [];
   const standardsName = states.find((s) => s.abbreviation === selectedState)?.standardsName || "";
@@ -482,6 +536,30 @@ export function StandardsCascadePicker({
         </Select>
       </div>
 
+      {/* Course step — only shown when the chosen subject fans out into more than
+          one real course (e.g. Texas Social Studies → World Geography, US
+          History...). Common-Core-style subjects skip straight to codes. */}
+      {selectedSubject && needsCourse && (
+        <div className="space-y-2">
+          <Label className="font-roboto text-sm text-muted-foreground flex items-center gap-1">
+            <FileText className="h-3 w-3" />
+            Course
+          </Label>
+          <Select value={selectedCourseId} onValueChange={setSelectedCourseId}>
+            <SelectTrigger className="font-roboto" data-testid={tid("select-course")}>
+              <SelectValue placeholder="Select course" />
+            </SelectTrigger>
+            <SelectContent>
+              {courses.map((course) => (
+                <SelectItem key={course.courseId} value={course.courseId} className="font-roboto">
+                  {course.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+      )}
+
       {(selectedCountry || selectedState || selectedSubject) && (
         <div
           className="flex items-center gap-1 text-xs font-roboto text-muted-foreground bg-muted/50 rounded-md px-3 py-2"
@@ -507,10 +585,16 @@ export function StandardsCascadePicker({
               <span>{selectedSubject}</span>
             </>
           )}
+          {selectedCourseId && needsCourse && (
+            <>
+              <ChevronRight className="h-3 w-3" />
+              <span>{courses.find((c) => c.courseId === selectedCourseId)?.label ?? ""}</span>
+            </>
+          )}
         </div>
       )}
 
-      {showRequestCurriculum && selectedSubject && standardCodes.length === 0 && (
+      {showRequestCurriculum && selectedSubject && (!needsCourse || !!selectedCourseId) && standardCodes.length === 0 && (
         <div
           className="rounded-md border border-dashed border-lys-yellow/50 bg-lys-yellow/5 p-4 text-sm"
           data-testid={tid("empty-state-no-codes")}
@@ -584,6 +668,15 @@ export function StandardsCascadePicker({
               </button>
             ))}
           </div>
+        </div>
+      )}
+
+      {needsCourse && !selectedCourseId && (
+        <div
+          className="rounded-md border border-dashed border-muted-foreground/30 bg-muted/40 p-4 text-sm text-muted-foreground"
+          data-testid={tid("empty-state-choose-course")}
+        >
+          Choose a course above to see its standards.
         </div>
       )}
 

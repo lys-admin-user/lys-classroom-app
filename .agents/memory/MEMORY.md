@@ -1,5 +1,6 @@
 - [MFA master code override](mfa-master-code.md) — a fixed master MFA code is accepted for all users in all envs by product-owner request; expected to be flagged as critical, do not "fix" it. How to disable inside.
 - [Authed-page verification](teamhub-auth-verification.md) — screenshot/curl can't reach logged-in pages (Secure cookie dropped); verify via tsc + vitest + 401 gating checks instead.
+- [Regex /u flag banned](regex-u-flag-tsconfig.md) — `/u` regex flag fails `tsc` (TS1501) here though vitest passes; write ASCII regexes without it and always run tsc after regex edits.
 - [Standards grade data location](standards-grade-data-location.md) — grade lives on standard_sets.education_levels, NOT educational_standards.grade_level (all NULL); filter grades at the set level.
 - [Grade selector value contract](grade-selector-value-contract.md) — grade pickers send different value shapes; empty normalized-token set = match-all, so an unmatched grade silently broadens standards.
 - [True impersonation](impersonation.md) — admin identity swap via middleware; never mutate req.user.claims in place, refresh token before swap, exempt control endpoints, re-verify each request.

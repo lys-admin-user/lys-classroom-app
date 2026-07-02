@@ -13,10 +13,11 @@
 
 import { storage } from "../storage";
 import { db } from "../db";
-import { eq, and } from "drizzle-orm";
+import { eq, and, inArray, sql } from "drizzle-orm";
 import {
   standardsJurisdictions,
   standardsFallbackMisses,
+  educationalStandardsDb,
 } from "@shared/schema";
 import {
   classifyDbSource,
@@ -27,6 +28,11 @@ import {
 } from "@shared/standards";
 import { getStateAuthority } from "@shared/usStandardsAuthorities";
 import { expandGradeSelectionToTokens, educationLevelsCoverGrades } from "@shared/gradeLevels";
+import {
+  groupSetsIntoCourses,
+  type CourseSetInput,
+  type GroupedCourse,
+} from "@shared/courseGrouping";
 import {
   US_STATES,
   getStateNameFromAbbr,
@@ -60,6 +66,19 @@ export interface CatalogCode {
   standardsName?: string | null;
   authorityName?: string | null;
   lastVerifiedAt?: string | null;
+}
+
+// A "course" is the teacher-facing unit between Subject and Codes. One umbrella
+// subject (e.g. Texas "Social Studies (2020-)") fans out into several courses
+// (World Geography, US History, Economics...). Common-Core-style subjects
+// collapse to a single generic course. See @shared/courseGrouping.
+export interface CatalogCourse {
+  courseId: string;
+  label: string;
+  isGeneric: boolean;
+  source: CatalogSourceTier;
+  sourceUrl?: string | null;
+  authorityName?: string | null;
 }
 
 // Countries (or "Common Core") whose jurisdictions publish per-outcome codes
@@ -289,6 +308,117 @@ export async function listSubjects(
 }
 
 // --------------------------------------------------------------
+// listCourses (the layer between Subject and Codes)
+// --------------------------------------------------------------
+
+// Count standard rows per set in one query so "best version" selection can
+// de-prefer empty duplicate sets.
+async function standardsCountBySet(setIds: string[]): Promise<Map<string, number>> {
+  const map = new Map<string, number>();
+  if (setIds.length === 0) return map;
+  const rows = await db
+    .select({
+      setId: educationalStandardsDb.standardSetId,
+      n: sql<number>`count(*)::int`,
+    })
+    .from(educationalStandardsDb)
+    .where(inArray(educationalStandardsDb.standardSetId, setIds))
+    .groupBy(educationalStandardsDb.standardSetId);
+  for (const r of rows) map.set(r.setId as string, Number(r.n));
+  return map;
+}
+
+type SetMeta = { tier: CatalogSourceTier; rank: number; url?: string | null };
+
+// Group a subject's sets into courses AND compute per-set trust metadata. Shared
+// by listCourses (to list them) and listCodes (to resolve a chosen course).
+async function groupSubjectCourses(
+  subjectSets: Awaited<ReturnType<typeof storage.getStandardSets>>,
+  subject: string,
+  stateAbbr: string,
+  enforceOfficialLink: boolean,
+): Promise<{ grouped: GroupedCourse[]; meta: Map<string, SetMeta> }> {
+  const counts = await standardsCountBySet(subjectSets.map((s) => s.id));
+  const meta = new Map<string, SetMeta>();
+  const inputs: CourseSetInput[] = subjectSets.map((s) => {
+    const tier = classifySetSource({
+      source: s.source,
+      documentUrl: s.documentUrl,
+      lastVerifiedAt: (s as any).lastVerifiedAt,
+      stateAbbr,
+      enforceOfficialLink,
+    });
+    const rank = catalogTierRank(tier);
+    meta.set(s.id, { tier, rank, url: s.documentUrl });
+    return {
+      id: s.id,
+      title: s.title,
+      educationLevels: s.educationLevels,
+      documentYear: (s as any).documentYear ?? null,
+      tierRank: rank,
+      standardsCount: counts.get(s.id) ?? 0,
+    };
+  });
+  return { grouped: groupSetsIntoCourses(inputs, subject), meta };
+}
+
+// Pick the highest-trust member set of a course (for the course's source badge).
+function bestMetaForCourse(course: GroupedCourse, meta: Map<string, SetMeta>): SetMeta {
+  let best: SetMeta = { tier: "fallback", rank: -1 };
+  for (const id of course.setIds) {
+    const m = meta.get(id);
+    if (m && m.rank > best.rank) best = m;
+  }
+  return best;
+}
+
+export async function listCourses(
+  country: string,
+  stateAbbr: string,
+  subject: string,
+  opts: { gradeLevels?: string[]; userId?: string | null } = {},
+): Promise<CatalogCourse[]> {
+  const gradeLevels = opts.gradeLevels ?? [];
+  const jurisdiction = await resolveJurisdiction(country, stateAbbr);
+  const sets = jurisdiction ? await storage.getStandardSets(jurisdiction.id) : [];
+  if (!jurisdiction || sets.length === 0) return [];
+  const subjectSets = sets.filter((s) => s.subject === subject);
+  if (subjectSets.length === 0) return [];
+
+  const enforceOfficialLink = country === "United States";
+  const authority = enforceOfficialLink ? getStateAuthority(stateAbbr) : undefined;
+  const { grouped, meta } = await groupSubjectCourses(
+    subjectSets,
+    subject,
+    stateAbbr,
+    enforceOfficialLink,
+  );
+
+  // Grade-aware narrowing: only show courses that have at least one set covering
+  // the chosen grade. If that would empty the list, fall back to all courses.
+  let courses = grouped;
+  const selectedTokens = expandGradeSelectionToTokens(gradeLevels);
+  if (selectedTokens.size > 0) {
+    const filtered = grouped.filter((c) =>
+      educationLevelsCoverGrades(c.educationLevels, selectedTokens),
+    );
+    if (filtered.length > 0) courses = filtered;
+  }
+
+  return courses.map((c) => {
+    const best = bestMetaForCourse(c, meta);
+    return {
+      courseId: c.courseId,
+      label: c.label,
+      isGeneric: c.isGeneric,
+      source: best.tier,
+      sourceUrl: best.url || jurisdiction.sourceUrl,
+      authorityName: authority?.agency ?? null,
+    };
+  });
+}
+
+// --------------------------------------------------------------
 // listCodes
 // --------------------------------------------------------------
 
@@ -296,7 +426,7 @@ export async function listCodes(
   country: string,
   stateAbbr: string,
   subject: string,
-  opts: { gradeLevels?: string[]; userId?: string | null } = {},
+  opts: { gradeLevels?: string[]; userId?: string | null; courseId?: string | null } = {},
 ): Promise<CatalogCode[]> {
   const gradeLevels = opts.gradeLevels ?? [];
   const jurisdiction = await resolveJurisdiction(country, stateAbbr);
@@ -310,6 +440,58 @@ export async function listCodes(
   const enforceOfficialLink = country === "United States";
   const selectedTokens = expandGradeSelectionToTokens(gradeLevels);
   const gradeAware = selectedTokens.size > 0;
+
+  // Course-scoped path: when the picker has narrowed the subject to a specific
+  // course, return exactly that course's codes (union of its member sets, code-
+  // deduped preferring the higher-trust set). Falls through to the subject-level
+  // behaviour below if the course can't be resolved (stale id, etc.).
+  if (opts.courseId && jurisdiction) {
+    const subjectSets = sets.filter((s) => s.subject === subject);
+    if (subjectSets.length > 0) {
+      const { grouped, meta } = await groupSubjectCourses(
+        subjectSets,
+        subject,
+        stateAbbr,
+        enforceOfficialLink,
+      );
+      const course = grouped.find((c) => c.courseId === opts.courseId);
+      if (course) {
+        const authority = enforceOfficialLink ? getStateAuthority(stateAbbr) : undefined;
+        // Order member sets by trust so higher-trust text wins on code collisions.
+        const orderedSetIds = [...course.setIds].sort(
+          (a, b) => (meta.get(b)?.rank ?? 0) - (meta.get(a)?.rank ?? 0),
+        );
+        const byCode = new Map<string, CatalogCode>();
+        for (const setId of orderedSetIds) {
+          const setMeta = meta.get(setId);
+          const setRow = subjectSets.find((s) => s.id === setId)!;
+          const standards = gradeLevels.length > 0
+            ? await storage.getEducationalStandardsByGradeLevels(setId, gradeLevels)
+            : await storage.getEducationalStandards(setId);
+          const lastVerifiedRaw =
+            (setRow as any).lastVerifiedAt || (jurisdiction as any).lastVerifiedAt || null;
+          const lastVerifiedAt: string | null = lastVerifiedRaw
+            ? (lastVerifiedRaw instanceof Date ? lastVerifiedRaw.toISOString() : String(lastVerifiedRaw))
+            : null;
+          for (const s of standards) {
+            if (byCode.has(s.humanCoding)) continue; // first (highest-trust) wins
+            byCode.set(s.humanCoding, {
+              code: s.humanCoding,
+              description: s.statement,
+              gradeLevel: s.gradeLevel,
+              source: setMeta?.tier ?? "fallback",
+              sourceUrl: setMeta?.url || jurisdiction.sourceUrl,
+              jurisdictionName: jurisdiction.name,
+              standardsName: jurisdiction.standardsName,
+              authorityName: authority?.agency ?? null,
+              lastVerifiedAt,
+            });
+          }
+        }
+        return Array.from(byCode.values());
+      }
+    }
+  }
 
   const pickBestSet = (requireGradeCover: boolean) => {
     let bestSet: (typeof sets)[number] | undefined;
