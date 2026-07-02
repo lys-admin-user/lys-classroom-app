@@ -31,7 +31,8 @@ export function ImpersonationBanner() {
       <div className="flex items-center gap-2">
         <UserCheck className="h-4 w-4 shrink-0" />
         <span className="font-roboto">
-          You are currently viewing as another user (ID: {imp.userId}). Started at{" "}
+          You are viewing the app as{" "}
+          <span className="font-semibold">{imp.userName || `user ${imp.userId}`}</span>. Started at{" "}
           {new Date(imp.startedAt).toLocaleTimeString()}.
         </span>
       </div>

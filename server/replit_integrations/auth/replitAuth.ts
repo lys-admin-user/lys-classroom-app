@@ -7,6 +7,7 @@ import type { Express, RequestHandler } from "express";
 import memoize from "memoizee";
 import connectPg from "connect-pg-simple";
 import { authStorage } from "./storage";
+import { hasRolePrivilege } from "@shared/models/auth";
 
 const getOidcConfig = memoize(
   async () => {
@@ -101,6 +102,54 @@ export async function setupAuth(app: Express) {
   app.use(getSession());
   app.use(passport.initialize());
   app.use(passport.session());
+
+  // ── True impersonation ────────────────────────────────────────────────
+  // When a site/system admin has an active impersonation session, swap the
+  // effective identity for API requests so every downstream handler sees the
+  // TARGET user (their role, their data) — not just a banner. We never mutate
+  // req.user in place: deserializeUser hands back the session-stored object, so
+  // we replace it with a shallow copy to avoid corrupting the admin's real
+  // session. The impersonation-control endpoints are exempt so the real admin
+  // keeps their identity to start/stop and pass the admin + MFA checks.
+  app.use(async (req: any, _res, next) => {
+    try {
+      const imp = req.session?.impersonating;
+      if (!imp?.userId) return next();
+      if (!req.path.startsWith("/api")) return next();
+      if (
+        req.path === "/api/admin/stop-impersonation" ||
+        /^\/api\/admin\/users\/[^/]+\/impersonate$/.test(req.path)
+      ) {
+        return next();
+      }
+      const sessionUser = req.user;
+      const realId = sessionUser?.claims?.sub;
+      if (!realId) return next();
+      const realUser = await authStorage.getUser(realId);
+      if (!realUser || !hasRolePrivilege((realUser.role as any) ?? "student", "site_admin")) {
+        delete req.session.impersonating;
+        return next();
+      }
+      // Refresh the REAL admin's token on the session-backed object BEFORE we
+      // swap, so rotated refresh tokens persist to the session (the swapped
+      // req.user is a copy and would drop the rotation, breaking later requests).
+      const now = Math.floor(Date.now() / 1000);
+      if (sessionUser.expires_at && now > sessionUser.expires_at && sessionUser.refresh_token) {
+        try {
+          const config = await getOidcConfig();
+          const tokenResponse = await client.refreshTokenGrant(config, sessionUser.refresh_token);
+          updateUserSession(sessionUser, tokenResponse);
+        } catch {
+          // Leave it to isAuthenticated to reject with 401.
+        }
+      }
+      req.impersonatorId = realId;
+      req.user = { ...sessionUser, claims: { ...sessionUser.claims, sub: imp.userId } };
+      return next();
+    } catch {
+      return next();
+    }
+  });
 
   const config = await getOidcConfig();
 

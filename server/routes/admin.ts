@@ -2977,11 +2977,32 @@ export function registerAdminRoutes(app: Express): void {
         res.status(404).json({ error: "User not found" });
         return;
       }
-      
+
+      if (id === adminId) {
+        res.status(400).json({ error: "You cannot impersonate yourself." });
+        return;
+      }
+
+      // Anti-escalation: never let an admin impersonate a user whose role
+      // outranks their own (that would hand them higher privileges).
+      const actor = await storage.getUser(adminId);
+      const actorRole = (actor?.role as any) ?? "student";
+      const targetRole = (targetUser.role as any) ?? "student";
+      if (!hasRolePrivilege(actorRole, targetRole)) {
+        res.status(403).json({ error: "You cannot impersonate a user with a higher role than your own." });
+        return;
+      }
+
+      const targetName =
+        [targetUser.firstName, targetUser.lastName].filter(Boolean).join(" ").trim() ||
+        targetUser.email ||
+        id;
+
       req.session.impersonating = {
         userId: id,
         originalAdminId: adminId,
         startedAt: new Date().toISOString(),
+        userName: targetName,
       };
       await logAuditEvent({
         userId: adminId,
@@ -3009,7 +3030,18 @@ export function registerAdminRoutes(app: Express): void {
   app.post("/api/admin/stop-impersonation", isAuthenticated, async (req: any, res) => {
     try {
       if (req.session.impersonating) {
+        const { userId: targetId, originalAdminId } = req.session.impersonating;
         delete req.session.impersonating;
+        await logAuditEvent({
+          userId: originalAdminId || req.user?.claims?.sub,
+          action: "admin.impersonate_stop",
+          category: "admin_action",
+          severity: "info",
+          resourceType: "user",
+          resourceId: targetId,
+          ipAddress: getClientIP(req),
+          userAgent: req.get("user-agent"),
+        });
         res.json({ success: true, message: "Stopped impersonation" });
       } else {
         res.status(400).json({ error: "Not currently impersonating" });
