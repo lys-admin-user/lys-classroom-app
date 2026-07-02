@@ -35,6 +35,7 @@ import {
   ChevronRight
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { US_GRADE_OPTIONS } from "@shared/gradeLevels";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useAuth } from "@/hooks/use-auth";
 import { Link, useLocation } from "wouter";
@@ -53,11 +54,7 @@ export const templateCategories = [
 
 export const templateGradeLevels = [
   "All Grades",
-  "Elementary (K-2)",
-  "Elementary (3-5)",
-  "Middle School (6-8)",
-  "High School (9-10)",
-  "High School (11-12)"
+  ...US_GRADE_OPTIONS.filter((o) => !o.disabled).map((o) => o.label),
 ];
 
 const bkdLabels = {

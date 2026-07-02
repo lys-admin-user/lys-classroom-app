@@ -400,7 +400,9 @@ export function registerOrgRoutes(app: Express): void {
     try {
       const { listSubjects } = await import("../services/standardsCatalog");
       const userId = req.user?.claims?.sub ?? null;
-      const result = await listSubjects(req.params.country, req.params.stateAbbr, { userId });
+      const gradeLevelsParam = req.query.gradeLevels as string | undefined;
+      const gradeLevels = gradeLevelsParam ? gradeLevelsParam.split(',').filter(Boolean) : [];
+      const result = await listSubjects(req.params.country, req.params.stateAbbr, { userId, gradeLevels });
       res.json(result);
     } catch (error) {
       console.error("Get subjects error:", error);

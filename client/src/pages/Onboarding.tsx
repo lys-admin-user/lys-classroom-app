@@ -96,7 +96,8 @@ const getAutoInterests = (role: string, primaryGoal: string): string[] => {
   return Array.from(new Set(interests));
 };
 
-const GRADE_LEVELS = [
+const GRADE_LEVELS: { id: string; label: string; band: string; disabled?: boolean }[] = [
+  { id: "pre_k", label: "Pre-K", band: "early_childhood" },
   { id: "K", label: "Kindergarten", band: "elementary" },
   { id: "1", label: "1st Grade", band: "elementary" },
   { id: "2", label: "2nd Grade", band: "elementary" },
@@ -110,14 +111,15 @@ const GRADE_LEVELS = [
   { id: "10", label: "10th Grade", band: "high_school" },
   { id: "11", label: "11th Grade", band: "high_school" },
   { id: "12", label: "12th Grade", band: "high_school" },
-  { id: "post_secondary", label: "Post-Secondary / College", band: "post_secondary" },
+  { id: "post_secondary", label: "Post-Secondary / College (coming soon)", band: "post_secondary", disabled: true },
 ];
 
-const GRADE_BANDS = [
+const GRADE_BANDS: { id: string; label: string; disabled?: boolean }[] = [
+  { id: "early_childhood", label: "Early Childhood (Pre-K)" },
   { id: "elementary", label: "Elementary (K-5)" },
   { id: "middle_school", label: "Middle School (6-8)" },
   { id: "high_school", label: "High School (9-12)" },
-  { id: "post_secondary", label: "Post-Secondary" },
+  { id: "post_secondary", label: "Post-Secondary (coming soon)", disabled: true },
 ];
 
 type StepKey = "role" | "classes" | "goals" | "location";
@@ -463,15 +465,16 @@ export default function Onboarding() {
                           <Checkbox
                             id={`band-${band.id}`}
                             checked={allSelected}
+                            disabled={band.disabled}
                             ref={(el) => {
                               if (el && someSelected && !allSelected) {
                                 (el as HTMLButtonElement).dataset.state = "indeterminate";
                               }
                             }}
-                            onCheckedChange={() => toggleGradeBand(band.id)}
+                            onCheckedChange={() => !band.disabled && toggleGradeBand(band.id)}
                             data-testid={`checkbox-band-${band.id}`}
                           />
-                          <Label htmlFor={`band-${band.id}`} className="font-oswald cursor-pointer flex items-center gap-2">
+                          <Label htmlFor={`band-${band.id}`} className={`font-oswald flex items-center gap-2 ${band.disabled ? "opacity-50 cursor-not-allowed" : "cursor-pointer"}`}>
                             <School className="h-4 w-4 text-muted-foreground" />
                             {band.label}
                           </Label>
@@ -482,10 +485,11 @@ export default function Onboarding() {
                               <Checkbox
                                 id={`grade-${grade.id}`}
                                 checked={selectedGradeLevels.includes(grade.id)}
-                                onCheckedChange={() => toggleGradeLevel(grade.id)}
+                                disabled={grade.disabled}
+                                onCheckedChange={() => !grade.disabled && toggleGradeLevel(grade.id)}
                                 data-testid={`checkbox-grade-${grade.id}`}
                               />
-                              <Label htmlFor={`grade-${grade.id}`} className="text-sm cursor-pointer">
+                              <Label htmlFor={`grade-${grade.id}`} className={`text-sm ${grade.disabled ? "opacity-50 cursor-not-allowed" : "cursor-pointer"}`}>
                                 {grade.label}
                               </Label>
                             </div>

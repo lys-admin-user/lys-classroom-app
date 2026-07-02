@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useMutation } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
+import { US_GRADE_OPTIONS } from "@shared/gradeLevels";
 import { useAuth } from "@/hooks/use-auth";
 import { useToast } from "@/hooks/use-toast";
 import { GuestEmailModal } from "@/components/GuestEmailModal";
@@ -32,22 +33,7 @@ import type {
   HomeschoolDayPlan,
 } from "@shared/schema";
 
-const GRADE_LEVELS = [
-  "Preschool",
-  "Kindergarten",
-  "1st Grade",
-  "2nd Grade",
-  "3rd Grade",
-  "4th Grade",
-  "5th Grade",
-  "6th Grade",
-  "7th Grade",
-  "8th Grade",
-  "9th Grade",
-  "10th Grade",
-  "11th Grade",
-  "12th Grade",
-];
+const GRADE_OPTIONS = US_GRADE_OPTIONS;
 
 const SUBJECT_OPTIONS = [
   "Math",
@@ -215,9 +201,9 @@ export default function HomeschoolPlanner() {
                     <SelectValue placeholder="Choose a grade" />
                   </SelectTrigger>
                   <SelectContent>
-                    {GRADE_LEVELS.map((g) => (
-                      <SelectItem key={g} value={g} data-testid={`option-grade-${g}`}>
-                        {g}
+                    {GRADE_OPTIONS.map((opt) => (
+                      <SelectItem key={opt.value} value={opt.value} disabled={opt.disabled} data-testid={`option-grade-${opt.value}`}>
+                        {opt.label}
                       </SelectItem>
                     ))}
                   </SelectContent>

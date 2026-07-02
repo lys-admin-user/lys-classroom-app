@@ -350,6 +350,7 @@ import {
   type RssPlacement,
 } from "@shared/schema";
 import { db } from "../db";
+import { expandGradeSelectionToTokens, standardMatchesGrades } from "@shared/gradeLevels";
 import { decryptIfPossible } from "../services/crypto";
 import { eq, desc, and, asc, gte, sql, or, inArray } from "drizzle-orm";
 import { randomUUID } from "crypto";
@@ -387,50 +388,22 @@ const classroomMethods: ThisType<DatabaseStorage> = {
     if (!gradeLevels || gradeLevels.length === 0) {
       return this.getEducationalStandards(standardSetId);
     }
-    
-    // Expand grade bands to individual grades for matching
-    const expandedGrades = new Set<string>();
-    const gradeBandMapping: Record<string, string[]> = {
-      'elementary': ['K', '1', '2', '3', '4', '5'],
-      'middle_school': ['6', '7', '8'],
-      'high_school': ['9', '10', '11', '12'],
-      'post_secondary': ['post_secondary', 'college', 'university', '13+'],
-    };
-    
-    gradeLevels.forEach(level => {
-      if (gradeBandMapping[level]) {
-        gradeBandMapping[level].forEach(g => expandedGrades.add(g));
-      } else {
-        expandedGrades.add(level);
-      }
-    });
-    
+
+    // Normalize the chosen grades (individual grades, band keys, or a mix — as
+    // stored in user preferences) into a set of canonical tokens. Using a set
+    // intersection avoids the old substring bug where grade "1" also matched
+    // "10"/"11"/"12" and "K" never matched numeric ranges.
+    const selected = expandGradeSelectionToTokens(gradeLevels);
+
     const allStandards = await this.getEducationalStandards(standardSetId);
-    
-    // Filter standards by grade level
-    return allStandards.filter(standard => {
-      if (!standard.gradeLevel) return true; // Include standards without grade info
-      
-      const standardGrade = standard.gradeLevel.toLowerCase();
-      
-      // Check for exact match or range overlap
-      for (const grade of Array.from(expandedGrades)) {
-        const g = grade.toLowerCase();
-        if (standardGrade === g) return true;
-        if (standardGrade.includes(g)) return true;
-        // Handle ranges like "9-12", "K-2", etc.
-        if (standardGrade.includes('-')) {
-          const [start, end] = standardGrade.split('-').map(s => s.trim());
-          const gradeNum = parseInt(g);
-          const startNum = start === 'k' ? 0 : parseInt(start);
-          const endNum = parseInt(end);
-          if (!isNaN(gradeNum) && !isNaN(startNum) && !isNaN(endNum)) {
-            if (gradeNum >= startNum && gradeNum <= endNum) return true;
-          }
-        }
-      }
-      return false;
-    });
+
+    // If nothing normalized (e.g. an international label with no US numeric
+    // equivalent), don't over-filter — return everything for the set.
+    if (selected.size === 0) return allStandards;
+
+    return allStandards.filter((standard) =>
+      standardMatchesGrades(standard.gradeLevel, selected),
+    );
   },
 
 

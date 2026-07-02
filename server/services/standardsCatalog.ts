@@ -190,8 +190,9 @@ export async function listStates(country: string): Promise<CatalogState[]> {
 export async function listSubjects(
   country: string,
   stateAbbr: string,
-  opts: { userId?: string | null } = {},
+  opts: { userId?: string | null; gradeLevels?: string[] } = {},
 ): Promise<CatalogSubject[]> {
+  const gradeLevels = opts.gradeLevels ?? [];
   const jurisdiction = await resolveJurisdiction(country, stateAbbr);
   const sets = jurisdiction ? await storage.getStandardSets(jurisdiction.id) : [];
 
@@ -205,7 +206,7 @@ export async function listSubjects(
     // This is the "DOE wins, hide the CSP duplicate" rule at the subject level.
     const bySubject = new Map<
       string,
-      { tier: CatalogSourceTier; sourceUrl?: string | null }
+      { tier: CatalogSourceTier; sourceUrl?: string | null; setId: string }
     >();
     for (const set of sets) {
       const tier = classifySetSource({
@@ -220,10 +221,31 @@ export async function listSubjects(
         bySubject.set(set.subject, {
           tier,
           sourceUrl: set.documentUrl || jurisdiction.sourceUrl,
+          setId: set.id,
         });
       }
     }
-    return Array.from(bySubject.entries()).map(([subject, best]) => ({
+
+    let entries = Array.from(bySubject.entries());
+
+    // Grade-aware narrowing: when a grade is chosen, only surface subjects whose
+    // chosen set actually has at least one standard for that grade. This keeps
+    // the subject dropdown honest per grade (e.g. a HS-only CTE course won't
+    // appear for a 3rd grader). If a grade filter would leave zero subjects,
+    // fall back to the unfiltered list rather than dead-ending the UI.
+    if (gradeLevels.length > 0) {
+      const filtered: typeof entries = [];
+      for (const entry of entries) {
+        const matched = await storage.getEducationalStandardsByGradeLevels(
+          entry[1].setId,
+          gradeLevels,
+        );
+        if (matched.length > 0) filtered.push(entry);
+      }
+      if (filtered.length > 0) entries = filtered;
+    }
+
+    return entries.map(([subject, best]) => ({
       subject,
       source: best.tier,
       sourceUrl: best.sourceUrl,

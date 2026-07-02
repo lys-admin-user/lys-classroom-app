@@ -24,6 +24,7 @@ import { useTrial } from "@/hooks/use-trial";
 import { PLAN_PRICES } from "@/lib/pricing";
 import { resolveCountryName } from "@/lib/countries";
 import { isAfricanCountry, getAfricanProfile, isWAECCountry } from "@shared/africaContext";
+import { US_GRADE_OPTIONS, US_GRADE_VALUES, type GradeOption } from "@shared/gradeLevels";
 import { AdBanner } from "@/components/AdBanner";
 import type { LessonPlan, EducatorProfile, Lesson } from "@shared/schema";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
@@ -35,13 +36,9 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { GuestSignupModal } from "@/components/GuestSignupModal";
 import { GuestEmailModal } from "@/components/GuestEmailModal";
 
-const defaultGradeLevels = [
-  "Elementary (K-2)",
-  "Elementary (3-5)",
-  "Middle School (6-8)",
-  "High School (9-10)",
-  "High School (11-12)",
-];
+// Individual grades (Pre-K → 12 + coming-soon Post-secondary), band-prefixed.
+const defaultGradeOptions: GradeOption[] = US_GRADE_OPTIONS;
+const defaultGradeValues = US_GRADE_VALUES;
 
 const durations = ["30 minutes", "45 minutes", "60 minutes", "90 minutes", "1-2 class periods"];
 
@@ -99,8 +96,18 @@ export default function LessonGenerator() {
   const africanProfile = useMemo(() => getAfricanProfile(selectedCountry), [selectedCountry]);
   const isAfrican = !!africanProfile;
   const isWAEC = isWAECCountry(selectedCountry);
-  const displayGradeLevels = useMemo(
-    () => (africanProfile ? africanProfile.gradeLevels : defaultGradeLevels),
+  // Grade options for the dropdown: African countries surface their own
+  // country-specific per-grade list; everyone else gets the individual US grades
+  // (Pre-K → 12 + coming-soon Post-secondary), band-prefixed.
+  const displayGradeOptions = useMemo<GradeOption[]>(
+    () =>
+      africanProfile
+        ? africanProfile.gradeLevels.map((g) => ({
+            value: g,
+            label: g,
+            band: "elementary" as const,
+          }))
+        : defaultGradeOptions,
     [africanProfile],
   );
   
@@ -312,14 +319,32 @@ export default function LessonGenerator() {
   });
   const states = statesData || [];
 
+  // Subjects are grade-aware: once a grade is chosen we only surface subjects
+  // that actually have standards for that grade in the selected jurisdiction.
   const { data: subjectsData } = useQuery<{ subject: string }[]>({
-    queryKey: ["/api/standards/subjects", selectedCountry, selectedState],
+    queryKey: ["/api/standards/subjects", selectedCountry, selectedState, gradeLevel],
+    queryFn: async () => {
+      const base = `/api/standards/subjects/${encodeURIComponent(selectedCountry)}/${encodeURIComponent(selectedState)}`;
+      const url = gradeLevel ? `${base}?gradeLevels=${encodeURIComponent(gradeLevel)}` : base;
+      const res = await fetch(url, { credentials: "include" });
+      if (!res.ok) throw new Error(`${res.status}`);
+      return res.json();
+    },
     enabled: !!selectedCountry && !!selectedState,
   });
   const subjects = subjectsData || [];
 
+  // Standard codes are filtered to the chosen individual grade so the picker
+  // shows only that grade's standards (not every grade's mixed together).
   const { data: standardCodesData } = useQuery<(StandardCode & { source?: "official" | "backup" | "curated" | "unverified" | "fallback"; sourceUrl?: string | null })[]>({
-    queryKey: ["/api/standards/codes", selectedCountry, selectedState, selectedSubject],
+    queryKey: ["/api/standards/codes", selectedCountry, selectedState, selectedSubject, gradeLevel],
+    queryFn: async () => {
+      const base = `/api/standards/codes/${encodeURIComponent(selectedCountry)}/${encodeURIComponent(selectedState)}/${encodeURIComponent(selectedSubject)}`;
+      const url = gradeLevel ? `${base}?gradeLevels=${encodeURIComponent(gradeLevel)}` : base;
+      const res = await fetch(url, { credentials: "include" });
+      if (!res.ok) throw new Error(`${res.status}`);
+      return res.json();
+    },
     enabled: !!selectedCountry && !!selectedState && !!selectedSubject,
   });
   const standardCodes = standardCodesData || [];
@@ -353,7 +378,7 @@ export default function LessonGenerator() {
     // Clear an incompatible US-style grade selection when switching to an
     // African country (and vice-versa) so the dropdown shows a valid placeholder.
     const nextProfile = getAfricanProfile(country);
-    const nextGrades = nextProfile ? nextProfile.gradeLevels : defaultGradeLevels;
+    const nextGrades = nextProfile ? nextProfile.gradeLevels : defaultGradeValues;
     if (gradeLevel && !nextGrades.includes(gradeLevel)) {
       setGradeLevel("");
     }
@@ -928,9 +953,14 @@ ${addedResources.length > 0 ? addedResources.map(r => `- ${r.title}: ${r.url}`).
                       <SelectValue placeholder="Select grade level" />
                     </SelectTrigger>
                     <SelectContent>
-                      {displayGradeLevels.map((level) => (
-                        <SelectItem key={level} value={level} className="font-roboto">
-                          {level}
+                      {displayGradeOptions.map((opt) => (
+                        <SelectItem
+                          key={opt.value}
+                          value={opt.value}
+                          disabled={opt.disabled}
+                          className="font-roboto"
+                        >
+                          {opt.label}
                         </SelectItem>
                       ))}
                     </SelectContent>

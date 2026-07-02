@@ -11,18 +11,13 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Separator } from "@/components/ui/separator";
 import { GraduationCap, MapPin, BookOpen, School, Loader2, Check, ChevronRight } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { US_GRADE_OPTIONS } from "@shared/gradeLevels";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { educationalStandards, getStates as getStandardsStates, getSubjects, getStandardCodes, getStandardsName, type StandardCode } from "@shared/standards";
 import type { EducatorProfile } from "@shared/schema";
 import allCountries from "country-region-data/data.json";
 
-const allGradeLevels = [
-  "Elementary (K-2)",
-  "Elementary (3-5)",
-  "Middle School (6-8)",
-  "High School (9-10)",
-  "High School (11-12)",
-];
+const allGradeOptions = US_GRADE_OPTIONS;
 
 const allSubjects = [
   "English Language Arts & Reading",
@@ -284,20 +279,23 @@ export default function EducatorProfileForm({ onComplete, isOnboarding = false, 
         <Label className="text-base font-medium">Grade Levels You Teach</Label>
         <p className="text-sm text-muted-foreground">Select all that apply</p>
         <div className="grid grid-cols-1 gap-2">
-          {allGradeLevels.map(grade => (
+          {allGradeOptions.map(opt => (
             <div 
-              key={grade}
-              className={`flex items-center gap-3 p-3 rounded-md cursor-pointer transition-colors ${
-                selectedGradeLevels.includes(grade) ? "bg-primary/10 border border-primary" : "border border-border hover-elevate"
+              key={opt.value}
+              className={`flex items-center gap-3 p-3 rounded-md transition-colors ${
+                opt.disabled
+                  ? "border border-border opacity-50 cursor-not-allowed"
+                  : `cursor-pointer ${selectedGradeLevels.includes(opt.value) ? "bg-primary/10 border border-primary" : "border border-border hover-elevate"}`
               }`}
-              onClick={() => toggleGradeLevel(grade)}
-              data-testid={`grade-${grade.replace(/[^a-zA-Z0-9]/g, '-')}`}
+              onClick={() => !opt.disabled && toggleGradeLevel(opt.value)}
+              data-testid={`grade-${opt.value.replace(/[^a-zA-Z0-9]/g, '-')}`}
             >
               <Checkbox 
-                checked={selectedGradeLevels.includes(grade)}
-                onCheckedChange={() => toggleGradeLevel(grade)}
+                checked={selectedGradeLevels.includes(opt.value)}
+                disabled={opt.disabled}
+                onCheckedChange={() => !opt.disabled && toggleGradeLevel(opt.value)}
               />
-              <span className="text-sm font-medium">{grade}</span>
+              <span className="text-sm font-medium">{opt.label}</span>
             </div>
           ))}
         </div>
