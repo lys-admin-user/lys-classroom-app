@@ -425,6 +425,16 @@ async function initLessonAiSubsystem(): Promise<void> {
       console.warn("[team-hub] role seed skipped:", (e as Error).message);
     }
     const { storage } = await import("./storage");
+    try {
+      // Users who already hold the staff role keep Team Hub access under the
+      // new approval gate (grandfathered as approved; idempotent).
+      const grandfathered = await storage.grandfatherExistingStaffAccess();
+      if (grandfathered > 0) {
+        console.log(`[team-hub] grandfathered ${grandfathered} existing staff member(s) as approved`);
+      }
+    } catch (e) {
+      console.warn("[team-hub] staff access grandfather skipped:", (e as Error).message);
+    }
     const existing = await storage.getFeatureFlagByName("new_lesson_retrieval");
     if (!existing) {
       await storage.createFeatureFlag({

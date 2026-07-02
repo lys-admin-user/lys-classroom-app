@@ -4312,4 +4312,10 @@ export interface DatabaseStorage extends IStorage {
   updateOnboardingTask(id: string, updates: Partial<import("@shared/schema").InsertHrOnboardingTask> & { status?: string }): Promise<import("@shared/schema").HrOnboardingTask | undefined>;
   deleteOnboardingTask(id: string): Promise<boolean>;
   generateOnboardingForEmployee(employeeId: string): Promise<import("@shared/schema").HrOnboardingTask[]>;
+  getStaffAccessRequest(id: string): Promise<import("@shared/schema").StaffAccessRequest | undefined>;
+  getStaffAccessRequestByUser(userId: string): Promise<import("@shared/schema").StaffAccessRequest | undefined>;
+  getStaffAccessRequests(status?: string): Promise<import("@shared/schema").StaffAccessRequest[]>;
+  upsertStaffAccessRequest(userId: string, message?: string | null): Promise<import("@shared/schema").StaffAccessRequest>;
+  decideStaffAccessRequest(id: string, status: "approved" | "denied", decidedById: string, extras?: { priorRole?: string | null }): Promise<import("@shared/schema").StaffAccessRequest | undefined>;
+  grandfatherExistingStaffAccess(): Promise<number>;
 }

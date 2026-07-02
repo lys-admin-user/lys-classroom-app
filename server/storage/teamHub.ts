@@ -3,12 +3,15 @@ import {
   hrRoles,
   employees,
   hrOnboardingTasks,
+  staffAccessRequests,
+  users,
   type HrRole,
   type InsertHrRole,
   type Employee,
   type InsertEmployee,
   type HrOnboardingTask,
   type InsertHrOnboardingTask,
+  type StaffAccessRequest,
 } from "@shared/schema";
 import { and, asc, eq } from "drizzle-orm";
 import { DatabaseStorage } from "./_base";
@@ -140,6 +143,96 @@ const teamHubMethods: ThisType<DatabaseStorage> & Record<string, any> = {
       .values(derived.map((t) => ({ ...t, employeeId })) as any)
       .returning();
     return rows.sort((a, b) => a.sortOrder - b.sortOrder);
+  },
+
+  // ----- Team Hub access approval -----
+  async getStaffAccessRequest(this: DatabaseStorage, id: string): Promise<StaffAccessRequest | undefined> {
+    const [row] = await db.select().from(staffAccessRequests).where(eq(staffAccessRequests.id, id));
+    return row;
+  },
+
+  async getStaffAccessRequestByUser(this: DatabaseStorage, userId: string): Promise<StaffAccessRequest | undefined> {
+    const [row] = await db.select().from(staffAccessRequests).where(eq(staffAccessRequests.userId, userId));
+    return row;
+  },
+
+  async getStaffAccessRequests(this: DatabaseStorage, status?: string): Promise<StaffAccessRequest[]> {
+    const q = db.select().from(staffAccessRequests);
+    const rows = status ? await q.where(eq(staffAccessRequests.status, status)) : await q;
+    return rows.sort(
+      (a, b) => (b.requestedAt?.getTime() ?? 0) - (a.requestedAt?.getTime() ?? 0),
+    );
+  },
+
+  // Create a pending request, or re-open a denied one. An approved row is
+  // returned untouched so approval can never be silently downgraded.
+  async upsertStaffAccessRequest(
+    this: DatabaseStorage,
+    userId: string,
+    message?: string | null,
+  ): Promise<StaffAccessRequest> {
+    const existing = await this.getStaffAccessRequestByUser(userId);
+    if (existing) {
+      if (existing.status === "approved" || existing.status === "pending") return existing;
+      const [row] = await db
+        .update(staffAccessRequests)
+        .set({
+          status: "pending",
+          message: message ?? existing.message,
+          source: "request",
+          requestedAt: new Date(),
+          decidedById: null,
+          decidedAt: null,
+        })
+        .where(eq(staffAccessRequests.id, existing.id))
+        .returning();
+      return row;
+    }
+    const [row] = await db
+      .insert(staffAccessRequests)
+      .values({ userId, message: message ?? null })
+      .returning();
+    return row;
+  },
+
+  async decideStaffAccessRequest(
+    this: DatabaseStorage,
+    id: string,
+    status: "approved" | "denied",
+    decidedById: string,
+    extras?: { priorRole?: string | null },
+  ): Promise<StaffAccessRequest | undefined> {
+    const [row] = await db
+      .update(staffAccessRequests)
+      .set({
+        status,
+        decidedById,
+        decidedAt: new Date(),
+        ...(extras && "priorRole" in extras ? { priorRole: extras.priorRole } : {}),
+      })
+      .where(eq(staffAccessRequests.id, id))
+      .returning();
+    return row;
+  },
+
+  // Boot-time seeding: users who already hold the `staff` role are treated as
+  // approved members (source="grandfathered") so the new gate never locks out
+  // existing staff. Idempotent — never touches rows that already exist.
+  async grandfatherExistingStaffAccess(this: DatabaseStorage): Promise<number> {
+    const staffUsers = await db.select({ id: users.id }).from(users).where(eq(users.role, "staff"));
+    let created = 0;
+    for (const u of staffUsers) {
+      const existing = await this.getStaffAccessRequestByUser(u.id);
+      if (existing) continue;
+      await db.insert(staffAccessRequests).values({
+        userId: u.id,
+        status: "approved",
+        source: "grandfathered",
+        decidedAt: new Date(),
+      });
+      created++;
+    }
+    return created;
   },
 };
 

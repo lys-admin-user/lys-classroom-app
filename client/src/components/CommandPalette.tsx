@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { useLocation } from "wouter";
 import { useAuth } from "@/hooks/use-auth";
 import { useViewAs } from "@/hooks/use-view-as";
+import { useTeamHubAccess } from "@/hooks/useTeamHubAccess";
 import {
   CommandDialog,
   CommandInput,
@@ -34,6 +35,7 @@ export function CommandPalette() {
   const [, setLocation] = useLocation();
   const { user, isAuthenticated } = useAuth();
   const { viewAsStudent } = useViewAs();
+  const { approved: teamHubApproved } = useTeamHubAccess();
   const actualRole = user?.role || "student";
   // Mirror AppSidebar: when an educator+ turns on student view, the palette
   // lists the same student destinations so the two nav surfaces never drift.
@@ -77,7 +79,8 @@ export function CommandPalette() {
   };
 
   const visibleGroups = navigationGroups
-    .filter(showGroup)
+    // Team Hub stays hidden until membership is approved (mirrors AppSidebar).
+    .filter((g) => showGroup(g) && (g.label !== "Team Hub" || teamHubApproved))
     .map((g) => ({ label: g.label, items: g.items.filter(showItem) }))
     .filter((g) => g.items.length > 0);
 

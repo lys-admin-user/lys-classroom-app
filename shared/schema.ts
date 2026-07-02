@@ -4818,3 +4818,37 @@ export const insertHrOnboardingTaskSchema = createInsertSchema(hrOnboardingTasks
 });
 export type InsertHrOnboardingTask = z.infer<typeof insertHrOnboardingTaskSchema>;
 export type HrOnboardingTask = typeof hrOnboardingTasks.$inferSelect;
+
+// Team Hub membership approval. Holding the `staff` platform role is NOT
+// enough to enter Team Hub — a user must also have an approved row here.
+// Only site_admin / system_admin may approve or deny. Existing staff-role
+// holders are grandfathered at boot (source="grandfathered").
+export const staffAccessRequests = pgTable(
+  "staff_access_requests",
+  {
+    id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+    userId: varchar("user_id").notNull().unique(),
+    status: text("status").notNull().default("pending"), // "pending" | "approved" | "denied"
+    message: text("message"), // optional note from the requester
+    source: text("source").notNull().default("request"), // "request" | "grandfathered" | "admin_grant"
+    requestedAt: timestamp("requested_at").defaultNow(),
+    decidedById: varchar("decided_by_id"), // -> users.id (approving/denying admin)
+    decidedAt: timestamp("decided_at"),
+    // Set when approval elevated the user's platform role to `staff`; used to
+    // restore their previous role if membership is later revoked.
+    priorRole: text("prior_role"),
+  },
+  (t) => ({
+    byStatus: index("staff_access_requests_status_idx").on(t.status),
+  }),
+);
+export const insertStaffAccessRequestSchema = createInsertSchema(staffAccessRequests).omit({
+  id: true,
+  status: true,
+  source: true,
+  requestedAt: true,
+  decidedById: true,
+  decidedAt: true,
+});
+export type InsertStaffAccessRequest = z.infer<typeof insertStaffAccessRequestSchema>;
+export type StaffAccessRequest = typeof staffAccessRequests.$inferSelect;

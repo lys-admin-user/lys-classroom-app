@@ -24,9 +24,12 @@ import {
 import {
   Building2, Users, Briefcase, ClipboardList, Plus, Pencil, Archive, RefreshCw,
   Compass, CheckCircle2, Circle, BookOpen, Target, Wrench, ListChecks, Sparkles,
-  Route, KanbanSquare, CalendarDays, LayoutDashboard, Megaphone,
+  Route, KanbanSquare, CalendarDays, LayoutDashboard, Megaphone, Lock, Hourglass,
 } from "lucide-react";
 import { JourneyView, KanbanView, CalendarView, DashboardsView, TrainingView } from "./TeamHubViews";
+import { useTeamHubAccess } from "@/hooks/useTeamHubAccess";
+import { MfaStepUpDialog } from "@/components/MfaStepUpDialog";
+import { isMfaRequiredError, isMfaEnrollmentRequiredError } from "@/hooks/use-mfa";
 
 const HORIZON_LABEL: Record<string, string> = {
   active: "Active now",
@@ -60,10 +63,206 @@ function linesToArray(s: string): string[] {
   return s.split("\n").map((l) => l.trim()).filter(Boolean);
 }
 
+/* ----------------------- Membership access gate ----------------------- */
+// Shown to anyone not yet approved as a Team Hub staff member. Pending
+// requests wait; new/denied users can (re)submit a request with a note.
+function TeamAccessGate({ status }: { status: "none" | "pending" | "approved" | "denied" }) {
+  const { toast } = useToast();
+  const [message, setMessage] = useState("");
+  const request = useMutation({
+    mutationFn: async () =>
+      apiRequest("POST", "/api/team/access/request", message.trim() ? { message: message.trim() } : {}),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/team/access/me"] });
+      toast({ title: "Request sent", description: "A site or system admin will review it." });
+    },
+    onError: () => toast({ title: "Could not send request", variant: "destructive" }),
+  });
+
+  return (
+    <div className="container mx-auto max-w-2xl px-4 py-16" data-testid="page-team-access-gate">
+      <Card>
+        <CardHeader className="text-center">
+          <div className="mx-auto mb-2 flex h-12 w-12 items-center justify-center rounded-full bg-muted">
+            {status === "pending" ? <Hourglass className="h-6 w-6 text-lys-teal" /> : <Lock className="h-6 w-6 text-muted-foreground" />}
+          </div>
+          <CardTitle className="font-oswald text-2xl">
+            {status === "pending" ? "Request pending" : "Team Hub is members-only"}
+          </CardTitle>
+          <CardDescription>
+            {status === "pending"
+              ? "Your request to join the Team Hub is waiting for a site or system admin to approve it."
+              : status === "denied"
+                ? "Your previous request was not approved. You can send a new one below."
+                : "The Team Hub is for approved LYS team members. Ask to join and a site or system admin will review your request."}
+          </CardDescription>
+        </CardHeader>
+        {status !== "pending" && (
+          <CardContent className="space-y-3">
+            <div>
+              <Label htmlFor="access-message">Note for the admins (optional)</Label>
+              <Textarea
+                id="access-message"
+                value={message}
+                onChange={(e) => setMessage(e.target.value)}
+                placeholder="Who are you, and why do you need Team Hub access?"
+                maxLength={1000}
+                data-testid="input-access-message"
+              />
+            </div>
+            <Button
+              className="w-full"
+              onClick={() => request.mutate()}
+              disabled={request.isPending}
+              data-testid="button-request-access"
+            >
+              {request.isPending ? "Sending..." : status === "denied" ? "Request again" : "Request access"}
+            </Button>
+          </CardContent>
+        )}
+      </Card>
+    </div>
+  );
+}
+
+interface AccessRequestRow {
+  id: string;
+  userId: string;
+  status: string;
+  message: string | null;
+  source: string;
+  requestedAt: string | null;
+  user: { id: string; firstName: string | null; lastName: string | null; email: string | null; role: string } | null;
+}
+
+// Admin-only queue (site/system admin) for approving or denying Team Hub
+// membership requests. Approval is MFA step-up protected server-side.
+function AccessRequestsCard() {
+  const { toast } = useToast();
+  const [mfaPrompt, setMfaPrompt] = useState<{ enrollmentRequired: boolean; retry: () => void } | null>(null);
+  const { data: requests = [], isLoading } = useQuery<AccessRequestRow[]>({
+    queryKey: ["/api/team/access/requests"],
+  });
+  const pending = requests.filter((r) => r.status === "pending");
+
+  const invalidate = () => {
+    queryClient.invalidateQueries({ queryKey: ["/api/team/access/requests"] });
+    queryClient.invalidateQueries({ queryKey: ["/api/team/access/me"] });
+  };
+
+  const decide = useMutation({
+    mutationFn: async ({ id, action }: { id: string; action: "approve" | "deny" }) =>
+      apiRequest("POST", `/api/team/access/requests/${id}/${action}`),
+    onSuccess: (_res, vars) => {
+      invalidate();
+      toast({ title: vars.action === "approve" ? "Member approved" : "Request denied" });
+    },
+    onError: (error: any, vars) => {
+      if (isMfaRequiredError(error)) {
+        setMfaPrompt({
+          enrollmentRequired: isMfaEnrollmentRequiredError(error),
+          retry: () => decide.mutate(vars),
+        });
+        return;
+      }
+      toast({ title: "Action failed", variant: "destructive" });
+    },
+  });
+
+  const displayName = (r: AccessRequestRow) => {
+    const n = [r.user?.firstName, r.user?.lastName].filter(Boolean).join(" ");
+    return n || r.user?.email || r.userId;
+  };
+
+  return (
+    <Card data-testid="card-access-requests">
+      <CardHeader className="pb-2">
+        <CardTitle className="text-base flex items-center gap-2">
+          <Lock className="h-4 w-4 text-lys-teal" /> Membership requests
+        </CardTitle>
+        <CardDescription>
+          People asking to join the Team Hub. Approving makes them a staff member.
+        </CardDescription>
+      </CardHeader>
+      <CardContent>
+        {isLoading ? (
+          <Skeleton className="h-16 w-full" />
+        ) : pending.length === 0 ? (
+          <p className="text-sm text-muted-foreground" data-testid="text-no-access-requests">
+            No pending requests.
+          </p>
+        ) : (
+          <div className="space-y-3">
+            {pending.map((r) => (
+              <div
+                key={r.id}
+                className="flex flex-wrap items-center justify-between gap-2 rounded-md border p-3"
+                data-testid={`row-access-request-${r.id}`}
+              >
+                <div className="min-w-0">
+                  <p className="text-sm font-medium">{displayName(r)}</p>
+                  <p className="text-xs text-muted-foreground">
+                    {r.user?.email}
+                    {r.user?.role ? ` · currently ${r.user.role.replace(/_/g, " ")}` : ""}
+                  </p>
+                  {r.message && <p className="text-xs mt-1 italic text-muted-foreground">"{r.message}"</p>}
+                </div>
+                <div className="flex gap-2">
+                  <Button
+                    size="sm"
+                    onClick={() => decide.mutate({ id: r.id, action: "approve" })}
+                    disabled={decide.isPending}
+                    data-testid={`button-approve-access-${r.id}`}
+                  >
+                    Approve
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => decide.mutate({ id: r.id, action: "deny" })}
+                    disabled={decide.isPending}
+                    data-testid={`button-deny-access-${r.id}`}
+                  >
+                    Deny
+                  </Button>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </CardContent>
+      <MfaStepUpDialog
+        open={!!mfaPrompt}
+        enrollmentRequired={!!mfaPrompt?.enrollmentRequired}
+        onClose={() => setMfaPrompt(null)}
+        onVerified={() => {
+          const retry = mfaPrompt?.retry;
+          setMfaPrompt(null);
+          retry?.();
+        }}
+      />
+    </Card>
+  );
+}
+
 export default function TeamHub() {
   const [, params] = useRoute("/team/:tab");
   const tab = params?.tab ?? "";
   const [, navigate] = useLocation();
+  const access = useTeamHubAccess();
+
+  if (access.isLoading) {
+    return (
+      <div className="container mx-auto max-w-6xl px-4 py-8">
+        <Skeleton className="h-10 w-64 mb-6" />
+        <Skeleton className="h-64 w-full" />
+      </div>
+    );
+  }
+
+  if (!access.approved) {
+    return <TeamAccessGate status={access.status} />;
+  }
 
   return (
     <div className="container mx-auto max-w-6xl px-4 py-8" data-testid="page-team-hub">
@@ -525,6 +724,7 @@ function PeopleTab() {
 
   return (
     <div className="space-y-6">
+      {isManager && <AccessRequestsCard />}
       <div className="flex items-center justify-between">
         <p className="text-sm text-muted-foreground">{employees.length} team member{employees.length === 1 ? "" : "s"}.</p>
         {isManager && <Button onClick={() => setAdding(true)} disabled={roles.length === 0} data-testid="button-add-employee"><Plus className="h-4 w-4 mr-1" /> Add person</Button>}

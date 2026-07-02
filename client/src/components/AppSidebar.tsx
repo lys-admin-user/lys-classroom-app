@@ -3,6 +3,7 @@ import { Link, useLocation } from "wouter";
 import { useQuery } from "@tanstack/react-query";
 import { motion } from "framer-motion";
 import { useAuth } from "@/hooks/use-auth";
+import { useTeamHubAccess } from "@/hooks/useTeamHubAccess";
 import { useViewAs } from "@/hooks/use-view-as";
 import { ROLE_HIERARCHY, type UserRole } from "@shared/models/auth";
 import { Badge } from "@/components/ui/badge";
@@ -316,6 +317,8 @@ export function AppSidebar() {
   });
   const pendingCount = pendingCountData?.count ?? 0;
 
+  const { approved: teamHubApproved } = useTeamHubAccess();
+
   const isActiveRoute = (url: string) => {
     const path = url.split("?")[0];
     if (path === "/") return location === "/";
@@ -342,7 +345,12 @@ export function AppSidebar() {
   };
 
   const visibleGroups = navigationGroups.filter(
-    (group) => shouldShowGroup(group) && group.items.some(shouldShowItem),
+    (group) =>
+      shouldShowGroup(group) &&
+      group.items.some(shouldShowItem) &&
+      // Team Hub stays hidden until membership is approved (admins are
+      // auto-approved server-side).
+      (group.label !== "Team Hub" || teamHubApproved),
   );
 
   // Only surface pinned shortcuts the current role/view can actually reach, so a
