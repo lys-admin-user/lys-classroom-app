@@ -171,6 +171,36 @@ export function gradesCoveredByStandard(gradeLevelStr: string | null | undefined
 }
 
 /**
+ * Does a standard SET (by its `education_levels` array) cover any of the
+ * selected grades? This is where real grade data lives — individual standards'
+ * `grade_level` column is empty in the ingested CSP data, so grade alignment
+ * has to happen at the set level.
+ *
+ * Levels look like `["09","10","11","12"]`, `["Pre-K","K","01",...]`, or may
+ * include non-grade tokens like `"VocationalTraining"`. Tokens that don't map
+ * to the K-12 scale are ignored. An empty selection, a set with no levels, or a
+ * set whose levels are ALL unparseable are treated as "applies to all grades"
+ * so we never hide a set we can't confidently place.
+ */
+export function educationLevelsCoverGrades(
+  levels: (string | null | undefined)[] | null | undefined,
+  selected: Set<GradeToken>,
+): boolean {
+  if (selected.size === 0) return true;
+  if (!levels || levels.length === 0) return true;
+  const covered = new Set<GradeToken>();
+  for (const l of levels) {
+    const t = normalizeGradeToken(l);
+    if (t) covered.add(t);
+  }
+  if (covered.size === 0) return true;
+  for (const t of Array.from(covered)) {
+    if (selected.has(t)) return true;
+  }
+  return false;
+}
+
+/**
  * Does a standard (by its grade field) apply to any of the selected grade
  * tokens? Standards with no parseable grade info are treated as applying to all
  * grades (so legitimate ungraded standards are never hidden).

@@ -6,6 +6,7 @@ import {
   expandGradeSelectionToTokens,
   gradesCoveredByStandard,
   standardMatchesGrades,
+  educationLevelsCoverGrades,
 } from "./gradeLevels";
 
 describe("US_GRADE_OPTIONS", () => {
@@ -122,5 +123,36 @@ describe("standardMatchesGrades", () => {
     const selected = expandGradeSelectionToTokens(["early_childhood"]);
     expect(standardMatchesGrades("PK", selected)).toBe(true);
     expect(standardMatchesGrades("K", selected)).toBe(false);
+  });
+});
+
+describe("educationLevelsCoverGrades (set-level grade data)", () => {
+  it("matches zero-padded CSP levels like 09/10", () => {
+    const g9 = expandGradeSelectionToTokens(["Grade 9"]);
+    expect(educationLevelsCoverGrades(["09", "10", "11", "12"], g9)).toBe(true);
+    const g3 = expandGradeSelectionToTokens(["Grade 3"]);
+    expect(educationLevelsCoverGrades(["09", "10", "11", "12"], g3)).toBe(false);
+  });
+
+  it("handles Pre-K / K tokens in the levels array", () => {
+    const pk = expandGradeSelectionToTokens(["Pre-K"]);
+    expect(educationLevelsCoverGrades(["Pre-K", "K", "01"], pk)).toBe(true);
+    const g5 = expandGradeSelectionToTokens(["Grade 5"]);
+    expect(educationLevelsCoverGrades(["Pre-K", "K", "01"], g5)).toBe(false);
+  });
+
+  it("ignores non-grade tokens like VocationalTraining", () => {
+    const g10 = expandGradeSelectionToTokens(["Grade 10"]);
+    expect(educationLevelsCoverGrades(["10", "11", "VocationalTraining"], g10)).toBe(true);
+    const g8 = expandGradeSelectionToTokens(["Grade 8"]);
+    expect(educationLevelsCoverGrades(["10", "11", "VocationalTraining"], g8)).toBe(false);
+  });
+
+  it("treats all-unparseable / empty / no-selection levels as cover-all", () => {
+    const g8 = expandGradeSelectionToTokens(["Grade 8"]);
+    expect(educationLevelsCoverGrades(["VocationalTraining"], g8)).toBe(true);
+    expect(educationLevelsCoverGrades([], g8)).toBe(true);
+    expect(educationLevelsCoverGrades(null, g8)).toBe(true);
+    expect(educationLevelsCoverGrades(["09"], new Set())).toBe(true);
   });
 });

@@ -26,6 +26,7 @@ import {
   type CatalogSourceTier,
 } from "@shared/standards";
 import { getStateAuthority } from "@shared/usStandardsAuthorities";
+import { expandGradeSelectionToTokens, educationLevelsCoverGrades } from "@shared/gradeLevels";
 import {
   US_STATES,
   getStateNameFromAbbr,
@@ -228,21 +229,28 @@ export async function listSubjects(
 
     let entries = Array.from(bySubject.entries());
 
-    // Grade-aware narrowing: when a grade is chosen, only surface subjects whose
-    // chosen set actually has at least one standard for that grade. This keeps
-    // the subject dropdown honest per grade (e.g. a HS-only CTE course won't
-    // appear for a 3rd grader). If a grade filter would leave zero subjects,
-    // fall back to the unfiltered list rather than dead-ending the UI.
+    // Grade-aware narrowing: when a grade is chosen, only surface subjects that
+    // have at least one standard set covering that grade. Grade data lives on
+    // the set's `education_levels` (individual standards carry no grade), so we
+    // check the levels of EVERY set for the subject — not just the highest-trust
+    // one — because a subject can be split into per-grade sets (e.g. one CTE
+    // course set for 9-10 and another for 11-12). If a grade filter would leave
+    // zero subjects, fall back to the unfiltered list rather than dead-ending.
     if (gradeLevels.length > 0) {
-      const filtered: typeof entries = [];
-      for (const entry of entries) {
-        const matched = await storage.getEducationalStandardsByGradeLevels(
-          entry[1].setId,
-          gradeLevels,
-        );
-        if (matched.length > 0) filtered.push(entry);
+      const selectedTokens = expandGradeSelectionToTokens(gradeLevels);
+      if (selectedTokens.size > 0) {
+        const subjectCovers = new Set<string>();
+        for (const set of sets) {
+          if (
+            !subjectCovers.has(set.subject) &&
+            educationLevelsCoverGrades(set.educationLevels, selectedTokens)
+          ) {
+            subjectCovers.add(set.subject);
+          }
+        }
+        const filtered = entries.filter(([subject]) => subjectCovers.has(subject));
+        if (filtered.length > 0) entries = filtered;
       }
-      if (filtered.length > 0) entries = filtered;
     }
 
     return entries.map(([subject, best]) => ({
@@ -295,23 +303,42 @@ export async function listCodes(
   const sets = jurisdiction ? await storage.getStandardSets(jurisdiction.id) : [];
 
   // When more than one set covers this subject (e.g. an official DOE upload AND
-  // a CSP backup), pick the HIGHEST-trust one and hide the duplicate.
+  // a CSP backup, OR the same subject split into per-grade course sets), pick
+  // the HIGHEST-trust one and hide the duplicate. When a grade is chosen we only
+  // consider sets whose `education_levels` cover that grade, so a 3rd-grade
+  // lesson never pulls 9-12 codes from a same-subject high-school set.
   const enforceOfficialLink = country === "United States";
-  let subjectSet: (typeof sets)[number] | undefined;
-  let subjectTier: CatalogSourceTier | undefined;
-  for (const set of sets) {
-    if (set.subject !== subject) continue;
-    const tier = classifySetSource({
-      source: set.source,
-      documentUrl: set.documentUrl,
-      lastVerifiedAt: (set as any).lastVerifiedAt,
-      stateAbbr,
-      enforceOfficialLink,
-    });
-    if (!subjectSet || catalogTierRank(tier) > catalogTierRank(subjectTier!)) {
-      subjectSet = set;
-      subjectTier = tier;
+  const selectedTokens = expandGradeSelectionToTokens(gradeLevels);
+  const gradeAware = selectedTokens.size > 0;
+
+  const pickBestSet = (requireGradeCover: boolean) => {
+    let bestSet: (typeof sets)[number] | undefined;
+    let bestTier: CatalogSourceTier | undefined;
+    for (const set of sets) {
+      if (set.subject !== subject) continue;
+      if (requireGradeCover && !educationLevelsCoverGrades(set.educationLevels, selectedTokens)) {
+        continue;
+      }
+      const tier = classifySetSource({
+        source: set.source,
+        documentUrl: set.documentUrl,
+        lastVerifiedAt: (set as any).lastVerifiedAt,
+        stateAbbr,
+        enforceOfficialLink,
+      });
+      if (!bestSet || catalogTierRank(tier) > catalogTierRank(bestTier!)) {
+        bestSet = set;
+        bestTier = tier;
+      }
     }
+    return { bestSet, bestTier };
+  };
+
+  // Prefer a grade-appropriate set; if none covers the grade, fall back to the
+  // highest-trust set overall so the UI still shows something.
+  let { bestSet: subjectSet, bestTier: subjectTier } = pickBestSet(gradeAware);
+  if (!subjectSet && gradeAware) {
+    ({ bestSet: subjectSet, bestTier: subjectTier } = pickBestSet(false));
   }
 
   if (jurisdiction && subjectSet && subjectTier) {

@@ -350,7 +350,7 @@ import {
   type RssPlacement,
 } from "@shared/schema";
 import { db } from "../db";
-import { expandGradeSelectionToTokens, standardMatchesGrades } from "@shared/gradeLevels";
+import { expandGradeSelectionToTokens, standardMatchesGrades, educationLevelsCoverGrades } from "@shared/gradeLevels";
 import { decryptIfPossible } from "../services/crypto";
 import { eq, desc, and, asc, gte, sql, or, inArray } from "drizzle-orm";
 import { randomUUID } from "crypto";
@@ -401,9 +401,30 @@ const classroomMethods: ThisType<DatabaseStorage> = {
     // equivalent), don't over-filter — return everything for the set.
     if (selected.size === 0) return allStandards;
 
-    return allStandards.filter((standard) =>
-      standardMatchesGrades(standard.gradeLevel, selected),
+    // Grade data lives at the SET level (`education_levels`), not on individual
+    // standards — the ingested CSP `grade_level` column is empty. So gate the
+    // whole set by its education levels: if the set doesn't cover the chosen
+    // grade, none of its standards do. When some standards DO carry their own
+    // grade_level (future/other sources), refine per-standard on top of that.
+    const [set] = await db
+      .select({ educationLevels: standardSets.educationLevels })
+      .from(standardSets)
+      .where(eq(standardSets.id, standardSetId));
+
+    const hasPerStandardGrades = allStandards.some(
+      (s) => s.gradeLevel != null && String(s.gradeLevel).trim() !== "",
     );
+    if (hasPerStandardGrades) {
+      return allStandards.filter((standard) =>
+        standard.gradeLevel != null && String(standard.gradeLevel).trim() !== ""
+          ? standardMatchesGrades(standard.gradeLevel, selected)
+          : educationLevelsCoverGrades(set?.educationLevels, selected),
+      );
+    }
+
+    return educationLevelsCoverGrades(set?.educationLevels, selected)
+      ? allStandards
+      : [];
   },
 
 
