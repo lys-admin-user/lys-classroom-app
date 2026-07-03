@@ -28,6 +28,7 @@ import {
 } from "lucide-react";
 import { JourneyView, KanbanView, CalendarView, DashboardsView, TrainingView } from "./TeamHubViews";
 import { useTeamHubAccess } from "@/hooks/useTeamHubAccess";
+import { FoundationDrawer } from "@/components/FoundationDrawer";
 import { MfaStepUpDialog } from "@/components/MfaStepUpDialog";
 import { isMfaRequiredError, isMfaEnrollmentRequiredError } from "@/hooks/use-mfa";
 
@@ -64,11 +65,16 @@ function linesToArray(s: string): string[] {
 }
 
 /* ----------------------- Membership access gate ----------------------- */
-// Shown to anyone not yet approved as a Team Hub staff member. Pending
-// requests wait; new/denied users can (re)submit a request with a note.
+// Shown to anyone not yet approved as a Team Hub staff member. Requesting to
+// join is unlocked by finishing the "Our Foundation" materials; until then
+// the card walks the user through completing them. Pending requests wait;
+// new/denied users can (re)submit a request with a note.
 function TeamAccessGate({ status }: { status: "none" | "pending" | "approved" | "denied" }) {
   const { toast } = useToast();
   const [message, setMessage] = useState("");
+  const [foundationOpen, setFoundationOpen] = useState(false);
+  const { foundationComplete, foundationPercent } = useTeamHubAccess();
+  const needsFoundation = status !== "pending" && !foundationComplete;
   const request = useMutation({
     mutationFn: async () =>
       apiRequest("POST", "/api/team/access/request", message.trim() ? { message: message.trim() } : {}),
@@ -84,20 +90,54 @@ function TeamAccessGate({ status }: { status: "none" | "pending" | "approved" | 
       <Card>
         <CardHeader className="text-center">
           <div className="mx-auto mb-2 flex h-12 w-12 items-center justify-center rounded-full bg-muted">
-            {status === "pending" ? <Hourglass className="h-6 w-6 text-lys-teal" /> : <Lock className="h-6 w-6 text-muted-foreground" />}
+            {status === "pending" ? (
+              <Hourglass className="h-6 w-6 text-lys-teal" />
+            ) : needsFoundation ? (
+              <Sparkles className="h-6 w-6 text-lys-teal" />
+            ) : (
+              <Lock className="h-6 w-6 text-muted-foreground" />
+            )}
           </div>
           <CardTitle className="font-oswald text-2xl">
-            {status === "pending" ? "Request pending" : "Team Hub is members-only"}
+            {status === "pending"
+              ? "Request pending"
+              : needsFoundation
+                ? "Start with Our Foundation"
+                : "Team Hub is members-only"}
           </CardTitle>
           <CardDescription>
             {status === "pending"
               ? "Your request to join the Team Hub is waiting for a site or system admin to approve it."
-              : status === "denied"
-                ? "Your previous request was not approved. You can send a new one below."
-                : "The Team Hub is for approved LYS team members. Ask to join and a site or system admin will review your request."}
+              : needsFoundation
+                ? "Explore all of the Our Foundation materials first — once you hit 100%, you can request to join the Team Hub."
+                : status === "denied"
+                  ? "Your previous request was not approved. You can send a new one below."
+                  : "The Team Hub is for approved LYS team members. Ask to join and a site or system admin will review your request."}
           </CardDescription>
         </CardHeader>
-        {status !== "pending" && (
+        {needsFoundation && (
+          <CardContent className="space-y-3">
+            <div className="space-y-1.5">
+              <div className="flex items-center justify-between text-sm">
+                <span className="font-oswald">Our Foundation</span>
+                <span className="text-muted-foreground" data-testid="text-foundation-gate-pct">
+                  {foundationPercent}% explored
+                </span>
+              </div>
+              <Progress value={foundationPercent} />
+            </div>
+            <Button
+              className="w-full"
+              onClick={() => setFoundationOpen(true)}
+              data-testid="button-open-foundation"
+            >
+              <Sparkles className="h-4 w-4 mr-2" />
+              Explore Our Foundation
+            </Button>
+            <FoundationDrawer open={foundationOpen} onOpenChange={setFoundationOpen} />
+          </CardContent>
+        )}
+        {status !== "pending" && !needsFoundation && (
           <CardContent className="space-y-3">
             <div>
               <Label htmlFor="access-message">Note for the admins (optional)</Label>

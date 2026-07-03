@@ -5,15 +5,13 @@ import { Sparkles } from "lucide-react";
 import { FoundationDrawer } from "./FoundationDrawer";
 import type { FoundationModule, FoundationProgress } from "@shared/schema";
 
-const FOUNDATION_ROLES = ["staff", "site_admin", "system_admin"];
-
 export function FoundationFooterPill() {
   const { user } = useAuth();
   const [open, setOpen] = useState(false);
 
-  // Gate: only staff and system-level admins see this widget.
-  const role = user?.role || "";
-  const canSee = FOUNDATION_ROLES.includes(role);
+  // Every signed-in user can explore the Foundation — finishing it is what
+  // unlocks the "Join the Team" (Team Hub membership) request.
+  const canSee = Boolean(user);
 
   const { data: modules = [] } = useQuery<FoundationModule[]>({
     queryKey: ["/api/foundation/modules"],

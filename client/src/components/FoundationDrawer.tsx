@@ -134,6 +134,9 @@ export function FoundationDrawer({ open, onOpenChange }: FoundationDrawerProps) 
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/foundation/progress"] });
+      // Completing all modules unlocks the "Join the Team" (Team Hub) request,
+      // so refresh access status too — the sidebar tab appears immediately.
+      queryClient.invalidateQueries({ queryKey: ["/api/team/access/me"] });
     },
   });
 

@@ -36,7 +36,7 @@ export function CommandPalette() {
   const [, setLocation] = useLocation();
   const { user, isAuthenticated } = useAuth();
   const { viewAsStudent } = useViewAs();
-  const { approved: teamHubApproved } = useTeamHubAccess();
+  const { approved: teamHubApproved, canRequest: canRequestTeamHub } = useTeamHubAccess();
   const actualRole = user?.role || "student";
   // Mirror AppSidebar: when an educator+ turns on student view, the palette
   // lists the same student destinations so the two nav surfaces never drift.
@@ -80,9 +80,24 @@ export function CommandPalette() {
   };
 
   const visibleGroups = navigationGroups
-    // Team Hub stays hidden until membership is approved (mirrors AppSidebar).
-    .filter((g) => showGroup(g) && (g.label !== "Team Hub" || teamHubApproved))
-    .map((g) => ({ label: g.label, items: g.items.filter(showItem) }))
+    // Mirrors AppSidebar: members see the full Team Hub section; users who
+    // finished the Foundation see a single "Join the Team" entry; everyone
+    // else sees nothing.
+    .filter((g) =>
+      g.label === "Team Hub"
+        ? isAuthenticated && (teamHubApproved || canRequestTeamHub)
+        : showGroup(g),
+    )
+    .map((g) =>
+      g.label === "Team Hub" && !teamHubApproved
+        ? {
+            label: g.label,
+            items: g.items
+              .filter((it) => it.url === "/team")
+              .map((it) => ({ ...it, title: "Join the Team" })),
+          }
+        : { label: g.label, items: g.items.filter(showItem) },
+    )
     .filter((g) => g.items.length > 0);
 
   // Mirror the sidebar's persona-first trimming: the persona's primary groups

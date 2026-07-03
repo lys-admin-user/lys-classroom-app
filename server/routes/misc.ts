@@ -457,7 +457,10 @@ export function registerMiscRoutes(app: Express): void {
   });
 
 
-  app.get("/api/foundation/modules", isAuthenticated, requireStaffOrAdmin, async (_req: any, res) => {
+  // Foundation materials are open to every signed-in user: completing them is
+  // the prerequisite for requesting Team Hub membership, so prospective
+  // members must be able to explore them before they are staff.
+  app.get("/api/foundation/modules", isAuthenticated, async (_req: any, res) => {
     try {
       const modules = await storage.getFoundationModules();
       res.json(modules);
@@ -467,7 +470,7 @@ export function registerMiscRoutes(app: Express): void {
   });
 
 
-  app.get("/api/foundation/progress", isAuthenticated, requireStaffOrAdmin, async (req: any, res) => {
+  app.get("/api/foundation/progress", isAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user?.claims?.sub;
       const rows = await storage.getFoundationProgressForUser(userId);
@@ -478,7 +481,7 @@ export function registerMiscRoutes(app: Express): void {
   });
 
 
-  app.post("/api/foundation/progress", isAuthenticated, requireStaffOrAdmin, async (req: any, res) => {
+  app.post("/api/foundation/progress", isAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user?.claims?.sub;
       const parsed = foundationProgressBodySchema.parse(req.body);

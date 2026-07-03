@@ -55,26 +55,55 @@ async function getScope(userId: string) {
   return { user, isManager, me };
 }
 
+// How far a user is through the "Our Foundation" modules. Completing all of
+// them is the prerequisite for requesting Team Hub membership.
+async function getFoundationStatus(userId: string) {
+  const modules = await storage.getFoundationModules();
+  const progress = await storage.getFoundationProgressForUser(userId);
+  const doneSlugs = new Set(
+    progress.filter((p: any) => p.completedAt).map((p: any) => p.moduleSlug),
+  );
+  const total = modules.length;
+  const completed = modules.filter((m: any) => doneSlugs.has(m.slug)).length;
+  return {
+    total,
+    completed,
+    percent: total ? Math.round((completed / total) * 100) : 0,
+    complete: total > 0 && completed === total,
+  };
+}
+
 export function registerTeamHubRoutes(app: Express) {
   // ---------- Membership access (request + approval) ----------
   // Own status — used by the sidebar/command palette to hide Team Hub until
   // approved, and by the Team Hub page to show a pending/request state.
+  // Includes Foundation progress so the client knows whether the user has
+  // earned the right to request membership yet.
   app.get("/api/team/access/me", isAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
       const user = await storage.getUser(userId);
       if (isFoundationAdmin(user?.role)) {
-        return res.json({ status: "approved", canManage: true });
+        return res.json({
+          status: "approved",
+          canManage: true,
+          foundation: { total: 0, completed: 0, percent: 100, complete: true },
+        });
       }
-      const access = await storage.getStaffAccessRequestByUser(userId);
-      res.json({ status: access?.status ?? "none", canManage: false });
+      const [access, foundation] = await Promise.all([
+        storage.getStaffAccessRequestByUser(userId),
+        getFoundationStatus(userId),
+      ]);
+      res.json({ status: access?.status ?? "none", canManage: false, foundation });
     } catch (e) {
       res.status(500).json({ error: "Failed to load access status" });
     }
   });
 
   // Ask to become a Team Hub staff member. Creates a pending request (or
-  // re-opens a denied one); approved rows are never downgraded.
+  // re-opens a denied one); approved rows are never downgraded. Requires the
+  // Foundation materials to be fully explored first — this is enforced here,
+  // server-side, not just hidden in the UI.
   app.post("/api/team/access/request", isAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
@@ -84,6 +113,13 @@ export function registerTeamHubRoutes(app: Express) {
       }
       const parsed = z.object({ message: z.string().max(1000).optional() }).safeParse(req.body ?? {});
       if (!parsed.success) return res.status(400).json({ error: "Invalid request" });
+      const foundation = await getFoundationStatus(userId);
+      if (!foundation.complete) {
+        return res.status(403).json({
+          error: "Finish exploring Our Foundation before requesting Team Hub access",
+          foundation,
+        });
+      }
       const row = await storage.upsertStaffAccessRequest(userId, parsed.data.message ?? null);
       await logAuditEvent({
         userId,

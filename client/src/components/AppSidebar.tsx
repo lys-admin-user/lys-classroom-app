@@ -321,7 +321,7 @@ export function AppSidebar() {
   });
   const pendingCount = pendingCountData?.count ?? 0;
 
-  const { approved: teamHubApproved } = useTeamHubAccess();
+  const { approved: teamHubApproved, canRequest: canRequestTeamHub } = useTeamHubAccess();
 
   const isActiveRoute = (url: string) => {
     const path = url.split("?")[0];
@@ -348,14 +348,27 @@ export function AppSidebar() {
     return true;
   };
 
-  const visibleGroups = navigationGroups.filter(
-    (group) =>
-      shouldShowGroup(group) &&
-      group.items.some(shouldShowItem) &&
-      // Team Hub stays hidden until membership is approved (admins are
-      // auto-approved server-side).
-      (group.label !== "Team Hub" || teamHubApproved),
-  );
+  const visibleGroups = navigationGroups
+    .filter((group) => {
+      // Team Hub is special: members (and admins) see the full section, and
+      // anyone who has finished the "Our Foundation" materials sees a single
+      // "Join the Team" entry so they can request membership. Everyone else
+      // doesn't see it at all.
+      if (group.label === "Team Hub") {
+        return isAuthenticated && (teamHubApproved || canRequestTeamHub);
+      }
+      return shouldShowGroup(group) && group.items.some(shouldShowItem);
+    })
+    .map((group) =>
+      group.label === "Team Hub" && !teamHubApproved
+        ? {
+            ...group,
+            items: group.items
+              .filter((it) => it.url === "/team")
+              .map((it) => ({ ...it, title: "Join the Team" })),
+          }
+        : group,
+    );
 
   // Only surface pinned shortcuts the current role/view can actually reach, so a
   // stale pin (e.g. an admin page pinned earlier, or while "viewing as student")
