@@ -14,7 +14,9 @@ import { TrialBanner } from "@/components/TrialBanner";
 import { ImpersonationBanner } from "@/components/ImpersonationBanner";
 import { OnboardingTour } from "@/components/OnboardingTour";
 import { CommandPalette } from "@/components/CommandPalette";
-import { ViewAsProvider, ViewAsStudentBanner } from "@/hooks/use-view-as";
+import { ViewAsProvider, ViewAsStudentBanner, useViewAs } from "@/hooks/use-view-as";
+import { personaForRole } from "@/lib/personas";
+import { hasMinRole } from "@/components/AppSidebar";
 import { PolicyReacceptModal } from "@/components/PolicyReacceptModal";
 import { RoleRoutedLanding } from "@/components/RoleRoutedLanding";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
@@ -462,9 +464,26 @@ function LoginMfaGate() {
   );
 }
 
+// Tags <html> with data-persona so the CSS accent variables (index.css) light
+// up the whole shell for the signed-in role. Respects "view as student" and is
+// purely visual — it never affects permissions.
+function usePersonaTheme() {
+  const { user, isAuthenticated } = useAuth();
+  const { viewAsStudent } = useViewAs();
+  const actualRole = user?.role || "student";
+  const effectiveRole =
+    viewAsStudent && hasMinRole(actualRole, "educator") ? "student" : actualRole;
+  const persona = isAuthenticated ? personaForRole(effectiveRole) : "student";
+
+  useEffect(() => {
+    document.documentElement.dataset.persona = persona;
+  }, [persona]);
+}
+
 function AppShell() {
   const { isAuthenticated, isLoading } = useAuth();
   const [location] = useLocation();
+  usePersonaTheme();
 
   const sidebarStyle = {
     // Wide enough for the 72px icon rail + 280px category flyout. Collapsing

@@ -24,7 +24,8 @@ LYS is an AI-powered educational platform that helps students and educators achi
 -   **Career Explorer Catalog (~830 careers)**: 42 curated in `seedCareers` (`server/storage/_base.ts`, stable ids "1".."42") + ~800 generated in `server/storage/careersGenerated.ts`; regenerate with `npx tsx scripts/ingest-bls-careers.ts`; UI `client/src/pages/Careers.tsx`
 -   **Embedded Routes**: `client/src/pages/EmbedRouter.tsx`, `client/src/components/EmbedWrapper.tsx`, `EmbedSidebar.tsx`
 -   **Command Palette**: `client/src/components/CommandPalette.tsx` (reuses `navigationGroups` + `hasMinRole` from `AppSidebar.tsx`)
--   **Anonymous Landing / Role Home**: `client/src/components/RoleRoutedLanding.tsx` (pre-login), `RoleQuickStart.tsx` (authed dashboard band)
+-   **Anonymous Landing / Role Home**: `client/src/components/RoleRoutedLanding.tsx` (pre-login); authed "/" is persona-routed (see Persona UI)
+-   **Persona UI (nav trim + theming + homes)**: config `client/src/lib/personas.ts` (personaForRole, PERSONA_CONFIGS.primaryGroups, homeConfigForRole); sidebar/palette persona-first ordering with "More" overflow (`AppSidebar.tsx`, `CommandPalette.tsx`); accent via `data-persona` on `<html>` (`usePersonaTheme` in `App.tsx`, vars in `index.css`, `persona` color in tailwind config); home layouts `client/src/components/PersonaHome.tsx` (PersonaQuickStart + Homeschool/Staff/SchoolAdmin/PlatformAdmin homes), routed in `Dashboard.tsx` default export. Presentation-only — server gating unchanged.
 -   **Guest Email Gate**: `client/src/components/GuestEmailModal.tsx`, `guest_leads` table, endpoints in `server/routes/lessons.ts`
 -   **Student Practice Flow**: `client/src/pages/PracticeGenerator.tsx` (`/practice`), `server/routes/practice.ts`, `server/practiceGenerator.ts`
 -   **School Demo Requests**: `client/src/pages/ForSchools.tsx` (`/for-schools`), `server/routes/demo.ts`, `server/storage/demo.ts`

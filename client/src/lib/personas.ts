@@ -1,5 +1,3 @@
-import { Link } from "wouter";
-import { Card, CardContent } from "@/components/ui/card";
 import {
   Sparkles,
   BookOpen,
@@ -12,27 +10,146 @@ import {
   Library,
   Building2,
   ShieldCheck,
+  Briefcase,
   Settings as SettingsIcon,
+  Compass,
+  Heart,
+  Target,
   type LucideIcon,
 } from "lucide-react";
 
-interface QuickLink {
+/**
+ * Persona layer — single source of truth for the persona-first UI.
+ *
+ * A persona is a presentation profile derived from the user's role. It decides:
+ *  - which navigation groups are always visible vs tucked into "More"
+ *  - the accent color identity (via the `data-persona` attribute + CSS vars)
+ *  - the home-page greeting + quick links
+ *
+ * IMPORTANT: personas are UX only. They never grant or remove access — all
+ * role gating still runs through minRole/exactRole checks (sidebar + palette)
+ * and, authoritatively, on the server.
+ */
+export type Persona =
+  | "student"
+  | "homeschool"
+  | "educator"
+  | "school_admin"
+  | "staff"
+  | "platform_admin";
+
+export function personaForRole(role: string | undefined | null): Persona {
+  switch (role) {
+    case "homeschool_parent":
+      return "homeschool";
+    case "educator":
+      return "educator";
+    case "staff":
+      return "staff";
+    case "campus_admin":
+    case "district_admin":
+      return "school_admin";
+    case "site_admin":
+    case "system_admin":
+      return "platform_admin";
+    case "student":
+    default:
+      return "student";
+  }
+}
+
+export interface PersonaQuickLink {
   label: string;
   href: string;
   icon: LucideIcon;
 }
 
-interface RoleConfig {
-  greeting: string;
-  subtitle: string;
-  links: QuickLink[];
+export interface PersonaConfig {
+  id: Persona;
+  label: string;
+  /**
+   * Navigation group labels (from AppSidebar's navigationGroups) that stay
+   * always visible for this persona, in display order. Any other group the
+   * role can see is tucked into the collapsed "More" section instead.
+   */
+  primaryGroups: string[];
 }
 
-// Role-aware home band. Each staff/parent role lands on the same "/" home but
-// sees a tailored greeting + the shortcuts that matter most to them. Students
-// have their own dedicated dashboard, so they are not handled here.
-function configForRole(role: string | undefined): RoleConfig {
+export const PERSONA_CONFIGS: Record<Persona, PersonaConfig> = {
+  student: {
+    id: "student",
+    label: "Student",
+    primaryGroups: [
+      "Overview",
+      "BE - Self Discovery",
+      "KNOW - Career Paths",
+      "DO - Take Action",
+    ],
+  },
+  homeschool: {
+    id: "homeschool",
+    label: "Homeschool Parent",
+    primaryGroups: ["Overview", "Homeschool Tools", "DO - Take Action"],
+  },
+  educator: {
+    id: "educator",
+    label: "Educator",
+    primaryGroups: ["Overview", "Educator Tools", "Students"],
+  },
+  school_admin: {
+    id: "school_admin",
+    label: "School Admin",
+    primaryGroups: [
+      "Overview",
+      "My Campus",
+      "My District / Network",
+      "Students",
+      "Growth & Analytics",
+    ],
+  },
+  staff: {
+    id: "staff",
+    label: "Internal Staff",
+    primaryGroups: ["Overview", "Team Hub"],
+  },
+  platform_admin: {
+    id: "platform_admin",
+    label: "Platform Admin",
+    primaryGroups: [
+      "Overview",
+      "System Administration",
+      "My District / Network",
+      "My Campus",
+    ],
+  },
+};
+
+export interface PersonaHomeConfig {
+  greeting: string;
+  subtitle: string;
+  links: PersonaQuickLink[];
+}
+
+/**
+ * Home-band config per role (absorbed from the old RoleQuickStart component).
+ * Kept role-keyed (not persona-keyed) because sibling roles inside one persona
+ * still deserve different shortcuts (campus vs district, site vs system).
+ */
+export function homeConfigForRole(role: string | undefined): PersonaHomeConfig {
   switch (role) {
+    case "student":
+      return {
+        greeting: "Welcome back",
+        subtitle: "Keep climbing — your journey is waiting.",
+        links: [
+          { label: "My Journey", href: "/my-journey", icon: Compass },
+          { label: "Self Discovery", href: "/self-discovery", icon: Heart },
+          { label: "Action Plans", href: "/action-plans", icon: Target },
+          { label: "Careers", href: "/careers", icon: Briefcase },
+          { label: "My Portfolio", href: "/portfolio", icon: GraduationCap },
+          { label: "Resources", href: "/resources", icon: Library },
+        ],
+      };
     case "homeschool_parent":
       return {
         greeting: "Welcome back, teacher-parent",
@@ -101,14 +218,14 @@ function configForRole(role: string | undefined): RoleConfig {
     case "staff":
       return {
         greeting: "Welcome back",
-        subtitle: "Your tools and resources, ready when you are.",
+        subtitle: "Your team tools and resources, ready when you are.",
         links: [
-          { label: "AI Lesson Planner", href: "/lesson-generator", icon: Sparkles },
-          { label: "My Lessons", href: "/my-lessons", icon: BookOpen },
-          { label: "Assignments", href: "/assignments", icon: ClipboardList },
+          { label: "Team Hub", href: "/team", icon: Building2 },
+          { label: "Role Directory", href: "/team/roles", icon: Briefcase },
+          { label: "People", href: "/team/people", icon: Users },
+          { label: "My Onboarding", href: "/team/onboarding", icon: ClipboardList },
           { label: "Resources", href: "/resources", icon: Library },
           { label: "Collaboration", href: "/collaboration", icon: Users },
-          { label: "Analytics", href: "/analytics", icon: BarChart3 },
         ],
       };
     case "educator":
@@ -126,40 +243,4 @@ function configForRole(role: string | undefined): RoleConfig {
         ],
       };
   }
-}
-
-export function RoleQuickStart({ role }: { role: string | undefined }) {
-  const { greeting, subtitle, links } = configForRole(role);
-
-  return (
-    <section
-      className="max-w-7xl mx-auto px-4 sm:px-6 pt-8"
-      data-testid="role-quick-start"
-    >
-      <div className="mb-4">
-        <h2 className="font-oswald text-2xl sm:text-3xl text-foreground" data-testid="text-role-greeting">
-          {greeting}
-        </h2>
-        <p className="font-roboto text-muted-foreground">{subtitle}</p>
-      </div>
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
-        {links.map((link) => {
-          const Icon = link.icon;
-          return (
-            <Link key={link.href} href={link.href}>
-              <Card
-                className="hover-elevate active-elevate-2 cursor-pointer h-full"
-                data-testid={`quick-link-${link.href.replace(/\//g, "-")}`}
-              >
-                <CardContent className="flex flex-col items-center justify-center gap-2 p-4 text-center">
-                  <Icon className="h-6 w-6 text-lys-red" />
-                  <span className="font-oswald text-sm leading-tight">{link.label}</span>
-                </CardContent>
-              </Card>
-            </Link>
-          );
-        })}
-      </div>
-    </section>
-  );
 }

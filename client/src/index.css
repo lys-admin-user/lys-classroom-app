@@ -168,6 +168,56 @@
   --destructive-border: hsl(from hsl(var(--destructive)) h s calc(l + var(--opaque-button-border-intensity)) / alpha);
 }
 
+/* PERSONA ACCENTS
+ * The app shell sets data-persona on <html> based on the signed-in role
+ * (see usePersonaTheme in App.tsx). Components reference the accent through
+ * the `persona` Tailwind color (hsl(var(--persona-accent))). Presentation
+ * only — never used for access decisions. */
+:root {
+  --persona-accent: 45 93% 38%; /* default / student: LYS gold */
+}
+:root[data-persona="student"] {
+  --persona-accent: 45 93% 38%;
+}
+:root[data-persona="homeschool"] {
+  --persona-accent: 186 98% 23%; /* LYS teal */
+}
+:root[data-persona="educator"] {
+  --persona-accent: 7 84% 54%; /* LYS red */
+}
+:root[data-persona="school_admin"] {
+  --persona-accent: 217 71% 40%; /* school blue */
+}
+:root[data-persona="staff"] {
+  --persona-accent: 262 52% 47%; /* staff violet */
+}
+:root[data-persona="platform_admin"] {
+  --persona-accent: 222 47% 35%; /* deep platform indigo */
+}
+
+/* Dark mode: lift lightness so accents stay readable on dark surfaces */
+.dark {
+  --persona-accent: 45 93% 62%;
+}
+.dark[data-persona="student"] {
+  --persona-accent: 45 93% 62%;
+}
+.dark[data-persona="homeschool"] {
+  --persona-accent: 186 80% 45%;
+}
+.dark[data-persona="educator"] {
+  --persona-accent: 7 84% 64%;
+}
+.dark[data-persona="school_admin"] {
+  --persona-accent: 217 80% 65%;
+}
+.dark[data-persona="staff"] {
+  --persona-accent: 262 70% 70%;
+}
+.dark[data-persona="platform_admin"] {
+  --persona-accent: 222 65% 70%;
+}
+
 @layer base {
   * {
     @apply border-border;

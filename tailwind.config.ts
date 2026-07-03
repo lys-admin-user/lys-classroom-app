@@ -86,6 +86,7 @@ export default {
           yellow: "hsl(var(--lys-yellow) / <alpha-value>)",
           teal: "hsl(var(--lys-teal) / <alpha-value>)",
         },
+        persona: "hsl(var(--persona-accent) / <alpha-value>)",
       },
       fontFamily: {
         sans: ["var(--font-sans)"],

@@ -50,8 +50,10 @@ import {
   Layers,
   Star,
   ChevronRight,
+  MoreHorizontal,
   type LucideIcon,
 } from "lucide-react";
+import { personaForRole, PERSONA_CONFIGS } from "@/lib/personas";
 
 export function hasMinRole(userRole: string, minRole: UserRole): boolean {
   const userLevel = ROLE_HIERARCHY[userRole as UserRole] ?? 0;
@@ -282,13 +284,15 @@ function usePinnedNav(accountKey?: string | null) {
   return { pinned, togglePin, isPinned };
 }
 
-// A rail entry: either a single nav group, or the combined Be-Know-Do bucket.
+// A rail entry: a single nav group, the combined Be-Know-Do bucket, or the
+// collapsed "More" bucket holding this persona's secondary groups.
 interface RailCategory {
   id: string;
   label: string;
   icon: LucideIcon;
   groups: NavGroup[];
-  isBKD?: boolean;
+  // Render the flyout as labeled sections (one per group) instead of a flat list.
+  isMulti?: boolean;
 }
 
 export function AppSidebar() {
@@ -361,17 +365,19 @@ export function AppSidebar() {
   );
   const visiblePinned = pinned.filter((url) => visibleUrls.has(url));
 
-  // Build rail categories: the three Be-Know-Do groups collapse into one rail
-  // entry (color-coded sections in the flyout); every other group is its own.
-  const studentFocusedGroups = visibleGroups.filter((g) => g.studentFocused);
-  const overview = visibleGroups.find((g) => g.label === "Overview");
-  const otherGroups = visibleGroups.filter(
-    (g) => !g.studentFocused && g.label !== "Overview",
-  );
+  // Persona-first navigation: the persona (derived from the effective role,
+  // so "view as student" flips it too) decides which groups stay always
+  // visible and in what order. Every other group the role can legitimately
+  // see is tucked into one collapsed "More" rail entry. This is presentation
+  // only — visibleGroups already applied all minRole/exactRole gating.
+  const persona = personaForRole(userRole);
+  const personaConfig = PERSONA_CONFIGS[persona];
 
-  const bkdCategory: RailCategory | null = studentFocusedGroups.length
-    ? { id: "bkd", label: "Be · Know · Do", icon: Layers, groups: studentFocusedGroups, isBKD: true }
-    : null;
+  const primaryGroups = personaConfig.primaryGroups
+    .map((label) => visibleGroups.find((g) => g.label === label))
+    .filter((g): g is NavGroup => !!g);
+  const primaryLabels = new globalThis.Set(primaryGroups.map((g) => g.label));
+  const moreGroups = visibleGroups.filter((g) => !primaryLabels.has(g.label));
 
   const toCategory = (g: NavGroup): RailCategory => ({
     id: g.label,
@@ -380,19 +386,36 @@ export function AppSidebar() {
     groups: [g],
   });
 
-  // Educators+ (not previewing as a student) get their tools first and the
-  // student Be-Know-Do bucket at the bottom; everyone else sees it up top.
-  const reorderForEducator =
-    hasMinRole(userRole, "educator") && !(viewAsStudent && isEducatorPlus);
-
+  // Build rail categories: student-focused (Be-Know-Do) primary groups
+  // collapse into one color-coded rail entry; each other primary group is its
+  // own entry; secondary groups share the single "More" entry at the bottom.
   const categories: RailCategory[] = [];
-  if (overview) categories.push(toCategory(overview));
-  if (reorderForEducator) {
-    categories.push(...otherGroups.map(toCategory));
-    if (bkdCategory) categories.push(bkdCategory);
-  } else {
-    if (bkdCategory) categories.push(bkdCategory);
-    categories.push(...otherGroups.map(toCategory));
+  for (const g of primaryGroups) {
+    if (g.studentFocused) {
+      const bkd = categories.find((c) => c.id === "bkd");
+      if (bkd) {
+        bkd.groups.push(g);
+      } else {
+        categories.push({
+          id: "bkd",
+          label: "Be · Know · Do",
+          icon: Layers,
+          groups: [g],
+          isMulti: true,
+        });
+      }
+    } else {
+      categories.push(toCategory(g));
+    }
+  }
+  if (moreGroups.length > 0) {
+    categories.push({
+      id: "more",
+      label: "More",
+      icon: MoreHorizontal,
+      groups: moreGroups,
+      isMulti: true,
+    });
   }
 
   // Which rail category's flyout is open. Defaults to the one matching the route,
@@ -425,11 +448,11 @@ export function AppSidebar() {
     : "bg-white border-r border-slate-200/80 shadow-[2px_0_12px_rgba(0,0,0,0.02)]";
   const railBtnActive = isDark
     ? "bg-white/10 text-white border border-white/10 shadow-[0_2px_10px_rgba(0,0,0,0.25)]"
-    : "bg-lys-yellow/15 text-slate-800 border border-lys-yellow/30 shadow-[0_2px_8px_rgba(0,0,0,0.03)]";
+    : "bg-persona/10 text-slate-800 border border-persona/25 shadow-[0_2px_8px_rgba(0,0,0,0.03)]";
   const railBtnIdle = isDark
     ? "text-slate-400 hover:bg-white/10 hover:text-white border border-transparent hover:scale-105 active:scale-95"
     : "text-slate-400 hover:bg-slate-100 hover:text-slate-700 border border-transparent hover:scale-105 active:scale-95";
-  const activeIconColor = isDark ? "text-lys-yellow" : "text-[hsl(45,93%,38%)]";
+  const activeIconColor = "text-persona";
   const railDivider = isDark ? "border-white/10" : "border-slate-200/80";
   // When collapsed to the rail (desktop), a category click can't reveal its
   // flyout (it's unmounted), so expand the sidebar first; otherwise just preview.
@@ -464,7 +487,7 @@ export function AppSidebar() {
         key={`${item.title}-${item.url}`}
         className={`group/item flex items-center pr-2 rounded-[10px] border transition-all duration-200 ${
           isActive
-            ? "bg-lys-yellow/15 border-lys-yellow/30 shadow-sm"
+            ? "bg-persona/10 border-persona/25 shadow-sm"
             : "border-transparent hover:bg-slate-100"
         }`}
       >
@@ -476,7 +499,7 @@ export function AppSidebar() {
         >
           <Icon
             className={`w-[18px] h-[18px] stroke-[1.75] shrink-0 ${
-              isActive ? "text-[hsl(45,93%,38%)]" : "text-slate-400 group-hover/item:text-slate-600"
+              isActive ? "text-persona" : "text-slate-400 group-hover/item:text-slate-600"
             }`}
           />
           <span
@@ -503,9 +526,9 @@ export function AppSidebar() {
             onClick={() => togglePin(item.url)}
             aria-label={pinnedNow ? `Unpin ${item.title}` : `Pin ${item.title} to rail`}
             title={pinnedNow ? "Unpin from rail" : "Pin to rail"}
-            className={`shrink-0 p-1 rounded-md transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-lys-yellow/50 ${
+            className={`shrink-0 p-1 rounded-md transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-persona/50 ${
               pinnedNow
-                ? "text-lys-yellow opacity-100"
+                ? "text-persona opacity-100"
                 : "text-slate-300 opacity-0 group-hover/item:opacity-100 group-focus-within/item:opacity-100 focus-visible:opacity-100 hover:text-slate-500"
             }`}
             data-testid={`pin-${slug(item.title)}`}
@@ -513,7 +536,7 @@ export function AppSidebar() {
             <Star className={`w-3.5 h-3.5 ${pinnedNow ? "fill-current" : ""}`} />
           </button>
         ) : isActive ? (
-          <div className="shrink-0 w-1.5 h-1.5 rounded-full bg-lys-yellow shadow-[0_0_4px_rgba(250,204,21,0.6)]" />
+          <div className="shrink-0 w-1.5 h-1.5 rounded-full bg-persona shadow-[0_0_4px_hsl(var(--persona-accent)/0.6)]" />
         ) : null}
       </div>
     );
@@ -557,7 +580,7 @@ export function AppSidebar() {
                         <PinnedIcon
                           className={`w-5 h-5 stroke-[1.75] ${active ? activeIconColor : ""}`}
                         />
-                        <span className="absolute -top-0.5 -right-0.5 w-2 h-2 rounded-full bg-lys-yellow shadow-[0_0_4px_rgba(250,204,21,0.6)]" />
+                        <span className="absolute -top-0.5 -right-0.5 w-2 h-2 rounded-full bg-persona shadow-[0_0_4px_hsl(var(--persona-accent)/0.6)]" />
                       </Link>
                     </TooltipTrigger>
                     <TooltipContent side="right">{meta.title}</TooltipContent>
@@ -589,7 +612,7 @@ export function AppSidebar() {
                       {isActive && (
                         <motion.div
                           layoutId="rail-active-indicator"
-                          className="absolute -left-3 top-1/2 -translate-y-1/2 w-[4px] h-[22px] bg-lys-yellow rounded-r-full shadow-[1px_0_8px_rgba(250,204,21,0.5)]"
+                          className="absolute -left-3 top-1/2 -translate-y-1/2 w-[4px] h-[22px] bg-persona rounded-r-full shadow-[1px_0_8px_hsl(var(--persona-accent)/0.5)]"
                           transition={{ type: "spring", stiffness: 500, damping: 38 }}
                         />
                       )}
@@ -633,7 +656,7 @@ export function AppSidebar() {
         {showFlyout && (
           <div className="flex-1 min-w-0 h-full flex flex-col overflow-hidden bg-white border-r border-slate-200/80 shadow-[2px_0_12px_rgba(0,0,0,0.03)]">
             <div className="h-[72px] shrink-0 flex items-center px-5 border-b border-slate-100 bg-slate-50/50 relative">
-              <div className="absolute top-0 left-0 right-0 h-[2px] bg-gradient-to-r from-[hsl(var(--lys-yellow))] to-transparent" />
+              <div className="absolute top-0 left-0 right-0 h-[2px] bg-gradient-to-r from-persona to-transparent" />
               <Link href="/" className="leading-none" data-testid="link-home-wordmark">
                 <span className="font-marker text-xl text-lys-red tracking-wider">LYS</span>
                 <p className="font-oswald text-[10px] text-muted-foreground tracking-wide mt-1">
@@ -643,7 +666,7 @@ export function AppSidebar() {
             </div>
 
             <div className="flex-1 overflow-y-auto px-3 py-3 flex flex-col gap-4">
-              {activeCategory?.isBKD ? (
+              {activeCategory?.isMulti ? (
                 activeCategory.groups.map((group) => {
                   const items = group.items.filter(shouldShowItem);
                   if (!items.length) return null;

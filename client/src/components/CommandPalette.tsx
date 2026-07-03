@@ -19,6 +19,7 @@ import {
   type NavGroup,
   type NavItem,
 } from "@/components/AppSidebar";
+import { personaForRole, PERSONA_CONFIGS } from "@/lib/personas";
 
 // Extra destinations that live in the sidebar footer rather than the main nav.
 const QUICK_LINKS: NavItem[] = [
@@ -84,6 +85,16 @@ export function CommandPalette() {
     .map((g) => ({ label: g.label, items: g.items.filter(showItem) }))
     .filter((g) => g.items.length > 0);
 
+  // Mirror the sidebar's persona-first trimming: the persona's primary groups
+  // list first (same order as the rail); everything else follows under a
+  // "More" prefix, matching the sidebar's collapsed More section.
+  const personaConfig = PERSONA_CONFIGS[personaForRole(userRole)];
+  const primaryOrder = personaConfig.primaryGroups;
+  const primaryGroups = primaryOrder
+    .map((label) => visibleGroups.find((g) => g.label === label))
+    .filter((g): g is (typeof visibleGroups)[number] => !!g);
+  const moreGroups = visibleGroups.filter((g) => !primaryOrder.includes(g.label));
+
   const quickVisible = QUICK_LINKS.filter(showItem);
 
   return (
@@ -91,7 +102,7 @@ export function CommandPalette() {
       <CommandInput placeholder="Jump to a page or tool..." data-testid="input-command-search" />
       <CommandList>
         <CommandEmpty>No results found.</CommandEmpty>
-        {visibleGroups.map((group) => (
+        {primaryGroups.map((group) => (
           <CommandGroup key={group.label} heading={group.label}>
             {group.items.map((item) => {
               const Icon = item.icon;
@@ -99,6 +110,25 @@ export function CommandPalette() {
                 <CommandItem
                   key={`${group.label}-${item.url}`}
                   value={`${group.label} ${item.title}`}
+                  onSelect={() => go(item.url)}
+                  data-testid={`command-item-${item.url.replace(/[^a-z0-9]+/gi, "-")}`}
+                >
+                  <Icon className="h-4 w-4" />
+                  <span>{item.title}</span>
+                </CommandItem>
+              );
+            })}
+          </CommandGroup>
+        ))}
+        {moreGroups.length > 0 && <CommandSeparator />}
+        {moreGroups.map((group) => (
+          <CommandGroup key={group.label} heading={`More · ${group.label}`}>
+            {group.items.map((item) => {
+              const Icon = item.icon;
+              return (
+                <CommandItem
+                  key={`${group.label}-${item.url}`}
+                  value={`more ${group.label} ${item.title}`}
                   onSelect={() => go(item.url)}
                   data-testid={`command-item-${item.url.replace(/[^a-z0-9]+/gi, "-")}`}
                 >

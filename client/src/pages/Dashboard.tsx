@@ -37,7 +37,13 @@ import {
 import { Link } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/use-auth";
-import { RoleQuickStart } from "@/components/RoleQuickStart";
+import {
+  PersonaQuickStart,
+  HomeschoolHome,
+  StaffHome,
+  SchoolAdminHome,
+  PlatformAdminHome,
+} from "@/components/PersonaHome";
 import { DemoVideoModal } from "@/components/DemoVideoModal";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -1130,7 +1136,7 @@ function EducatorDashboard() {
 
   return (
     <div className="min-h-screen bg-background" data-testid="educator-dashboard">
-      {isAuthenticated && <RoleQuickStart role={user?.role ?? undefined} />}
+      {isAuthenticated && <PersonaQuickStart role={user?.role ?? undefined} />}
       <section className="relative overflow-hidden bg-gradient-to-br from-lys-yellow/20 via-background to-lys-teal/10">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 py-12 lg:py-20">
           <div className="grid lg:grid-cols-2 gap-8 lg:gap-12 items-center">
@@ -1498,12 +1504,27 @@ function EducatorDashboard() {
   );
 }
 
+// Persona-routed home: every signed-in role lands on "/" but sees the layout
+// built for its persona. Anonymous visitors on other paths (the "/" landing is
+// handled outside the shell) and educators get the full educator dashboard.
 export default function Dashboard() {
   const { isAuthenticated, user } = useAuth();
-  const isStudent = user?.role === "student";
 
-  if (isAuthenticated && isStudent) {
-    return <StudentDashboard />;
+  if (isAuthenticated) {
+    switch (user?.role) {
+      case "student":
+        return <StudentDashboard />;
+      case "homeschool_parent":
+        return <HomeschoolHome />;
+      case "staff":
+        return <StaffHome />;
+      case "campus_admin":
+      case "district_admin":
+        return <SchoolAdminHome />;
+      case "site_admin":
+      case "system_admin":
+        return <PlatformAdminHome />;
+    }
   }
 
   return <EducatorDashboard />;
