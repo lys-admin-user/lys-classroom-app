@@ -2,8 +2,8 @@
 import type { Express } from "express";
 import { db } from "../db";
 import { storage } from "../storage";
-import { userPreferences, NOTIFICATION_KINDS, DIGEST_CADENCES, type DigestCadence } from "@shared/schema";
-import { eq } from "drizzle-orm";
+import { userPreferences, standardsDigestLog, NOTIFICATION_KINDS, DIGEST_CADENCES, type DigestCadence } from "@shared/schema";
+import { eq, desc } from "drizzle-orm";
 import { z } from "zod";
 import { isAuthenticated } from "../replit_integrations/auth";
 import {
@@ -148,6 +148,23 @@ export function registerNotificationsRoutes(app: Express): void {
       }
       console.error("[notifications] update settings failed:", err);
       res.status(500).json({ error: "Failed to update notification settings" });
+    }
+  });
+
+  // Task #19 — browse the append-only history of assembled weekly digests so
+  // admins can see "what did last week's report say?" without a SQL query. Also
+  // a debugging aid until a real outbound transport is wired up.
+  app.get("/api/admin/digest/history", isAuthenticated, requireSystemAdmin(), async (_req, res) => {
+    try {
+      const rows = await db
+        .select()
+        .from(standardsDigestLog)
+        .orderBy(desc(standardsDigestLog.createdAt))
+        .limit(100);
+      res.json(rows);
+    } catch (err) {
+      console.error("[digest] history load failed:", err);
+      res.status(500).json({ error: "Failed to load digest history" });
     }
   });
 

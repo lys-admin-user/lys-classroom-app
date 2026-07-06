@@ -13,7 +13,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/use-auth";
-import { Loader2, Globe, RefreshCw, CheckCircle2, XCircle, Plus, Inbox, TrendingDown, History, ExternalLink, ShieldCheck, FileText, ChevronDown, ChevronUp } from "lucide-react";
+import { Loader2, Globe, RefreshCw, CheckCircle2, XCircle, Plus, Inbox, TrendingDown, History, ExternalLink, ShieldCheck, FileText, ChevronDown, ChevronUp, Mail } from "lucide-react";
 
 export default function StandardsIngestionAdmin() {
   const { user } = useAuth();
@@ -36,6 +36,7 @@ export default function StandardsIngestionAdmin() {
           <TabsTrigger value="sources" data-testid="tab-sources"><Globe className="h-4 w-4 mr-1" />Sources</TabsTrigger>
           <TabsTrigger value="gaps" data-testid="tab-gaps"><TrendingDown className="h-4 w-4 mr-1" />Coverage gaps</TabsTrigger>
           <TabsTrigger value="runs" data-testid="tab-runs"><History className="h-4 w-4 mr-1" />Sync history</TabsTrigger>
+          <TabsTrigger value="digests" data-testid="tab-digests"><Mail className="h-4 w-4 mr-1" />Past digests</TabsTrigger>
         </TabsList>
         <TabsContent value="moderation"><ModerationQueue /></TabsContent>
         <TabsContent value="pending"><PendingReview /></TabsContent>
@@ -43,6 +44,7 @@ export default function StandardsIngestionAdmin() {
         <TabsContent value="sources"><SourcesPanel /></TabsContent>
         <TabsContent value="gaps"><CoverageGaps /></TabsContent>
         <TabsContent value="runs"><SyncHistory /></TabsContent>
+        <TabsContent value="digests"><PastDigests /></TabsContent>
       </Tabs>
     </div>
   );
@@ -326,6 +328,104 @@ function SyncHistory() {
             )}
           </CardContent>
         </Card>
+      ))}
+    </div>
+  );
+}
+
+// ===== Task #19: Past digests =====
+
+type DigestLogRow = {
+  id: string;
+  userId: string;
+  email: string | null;
+  subject: string;
+  body: string;
+  status: string;
+  errorMessage: string | null;
+  periodStart: string;
+  periodEnd: string;
+  createdAt: string | null;
+};
+
+function digestStatusColor(s: string) {
+  if (s === "sent") return "bg-green-100 text-green-800";
+  if (s === "failed") return "bg-red-100 text-red-800";
+  if (s === "skipped_opted_out") return "bg-slate-100 text-slate-700";
+  return "bg-amber-100 text-amber-800";
+}
+
+function DigestRow({ row }: { row: DigestLogRow }) {
+  const [open, setOpen] = useState(false);
+  const fmt = (d: string | null) => (d ? new Date(d).toLocaleDateString() : "—");
+  return (
+    <Card data-testid={`card-digest-${row.id}`}>
+      <CardContent className="p-3">
+        <div className="flex items-center gap-2 flex-wrap">
+          <Badge className={digestStatusColor(row.status)} data-testid={`badge-digest-status-${row.id}`}>
+            {row.status}
+          </Badge>
+          <span className="text-sm font-semibold" data-testid={`text-digest-period-${row.id}`}>
+            {fmt(row.periodStart)} → {fmt(row.periodEnd)}
+          </span>
+          <span className="text-xs text-muted-foreground" data-testid={`text-digest-recipient-${row.id}`}>
+            {row.email || row.userId}
+          </span>
+          <span className="text-xs text-muted-foreground ml-auto">
+            {row.createdAt ? new Date(row.createdAt).toLocaleString() : "—"}
+          </span>
+        </div>
+        {row.errorMessage && (
+          <p className="text-xs text-red-700 mt-1" data-testid={`text-digest-error-${row.id}`}>
+            <ExternalLink className="h-3 w-3 inline mr-1" />{row.errorMessage}
+          </p>
+        )}
+        <Collapsible open={open} onOpenChange={setOpen}>
+          <CollapsibleTrigger asChild>
+            <Button
+              variant="ghost"
+              size="sm"
+              className="mt-2 h-7 px-2 text-xs"
+              data-testid={`button-digest-toggle-${row.id}`}
+            >
+              {open ? <ChevronUp className="h-3 w-3 mr-1" /> : <ChevronDown className="h-3 w-3 mr-1" />}
+              {open ? "Hide" : "Show"} body
+            </Button>
+          </CollapsibleTrigger>
+          <CollapsibleContent>
+            <p className="text-sm font-semibold mt-2" data-testid={`text-digest-subject-${row.id}`}>{row.subject}</p>
+            <pre
+              className="mt-1 whitespace-pre-wrap break-words rounded-md bg-muted p-3 text-xs font-mono text-foreground"
+              data-testid={`text-digest-body-${row.id}`}
+            >
+              {row.body}
+            </pre>
+          </CollapsibleContent>
+        </Collapsible>
+      </CardContent>
+    </Card>
+  );
+}
+
+function PastDigests() {
+  const { data: digests = [], isLoading } = useQuery<DigestLogRow[]>({
+    queryKey: ["/api/admin/digest/history"],
+  });
+  if (isLoading)
+    return <div className="py-8 text-center text-muted-foreground" data-testid="text-digests-loading">Loading…</div>;
+  if (digests.length === 0)
+    return (
+      <Card className="mt-4">
+        <CardContent className="py-12 text-center text-muted-foreground" data-testid="text-no-digests">
+          No digests logged yet. Trigger one from the notification settings or wait for the weekly run.
+        </CardContent>
+      </Card>
+    );
+  return (
+    <div className="mt-4 space-y-2">
+      <p className="text-sm text-muted-foreground">{digests.length} most recent digest{digests.length === 1 ? "" : "s"}.</p>
+      {digests.map((row) => (
+        <DigestRow key={row.id} row={row} />
       ))}
     </div>
   );
