@@ -4,6 +4,7 @@ import {
   shouldPromptOptInMfa,
   isLoginMfaExempt,
   isAdminMfaSurface,
+  mustEnrollAuthenticator,
   LOGIN_MFA_MIN_ROLE,
   type LoginMfaContext,
 } from "../services/mfaAccessPolicy";
@@ -17,6 +18,7 @@ function ctx(overrides: Partial<LoginMfaContext> = {}): LoginMfaContext {
     fresh: false,
     trustedDevice: false,
     hasTotp: true,
+    hasAuthenticator: true,
     emailOk: true,
     bypassed: false,
     ...overrides,
@@ -34,6 +36,11 @@ describe("mfaAccessPolicy: path helpers", () => {
   it("recognizes admin surfaces (prefix match, not substring)", () => {
     expect(isAdminMfaSurface("/api/admin")).toBe(true);
     expect(isAdminMfaSurface("/api/admin/users")).toBe(true);
+    expect(isAdminMfaSurface("/api/org-admin")).toBe(true);
+    expect(isAdminMfaSurface("/api/org-admin/orgs")).toBe(true);
+    expect(isAdminMfaSurface("/api/org-safety")).toBe(true);
+    expect(isAdminMfaSurface("/api/team")).toBe(true);
+    expect(isAdminMfaSurface("/api/team/roles")).toBe(true);
     expect(isAdminMfaSurface("/api/lessons")).toBe(false);
     // must not false-match a path that merely contains "admin"
     expect(isAdminMfaSurface("/api/badminton")).toBe(false);
@@ -46,14 +53,21 @@ describe("mfaAccessPolicy: decideLoginMfa", () => {
     expect(d.action).toBe("challenge");
   });
 
-  it("does NOT fail open when a required user has no usable factor", () => {
-    const d = decideLoginMfa(ctx({ hasTotp: false, emailOk: false }));
+  it("does NOT fail open when a required user has no authenticator enrolled", () => {
+    const d = decideLoginMfa(ctx({ hasTotp: false, hasAuthenticator: false, emailOk: false }));
     expect(d.action).toBe("challenge");
     expect(d).toMatchObject({ enrollmentRequired: true });
   });
 
-  it("marks enrollmentRequired false when a factor exists", () => {
-    const d = decideLoginMfa(ctx({ hasTotp: true, emailOk: false }));
+  it("forces enrollment when only the master code is usable (no real authenticator)", () => {
+    // Master code makes hasTotp true, but the user still has no enrolled
+    // authenticator, so we must push them through setup.
+    const d = decideLoginMfa(ctx({ hasTotp: true, hasAuthenticator: false, emailOk: false }));
+    expect(d).toEqual({ action: "challenge", enrollmentRequired: true });
+  });
+
+  it("marks enrollmentRequired false when an authenticator is enrolled", () => {
+    const d = decideLoginMfa(ctx({ hasTotp: true, hasAuthenticator: true, emailOk: false }));
     expect(d).toEqual({ action: "challenge", enrollmentRequired: false });
   });
 
@@ -92,6 +106,26 @@ describe("mfaAccessPolicy: decideLoginMfa", () => {
 
   it("honors the dev bypass", () => {
     expect(decideLoginMfa(ctx({ bypassed: true })).action).toBe("allow");
+  });
+});
+
+describe("mfaAccessPolicy: mustEnrollAuthenticator", () => {
+  it("forces staff+ with no authenticator to enroll (blocks email/recovery bypass)", () => {
+    expect(mustEnrollAuthenticator("staff", false)).toBe(true);
+    expect(mustEnrollAuthenticator("site_admin", false)).toBe(true);
+    expect(mustEnrollAuthenticator("system_admin", false)).toBe(true);
+  });
+
+  it("does not force enrollment once an authenticator is enrolled", () => {
+    expect(mustEnrollAuthenticator("staff", true)).toBe(false);
+    expect(mustEnrollAuthenticator("site_admin", true)).toBe(false);
+  });
+
+  it("never forces optional roles (below staff)", () => {
+    expect(mustEnrollAuthenticator("educator", false)).toBe(false);
+    expect(mustEnrollAuthenticator("homeschool_parent", false)).toBe(false);
+    expect(mustEnrollAuthenticator("student", false)).toBe(false);
+    expect(mustEnrollAuthenticator(undefined, false)).toBe(false);
   });
 });
 

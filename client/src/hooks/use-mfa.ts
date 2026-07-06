@@ -22,6 +22,9 @@ export interface MfaStatus {
   recoveryCodesRemaining?: number;
   // Whether to show the optional "turn on 2FA" nudge (optional-role users only).
   promptOptIn?: boolean;
+  // True when a required (staff+) user has no authenticator enrolled yet, so the
+  // login gate must force them through enrollment rather than a plain challenge.
+  enrollmentRequired?: boolean;
 }
 
 export interface TrustedDeviceInfo {
@@ -63,7 +66,7 @@ export function useMfaEnroll() {
 }
 
 export function useMfaActivate() {
-  return useMutation<{ success: boolean }, Error, string>({
+  return useMutation<{ success: boolean; recoveryCodes?: string[] }, Error, string>({
     mutationFn: async (token: string) => {
       const res = await apiRequest("POST", "/api/mfa/activate", { token });
       return res.json();

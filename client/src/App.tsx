@@ -449,16 +449,22 @@ function LoginMfaGate() {
   const required = !!status?.loginMfaRequired;
   if (!required) return null;
 
+  const enrollmentRequired = !!status?.enrollmentRequired;
+
   return (
     <MfaStepUpDialog
       open
-      enrollmentRequired={false}
+      enrollmentRequired={enrollmentRequired}
       dismissable={false}
       allowRememberDevice
       purpose="login"
       methods={status?.methods}
-      title="Two-factor verification required"
-      description="Your role requires a second factor each session. Verify with your authenticator app, an emailed code, or a recovery code to continue."
+      title={enrollmentRequired ? "Set up two-factor authentication" : "Two-factor verification required"}
+      description={
+        enrollmentRequired
+          ? "Your role requires two-factor authentication. Set up an authenticator app to continue."
+          : "Your role requires a second factor each session. Verify with your authenticator app, an emailed code, or a recovery code to continue."
+      }
       onClose={() => {}}
       onVerified={() => invalidateMfaStatus()}
     />

@@ -46,10 +46,15 @@ export function MfaSettingsCard() {
 
   const confirmActivate = async () => {
     try {
-      await activate.mutateAsync(activateToken);
+      const res = await activate.mutateAsync(activateToken);
       setEnrollData(null);
       setActivateToken("");
-      toast({ title: "Two-factor authentication enabled" });
+      if (res.recoveryCodes?.length) {
+        setRecoveryCodes(res.recoveryCodes);
+        toast({ title: "Two-factor authentication enabled", description: "Save your recovery codes now — they won't be shown again." });
+      } else {
+        toast({ title: "Two-factor authentication enabled" });
+      }
     } catch (err: any) {
       toast({ title: "Verification failed", description: err?.error || err?.message || "Invalid code", variant: "destructive" });
     }

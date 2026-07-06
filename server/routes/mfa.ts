@@ -25,6 +25,7 @@ import {
   shouldPromptOptInMfa,
   isLoginMfaExempt,
   isAdminMfaSurface,
+  mustEnrollAuthenticator,
 } from "../services/mfaAccessPolicy";
 import {
   regenerateRecoveryCodes,
@@ -157,7 +158,8 @@ export const requireLoginMfa: RequestHandler = async (req: any, res, next) => {
 
     const fresh = isSessionFresh(req);
     const trustedDevice = fresh ? false : await hasValidTrustedDevice(userId, req);
-    const hasTotp = !!(user.mfaEnabled && user.mfaSecret) || MASTER_MFA_CODE_ENABLED;
+    const hasAuthenticator = !!(user.mfaEnabled && user.mfaSecret);
+    const hasTotp = hasAuthenticator || MASTER_MFA_CODE_ENABLED;
     const emailOk = emailDeliverable(user);
 
     const decision = decideLoginMfa({
@@ -167,6 +169,7 @@ export const requireLoginMfa: RequestHandler = async (req: any, res, next) => {
       fresh,
       trustedDevice,
       hasTotp,
+      hasAuthenticator,
       emailOk,
       bypassed: false,
     });
@@ -224,6 +227,9 @@ export function registerMfaRoutes(app: Express): void {
         // the client's login-MFA challenge.
         loginMfaRequired:
           !loginMfaBypassed() && subjectToLoginMfa && !fresh && !trustedDevice,
+        // True when a required (staff+) user has no real authenticator enrolled,
+        // so the client must force them through enrollment (not just a challenge).
+        enrollmentRequired: subjectToLoginMfa && !hasTotp,
       });
     } catch (err) {
       res.status(500).json({ error: "Failed to load MFA status" });
@@ -276,6 +282,9 @@ export function registerMfaRoutes(app: Express): void {
         .set({ mfaEnabled: true, mfaActivatedAt: new Date(), updatedAt: new Date() })
         .where(eq(users.id, userId));
       req.session.mfaVerifiedAt = Date.now();
+      // Issue the one-time recovery codes now, at enrollment, and return them
+      // ONCE for the user to save (only hashes are stored).
+      const recoveryCodes = await regenerateRecoveryCodes(userId);
       await logAuditEvent({
         userId,
         action: "mfa.activated",
@@ -286,7 +295,18 @@ export function registerMfaRoutes(app: Express): void {
         ipAddress: getClientIP(req),
         userAgent: req.get("user-agent"),
       });
-      res.json({ success: true });
+      await logAuditEvent({
+        userId,
+        action: "mfa.recovery_generated",
+        category: "security",
+        severity: "warning",
+        resourceType: "user",
+        resourceId: userId,
+        ipAddress: getClientIP(req),
+        userAgent: req.get("user-agent"),
+        details: { count: recoveryCodes.length, atEnrollment: true },
+      });
+      res.json({ success: true, recoveryCodes });
     } catch (err) {
       console.error("MFA activate error:", err);
       res.status(500).json({ error: "Failed to activate MFA" });
@@ -309,10 +329,14 @@ export function registerMfaRoutes(app: Express): void {
         return res.json({ success: true });
       }
       const user = await storage.getUser(userId);
+      // Required (staff+) users with no authenticator enrolled must be forced
+      // through enrollment — a recovery code must NOT satisfy the login gate for
+      // them (and they can't have one anyway before enrolling). No fail-open.
+      const mustEnroll = mustEnrollAuthenticator(user?.role, !!(user?.mfaEnabled && user?.mfaSecret));
       let verified = false;
       if (user?.mfaEnabled && user.mfaSecret && verifyTokenAgainstEncrypted(token, user.mfaSecret)) {
         verified = true;
-      } else if (await verifyRecoveryCode(userId, token)) {
+      } else if (!mustEnroll && await verifyRecoveryCode(userId, token)) {
         verified = true;
         await logAuditEvent({
           userId,
@@ -326,8 +350,8 @@ export function registerMfaRoutes(app: Express): void {
         });
       }
       if (!verified) {
-        if (!user?.mfaEnabled || !user.mfaSecret) {
-          return res.status(400).json({ error: "MFA is not enabled.", enrollmentRequired: true });
+        if (mustEnroll || !user?.mfaEnabled || !user.mfaSecret) {
+          return res.status(400).json({ error: "Set up an authenticator app to continue.", enrollmentRequired: true });
         }
         return res.status(400).json({ error: "Invalid code. Please try again." });
       }
@@ -389,6 +413,13 @@ export function registerMfaRoutes(app: Express): void {
         req.session.mfaVerifiedAt = Date.now();
         if (remember) await issueTrustedDevice(userId, req, res);
         return res.json({ success: true });
+      }
+      const emailUser = await storage.getUser(userId);
+      // No fail-open via email: a required (staff+) user with no authenticator
+      // enrolled must enroll one first. An email code must NOT mark them fresh
+      // (which would satisfy the login gate) regardless of the stated purpose.
+      if (mustEnrollAuthenticator(emailUser?.role, !!(emailUser?.mfaEnabled && emailUser?.mfaSecret))) {
+        return res.status(400).json({ error: "Set up an authenticator app to continue.", enrollmentRequired: true });
       }
       const ok = await verifyEmailOtp(userId, code, purpose);
       if (!ok) {

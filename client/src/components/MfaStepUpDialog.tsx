@@ -66,6 +66,8 @@ export function MfaStepUpDialog({
   const [mode, setMode] = useState<"app" | "email" | "recovery">("app");
   const [emailSentTo, setEmailSentTo] = useState<string | null>(null);
   const [rememberDevice, setRememberDevice] = useState(false);
+  // Recovery codes returned once at enrollment; shown until the user confirms.
+  const [recoveryCodes, setRecoveryCodes] = useState<string[] | null>(null);
 
   const enroll = useMfaEnroll();
   const activate = useMfaActivate();
@@ -124,7 +126,15 @@ export function MfaStepUpDialog({
           await startEnroll();
           return;
         }
-        await activate.mutateAsync(token);
+        const res = await activate.mutateAsync(token);
+        // Show recovery codes once before finishing enrollment.
+        if (res.recoveryCodes?.length) {
+          setRecoveryCodes(res.recoveryCodes);
+          setToken("");
+          setEnrollData(null);
+          setEmailSentTo(null);
+          return;
+        }
       } else {
         await verify.mutateAsync({ token, rememberDevice: remember });
       }
@@ -181,6 +191,20 @@ export function MfaStepUpDialog({
           <DialogDescription>{computedDescription}</DialogDescription>
         </DialogHeader>
 
+        {recoveryCodes ? (
+          <div className="space-y-3">
+            <p className="text-sm text-muted-foreground">
+              Save these one-time recovery codes somewhere safe. Each works only
+              once and they won't be shown again.
+            </p>
+            <div className="grid grid-cols-2 gap-2 rounded-md border p-3 font-mono text-sm" data-testid="list-recovery-codes">
+              {recoveryCodes.map((code) => (
+                <span key={code} data-testid={`text-recovery-code-${code}`}>{code}</span>
+              ))}
+            </div>
+          </div>
+        ) : (
+        <>
         {/* Factor switch. Recovery codes are always offered as a fallback so a
             user who lost their authenticator/email can still get in. */}
         {!enrollmentRequired && (hasTotp || hasEmail) && (
@@ -277,21 +301,34 @@ export function MfaStepUpDialog({
             )}
           </div>
         )}
+        </>
+        )}
 
         <DialogFooter>
-          {dismissable && (
-            <Button variant="ghost" onClick={close} data-testid="button-mfa-cancel">
-              Cancel
+          {recoveryCodes ? (
+            <Button
+              onClick={() => { setRecoveryCodes(null); onVerified(); }}
+              data-testid="button-mfa-recovery-done"
+            >
+              I've saved my codes
             </Button>
+          ) : (
+            <>
+              {dismissable && (
+                <Button variant="ghost" onClick={close} data-testid="button-mfa-cancel">
+                  Cancel
+                </Button>
+              )}
+              <Button
+                onClick={needsEnrollStart ? startEnroll : needsEmailSend ? sendEmailCode : handleConfirm}
+                disabled={busy || (!needsEnrollStart && !needsEmailSend && token.trim().length < 6)}
+                data-testid="button-mfa-confirm"
+              >
+                {busy && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                {needsEnrollStart ? "Start setup" : needsEmailSend ? "Send code" : "Verify"}
+              </Button>
+            </>
           )}
-          <Button
-            onClick={needsEnrollStart ? startEnroll : needsEmailSend ? sendEmailCode : handleConfirm}
-            disabled={busy || (!needsEnrollStart && !needsEmailSend && token.trim().length < 6)}
-            data-testid="button-mfa-confirm"
-          >
-            {busy && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-            {needsEnrollStart ? "Start setup" : needsEmailSend ? "Send code" : "Verify"}
-          </Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>

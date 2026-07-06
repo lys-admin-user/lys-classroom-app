@@ -28,13 +28,35 @@ export function isLoginMfaExempt(path: string): boolean {
 }
 
 // Admin surfaces whose READS (not just mutations) also require a passed second
-// factor or a valid trusted device. Merely browsing these admin tools is
+// factor or a valid trusted device. Merely browsing these admin/staff tools is
 // sensitive, so we gate the GETs too — everything else stays browsable while the
-// client presents the challenge.
-export const ADMIN_MFA_SURFACES = ["/api/admin"];
+// client presents the challenge. These mirror the server-side role guards
+// (requireCampusAdmin / requireSiteAdmin / requireApprovedStaff, etc.), so any
+// route already restricted to staff+ also requires a passed second factor to
+// read. (Optional roles below staff are never gated here — decideLoginMfa returns
+// "allow" for them before this check.)
+export const ADMIN_MFA_SURFACES = [
+  "/api/admin",
+  "/api/org-admin",
+  "/api/org-safety",
+  "/api/team",
+];
 
 export function isAdminMfaSurface(path: string): boolean {
   return ADMIN_MFA_SURFACES.some((p) => path === p || path.startsWith(p + "/"));
+}
+
+// Whether a user must FIRST enroll an authenticator app before any second factor
+// (email code, recovery code) can satisfy the login gate. Required (staff+) users
+// with no authenticator enrolled must be forced through enrollment; email/recovery
+// verification must NOT grant them a fresh login-gate session, or the "no
+// fail-open, force enrollment" rule could be bypassed by the email path. The
+// master code is handled separately (intentionally still accepted).
+export function mustEnrollAuthenticator(
+  role: string | null | undefined,
+  hasAuthenticator: boolean,
+): boolean {
+  return hasRolePrivilege((role as any) ?? "student", LOGIN_MFA_MIN_ROLE) && !hasAuthenticator;
 }
 
 export interface LoginMfaContext {
@@ -47,6 +69,10 @@ export interface LoginMfaContext {
   trustedDevice: boolean;
   // A code-based factor is available: real TOTP enrollment OR the master code.
   hasTotp: boolean;
+  // A real authenticator app is enrolled for this user (mfaEnabled + secret).
+  // This is what "forced enrollment" keys off — NOT the master code and NOT
+  // email, since authenticator enrollment doesn't depend on email delivery.
+  hasAuthenticator: boolean;
   // An email one-time code can realistically reach this user.
   emailOk: boolean;
   // Dev-only bypass (non-production, no email transport configured).
@@ -81,9 +107,13 @@ export function decideLoginMfa(ctx: LoginMfaContext): LoginMfaDecision {
   if (ctx.fresh) return { action: "allow" };
   if (ctx.trustedDevice) return { action: "allow" };
 
+  // Required user with no real authenticator enrolled → force enrollment. This
+  // is independent of the master code / email fallback: a required user must set
+  // up an authenticator app, even though the master code can still satisfy the
+  // challenge in the meantime.
   return {
     action: "challenge",
-    enrollmentRequired: !ctx.hasTotp && !ctx.emailOk,
+    enrollmentRequired: !ctx.hasAuthenticator,
   };
 }
 

@@ -9,9 +9,16 @@ import type { Request, Response } from "express";
 import { and, desc, eq, gt, isNull } from "drizzle-orm";
 import { db } from "../db";
 import { trustedDevices } from "@shared/schema";
+import { logAuditEvent, getClientIP } from "./auditLog";
 
 export const TRUSTED_DEVICE_COOKIE = "lys_td";
 export const TRUSTED_DEVICE_TTL_MS = 30 * 24 * 60 * 60 * 1000; // 30 days
+
+// Secure cookies in any production deployment. Tied to NODE_ENV so it holds when
+// migrating off Replit (e.g. to Render), not just REPLIT_DEPLOYMENT.
+function useSecureCookie(): boolean {
+  return process.env.NODE_ENV === "production" || process.env.REPLIT_DEPLOYMENT === "1";
+}
 
 // --- Pure helpers (unit-tested; no DB) -------------------------------------
 
@@ -68,10 +75,11 @@ function readCookieToken(req: Request): string | null {
 // Mint a trusted device for the user and set the signed cookie on the response.
 export async function issueTrustedDevice(userId: string, req: Request, res: Response): Promise<void> {
   const token = generateDeviceToken();
+  const label = deviceLabelFromUserAgent(req.get("user-agent"));
   await db.insert(trustedDevices).values({
     userId,
     tokenHash: hashDeviceToken(token),
-    label: deviceLabelFromUserAgent(req.get("user-agent")),
+    label,
     ipAddress:
       (req.headers["x-forwarded-for"] as string)?.split(",")[0]?.trim() ||
       req.socket?.remoteAddress ||
@@ -82,9 +90,20 @@ export async function issueTrustedDevice(userId: string, req: Request, res: Resp
     httpOnly: true,
     signed: true,
     sameSite: "lax",
-    secure: process.env.REPLIT_DEPLOYMENT === "1",
+    secure: useSecureCookie(),
     maxAge: TRUSTED_DEVICE_TTL_MS,
     path: "/",
+  });
+  await logAuditEvent({
+    userId,
+    action: "mfa.trusted_device_created",
+    category: "security",
+    severity: "info",
+    resourceType: "user",
+    resourceId: userId,
+    ipAddress: getClientIP(req),
+    userAgent: req.get("user-agent"),
+    details: { label },
   });
 }
 

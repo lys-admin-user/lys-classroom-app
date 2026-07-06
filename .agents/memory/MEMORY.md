@@ -5,3 +5,4 @@
 - [Grade selector value contract](grade-selector-value-contract.md) — grade pickers send different value shapes; empty normalized-token set = match-all, so an unmatched grade silently broadens standards.
 - [True impersonation](impersonation.md) — admin identity swap via middleware; never mutate req.user.claims in place, refresh token before swap, exempt control endpoints, re-verify each request.
 - [requireTeacher & student ownership](requireteacher-and-student-ownership.md) — `students.userId` is the educator owner not the student's auth id, so student-self reads can't use ensureStudentRecordAccess; residual IDOR on /api/students/:id + /api/student-assignments/:studentId.
+- [MFA login-gate freshness](mfa-login-gate-freshness.md) — the login-2FA gate keys off session freshness alone, so forced-enrollment must be enforced in EVERY factor-verify path, not just the gate.
