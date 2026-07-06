@@ -1,16 +1,22 @@
 // Shared outbound email transport.
 //
 // Originally lived inside `standardsDigest.ts` (Task #8); extracted here so the
-// weekly standards digest, the daily moderation-backlog alert (Task #12), and
-// the pre-billing reminder notices share one outbound path + the same
-// "no transport configured" fallback.
+// weekly standards digest, the daily moderation-backlog alert (Task #12), the
+// pre-billing reminder notices, and any other outbound mail share one path +
+// the same "no transport configured" fallback.
 //
 // Provider resolution order (first one configured wins):
 //   1. Resend       — set RESEND_API_KEY (+ optional RESEND_FROM_EMAIL).
-//   2. Gmail (SMTP) — set GMAIL_USER + GMAIL_APP_PASSWORD (a Google App Password).
-//   3. Generic SMTP — set SMTP_HOST, SMTP_PORT (+ optional SMTP_USER / SMTP_PASS).
-//   4. None         — log the rendered email and return `logged_no_transport`
+//   2. SendGrid     — set SENDGRID_API_KEY (HTTPS API, no SMTP needed).
+//   3. Gmail (SMTP) — set GMAIL_USER + GMAIL_APP_PASSWORD (a Google App Password).
+//   4. Generic SMTP — set SMTP_HOST, SMTP_PORT (+ optional SMTP_USER / SMTP_PASS).
+//   5. None         — log the rendered email and return `logged_no_transport`
 //                     so callers can still persist a paper trail.
+//
+// The "from" address comes from RESEND_FROM_EMAIL / DIGEST_FROM_EMAIL / SMTP_FROM
+// (a plain "you@example.com" or an "LYS <you@example.com>" form both work). Note
+// that Resend/SendGrid require the sending domain/address to be verified in their
+// dashboards before real delivery succeeds.
 import nodemailer, { type Transporter } from "nodemailer";
 
 export type EmailSendStatus = "sent" | "logged_no_transport" | "failed";
@@ -21,6 +27,7 @@ export type EmailSendStatus = "sent" | "logged_no_transport" | "failed";
 export function isEmailConfigured(): boolean {
   return !!(
     process.env.RESEND_API_KEY ||
+    process.env.SENDGRID_API_KEY ||
     (process.env.GMAIL_USER && process.env.GMAIL_APP_PASSWORD) ||
     (process.env.SMTP_HOST && process.env.SMTP_PORT)
   );
@@ -33,12 +40,42 @@ export function getBaseUrl(): string {
   return "http://localhost:5000";
 }
 
+type ProviderKind = "resend" | "sendgrid" | "smtp" | "none";
+
+// Resolve the active provider from the environment. Resend and SendGrid only
+// need a single API key, so they take precedence over SMTP. The "smtp" kind
+// covers both Gmail (App Password) and a generic SMTP host — getSmtpTransporter
+// picks the right one.
+function getActiveProvider(): ProviderKind {
+  if (process.env.RESEND_API_KEY) return "resend";
+  if (process.env.SENDGRID_API_KEY) return "sendgrid";
+  if (
+    (process.env.GMAIL_USER && process.env.GMAIL_APP_PASSWORD) ||
+    (process.env.SMTP_HOST && process.env.SMTP_PORT)
+  ) {
+    return "smtp";
+  }
+  return "none";
+}
+
+const DEFAULT_FROM = "LYS <no-reply@laddering-your-success.local>";
+
 function getFromAddress(): string {
   if (process.env.RESEND_FROM_EMAIL) return process.env.RESEND_FROM_EMAIL;
   if (process.env.DIGEST_FROM_EMAIL) return process.env.DIGEST_FROM_EMAIL;
   if (process.env.SMTP_FROM) return process.env.SMTP_FROM;
   if (process.env.GMAIL_USER) return `LYS <${process.env.GMAIL_USER}>`;
-  return "LYS <no-reply@laddering-your-success.local>";
+  return DEFAULT_FROM;
+}
+
+// Split "Name <email@host>" into its parts; a bare "email@host" yields no name.
+function parseFromAddress(raw: string): { email: string; name?: string } {
+  const match = raw.match(/^\s*(.*?)\s*<\s*([^>]+)\s*>\s*$/);
+  if (match) {
+    const name = match[1].trim();
+    return { email: match[2].trim(), name: name || undefined };
+  }
+  return { email: raw.trim() };
 }
 
 // Lazily constructed nodemailer singleton (Gmail or generic SMTP) so we don't
@@ -46,7 +83,7 @@ function getFromAddress(): string {
 // configured. `undefined` = not yet checked, `null` = no SMTP transport.
 let cachedTransporter: Transporter | null | undefined;
 
-function getTransporter(): Transporter | null {
+function getSmtpTransporter(): Transporter | null {
   if (cachedTransporter !== undefined) return cachedTransporter;
 
   // Gmail via App Password.
@@ -76,30 +113,52 @@ function getTransporter(): Transporter | null {
   return cachedTransporter;
 }
 
-async function sendViaResend(
-  to: string,
-  subject: string,
-  text: string,
-): Promise<{ ok: boolean; error?: string }> {
-  const apiKey = process.env.RESEND_API_KEY;
-  if (!apiKey) return { ok: false, error: "no_resend_key" };
-  try {
-    const resp = await fetch("https://api.resend.com/emails", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${apiKey}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({ from: getFromAddress(), to: [to], subject, text }),
-    });
-    if (!resp.ok) {
-      const body = await resp.text().catch(() => "");
-      return { ok: false, error: `resend ${resp.status}: ${body.slice(0, 300)}` };
-    }
-    return { ok: true };
-  } catch (err: any) {
-    return { ok: false, error: err?.message || String(err) };
+async function sendViaResend(to: string, subject: string, body: string): Promise<void> {
+  const res = await fetch("https://api.resend.com/emails", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${process.env.RESEND_API_KEY}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      from: getFromAddress(),
+      to: [to],
+      subject,
+      text: body,
+    }),
+  });
+  if (!res.ok) {
+    const detail = await res.text().catch(() => "");
+    throw new Error(`Resend ${res.status}: ${detail.slice(0, 300)}`);
   }
+}
+
+async function sendViaSendgrid(to: string, subject: string, body: string): Promise<void> {
+  const from = parseFromAddress(getFromAddress());
+  const res = await fetch("https://api.sendgrid.com/v3/mail/send", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${process.env.SENDGRID_API_KEY}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      personalizations: [{ to: [{ email: to }] }],
+      from: from.name ? { email: from.email, name: from.name } : { email: from.email },
+      subject,
+      content: [{ type: "text/plain", value: body }],
+    }),
+  });
+  // SendGrid returns 202 Accepted on success.
+  if (!res.ok) {
+    const detail = await res.text().catch(() => "");
+    throw new Error(`SendGrid ${res.status}: ${detail.slice(0, 300)}`);
+  }
+}
+
+async function sendViaSmtp(to: string, subject: string, body: string): Promise<void> {
+  const transporter = getSmtpTransporter();
+  if (!transporter) throw new Error("SMTP transporter unavailable");
+  await transporter.sendMail({ from: getFromAddress(), to, subject, text: body });
 }
 
 export async function sendEmail(
@@ -109,37 +168,23 @@ export async function sendEmail(
   opts: { logPrefix?: string } = {},
 ): Promise<{ status: EmailSendStatus; errorMessage?: string }> {
   const prefix = opts.logPrefix ?? "email";
+  const provider = getActiveProvider();
 
-  if (!recipient.email) {
-    console.log(`[${prefix}] (no-transport) to=(no email) subject="${subject}"\n${body}`);
+  if (provider === "none" || !recipient.email) {
+    console.log(
+      `[${prefix}] (no-transport) to=${recipient.email ?? "(no email)"} subject="${subject}"\n${body}`,
+    );
     return { status: "logged_no_transport" };
   }
 
-  // 1. Resend (HTTP API).
-  if (process.env.RESEND_API_KEY) {
-    const r = await sendViaResend(recipient.email, subject, body);
-    if (r.ok) return { status: "sent" };
-    console.error(`[${prefix}] Resend send failed for ${recipient.email}:`, r.error);
-    return { status: "failed", errorMessage: (r.error || "").slice(0, 500) };
-  }
-
-  // 2. Gmail / generic SMTP via nodemailer.
-  const transporter = getTransporter();
-  if (!transporter) {
-    console.log(`[${prefix}] (no-transport) to=${recipient.email} subject="${subject}"\n${body}`);
-    return { status: "logged_no_transport" };
-  }
   try {
-    await transporter.sendMail({
-      from: getFromAddress(),
-      to: recipient.email,
-      subject,
-      text: body,
-    });
+    if (provider === "resend") await sendViaResend(recipient.email, subject, body);
+    else if (provider === "sendgrid") await sendViaSendgrid(recipient.email, subject, body);
+    else await sendViaSmtp(recipient.email, subject, body);
     return { status: "sent" };
   } catch (err: any) {
     const msg = err?.message || String(err);
-    console.error(`[${prefix}] SMTP send failed for ${recipient.email}:`, msg);
+    console.error(`[${prefix}] ${provider} send failed for ${recipient.email}:`, msg);
     return { status: "failed", errorMessage: msg.slice(0, 500) };
   }
 }
