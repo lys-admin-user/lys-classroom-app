@@ -19,12 +19,30 @@ import { logAuditEvent, getClientIP } from "../services/auditLog";
 import { sendEmailOtp, verifyEmailOtp } from "../services/emailOtpService";
 import { isEmailConfigured } from "../services/emailTransport";
 import { hasRolePrivilege } from "@shared/models/auth";
+import {
+  LOGIN_MFA_MIN_ROLE,
+  decideLoginMfa,
+  shouldPromptOptInMfa,
+  isLoginMfaExempt,
+  isAdminMfaSurface,
+} from "../services/mfaAccessPolicy";
+import {
+  regenerateRecoveryCodes,
+  verifyRecoveryCode,
+  countRemainingRecoveryCodes,
+} from "../services/recoveryCodeService";
+import {
+  issueTrustedDevice,
+  hasValidTrustedDevice,
+  listTrustedDevices,
+  revokeTrustedDevice,
+  revokeAllTrustedDevices,
+  revokeCurrentTrustedDevice,
+  clearTrustedDeviceCookie,
+} from "../services/trustedDeviceService";
 
 // How long a successful step-up verification stays "fresh" (ms).
 const MFA_FRESH_WINDOW_MS = 5 * 60 * 1000;
-
-// Roles required to complete a second factor at login (educators and above).
-const LOGIN_MFA_MIN_ROLE = "educator";
 
 function getUserId(req: any): string {
   return req.user?.claims?.sub as string;
@@ -107,60 +125,71 @@ export const requireFreshMfa: RequestHandler = async (req: any, res, next) => {
   }
 };
 
-// Paths exempt from the login-MFA gate: the auth handshake itself, the MFA
-// endpoints used to satisfy the gate, lightweight status/onboarding reads, and
-// health checks. Everything else under /api for an educator+ requires freshness.
-const LOGIN_MFA_EXEMPT = [
-  "/api/mfa",
-  "/api/login",
-  "/api/logout",
-  "/api/callback",
-  "/api/auth",
-  "/api/onboarding",
-  "/api/health",
-  "/api/ready",
-];
-
-function isLoginMfaExempt(path: string): boolean {
-  return LOGIN_MFA_EXEMPT.some((p) => path === p || path.startsWith(p + "/"));
-}
-
-// Login-MFA gate: educators-and-up must have a fresh second-factor verification
-// before they can MUTATE anything via the API. Read-only requests (GET/HEAD)
-// pass through so the app remains browsable while the challenge is presented by
-// the client. Degrades safely: if the user has no usable second factor (no TOTP
-// and no deliverable email) the gate steps aside rather than locking them out.
+// Login-MFA gate: staff-and-up must have a fresh second-factor verification (or
+// a valid trusted device) before they can MUTATE anything via the API OR access
+// admin surfaces (reads to /api/admin/* are gated too). Non-admin reads pass so
+// the app stays browsable while the client presents the challenge. Unlike the
+// old behavior, this does NOT fail open when a required user has no factor: it
+// returns a challenge with enrollmentRequired so setup is forced (with the
+// master code enabled, the challenge stays satisfiable in the meantime).
 export const requireLoginMfa: RequestHandler = async (req: any, res, next) => {
-  try {
-    if (loginMfaBypassed()) return next();
-    const method = req.method.toUpperCase();
-    if (method === "GET" || method === "HEAD" || method === "OPTIONS") return next();
-    const userId = getUserId(req);
-    if (!userId) return next();
-    // This middleware is mounted at "/api", so req.path is mount-relative
-    // (e.g. "/mfa/email/send"). Reconstruct the absolute path so the exempt
-    // list (which uses "/api/..." prefixes) matches correctly.
-    const fullPath = (req.baseUrl || "") + req.path;
-    if (isLoginMfaExempt(fullPath)) return next();
-    if (isSessionFresh(req)) return next();
+  if (loginMfaBypassed()) return next();
+  // Mounted at "/api", so req.path is mount-relative — reconstruct the
+  // absolute path the policy's exempt/admin lists expect.
+  const fullPath = (req.baseUrl || "") + req.path;
+  const method = req.method.toUpperCase();
+  const isRead = method === "GET" || method === "HEAD" || method === "OPTIONS";
 
+  // Cheap, pure pre-filter (cannot throw) so the vast majority of requests never
+  // touch the DB: exempt paths and non-admin reads are never gated, and an
+  // unauthenticated request is left for the auth layer to handle.
+  if (isLoginMfaExempt(fullPath)) return next();
+  if (isRead && !isAdminMfaSurface(fullPath)) return next();
+  const userId = getUserId(req);
+  if (!userId) return next();
+
+  // Past this point the request is a gated surface (mutation, or admin read) for
+  // an authenticated user. Any failure evaluating the factor state must FAIL
+  // CLOSED — a runtime fault here must not silently grant access.
+  try {
     const user = await storage.getUser(userId);
     if (!user) return next();
-    if (!hasRolePrivilege(user.role as any, LOGIN_MFA_MIN_ROLE)) return next();
 
-    const hasTotp = !!(user.mfaEnabled && user.mfaSecret);
+    const fresh = isSessionFresh(req);
+    const trustedDevice = fresh ? false : await hasValidTrustedDevice(userId, req);
+    const hasTotp = !!(user.mfaEnabled && user.mfaSecret) || MASTER_MFA_CODE_ENABLED;
     const emailOk = emailDeliverable(user);
-    if (!hasTotp && !emailOk) return next(); // cannot complete — don't lock out
+
+    const decision = decideLoginMfa({
+      role: user.role as any,
+      method,
+      fullPath,
+      fresh,
+      trustedDevice,
+      hasTotp,
+      emailOk,
+      bypassed: false,
+    });
+    if (decision.action === "allow") return next();
 
     return res.status(403).json({
-      error: "Please verify your second factor to continue.",
+      error: decision.enrollmentRequired
+        ? "Two-factor authentication must be set up before continuing."
+        : "Please verify your second factor to continue.",
       loginMfaRequired: true,
       mfaRequired: true,
+      enrollmentRequired: decision.enrollmentRequired,
       methods: { totp: hasTotp, email: emailOk },
     });
   } catch (err) {
     console.error("requireLoginMfa error:", err);
-    return next(); // fail open — never hard-block the whole API on a bug
+    // Fail closed: we could not confirm the second factor for a gated request.
+    return res.status(403).json({
+      error: "Could not verify your second factor right now. Please try again.",
+      loginMfaRequired: true,
+      mfaRequired: true,
+      enrollmentRequired: false,
+    });
   }
 };
 
@@ -174,16 +203,27 @@ export function registerMfaRoutes(app: Express): void {
       const hasTotp = !!(user?.mfaEnabled && user?.mfaSecret);
       const emailOk = emailDeliverable(user);
       const subjectToLoginMfa = hasRolePrivilege((user?.role as any) ?? "student", LOGIN_MFA_MIN_ROLE);
+      const trustedDevice = fresh ? false : await hasValidTrustedDevice(userId, req);
+      const recoveryCodesRemaining = await countRemainingRecoveryCodes(userId);
       res.json({
         enabled: !!user?.mfaEnabled,
         verifiedFresh: fresh,
+        trustedDevice,
         encryptionConfigured: isEncryptionConfigured(),
         methods: { totp: hasTotp, email: emailOk },
         emailConfigured: isEmailConfigured(),
-        // True when this user must complete a second factor before mutating, and
-        // hasn't yet this session. Drives the client's login-MFA challenge.
+        recoveryCodesRemaining,
+        // Optional-role users (below staff) see a dismissible nudge to turn on 2FA.
+        promptOptIn: shouldPromptOptInMfa(
+          user?.role,
+          !!user?.mfaEnabled,
+          !!user?.mfaPromptDismissedAt,
+        ),
+        // True when this user must complete a second factor before mutating/admin
+        // access, and hasn't yet this session (and has no trusted device). Drives
+        // the client's login-MFA challenge.
         loginMfaRequired:
-          !loginMfaBypassed() && subjectToLoginMfa && !fresh && (hasTotp || emailOk),
+          !loginMfaBypassed() && subjectToLoginMfa && !fresh && !trustedDevice,
       });
     } catch (err) {
       res.status(500).json({ error: "Failed to load MFA status" });
@@ -254,24 +294,45 @@ export function registerMfaRoutes(app: Express): void {
   });
 
   // Step-up verification: confirm a code to mark the session as freshly verified.
+  // A recovery code is accepted anywhere a TOTP/master code is. Passing
+  // rememberDevice: true also mints a 30-day trusted device for this browser.
   app.post("/api/mfa/verify", isAuthenticated, async (req: any, res) => {
     try {
       const userId = getUserId(req);
       const token = String(req.body?.token || "");
+      const remember = req.body?.rememberDevice === true;
       // Master MFA code: accept for any user (even without enrollment) and mark
       // the session freshly verified. Product-owner default until disabled.
       if (isMasterMfaCode(token)) {
         req.session.mfaVerifiedAt = Date.now();
+        if (remember) await issueTrustedDevice(userId, req, res);
         return res.json({ success: true });
       }
       const user = await storage.getUser(userId);
-      if (!user?.mfaEnabled || !user.mfaSecret) {
-        return res.status(400).json({ error: "MFA is not enabled.", enrollmentRequired: true });
+      let verified = false;
+      if (user?.mfaEnabled && user.mfaSecret && verifyTokenAgainstEncrypted(token, user.mfaSecret)) {
+        verified = true;
+      } else if (await verifyRecoveryCode(userId, token)) {
+        verified = true;
+        await logAuditEvent({
+          userId,
+          action: "mfa.recovery_used",
+          category: "security",
+          severity: "warning",
+          resourceType: "user",
+          resourceId: userId,
+          ipAddress: getClientIP(req),
+          userAgent: req.get("user-agent"),
+        });
       }
-      if (!verifyTokenAgainstEncrypted(token, user.mfaSecret)) {
+      if (!verified) {
+        if (!user?.mfaEnabled || !user.mfaSecret) {
+          return res.status(400).json({ error: "MFA is not enabled.", enrollmentRequired: true });
+        }
         return res.status(400).json({ error: "Invalid code. Please try again." });
       }
       req.session.mfaVerifiedAt = Date.now();
+      if (remember) await issueTrustedDevice(userId, req, res);
       res.json({ success: true });
     } catch (err) {
       console.error("MFA verify error:", err);
@@ -322,9 +383,11 @@ export function registerMfaRoutes(app: Express): void {
       const userId = getUserId(req);
       const code = String(req.body?.code || "");
       const purpose = req.body?.purpose === "login" ? "login" : "mfa";
+      const remember = req.body?.rememberDevice === true;
       // Master MFA code: accept here too so the email-code path also honors it.
       if (isMasterMfaCode(code)) {
         req.session.mfaVerifiedAt = Date.now();
+        if (remember) await issueTrustedDevice(userId, req, res);
         return res.json({ success: true });
       }
       const ok = await verifyEmailOtp(userId, code, purpose);
@@ -332,6 +395,7 @@ export function registerMfaRoutes(app: Express): void {
         return res.status(400).json({ error: "Invalid or expired code. Please try again." });
       }
       req.session.mfaVerifiedAt = Date.now();
+      if (remember) await issueTrustedDevice(userId, req, res);
       await logAuditEvent({
         userId,
         action: "mfa.email_verified",
@@ -380,6 +444,106 @@ export function registerMfaRoutes(app: Express): void {
     } catch (err) {
       console.error("MFA disable error:", err);
       res.status(500).json({ error: "Failed to disable MFA" });
+    }
+  });
+
+  // Generate a fresh batch of one-time recovery codes (invalidating any old
+  // ones). Returned in plaintext ONCE — only hashes are stored. Requires a fresh
+  // step-up so a hijacked session can't silently mint a backdoor.
+  app.post("/api/mfa/recovery/generate", isAuthenticated, requireFreshMfa, async (req: any, res) => {
+    try {
+      const userId = getUserId(req);
+      const codes = await regenerateRecoveryCodes(userId);
+      await logAuditEvent({
+        userId,
+        action: "mfa.recovery_generated",
+        category: "security",
+        severity: "warning",
+        resourceType: "user",
+        resourceId: userId,
+        ipAddress: getClientIP(req),
+        userAgent: req.get("user-agent"),
+        details: { count: codes.length },
+      });
+      res.json({ codes });
+    } catch (err) {
+      console.error("MFA recovery generate error:", err);
+      res.status(500).json({ error: "Failed to generate recovery codes" });
+    }
+  });
+
+  // List this user's active (non-revoked, unexpired) trusted devices. Marks the
+  // device tied to the current request's cookie as "current".
+  app.get("/api/mfa/trusted-devices", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = getUserId(req);
+      const devices = await listTrustedDevices(userId);
+      const isCurrent = await hasValidTrustedDevice(userId, req);
+      // hasValidTrustedDevice refreshed lastUsedAt on the current device, so it
+      // sorts first; flag it for the UI when a valid cookie is present.
+      if (isCurrent && devices[0]) devices[0].current = true;
+      res.json({ devices });
+    } catch (err) {
+      console.error("MFA trusted-devices list error:", err);
+      res.status(500).json({ error: "Failed to load trusted devices" });
+    }
+  });
+
+  // Revoke one trusted device by id, or all of them (?all=true / body.all).
+  app.post("/api/mfa/trusted-devices/revoke", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = getUserId(req);
+      const all = req.body?.all === true || req.query?.all === "true";
+      let count = 0;
+      if (all) {
+        count = await revokeAllTrustedDevices(userId);
+        clearTrustedDeviceCookie(res);
+      } else {
+        const id = String(req.body?.id || "");
+        if (!id) return res.status(400).json({ error: "Missing device id." });
+        const ok = await revokeTrustedDevice(userId, id);
+        if (!ok) return res.status(404).json({ error: "Device not found." });
+        count = 1;
+      }
+      await logAuditEvent({
+        userId,
+        action: "mfa.trusted_device_revoked",
+        category: "security",
+        severity: "info",
+        resourceType: "user",
+        resourceId: userId,
+        ipAddress: getClientIP(req),
+        userAgent: req.get("user-agent"),
+        details: { count, all },
+      });
+      res.json({ success: true, revoked: count });
+    } catch (err) {
+      console.error("MFA trusted-device revoke error:", err);
+      res.status(500).json({ error: "Failed to revoke trusted device" });
+    }
+  });
+
+  // Dismiss the optional "turn on two-factor" nudge (optional-role users only).
+  app.post("/api/mfa/prompt/dismiss", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = getUserId(req);
+      await db.update(users)
+        .set({ mfaPromptDismissedAt: new Date(), updatedAt: new Date() })
+        .where(eq(users.id, userId));
+      await logAuditEvent({
+        userId,
+        action: "mfa.prompt_dismissed",
+        category: "security",
+        severity: "info",
+        resourceType: "user",
+        resourceId: userId,
+        ipAddress: getClientIP(req),
+        userAgent: req.get("user-agent"),
+      });
+      res.json({ success: true });
+    } catch (err) {
+      console.error("MFA prompt dismiss error:", err);
+      res.status(500).json({ error: "Failed to dismiss prompt" });
     }
   });
 }

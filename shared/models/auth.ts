@@ -81,6 +81,9 @@ export const users = pgTable("users", {
   mfaEnabled: boolean("mfa_enabled").default(false),
   mfaSecret: text("mfa_secret"),
   mfaActivatedAt: timestamp("mfa_activated_at"),
+  // When an OPTIONAL-role user (below staff) dismissed the "turn on 2FA" prompt.
+  // Non-null hides the settings nudge; enabling 2FA makes the prompt moot.
+  mfaPromptDismissedAt: timestamp("mfa_prompt_dismissed_at"),
   // GDPR/CCPA/COPPA data lifecycle.
   // accountStatus: "active" | "closed" (deactivated, awaiting purge) | "anonymized"
   // deletedAt: when a hard delete / closure was performed

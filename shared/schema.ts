@@ -4692,6 +4692,52 @@ export const insertEmailOtpCodeSchema = createInsertSchema(emailOtpCodes).omit({
 export type InsertEmailOtpCode = z.infer<typeof insertEmailOtpCodeSchema>;
 export type EmailOtpCode = typeof emailOtpCodes.$inferSelect;
 
+// One-time recovery codes: a fallback second factor for when a user loses their
+// authenticator and cannot receive an email code. Codes are high-entropy,
+// generated in a batch, shown to the user exactly once, and stored ONLY as a
+// SHA-256 hash. Each code is single-use (consumedAt) and the whole set can be
+// regenerated (which invalidates the old set).
+export const mfaRecoveryCodes = pgTable(
+  "mfa_recovery_codes",
+  {
+    id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+    userId: varchar("user_id").notNull(),
+    codeHash: text("code_hash").notNull(),
+    consumedAt: timestamp("consumed_at"),
+    createdAt: timestamp("created_at").defaultNow(),
+  },
+  (t) => ({
+    byUser: index("mfa_recovery_user_idx").on(t.userId),
+  }),
+);
+export type MfaRecoveryCode = typeof mfaRecoveryCodes.$inferSelect;
+
+// "Remember this device for 30 days": a server-side trusted-device record keyed
+// by a hashed random token. The plaintext token lives only in a signed,
+// httpOnly cookie on the user's browser; the server stores the SHA-256 hash so
+// a DB leak cannot mint valid device cookies. A valid trusted device lets a
+// required user skip the login-time second factor — but NOT the fresh step-up
+// required for sensitive actions (delete/impersonate/role change/export/billing).
+export const trustedDevices = pgTable(
+  "trusted_devices",
+  {
+    id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+    userId: varchar("user_id").notNull(),
+    tokenHash: text("token_hash").notNull(),
+    label: text("label"), // coarse user-agent hint, e.g. "Chrome on macOS"
+    ipAddress: text("ip_address"),
+    expiresAt: timestamp("expires_at").notNull(),
+    lastUsedAt: timestamp("last_used_at"),
+    revokedAt: timestamp("revoked_at"),
+    createdAt: timestamp("created_at").defaultNow(),
+  },
+  (t) => ({
+    byUser: index("trusted_device_user_idx").on(t.userId),
+    byToken: index("trusted_device_token_idx").on(t.tokenHash),
+  }),
+);
+export type TrustedDevice = typeof trustedDevices.$inferSelect;
+
 // ============================================================================
 // TEAM HUB (Internal HR + Operations) — "Project Pulse"
 // ----------------------------------------------------------------------------

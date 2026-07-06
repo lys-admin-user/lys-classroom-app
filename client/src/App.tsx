@@ -454,10 +454,11 @@ function LoginMfaGate() {
       open
       enrollmentRequired={false}
       dismissable={false}
+      allowRememberDevice
       purpose="login"
       methods={status?.methods}
       title="Two-factor verification required"
-      description="Your role requires a second factor each session. Verify with your authenticator app or an emailed code to continue."
+      description="Your role requires a second factor each session. Verify with your authenticator app, an emailed code, or a recovery code to continue."
       onClose={() => {}}
       onVerified={() => invalidateMfaStatus()}
     />

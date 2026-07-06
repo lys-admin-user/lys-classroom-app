@@ -10,7 +10,8 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Loader2, ShieldCheck, Mail, Smartphone } from "lucide-react";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Loader2, ShieldCheck, Mail, Smartphone, KeyRound } from "lucide-react";
 import {
   useMfaVerify,
   useMfaEnroll,
@@ -35,6 +36,9 @@ interface MfaStepUpDialogProps {
   purpose?: OtpPurpose;
   // When false, hides Cancel and prevents dismissal (used for the login gate).
   dismissable?: boolean;
+  // Show the "remember this device for 30 days" checkbox (login gate only —
+  // never for sensitive step-up, which must re-challenge every time).
+  allowRememberDevice?: boolean;
   title?: string;
   description?: string;
 }
@@ -52,14 +56,16 @@ export function MfaStepUpDialog({
   methods,
   purpose = "mfa",
   dismissable = true,
+  allowRememberDevice = false,
   title,
   description,
 }: MfaStepUpDialogProps) {
   const { toast } = useToast();
   const [token, setToken] = useState("");
   const [enrollData, setEnrollData] = useState<{ qrDataUrl: string; secret: string } | null>(null);
-  const [mode, setMode] = useState<"app" | "email">("app");
+  const [mode, setMode] = useState<"app" | "email" | "recovery">("app");
   const [emailSentTo, setEmailSentTo] = useState<string | null>(null);
+  const [rememberDevice, setRememberDevice] = useState(false);
 
   const enroll = useMfaEnroll();
   const activate = useMfaActivate();
@@ -83,6 +89,7 @@ export function MfaStepUpDialog({
     setToken("");
     setEnrollData(null);
     setEmailSentTo(null);
+    setRememberDevice(false);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open]);
 
@@ -107,8 +114,11 @@ export function MfaStepUpDialog({
 
   const handleConfirm = async () => {
     try {
+      const remember = allowRememberDevice && rememberDevice;
       if (mode === "email") {
-        await emailVerify.mutateAsync({ code: token, purpose });
+        await emailVerify.mutateAsync({ code: token, purpose, rememberDevice: remember });
+      } else if (mode === "recovery") {
+        await verify.mutateAsync({ token, rememberDevice: remember });
       } else if (enrollmentRequired) {
         if (!enrollData) {
           await startEnroll();
@@ -116,7 +126,7 @@ export function MfaStepUpDialog({
         }
         await activate.mutateAsync(token);
       } else {
-        await verify.mutateAsync(token);
+        await verify.mutateAsync({ token, rememberDevice: remember });
       }
       setToken("");
       setEnrollData(null);
@@ -171,26 +181,40 @@ export function MfaStepUpDialog({
           <DialogDescription>{computedDescription}</DialogDescription>
         </DialogHeader>
 
-        {/* Factor switch when more than one is available. */}
-        {hasTotp && hasEmail && !enrollmentRequired && (
-          <div className="flex gap-2">
+        {/* Factor switch. Recovery codes are always offered as a fallback so a
+            user who lost their authenticator/email can still get in. */}
+        {!enrollmentRequired && (hasTotp || hasEmail) && (
+          <div className="flex flex-wrap gap-2">
+            {hasTotp && (
+              <Button
+                type="button"
+                size="sm"
+                variant={mode === "app" ? "default" : "outline"}
+                onClick={() => { setMode("app"); setToken(""); }}
+                data-testid="button-mfa-method-app"
+              >
+                <Smartphone className="mr-2 h-4 w-4" /> Authenticator
+              </Button>
+            )}
+            {hasEmail && (
+              <Button
+                type="button"
+                size="sm"
+                variant={mode === "email" ? "default" : "outline"}
+                onClick={() => { setMode("email"); setToken(""); }}
+                data-testid="button-mfa-method-email"
+              >
+                <Mail className="mr-2 h-4 w-4" /> Email code
+              </Button>
+            )}
             <Button
               type="button"
               size="sm"
-              variant={mode === "app" ? "default" : "outline"}
-              onClick={() => { setMode("app"); setToken(""); }}
-              data-testid="button-mfa-method-app"
+              variant={mode === "recovery" ? "default" : "outline"}
+              onClick={() => { setMode("recovery"); setToken(""); }}
+              data-testid="button-mfa-method-recovery"
             >
-              <Smartphone className="mr-2 h-4 w-4" /> Authenticator
-            </Button>
-            <Button
-              type="button"
-              size="sm"
-              variant={mode === "email" ? "default" : "outline"}
-              onClick={() => { setMode("email"); setToken(""); }}
-              data-testid="button-mfa-method-email"
-            >
-              <Mail className="mr-2 h-4 w-4" /> Email code
+              <KeyRound className="mr-2 h-4 w-4" /> Recovery code
             </Button>
           </div>
         )}
@@ -221,18 +245,36 @@ export function MfaStepUpDialog({
                 </button>
               </p>
             )}
+            {mode === "recovery" && (
+              <p className="text-xs text-muted-foreground">
+                Enter one of the one-time recovery codes you saved when you set up
+                two-factor authentication. Each code works only once.
+              </p>
+            )}
             <div className="space-y-2">
-              <Label htmlFor="mfa-stepup-code">{mode === "email" ? "Email code" : "Authentication code"}</Label>
+              <Label htmlFor="mfa-stepup-code">
+                {mode === "email" ? "Email code" : mode === "recovery" ? "Recovery code" : "Authentication code"}
+              </Label>
               <Input
                 id="mfa-stepup-code"
-                inputMode="numeric"
+                inputMode={mode === "recovery" ? "text" : "numeric"}
                 autoComplete="one-time-code"
-                placeholder="123456"
+                placeholder={mode === "recovery" ? "ABCDE-FGHJK" : "123456"}
                 value={token}
                 onChange={(e) => setToken(e.target.value)}
                 data-testid="input-mfa-code"
               />
             </div>
+            {allowRememberDevice && !enrollmentRequired && (
+              <label className="flex items-center gap-2 text-sm text-muted-foreground cursor-pointer">
+                <Checkbox
+                  checked={rememberDevice}
+                  onCheckedChange={(v) => setRememberDevice(v === true)}
+                  data-testid="checkbox-remember-device"
+                />
+                Remember this device for 30 days
+              </label>
+            )}
           </div>
         )}
 

@@ -328,12 +328,8 @@ export default function Settings() {
             isOnboarding={!profile}
           />
 
-          {hasMinRole(userRole, "site_admin") && (
-            <>
-              <Separator />
-              <MfaSettingsCard />
-            </>
-          )}
+          <Separator />
+          <MfaSettingsCard />
 
           {adminLinks.length > 0 && (
             <>
