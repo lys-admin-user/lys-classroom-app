@@ -113,8 +113,15 @@ describe("mfaAccessPolicy: decideLoginMfa", () => {
     expect(decideLoginMfa(ctx({ fullPath: "/api/mfa/verify" })).action).toBe("allow");
   });
 
-  it("honors the dev bypass", () => {
+  it("honors the dev bypass once an authenticator is enrolled", () => {
     expect(decideLoginMfa(ctx({ bypassed: true })).action).toBe("allow");
+  });
+
+  it("does NOT let the dev bypass skip forced enrollment for staff+", () => {
+    // A required user with no authenticator must be forced to enroll even in a
+    // non-prod / no-email environment where the bypass is active.
+    const d = decideLoginMfa(ctx({ bypassed: true, hasAuthenticator: false, hasTotp: false }));
+    expect(d).toEqual({ action: "challenge", enrollmentRequired: true });
   });
 });
 

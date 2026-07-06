@@ -135,7 +135,10 @@ export const requireFreshMfa: RequestHandler = async (req: any, res, next) => {
 // returns a challenge with enrollmentRequired so setup is forced (with the
 // master code enabled, the challenge stays satisfiable in the meantime).
 export const requireLoginMfa: RequestHandler = async (req: any, res, next) => {
-  if (loginMfaBypassed()) return next();
+  // NOTE: the dev/email bypass is applied INSIDE decideLoginMfa (after the
+  // forced-enrollment check), not as an early return here — otherwise a staff+
+  // user with no authenticator could skip enrollment entirely in a non-prod /
+  // no-email environment.
   // Mounted at "/api", so req.path is mount-relative — reconstruct the
   // absolute path the policy's exempt/admin lists expect.
   const fullPath = (req.baseUrl || "") + req.path;
@@ -172,7 +175,7 @@ export const requireLoginMfa: RequestHandler = async (req: any, res, next) => {
       hasTotp,
       hasAuthenticator,
       emailOk,
-      bypassed: false,
+      bypassed: loginMfaBypassed(),
     });
     if (decision.action === "allow") return next();
 
@@ -225,9 +228,11 @@ export function registerMfaRoutes(app: Express): void {
         ),
         // True when this user must complete a second factor before mutating/admin
         // access, and hasn't yet this session (and has no trusted device). Drives
-        // the client's login-MFA challenge.
+        // the client's login-MFA challenge. Forced enrollment overrides the bypass:
+        // a required user with no authenticator must still be surfaced the gate.
         loginMfaRequired:
-          !loginMfaBypassed() && subjectToLoginMfa && !fresh && !trustedDevice,
+          subjectToLoginMfa &&
+          (!hasTotp || (!loginMfaBypassed() && !fresh && !trustedDevice)),
         // True when a required (staff+) user has no real authenticator enrolled,
         // so the client must force them through enrollment (not just a challenge).
         enrollmentRequired: subjectToLoginMfa && !hasTotp,

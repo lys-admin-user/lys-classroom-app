@@ -88,8 +88,6 @@ export type LoginMfaDecision =
 // a challenge with enrollmentRequired so the client forces setup (with the master
 // code enabled, the challenge is always satisfiable in the meantime).
 export function decideLoginMfa(ctx: LoginMfaContext): LoginMfaDecision {
-  if (ctx.bypassed) return { action: "allow" };
-
   const method = ctx.method.toUpperCase();
   const isRead = method === "GET" || method === "HEAD" || method === "OPTIONS";
 
@@ -105,13 +103,17 @@ export function decideLoginMfa(ctx: LoginMfaContext): LoginMfaDecision {
   if (isRead && !isAdminMfaSurface(ctx.fullPath)) return { action: "allow" };
 
   // Required user with no real authenticator enrolled → force enrollment BEFORE
-  // any allow shortcut. This must beat both freshness and a trusted device:
-  // otherwise a user who trusted a device (or was fresh) and then disabled MFA
-  // could keep reaching admin surfaces without ever re-enrolling. The master
-  // code can still satisfy the resulting challenge in the meantime.
+  // any allow shortcut, INCLUDING the dev/email bypass. This must beat freshness,
+  // a trusted device, and the bypass: otherwise a staff+ user could keep reaching
+  // admin surfaces without ever enrolling (e.g. in a non-prod/no-email env, or on
+  // a stale trusted-device cookie after disabling MFA). The master code can still
+  // satisfy the resulting challenge in the meantime.
   if (!ctx.hasAuthenticator) {
     return { action: "challenge", enrollmentRequired: true };
   }
+
+  // Dev/email bypass only applies once a required user is actually enrolled.
+  if (ctx.bypassed) return { action: "allow" };
 
   if (ctx.fresh) return { action: "allow" };
   if (ctx.trustedDevice) return { action: "allow" };
