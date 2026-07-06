@@ -104,17 +104,19 @@ export function decideLoginMfa(ctx: LoginMfaContext): LoginMfaDecision {
   // shell renders and the client can present the challenge.
   if (isRead && !isAdminMfaSurface(ctx.fullPath)) return { action: "allow" };
 
+  // Required user with no real authenticator enrolled → force enrollment BEFORE
+  // any allow shortcut. This must beat both freshness and a trusted device:
+  // otherwise a user who trusted a device (or was fresh) and then disabled MFA
+  // could keep reaching admin surfaces without ever re-enrolling. The master
+  // code can still satisfy the resulting challenge in the meantime.
+  if (!ctx.hasAuthenticator) {
+    return { action: "challenge", enrollmentRequired: true };
+  }
+
   if (ctx.fresh) return { action: "allow" };
   if (ctx.trustedDevice) return { action: "allow" };
 
-  // Required user with no real authenticator enrolled → force enrollment. This
-  // is independent of the master code / email fallback: a required user must set
-  // up an authenticator app, even though the master code can still satisfy the
-  // challenge in the meantime.
-  return {
-    action: "challenge",
-    enrollmentRequired: !ctx.hasAuthenticator,
-  };
+  return { action: "challenge", enrollmentRequired: false };
 }
 
 // Whether to show the optional "turn on two-factor" nudge in settings: only for

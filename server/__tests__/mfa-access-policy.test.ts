@@ -79,6 +79,15 @@ describe("mfaAccessPolicy: decideLoginMfa", () => {
     expect(decideLoginMfa(ctx({ trustedDevice: true })).action).toBe("allow");
   });
 
+  it("forces enrollment even with a trusted device when no authenticator is enrolled", () => {
+    // e.g. a staff+ user who trusted a device, then disabled MFA — must not slip
+    // through on the stale trusted-device cookie; enrollment beats trust/freshness.
+    const td = decideLoginMfa(ctx({ trustedDevice: true, hasAuthenticator: false, hasTotp: false }));
+    expect(td).toEqual({ action: "challenge", enrollmentRequired: true });
+    const fr = decideLoginMfa(ctx({ fresh: true, hasAuthenticator: false, hasTotp: false }));
+    expect(fr).toEqual({ action: "challenge", enrollmentRequired: true });
+  });
+
   it("allows optional-role users (below staff) regardless", () => {
     expect(decideLoginMfa(ctx({ role: "educator" })).action).toBe("allow");
     expect(decideLoginMfa(ctx({ role: "student" })).action).toBe("allow");

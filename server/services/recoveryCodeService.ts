@@ -53,6 +53,16 @@ export async function regenerateRecoveryCodes(userId: string): Promise<string[]>
   return codes;
 }
 
+// Delete all of a user's recovery codes (e.g. when MFA is disabled). Returns the
+// number removed so callers can decide whether to audit.
+export async function invalidateRecoveryCodes(userId: string): Promise<number> {
+  const removed = await db
+    .delete(mfaRecoveryCodes)
+    .where(eq(mfaRecoveryCodes.userId, userId))
+    .returning({ id: mfaRecoveryCodes.id });
+  return removed.length;
+}
+
 export async function countRemainingRecoveryCodes(userId: string): Promise<number> {
   const rows = await db
     .select({ id: mfaRecoveryCodes.id })

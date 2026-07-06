@@ -31,6 +31,7 @@ import {
   regenerateRecoveryCodes,
   verifyRecoveryCode,
   countRemainingRecoveryCodes,
+  invalidateRecoveryCodes,
 } from "../services/recoveryCodeService";
 import {
   issueTrustedDevice,
@@ -461,6 +462,12 @@ export function registerMfaRoutes(app: Express): void {
         .set({ mfaEnabled: false, mfaSecret: null, mfaActivatedAt: null, updatedAt: new Date() })
         .where(eq(users.id, userId));
       if (req.session) req.session.mfaVerifiedAt = undefined;
+      // Tear down every factor tied to this enrollment: leftover trusted devices
+      // or recovery codes must NOT let a required user keep bypassing the gate
+      // (or re-enrollment) after they've turned MFA off.
+      const devicesRevoked = await revokeAllTrustedDevices(userId);
+      clearTrustedDeviceCookie(res);
+      const codesInvalidated = await invalidateRecoveryCodes(userId);
       await logAuditEvent({
         userId,
         action: "mfa.disabled",
@@ -470,6 +477,7 @@ export function registerMfaRoutes(app: Express): void {
         resourceId: userId,
         ipAddress: getClientIP(req),
         userAgent: req.get("user-agent"),
+        details: { devicesRevoked, codesInvalidated },
       });
       res.json({ success: true });
     } catch (err) {
