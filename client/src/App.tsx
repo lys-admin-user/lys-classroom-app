@@ -91,6 +91,8 @@ const Terms = lazy(() => import("@/pages/Terms"));
 const Privacy = lazy(() => import("@/pages/Privacy"));
 const AiPolicy = lazy(() => import("@/pages/AiPolicy"));
 const EmbedRouter = lazy(() => import("@/pages/EmbedRouter").then(m => ({ default: m.EmbedRouter })));
+const SignInPage = lazy(() => import("@/pages/SignIn"));
+const SignUpPage = lazy(() => import("@/pages/SignUp"));
 
 const EXEMPT_PATHS = ["/onboarding", "/pricing", "/shared", "/p/", "/embed/", "/terms", "/privacy", "/ai-policy"];
 const MAX_ONBOARDING_SKIPS = 3;
@@ -232,7 +234,7 @@ function AuthRequired({ children }: { children: React.ReactNode }) {
           <CardHeader>
             <CardTitle className="font-permanent-marker text-2xl">Sign In Required</CardTitle>
             <CardDescription className="font-roboto">
-              Please sign in with your Replit account to access this feature.
+              Please sign in to access this feature.
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -498,6 +500,16 @@ function AppShell() {
     "--sidebar-width": "22rem",
     "--sidebar-width-icon": "4.5rem",
   };
+
+  // Clerk sign-in / sign-up render full-screen (no app sidebar/header/footer),
+  // like the marketing surfaces. Handled here so the auth pages own the viewport.
+  if (location.startsWith("/sign-in") || location.startsWith("/sign-up")) {
+    return (
+      <Suspense fallback={<PageLoader />}>
+        {location.startsWith("/sign-up") ? <SignUpPage /> : <SignInPage />}
+      </Suspense>
+    );
+  }
 
   // Anonymous visitors landing on "/" get the full-screen role-routed landing
   // page (no app sidebar/header/footer) — it's a pre-login marketing surface.

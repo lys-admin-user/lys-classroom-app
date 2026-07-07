@@ -9,7 +9,8 @@ import rateLimit from "express-rate-limit";
 import cookieParser from "cookie-parser";
 import { randomUUID } from "node:crypto";
 import { WebhookHandlers } from "./webhookHandlers";
-import { getStripeSync } from "./stripeClient";
+import { getStripeSync, isStripeConfigured } from "./stripeClient";
+import { isProductionDeployment, getPublicBaseUrl } from "./lib/hosting";
 import { readdirSync, statSync } from "node:fs";
 import { join } from "node:path";
 import { logger, httpLogger } from "./observability";
@@ -99,7 +100,7 @@ app.use((req, _res, next) => {
 // bundle isn't nonce-tagged; nonce-based hardening is a follow-up. frame-src /
 // frame-ancestors are left at helmet defaults ('self') to match the existing
 // X-Frame-Options behavior and not regress the /embed/* surfaces.
-const isDeployment = process.env.REPLIT_DEPLOYMENT === "1";
+const isDeployment = isProductionDeployment();
 app.use(
   helmet({
     contentSecurityPolicy: isDeployment
@@ -128,7 +129,7 @@ app.use(
 // overridden on the published app. Dev/preview is left alone so it stays
 // out of search results.
 app.use((req, res, next) => {
-  if (process.env.REPLIT_DEPLOYMENT === "1" && !req.path.startsWith("/api")) {
+  if (isProductionDeployment() && !req.path.startsWith("/api")) {
     res.setHeader("X-Robots-Tag", "index, follow");
   }
   next();
@@ -161,7 +162,7 @@ app.use((req, res, next) => {
       httpOnly: true,
       signed: true,
       sameSite: "lax",
-      secure: process.env.REPLIT_DEPLOYMENT === "1",
+      secure: isProductionDeployment(),
       maxAge: 90 * 24 * 60 * 60 * 1000,
       path: "/",
     });
@@ -301,15 +302,31 @@ async function initStripe() {
     console.warn('DATABASE_URL not set - skipping Stripe initialization');
     return;
   }
+  if (!isStripeConfigured()) {
+    console.warn('STRIPE_SECRET_KEY not set - skipping Stripe initialization');
+    return;
+  }
 
   try {
     console.log('Initializing Stripe...');
 
     const stripeSync = await getStripeSync();
 
-    const webhookBaseUrl = `https://${process.env.REPLIT_DOMAINS?.split(',')[0]}`;
-    await stripeSync.findOrCreateManagedWebhook(`${webhookBaseUrl}/api/stripe/webhook`);
-    console.log('Stripe webhook configured');
+    // Register the webhook against the hosting-agnostic public base URL. When it
+    // can't be determined (e.g. no PUBLIC_BASE_URL / RENDER_EXTERNAL_URL set),
+    // skip automatic registration — the webhook is then configured manually in
+    // the Stripe dashboard per the migration runbook. The receiving endpoint
+    // (/api/stripe/webhook) still verifies the Stripe signature either way.
+    const baseUrl = getPublicBaseUrl();
+    if (baseUrl) {
+      await stripeSync.findOrCreateManagedWebhook(`${baseUrl}/api/stripe/webhook`);
+      console.log('Stripe webhook configured at', `${baseUrl}/api/stripe/webhook`);
+    } else {
+      console.warn(
+        'No public base URL (PUBLIC_BASE_URL / RENDER_EXTERNAL_URL) - skipping ' +
+        'automatic Stripe webhook registration. Configure it manually in the Stripe dashboard.',
+      );
+    }
 
     stripeSync.syncBackfill()
       .then(() => console.log('Stripe data synced'))

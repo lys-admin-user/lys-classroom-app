@@ -56,6 +56,10 @@ export function hasRolePrivilege(userRole: UserRole, requiredRole: UserRole): bo
 export const users = pgTable("users", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   email: varchar("email").unique(),
+  // Stable link to the external identity provider (Clerk). Existing users are
+  // matched/linked by email on first Clerk login; this is then used for fast
+  // lookups on subsequent logins. Nullable so pre-existing rows remain valid.
+  clerkId: varchar("clerk_id").unique(),
   firstName: varchar("first_name"),
   lastName: varchar("last_name"),
   profileImageUrl: varchar("profile_image_url"),

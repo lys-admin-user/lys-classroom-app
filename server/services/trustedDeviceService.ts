@@ -10,14 +10,15 @@ import { and, desc, eq, gt, isNull } from "drizzle-orm";
 import { db } from "../db";
 import { trustedDevices } from "@shared/schema";
 import { logAuditEvent, getClientIP } from "./auditLog";
+import { isProductionDeployment } from "../lib/hosting";
 
 export const TRUSTED_DEVICE_COOKIE = "lys_td";
 export const TRUSTED_DEVICE_TTL_MS = 30 * 24 * 60 * 60 * 1000; // 30 days
 
-// Secure cookies in any production deployment. Tied to NODE_ENV so it holds when
-// migrating off Replit (e.g. to Render), not just REPLIT_DEPLOYMENT.
+// Secure cookies in any production deployment. Hosting-agnostic so it holds on
+// Render (NODE_ENV=production) as well as the legacy Replit deployment flag.
 function useSecureCookie(): boolean {
-  return process.env.NODE_ENV === "production" || process.env.REPLIT_DEPLOYMENT === "1";
+  return isProductionDeployment();
 }
 
 // --- Pure helpers (unit-tested; no DB) -------------------------------------

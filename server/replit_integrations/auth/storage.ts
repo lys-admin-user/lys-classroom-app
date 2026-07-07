@@ -14,93 +14,110 @@ class AuthStorage implements IAuthStorage {
     return user;
   }
 
+  /**
+   * Link an external identity (Clerk) to the local `users` table without ever
+   * changing an existing user's primary id (which the rest of the app + all
+   * foreign keys depend on). Resolution order:
+   *   1. Existing row already linked by clerkId  → update profile + bump login.
+   *   2. Existing row with the same email         → link clerkId + update.
+   *   3. No match                                 → insert a brand-new user.
+   *
+   * Roles, MFA/recovery-code/trusted-device fields and every other column are
+   * preserved on the matched row — only profile/login-tracking fields are set.
+   */
   async upsertUser(userData: UpsertUser): Promise<User> {
     const now = new Date();
 
-    // If an account already exists with this email under a different id,
-    // update that existing row instead of attempting an insert that would
-    // violate the email unique constraint. This keeps the original user id
-    // (and all of its related records) stable.
+    // Only the profile + login-tracking fields are ever written on a match, so
+    // we never clobber role, tier, MFA secrets, subscription state, etc.
+    const profile = {
+      email: userData.email,
+      firstName: userData.firstName,
+      lastName: userData.lastName,
+      profileImageUrl: userData.profileImageUrl,
+    };
+
+    // 1. Already linked by external id → straightforward profile refresh.
+    if (userData.clerkId) {
+      const [existingByClerk] = await db
+        .select()
+        .from(users)
+        .where(eq(users.clerkId, userData.clerkId));
+
+      if (existingByClerk) {
+        const [updated] = await db
+          .update(users)
+          .set({
+            ...profile,
+            lastLoginAt: now,
+            loginCount: sql`COALESCE(${users.loginCount}, 0) + 1`,
+            updatedAt: now,
+          })
+          .where(eq(users.id, existingByClerk.id))
+          .returning();
+
+        logAuditEvent({
+          userId: updated.id,
+          action: "user_login",
+          category: "auth",
+          severity: "info",
+          details: { email: userData.email, method: "clerk" },
+        }).catch(() => {});
+
+        return updated;
+      }
+    }
+
+    // 2. Existing account with this email → link the external id to it. This is
+    // what keeps current users (and all their data/roles) after cutover.
     if (userData.email) {
       const [existingByEmail] = await db
         .select()
         .from(users)
         .where(eq(users.email, userData.email));
 
-      if (existingByEmail && existingByEmail.id !== userData.id) {
-        // Migrate the existing row's id to match the new OIDC sub so that
-        // session lookups (which key off claims.sub) all hit this row going
-        // forward. This is safe when no FK references to the old id exist.
-        // If FK references do exist, fall back to keeping the existing id.
-        try {
-          const [migrated] = await db
-            .update(users)
-            .set({
-              ...userData,
-              lastLoginAt: now,
-              loginCount: sql`COALESCE(${users.loginCount}, 0) + 1`,
-              updatedAt: now,
-            })
-            .where(eq(users.id, existingByEmail.id))
-            .returning();
+      if (existingByEmail) {
+        const [linked] = await db
+          .update(users)
+          .set({
+            ...profile,
+            clerkId: userData.clerkId ?? existingByEmail.clerkId,
+            lastLoginAt: now,
+            loginCount: sql`COALESCE(${users.loginCount}, 0) + 1`,
+            updatedAt: now,
+          })
+          .where(eq(users.id, existingByEmail.id))
+          .returning();
 
-          logAuditEvent({
-            userId: migrated.id,
-            action: "user_login",
-            category: "auth",
-            severity: "info",
-            details: { email: userData.email, method: "replit_auth", note: "id_migrated", previousId: existingByEmail.id },
-          }).catch(() => {});
+        logAuditEvent({
+          userId: linked.id,
+          action: "user_login",
+          category: "auth",
+          severity: "info",
+          details: { email: userData.email, method: "clerk", note: "linked_by_email" },
+        }).catch(() => {});
 
-          return migrated;
-        } catch (e: any) {
-          console.error("[auth] Could not migrate user id (likely FK refs exist), keeping existing id:", e?.message);
-
-          const { id: _ignoredId, ...rest } = userData;
-          const [updated] = await db
-            .update(users)
-            .set({
-              ...rest,
-              lastLoginAt: now,
-              loginCount: sql`COALESCE(${users.loginCount}, 0) + 1`,
-              updatedAt: now,
-            })
-            .where(eq(users.id, existingByEmail.id))
-            .returning();
-
-          logAuditEvent({
-            userId: updated.id,
-            action: "user_login",
-            category: "auth",
-            severity: "warning",
-            details: { email: userData.email, method: "replit_auth", note: "id_mismatch_keeping_existing", sessionSub: userData.id },
-          }).catch(() => {});
-
-          return updated;
-        }
+        return linked;
       }
     }
 
-    const [user] = await db
-      .insert(users)
-      .values({ ...userData, lastLoginAt: now, loginCount: 1 })
-      .onConflictDoUpdate({
-        target: users.id,
-        set: {
-          ...userData,
-          lastLoginAt: now,
-          loginCount: sql`COALESCE(${users.loginCount}, 0) + 1`,
-          updatedAt: now,
-        },
-      })
-      .returning();
+    // 3. Brand-new user. Let the DB generate the id (gen_random_uuid) unless a
+    // caller provided one explicitly.
+    const insertValues: UpsertUser = {
+      ...userData,
+      lastLoginAt: now,
+      loginCount: 1,
+    };
+    if (!insertValues.id) delete (insertValues as any).id;
+
+    const [user] = await db.insert(users).values(insertValues).returning();
 
     logAuditEvent({
       userId: user.id,
       action: "user_login",
       category: "auth",
       severity: "info",
-      details: { email: userData.email, method: "replit_auth" },
+      details: { email: userData.email, method: "clerk", note: "new_user" },
     }).catch(() => {});
 
     return user;

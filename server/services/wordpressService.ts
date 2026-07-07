@@ -11,6 +11,8 @@
  * 4. SSO/OAuth - Single sign-on between platforms
  */
 
+import { getPublicBaseUrl } from "../lib/hosting";
+
 export interface WordPressConfig {
   siteUrl: string;
   apiEndpoint: string;
@@ -76,9 +78,7 @@ export function generateEmbedCode(type: EmbedType, options?: {
   locale?: string;
   initialPath?: string;
 }): string {
-  const baseUrl = process.env.REPLIT_DEV_DOMAIN 
-    ? `https://${process.env.REPLIT_DEV_DOMAIN}`
-    : 'https://lys.ladderingyoursuccess.com';
+  const baseUrl = getPublicBaseUrl() || 'https://lys.ladderingyoursuccess.com';
   
   const embedPaths = EMBED_PATHS;
   
@@ -292,9 +292,7 @@ export function generateOEmbedResponse(url: string, type: string): {
   width: number;
   height: number;
 } {
-  const baseUrl = process.env.REPLIT_DEV_DOMAIN 
-    ? `https://${process.env.REPLIT_DEV_DOMAIN}`
-    : 'https://lys.ladderingyoursuccess.com';
+  const baseUrl = getPublicBaseUrl() || 'https://lys.ladderingyoursuccess.com';
     
   return {
     version: '1.0',

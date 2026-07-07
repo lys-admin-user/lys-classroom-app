@@ -11,6 +11,8 @@
     "db:push": "drizzle-kit push"
   },
   "dependencies": {
+    "@clerk/clerk-react": "^5.61.8",
+    "@clerk/express": "^2.1.36",
     "@hookform/resolvers": "^3.10.0",
     "@hubspot/api-client": "^12.0.1",
     "@jridgewell/trace-mapping": "^0.3.25",

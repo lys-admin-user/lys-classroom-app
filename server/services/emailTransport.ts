@@ -18,6 +18,7 @@
 // that Resend/SendGrid require the sending domain/address to be verified in their
 // dashboards before real delivery succeeds.
 import nodemailer, { type Transporter } from "nodemailer";
+import { getPublicBaseUrl } from "../lib/hosting";
 
 export type EmailSendStatus = "sent" | "logged_no_transport" | "failed";
 
@@ -34,9 +35,8 @@ export function isEmailConfigured(): boolean {
 }
 
 export function getBaseUrl(): string {
-  const domains = process.env.REPLIT_DOMAINS?.split(",")[0];
-  if (domains) return `https://${domains}`;
-  if (process.env.REPLIT_DEV_DOMAIN) return `https://${process.env.REPLIT_DEV_DOMAIN}`;
+  const base = getPublicBaseUrl();
+  if (base) return base;
   return "http://localhost:5000";
 }
 

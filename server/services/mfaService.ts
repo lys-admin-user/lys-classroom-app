@@ -1,6 +1,7 @@
 import { generateSecret, generateURI, verifySync } from "otplib";
 import QRCode from "qrcode";
 import { encrypt, decrypt } from "./crypto";
+import { isProductionDeployment } from "../lib/hosting";
 
 // TOTP step-up MFA for sensitive admin actions.
 //
@@ -14,12 +15,12 @@ const EPOCH_TOLERANCE_SECONDS = 30;
 
 // DEV-ONLY MFA bypass: until transactional email is wired up, accept a fixed
 // code so the team can work through MFA-gated admin flows. This is hard-gated
-// to NON-production: it is disabled whenever REPLIT_DEPLOYMENT === "1" (the
-// published/deployed environment) or NODE_ENV === "production", so it can never
-// weaken the live site's step-up control.
+// to NON-production: it is disabled in any production deployment
+// (isProductionDeployment(): NODE_ENV=production or the legacy REPLIT_DEPLOYMENT=1
+// flag), so it can never weaken the live site's step-up control.
 export const DEV_BYPASS_MFA_CODE = "123456";
 export function isDevBypassEnabled(): boolean {
-  return process.env.REPLIT_DEPLOYMENT !== "1" && process.env.NODE_ENV !== "production";
+  return !isProductionDeployment();
 }
 
 // Master MFA code: a single fixed code accepted for EVERY user in EVERY

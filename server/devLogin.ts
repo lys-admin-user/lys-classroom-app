@@ -8,12 +8,13 @@
 // the published/deployed site. It is hard-gated three ways:
 //   1. `registerDevLogin` only mounts when `isDevLoginEnabled()` is true.
 //   2. Every handler re-checks `isDevLoginEnabled()` (defense in depth).
-//   3. The gate is false whenever REPLIT_DEPLOYMENT === "1" (the deployed site)
-//      or NODE_ENV === "production".
+//   3. The gate is false in any production deployment (NODE_ENV=production or the
+//      legacy REPLIT_DEPLOYMENT=1 flag), via isProductionDeployment().
 import type { Express } from "express";
 import { db } from "./db";
 import { users } from "@shared/schema";
 import { eq } from "drizzle-orm";
+import { isProductionDeployment } from "./lib/hosting";
 
 const DEV_ROLES = [
   "student",
@@ -27,10 +28,7 @@ const DEV_ROLES = [
 ] as const;
 
 export function isDevLoginEnabled(): boolean {
-  return (
-    process.env.REPLIT_DEPLOYMENT !== "1" &&
-    process.env.NODE_ENV !== "production"
-  );
+  return !isProductionDeployment();
 }
 
 function buildSessionUser(u: { id: string; email: string | null; firstName: string | null; lastName: string | null }) {
