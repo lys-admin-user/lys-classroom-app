@@ -36,6 +36,12 @@ See `.env.example` for the full variable list.
   If neither is set, automatic registration is skipped and you configure the
   webhook manually in the Stripe dashboard (see below). The receiving endpoint
   verifies the Stripe signature either way.
+- **Note on the `stripe-replit-sync` package:** despite its name, this npm
+  dependency is host-agnostic — it is a generic Stripe→Postgres sync tool. It is
+  fed only `STRIPE_SECRET_KEY` + `DATABASE_URL` and has no Replit connector or
+  runtime dependency (its own deps are just `pg`, `pg-node-migrations`, `ws`,
+  `yesql`, and a `stripe` peer). It runs unchanged on Render — do NOT remove it
+  during the migration.
 
 ### Hosting flags: Replit-only → hosting-agnostic
 - `server/lib/hosting.ts` centralises two helpers:
