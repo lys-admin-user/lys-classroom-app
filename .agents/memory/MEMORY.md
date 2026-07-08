@@ -8,3 +8,4 @@
 - [MFA login-gate freshness](mfa-login-gate-freshness.md) — the login-2FA gate keys off session freshness alone, so forced-enrollment must be enforced in EVERY factor-verify path, not just the gate.
 - [External-identity email linking](external-identity-email-linking.md) — Clerk/SSO→existing-user linking by email must require a verified email or it's an account-takeover vector; never re-broaden.
 - [Email transport portability](email-transport-portability.md) — outbound email uses plain RESEND_API_KEY + fetch (NOT the Replit Resend connector) so it works on Render; don't re-couple to a connector/SDK.
+- [Clerk embedded SignIn routing](clerk-embedded-signin-routing.md) — embedded <SignIn>/<SignUp> need signInUrl/signUpUrl on ClerkProvider or Google/OAuth bounces to hosted Account Portal and crashes ("Application error").

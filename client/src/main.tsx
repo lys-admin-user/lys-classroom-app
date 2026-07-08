@@ -14,7 +14,16 @@ const root = createRoot(document.getElementById("root")!);
 
 if (clerkPublishableKey) {
   root.render(
-    <ClerkProvider publishableKey={clerkPublishableKey} afterSignOutUrl="/sign-in">
+    // signInUrl/signUpUrl point Clerk at our EMBEDDED <SignIn>/<SignUp> pages.
+    // Without them Clerk falls back to its hosted Account Portal (accounts.dev)
+    // for the OAuth flow, which then crashes on the redirect back to the app
+    // ("You're signing back in to Clerk" → client-side exception).
+    <ClerkProvider
+      publishableKey={clerkPublishableKey}
+      signInUrl="/sign-in"
+      signUpUrl="/sign-up"
+      afterSignOutUrl="/sign-in"
+    >
       <App />
     </ClerkProvider>,
   );
