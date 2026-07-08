@@ -116,6 +116,12 @@ function OnboardingGuard({ children }: { children: React.ReactNode }) {
     if (isLoading) return;
     if (!isAuthenticated || !user || user.onboardingCompleted) return;
 
+    // Admin/staff accounts are provisioned by an organization, not created via
+    // self-serve sign-up. Never trap them in the self-serve onboarding wizard —
+    // it is meant for students/educators/homeschool parents, and completing it
+    // would try to overwrite their privileged role with a self-serve one.
+    if ((user as any).role && hasMinRole((user as any).role, "staff")) return;
+
     const isExemptPath = EXEMPT_PATHS.some(path => location.startsWith(path));
     if (isExemptPath) return;
 

@@ -505,8 +505,17 @@ export function registerAccountRoutes(app: Express): void {
             message: "That role can't be set during sign-up.",
           });
         }
-        const dbRole = role === "homeschool_parent" ? "educator" : role;
-        await storage.updateUserRole(userId, dbRole as UserRole);
+        // Never downgrade an already-privileged (admin/staff-provisioned) account
+        // through self-serve onboarding. If the user already holds a role outside
+        // the self-serve set, keep it — onboarding may complete, but it must not
+        // overwrite an admin/staff role with a student/educator one.
+        const currentRoleIsPrivileged =
+          !!currentUser?.role &&
+          !(SELF_SERVE_ONBOARDING_ROLES as readonly string[]).includes(currentUser.role);
+        if (!currentRoleIsPrivileged) {
+          const dbRole = role === "homeschool_parent" ? "educator" : role;
+          await storage.updateUserRole(userId, dbRole as UserRole);
+        }
       }
       
       // Save preferences with needs analysis

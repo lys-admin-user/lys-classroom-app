@@ -545,6 +545,27 @@ async function initLessonAiSubsystem(): Promise<void> {
     } catch (e) {
       console.warn("[bootstrap-admin] skipped:", (e as Error).message);
     }
+    // Onboarding backfill: admin/staff accounts are provisioned by an org, not
+    // created via self-serve sign-up, so they must never be forced through (or
+    // nagged by) the self-serve onboarding wizard. Mark any already-privileged
+    // account (role outside the self-serve set) as onboarded. Idempotent — only
+    // touches rows still flagged incomplete, so it is a no-op once settled.
+    try {
+      const SELF_SERVE_ROLES = ["student", "educator", "homeschool_parent"];
+      const allUsers = await storage.getAllUsers();
+      let backfilled = 0;
+      for (const u of allUsers) {
+        if (!u.onboardingCompleted && u.role && !SELF_SERVE_ROLES.includes(u.role)) {
+          await storage.completeOnboarding(u.id);
+          backfilled++;
+        }
+      }
+      if (backfilled > 0) {
+        console.log(`[onboarding-backfill] marked ${backfilled} privileged account(s) as onboarded`);
+      }
+    } catch (e) {
+      console.warn("[onboarding-backfill] skipped:", (e as Error).message);
+    }
     const existing = await storage.getFeatureFlagByName("new_lesson_retrieval");
     if (!existing) {
       await storage.createFeatureFlag({
