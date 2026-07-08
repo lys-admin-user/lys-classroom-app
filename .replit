@@ -103,4 +103,4 @@ timeoutMs = 20000
 [userenv]
 
 [userenv.shared]
-RESEND_FROM_EMAIL = "LYS <onboarding@resend.dev>"
+RESEND_FROM_EMAIL = "LYS <no-reply@lyslessonplanning.com>"
