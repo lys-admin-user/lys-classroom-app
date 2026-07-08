@@ -664,8 +664,11 @@ export function registerPaymentsRoutes(app: Express): void {
         return;
       }
 
-      // Real Stripe subscription — cancel at period end
-      if (user.stripeSubscriptionId && user.subscriptionStatus === "active") {
+      // Real Stripe subscription — cancel at period end. Keyed off the presence
+      // of a Stripe subscription id (NOT status === "active") so a subscription
+      // that already has a scheduled downgrade ("canceling") is re-scheduled at
+      // period end rather than wiped immediately, which would forfeit paid time.
+      if (user.stripeSubscriptionId) {
         const stripe = await getUncachableStripeClient();
         const sub = await stripe.subscriptions.update(user.stripeSubscriptionId, {
           cancel_at_period_end: true,
@@ -705,6 +708,44 @@ export function registerPaymentsRoutes(app: Express): void {
     }
   });
 
+  // Cancel a scheduled downgrade / cancellation and keep the current plan.
+  // Clears cancel_at_period_end on Stripe and restores the active status so the
+  // subscription continues billing normally.
+  app.post("/api/subscription/resume", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user?.claims?.sub;
+
+      const userRecord = await db.select().from(users).where(eq(users.id, userId)).limit(1);
+      const user = userRecord[0];
+      if (!user) {
+        res.status(404).json({ error: "User not found" });
+        return;
+      }
+
+      if (!user.stripeSubscriptionId) {
+        res.status(400).json({ error: "No active subscription to resume." });
+        return;
+      }
+
+      const stripe = await getUncachableStripeClient();
+      await stripe.subscriptions.update(user.stripeSubscriptionId, {
+        cancel_at_period_end: false,
+      });
+
+      await db.update(users)
+        .set({ subscriptionStatus: "active", downgradeTargetTier: null, updatedAt: new Date() })
+        .where(eq(users.id, userId));
+
+      res.json({
+        success: true,
+        message: `Your ${user.tier} plan will continue as before.`,
+      });
+    } catch (error: any) {
+      console.error("Resume subscription error:", error);
+      res.status(500).json({ error: "Failed to resume subscription" });
+    }
+  });
+
 
   // Explicit "Cancel Subscription" — FTC "Click to Cancel" parity. Cancellation
   // must be as simple as sign-up: one click, no retention hoops. Cancels at the
@@ -720,8 +761,11 @@ export function registerPaymentsRoutes(app: Express): void {
         return;
       }
 
-      // Real Stripe subscription — cancel at period end.
-      if (user.stripeSubscriptionId && user.subscriptionStatus === "active") {
+      // Real Stripe subscription — cancel at period end. Keyed off the presence
+      // of a Stripe subscription id (NOT status === "active") so a subscription
+      // already scheduled to change ("canceling") is kept to period end rather
+      // than wiped immediately, which would forfeit paid time.
+      if (user.stripeSubscriptionId) {
         const stripe = await getUncachableStripeClient();
         const sub = await stripe.subscriptions.update(user.stripeSubscriptionId, {
           cancel_at_period_end: true,

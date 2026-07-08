@@ -369,6 +369,23 @@ export default function Pricing() {
     },
   });
 
+  // Cancel a scheduled (end-of-period) downgrade and keep the current plan.
+  const resumeMutation = useMutation({
+    mutationFn: () =>
+      apiRequest("POST", "/api/subscription/resume", {}).then(r => r.json()),
+    onSuccess: (data: any) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/subscription/status"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/auth/user"] });
+      toast({
+        title: "Downgrade Canceled",
+        description: data?.message || "Your plan will continue as before.",
+      });
+    },
+    onError: () => {
+      toast({ title: "Error", description: "Could not cancel the scheduled downgrade. Please try again.", variant: "destructive" });
+    },
+  });
+
   const currentTier = subscriptionStatus?.tier || user?.tier || "free";
 
   const getButtonAction = (tierId: string) => {
@@ -453,7 +470,7 @@ export default function Pricing() {
     : seatMinTotal !== null
       ? `Starts at $${seatMinTotal}`
       : selectedTierData ? `$${selectedTierData.basePrice}` : "$0";
-  const isPending = upgradeMutation.isPending || downgradeMutation.isPending || poMutation.isPending || bankTransferMutation.isPending || stripeLoading;
+  const isPending = upgradeMutation.isPending || downgradeMutation.isPending || resumeMutation.isPending || poMutation.isPending || bankTransferMutation.isPending || stripeLoading;
 
   const hasNetworkQuote = !!enterpriseQuote?.hasOrg && enterpriseQuote.quote !== undefined;
   const estimatorCampusCount = hasNetworkQuote ? enterpriseQuote!.quote!.campusCount : estimatorCampuses;
@@ -464,7 +481,14 @@ export default function Pricing() {
   const periodEndFormatted = subscriptionStatus?.currentPeriodEnd
     ? new Date(subscriptionStatus.currentPeriodEnd).toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" })
     : null;
-  const hasRealSubscription = !!subscriptionStatus?.stripeSubscriptionId && subscriptionStatus?.subscriptionStatus === "active";
+  // True when the account has a real paid subscription whose paid period still
+  // extends into the future — i.e. downgrades must take effect at period end so
+  // the user never forfeits time they already paid for. Keyed off a future
+  // period end, NOT status === "active", so an already-scheduled ("canceling")
+  // subscription still gets the correct end-of-period treatment.
+  const hasFuturePaidPeriod = !!subscriptionStatus?.stripeSubscriptionId
+    && !!subscriptionStatus?.currentPeriodEnd
+    && new Date(subscriptionStatus.currentPeriodEnd).getTime() > Date.now();
 
   const scheduledDowngrade = subscriptionStatus?.subscriptionStatus === "canceling" && subscriptionStatus?.downgradeTargetTier
     ? {
@@ -591,6 +615,7 @@ export default function Pricing() {
           {baseTiers.map((tier) => {
             const action = getButtonAction(tier.id);
             const isCurrentPlan = tier.id === currentTier;
+            const isScheduledTarget = scheduledDowngrade?.targetTier === tier.id;
             const adjustedPricing = getAdjustedPrice(tier.id);
             const displayPrice = adjustedPricing ? formatPrice(adjustedPricing.price) : `$${tier.basePrice}`;
             const hasSavings = adjustedPricing && adjustedPricing.savingsPercent > 0;
@@ -711,13 +736,20 @@ export default function Pricing() {
                   {isAuthenticated ? (
                     <Button 
                       className="w-full" 
-                      variant={isCurrentPlan ? "secondary" : tier.popular ? "default" : "outline"}
-                      disabled={(isCurrentPlan && !scheduledDowngrade) || isPending}
-                      onClick={() => handleTierClick(tier.id)}
+                      variant={isCurrentPlan && scheduledDowngrade ? "default" : isCurrentPlan ? "secondary" : tier.popular ? "default" : "outline"}
+                      disabled={(isCurrentPlan && !scheduledDowngrade) || isScheduledTarget || isPending}
+                      onClick={() => {
+                        if (isCurrentPlan && scheduledDowngrade) {
+                          resumeMutation.mutate();
+                        } else {
+                          handleTierClick(tier.id);
+                        }
+                      }}
                       data-testid={`button-select-${tier.name.toLowerCase()}`}
                     >
                       {isCurrentPlan && !scheduledDowngrade ? "Current Plan" :
-                       isCurrentPlan && scheduledDowngrade ? "Change Plan" :
+                       isCurrentPlan && scheduledDowngrade ? `Keep ${tier.name}` :
+                       isScheduledTarget ? (scheduledDowngrade?.date ? `Switching on ${scheduledDowngrade.date}` : "Switching soon") :
                        action === "downgrade" ? `Switch to ${tier.name}` :
                        tier.cta}
                     </Button>
@@ -920,7 +952,7 @@ export default function Pricing() {
 
           <div className="space-y-4 py-1">
             {/* Access timeline */}
-            {hasRealSubscription && periodEndFormatted ? (
+            {hasFuturePaidPeriod && periodEndFormatted ? (
               <div className="rounded-lg border border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-950/20 p-4 space-y-1">
                 <p className="text-sm font-medium text-amber-800 dark:text-amber-300">
                   You keep full access until {periodEndFormatted}
@@ -974,7 +1006,7 @@ export default function Pricing() {
               data-testid="button-confirm-downgrade"
             >
               {downgradeMutation.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
-              {hasRealSubscription && periodEndFormatted
+              {hasFuturePaidPeriod && periodEndFormatted
                 ? `Downgrade on ${periodEndFormatted}`
                 : `Switch to ${downgradeToData?.name}`}
             </Button>
