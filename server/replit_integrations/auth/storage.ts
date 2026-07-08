@@ -25,7 +25,11 @@ class AuthStorage implements IAuthStorage {
    * Roles, MFA/recovery-code/trusted-device fields and every other column are
    * preserved on the matched row — only profile/login-tracking fields are set.
    */
-  async upsertUser(userData: UpsertUser, opts?: { emailVerified?: boolean }): Promise<User> {
+  async upsertUser(
+    userData: UpsertUser,
+    opts?: { emailVerified?: boolean },
+    isRetry = false,
+  ): Promise<User> {
     const now = new Date();
 
     // Only the profile + login-tracking fields are ever written on a match, so
@@ -116,17 +120,31 @@ class AuthStorage implements IAuthStorage {
     };
     if (!insertValues.id) delete (insertValues as any).id;
 
-    const [user] = await db.insert(users).values(insertValues).returning();
+    try {
+      const [user] = await db.insert(users).values(insertValues).returning();
 
-    logAuditEvent({
-      userId: user.id,
-      action: "user_login",
-      category: "auth",
-      severity: "info",
-      details: { email: userData.email, method: "clerk", note: "new_user" },
-    }).catch(() => {});
+      logAuditEvent({
+        userId: user.id,
+        action: "user_login",
+        category: "auth",
+        severity: "info",
+        details: { email: userData.email, method: "clerk", note: "new_user" },
+      }).catch(() => {});
 
-    return user;
+      return user;
+    } catch (err: any) {
+      // Concurrent first-login requests (the SPA fires several /api calls at
+      // once) all reach step 3 before any row exists, so the losers hit the
+      // unique constraint on email/clerkId (Postgres 23505). Re-run resolution
+      // once: the winner's row now exists, so step 1 (clerkId) or step 2
+      // (verified email) links to it instead of failing the login. The
+      // verified-email gate in step 2 is unchanged, so this adds no new linking
+      // path — it only recovers from the race.
+      if (err?.code === "23505" && !isRetry) {
+        return this.upsertUser(userData, opts, true);
+      }
+      throw err;
+    }
   }
 }
 

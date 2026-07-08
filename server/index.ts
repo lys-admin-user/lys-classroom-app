@@ -101,6 +101,25 @@ app.use((req, _res, next) => {
 // frame-ancestors are left at helmet defaults ('self') to match the existing
 // X-Frame-Options behavior and not regress the /embed/* surfaces.
 const isDeployment = isProductionDeployment();
+// Clerk (auth) needs its script/frame/worker origins allowed and requires
+// 'unsafe-eval' for its Cloudflare bot-protection challenge. Google OAuth is
+// popup-based, so the default helmet Cross-Origin-Opener-Policy: 'same-origin'
+// severs window.opener and the popup can't post the result back
+// ("window.opener is null" -> client-side exception). 'same-origin-allow-popups'
+// keeps COOP protection for the page while letting the OAuth popup talk back.
+// Production Clerk is served from a first-party domain (e.g.
+// https://clerk.lyslessonplanning.com) that the *.clerk.* wildcards don't cover,
+// so allow it explicitly. Override via CLERK_FRONTEND_API_URL when the domain
+// changes rather than editing this list.
+const clerkFrontendApi =
+  process.env.CLERK_FRONTEND_API_URL || "https://clerk.lyslessonplanning.com";
+const clerkScriptSrc = [
+  "https://*.clerk.accounts.dev",
+  "https://*.clerk.com",
+  "https://clerk.com",
+  clerkFrontendApi,
+  "https://challenges.cloudflare.com",
+];
 app.use(
   helmet({
     contentSecurityPolicy: isDeployment
@@ -108,12 +127,26 @@ app.use(
           useDefaults: true,
           directives: {
             defaultSrc: ["'self'"],
-            scriptSrc: ["'self'", "'unsafe-inline'", "https://js.stripe.com"],
+            scriptSrc: [
+              "'self'",
+              "'unsafe-inline'",
+              "'unsafe-eval'",
+              "https://js.stripe.com",
+              ...clerkScriptSrc,
+            ],
             styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
             fontSrc: ["'self'", "https://fonts.gstatic.com", "data:"],
             imgSrc: ["'self'", "data:", "blob:", "https:"],
             connectSrc: ["'self'", "https:", "wss:"],
-            frameSrc: ["'self'", "https://js.stripe.com"],
+            frameSrc: [
+              "'self'",
+              "https://js.stripe.com",
+              "https://challenges.cloudflare.com",
+              "https://*.clerk.accounts.dev",
+              "https://*.clerk.com",
+              clerkFrontendApi,
+            ],
+            workerSrc: ["'self'", "blob:"],
             objectSrc: ["'none'"],
             baseUri: ["'self'"],
             upgradeInsecureRequests: [],
@@ -121,6 +154,7 @@ app.use(
         }
       : false,
     crossOriginEmbedderPolicy: false,
+    crossOriginOpenerPolicy: { policy: "same-origin-allow-popups" },
   }),
 );
 
