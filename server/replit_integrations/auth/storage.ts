@@ -5,7 +5,7 @@ import { logAuditEvent } from "../../services/auditLog";
 
 export interface IAuthStorage {
   getUser(id: string): Promise<User | undefined>;
-  upsertUser(user: UpsertUser): Promise<User>;
+  upsertUser(user: UpsertUser, opts?: { emailVerified?: boolean }): Promise<User>;
 }
 
 class AuthStorage implements IAuthStorage {
@@ -25,7 +25,7 @@ class AuthStorage implements IAuthStorage {
    * Roles, MFA/recovery-code/trusted-device fields and every other column are
    * preserved on the matched row — only profile/login-tracking fields are set.
    */
-  async upsertUser(userData: UpsertUser): Promise<User> {
+  async upsertUser(userData: UpsertUser, opts?: { emailVerified?: boolean }): Promise<User> {
     const now = new Date();
 
     // Only the profile + login-tracking fields are ever written on a match, so
@@ -70,7 +70,13 @@ class AuthStorage implements IAuthStorage {
 
     // 2. Existing account with this email → link the external id to it. This is
     // what keeps current users (and all their data/roles) after cutover.
-    if (userData.email) {
+    //
+    // SECURITY: email-based linking binds an external identity to an EXISTING
+    // account, so it is only safe when the caller has proven the email really
+    // belongs to this person (Clerk "verified" status / trusted IdP assertion).
+    // An unverified email must NEVER auto-link — otherwise an attacker could
+    // claim another user's account just by typing their email into Clerk.
+    if (userData.email && opts?.emailVerified === true) {
       const [existingByEmail] = await db
         .select()
         .from(users)

@@ -77,19 +77,23 @@ async function linkClerkUser(
   clerkUserId: string,
   data: {
     email: string | null;
+    emailVerified: boolean;
     firstName: string | null;
     lastName: string | null;
     profileImageUrl: string | null;
   },
   ipAddress?: string,
 ): Promise<User> {
-  const user = await authStorage.upsertUser({
-    clerkId: clerkUserId,
-    email: data.email,
-    firstName: data.firstName,
-    lastName: data.lastName,
-    profileImageUrl: data.profileImageUrl,
-  });
+  const user = await authStorage.upsertUser(
+    {
+      clerkId: clerkUserId,
+      email: data.email,
+      firstName: data.firstName,
+      lastName: data.lastName,
+      profileImageUrl: data.profileImageUrl,
+    },
+    { emailVerified: data.emailVerified },
+  );
 
   // Auto-start a 10-day trial for brand-new users (loginCount === 1).
   if (user.loginCount === 1) {
@@ -137,8 +141,16 @@ export async function setupAuth(app: Express) {
   passport.deserializeUser((user: Express.User, cb) => cb(null, user));
 
   // Verify Clerk sessions (reads __session cookie or Authorization Bearer).
+  // Scope to /api only: running clerkMiddleware on the SPA document/asset
+  // requests triggers Clerk's handshake-redirect flow, which conflicts with
+  // Vite serving the HTML shell. The browser session is owned by the client
+  // ClerkProvider; the server only needs to verify Clerk tokens on API calls.
   if (clerkConfigured()) {
-    app.use(clerkMiddleware());
+    const clerkAuthMw = clerkMiddleware();
+    app.use((req, res, next) => {
+      if (!req.path.startsWith("/api")) return next();
+      return clerkAuthMw(req, res, next);
+    });
   }
 
   // ── Clerk → local session establisher ─────────────────────────────────
@@ -146,9 +158,16 @@ export async function setupAuth(app: Express) {
   // touch, and propagate Clerk sign-out.
   if (clerkConfigured()) {
     app.use(async (req: any, _res, next) => {
+      if (!req.path.startsWith("/api")) return next();
       try {
-        const auth = getAuth(req);
-        const clerkUserId = auth?.userId as string | undefined;
+        // getAuth throws when the request had no Clerk context; treat any
+        // failure as "no Clerk user" so anonymous/API calls pass through.
+        let clerkUserId: string | undefined;
+        try {
+          clerkUserId = (getAuth(req)?.userId as string | undefined) ?? undefined;
+        } catch {
+          clerkUserId = undefined;
+        }
 
         // Already have a local passport session.
         if (req.isAuthenticated?.() && req.user?.claims?.sub) {
@@ -165,15 +184,31 @@ export async function setupAuth(app: Express) {
         // First authenticated request after a Clerk sign-in: link/create the
         // local user and persist a passport session.
         const clerkUser = await clerkClient.users.getUser(clerkUserId);
-        const email =
-          clerkUser.primaryEmailAddress?.emailAddress ??
-          clerkUser.emailAddresses?.[0]?.emailAddress ??
+        const primaryEmail =
+          clerkUser.primaryEmailAddress ??
+          clerkUser.emailAddresses?.[0] ??
           null;
+        const email = primaryEmail?.emailAddress ?? null;
+        const emailVerified =
+          primaryEmail?.verification?.status === "verified";
+
+        // SECURITY: never bind a Clerk identity to an existing local account via
+        // an unverified email. Without this check, someone could take over
+        // another user's account just by adding (but not proving) their email
+        // address in Clerk. Legitimate email + OAuth sign-ups are always
+        // verified, so this only blocks the abuse case.
+        if (email && !emailVerified) {
+          console.warn(
+            "[auth] refusing to establish session: Clerk email not verified",
+          );
+          return next();
+        }
 
         const localUser = await linkClerkUser(
           clerkUserId,
           {
             email,
+            emailVerified,
             firstName: clerkUser.firstName ?? null,
             lastName: clerkUser.lastName ?? null,
             profileImageUrl: clerkUser.imageUrl ?? null,

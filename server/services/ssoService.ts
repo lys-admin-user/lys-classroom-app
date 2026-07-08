@@ -202,13 +202,17 @@ export async function provisionSsoUser(
     if (connection.autoProvision === false) {
       return null;
     }
-    const created = await authStorage.upsertUser({
-      email: claims.email,
-      firstName: claims.firstName,
-      lastName: claims.lastName,
-      profileImageUrl: claims.profileImageUrl,
-      role: sanitizeProvisionRole(connection.defaultRole),
-    } as any);
+    const created = await authStorage.upsertUser(
+      {
+        email: claims.email,
+        firstName: claims.firstName,
+        lastName: claims.lastName,
+        profileImageUrl: claims.profileImageUrl,
+        role: sanitizeProvisionRole(connection.defaultRole),
+      } as any,
+      // The email is asserted by a trusted, admin-configured SSO IdP.
+      { emailVerified: true },
+    );
     userId = created.id;
   }
 
