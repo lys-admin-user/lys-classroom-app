@@ -26,6 +26,7 @@ export function NeedsAnalyzerModal() {
     if (hasSeenAnalyzer()) return;
     if (location === "/start" || location.startsWith("/onboarding") || location.startsWith("/api/")) return;
     if (location.startsWith("/embed/") || location.startsWith("/shared/")) return;
+    if (location.startsWith("/sign-in") || location.startsWith("/sign-up")) return;
 
     const t = window.setTimeout(() => setOpen(true), 4000);
     return () => window.clearTimeout(t);
