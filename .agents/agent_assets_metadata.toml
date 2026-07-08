@@ -24,3 +24,9 @@ id = "V4mHwFw5G1JV6pXB1jgQ-"
 uri = "file://exports/LYS_Role_Access_Levels.xlsx"
 type = "table"
 title = "LYS Role Access Levels"
+
+[[outputs]]
+id = "Bkn8lCjOYW0TZ0FPe0WYz"
+uri = "file://exports/LYS_Users_Roles_Compare.xlsx"
+type = "table"
+title = "LYS Users — Roles Compared (Previous vs Live)"
