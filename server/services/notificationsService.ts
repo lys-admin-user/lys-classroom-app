@@ -65,9 +65,9 @@ async function getOptInSystemAdmins(
 // neither signal default to "weekly".
 export async function getEmailDigestRecipients(
   opts: { cadences?: DigestCadence[] } = {},
-): Promise<{ id: string; email: string | null }[]> {
+): Promise<{ id: string; email: string | null; firstName: string | null }[]> {
   const admins = await db
-    .select({ id: users.id, email: users.email })
+    .select({ id: users.id, email: users.email, firstName: users.firstName })
     .from(users)
     .where(eq(users.role, SYSTEM_ADMIN_ROLE));
   if (admins.length === 0) return [];

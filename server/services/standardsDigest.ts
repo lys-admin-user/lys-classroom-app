@@ -119,7 +119,10 @@ export async function buildDigestPayload(now: Date = new Date()): Promise<Digest
   };
 }
 
-export function renderDigestEmail(payload: DigestPayload, recipient: { email: string | null }): {
+export function renderDigestEmail(
+  payload: DigestPayload,
+  recipient: { email: string | null; firstName?: string | null },
+): {
   subject: string;
   body: string;
 } {
@@ -130,7 +133,8 @@ export function renderDigestEmail(payload: DigestPayload, recipient: { email: st
 
   const subject = `LYS Standards Weekly Digest — ${fmt(payload.periodStart)} → ${fmt(payload.periodEnd)}`;
   const lines: string[] = [];
-  lines.push(`Hello${recipient.email ? ` ${recipient.email}` : ""},`);
+  const greetingName = recipient.firstName?.trim() || recipient.email || "there";
+  lines.push(`Hello ${greetingName},`);
   lines.push("");
   lines.push(`Here is your weekly summary of the LYS standards pipeline.`);
   lines.push("");
