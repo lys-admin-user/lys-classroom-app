@@ -486,6 +486,65 @@ async function initLessonAiSubsystem(): Promise<void> {
     } catch (e) {
       console.warn("[team-hub] staff access grandfather skipped:", (e as Error).message);
     }
+    // First-admin bootstrap: when BOOTSTRAP_ADMIN_EMAIL is set AND no system_admin
+    // exists yet, promote that already-registered user to system_admin. This is a
+    // one-time cutover aid so a freshly published production database — which starts
+    // with zero admins — can get its first top-level admin without hand-editing the
+    // live DB. A persistent latch (`first_admin_bootstrap_completed` feature flag) is
+    // set on success so this NEVER fires again — even if every admin is later removed
+    // — and can never override intentional role changes made from the admin panel.
+    const BOOTSTRAP_LATCH = "first_admin_bootstrap_completed";
+    try {
+      const bootstrapEmail = process.env.BOOTSTRAP_ADMIN_EMAIL?.trim().toLowerCase();
+      const latch = bootstrapEmail
+        ? await storage.getFeatureFlagByName(BOOTSTRAP_LATCH)
+        : null;
+      if (bootstrapEmail && !latch?.isEnabled) {
+        const allUsers = await storage.getAllUsers();
+        const hasSystemAdmin = allUsers.some((u) => u.role === "system_admin");
+        if (!hasSystemAdmin) {
+          const target = allUsers.find(
+            (u) => (u.email || "").toLowerCase() === bootstrapEmail,
+          );
+          if (target && target.role !== "system_admin") {
+            await storage.updateUserRole(target.id, "system_admin");
+            console.log(
+              `[bootstrap-admin] promoted first admin (no prior system_admin existed)`,
+            );
+            try {
+              const { logAuditEvent } = await import("./services/auditLog");
+              await logAuditEvent({
+                userId: target.id,
+                action: "role_change",
+                category: "admin_action",
+                severity: "warning",
+                resourceType: "user",
+                resourceId: target.id,
+                details: { to: "system_admin", via: "bootstrap_admin_env", reason: "first_admin_bootstrap" },
+              });
+            } catch {
+              /* audit is best-effort */
+            }
+            // Latch it closed so the bootstrap is strictly one-time.
+            try {
+              await storage.createFeatureFlag({
+                name: BOOTSTRAP_LATCH,
+                description: "Set once the first system_admin has been bootstrapped; prevents any future auto-promotion.",
+                isEnabled: true,
+              } as any);
+            } catch {
+              /* latch already exists or write raced; safe to ignore */
+            }
+          } else if (!target) {
+            console.warn(
+              "[bootstrap-admin] BOOTSTRAP_ADMIN_EMAIL set but no matching user found yet; will retry on next boot",
+            );
+          }
+        }
+      }
+    } catch (e) {
+      console.warn("[bootstrap-admin] skipped:", (e as Error).message);
+    }
     const existing = await storage.getFeatureFlagByName("new_lesson_retrieval");
     if (!existing) {
       await storage.createFeatureFlag({

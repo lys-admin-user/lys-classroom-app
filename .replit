@@ -104,3 +104,4 @@ timeoutMs = 20000
 
 [userenv.shared]
 RESEND_FROM_EMAIL = "LYS <no-reply@lyslessonplanning.com>"
+BOOTSTRAP_ADMIN_EMAIL = "bayo@maskil.dev"

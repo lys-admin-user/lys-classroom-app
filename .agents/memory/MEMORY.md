@@ -10,3 +10,4 @@
 - [Email transport portability](email-transport-portability.md) — outbound email uses plain RESEND_API_KEY + fetch (NOT the Replit Resend connector) so it works on Render; don't re-couple to a connector/SDK.
 - [Clerk embedded SignIn routing](clerk-embedded-signin-routing.md) — embedded <SignIn>/<SignUp> need signInUrl/signUpUrl on ClerkProvider or Google/OAuth bounces to hosted Account Portal and crashes ("Application error").
 - [Helmet COOP breaks OAuth popups](helmet-coop-oauth-popups.md) — helmet's default COOP:same-origin nulls window.opener → Google login popup crashes; use same-origin-allow-popups. Includes Clerk prod CSP origins.
+- [Dev/prod separate DBs](dev-prod-separate-dbs.md) — publish migrates schema not rows; dev admins ≠ prod admins; first prod admin via BOOTSTRAP_ADMIN_EMAIL + one-time latch.
