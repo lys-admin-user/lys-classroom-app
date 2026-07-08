@@ -94,9 +94,15 @@ See `.env.example` for the full variable list.
   (`SENDGRID_API_KEY`) and SMTP (`SMTP_HOST`/`SMTP_PORT`) are also supported —
   see `.env.example`. First configured provider wins.
 - The "from" address's domain must be **verified in the Resend dashboard**
-  before real delivery works.
-- If no provider is set, email is safely logged instead of sent and login MFA
-  degrades gracefully — nothing crashes.
+  before real delivery to arbitrary recipients works. Until you verify a domain,
+  set `RESEND_FROM_EMAIL=LYS <onboarding@resend.dev>` (Resend's shared test
+  sender): it delivers only to your own Resend account email — enough to confirm
+  the pipeline end-to-end. Swap it for `no-reply@yourdomain.com` once the domain
+  is verified.
+- If no provider is set, email is safely logged instead of sent. Sends that fail
+  (e.g. unverified sender) are logged and return `failed` without throwing, so
+  digests, billing reminders, and login MFA all degrade gracefully — nothing
+  crashes.
 
 ---
 

@@ -7,3 +7,4 @@
 - [requireTeacher & student ownership](requireteacher-and-student-ownership.md) — `students.userId` is the educator owner not the student's auth id, so student-self reads can't use ensureStudentRecordAccess; residual IDOR on /api/students/:id + /api/student-assignments/:studentId.
 - [MFA login-gate freshness](mfa-login-gate-freshness.md) — the login-2FA gate keys off session freshness alone, so forced-enrollment must be enforced in EVERY factor-verify path, not just the gate.
 - [External-identity email linking](external-identity-email-linking.md) — Clerk/SSO→existing-user linking by email must require a verified email or it's an account-takeover vector; never re-broaden.
+- [Email transport portability](email-transport-portability.md) — outbound email uses plain RESEND_API_KEY + fetch (NOT the Replit Resend connector) so it works on Render; don't re-couple to a connector/SDK.
