@@ -83,6 +83,21 @@ See `.env.example` for the full variable list.
 - Point `DATABASE_URL` at your Postgres. Apply schema with `npm run db:push`
   (adds the `users.clerk_id` column + unique constraint; safe on existing data).
 
+### 4. Email (optional but recommended)
+- Outbound email (MFA/login codes, admin digests, billing reminders,
+  notifications) all flow through one host-agnostic transport
+  (`server/services/emailTransport.ts`). It reads plain env vars and calls the
+  provider's HTTPS API directly — **no Replit connector**, so it behaves
+  identically on Render.
+- Recommended provider is **Resend**: set `RESEND_API_KEY` and
+  `RESEND_FROM_EMAIL` (e.g. `LYS <no-reply@yourdomain.com>`). SendGrid
+  (`SENDGRID_API_KEY`) and SMTP (`SMTP_HOST`/`SMTP_PORT`) are also supported —
+  see `.env.example`. First configured provider wins.
+- The "from" address's domain must be **verified in the Resend dashboard**
+  before real delivery works.
+- If no provider is set, email is safely logged instead of sent and login MFA
+  degrades gracefully — nothing crashes.
+
 ---
 
 ## Deploying to Render
