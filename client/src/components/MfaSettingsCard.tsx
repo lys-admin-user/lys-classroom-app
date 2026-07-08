@@ -91,25 +91,25 @@ export function MfaSettingsCard() {
   return (
     <Card data-testid="card-mfa-settings">
       <CardHeader>
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            {status?.enabled ? (
-              <ShieldCheck className="h-5 w-5 text-green-600" />
-            ) : (
-              <ShieldAlert className="h-5 w-5 text-amber-600" />
-            )}
-            <div>
-              <CardTitle className="font-oswald">Two-Factor Authentication</CardTitle>
-              <CardDescription className="font-roboto">
-                Add a second step at sign-in and protect sensitive actions (deleting users, changing roles, impersonation) with an authenticator app.
-              </CardDescription>
-            </div>
-          </div>
-          {!isLoading && (
-            <Badge variant={status?.enabled ? "default" : "secondary"} data-testid="badge-mfa-status">
-              {status?.enabled ? "Enabled" : "Disabled"}
-            </Badge>
+        <div className="flex items-start gap-3">
+          {status?.enabled ? (
+            <ShieldCheck className="h-5 w-5 shrink-0 text-green-600 mt-1" />
+          ) : (
+            <ShieldAlert className="h-5 w-5 shrink-0 text-amber-600 mt-1" />
           )}
+          <div>
+            <div className="flex flex-wrap items-center gap-2">
+              <CardTitle className="font-oswald">Two-Factor Authentication</CardTitle>
+              {!isLoading && (
+                <Badge variant={status?.enabled ? "default" : "secondary"} data-testid="badge-mfa-status">
+                  {status?.enabled ? "Enabled" : "Disabled"}
+                </Badge>
+              )}
+            </div>
+            <CardDescription className="font-roboto">
+              Add a second step at sign-in and protect sensitive actions (deleting users, changing roles, impersonation) with an authenticator app.
+            </CardDescription>
+          </div>
         </div>
       </CardHeader>
       <CardContent className="space-y-6">
