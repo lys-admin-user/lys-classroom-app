@@ -138,7 +138,7 @@ export function RoleRoutedLanding() {
       </header>
       <main className="flex-1 flex flex-col items-center pt-12 pb-24 px-4 text-center max-w-5xl mx-auto w-full relative z-10">
         <div className="mb-10">
-          <h1 className="font-oswald text-4xl md:text-5xl font-bold text-slate-900 tracking-tight mb-4">Are you ready to prepare students for success today?</h1>
+          <h1 className="font-oswald text-4xl md:text-5xl font-bold text-slate-900 tracking-tight mb-4">Are you ready to prepare students for success today.</h1>
           <p className="text-lg text-slate-600 max-w-2xl mx-auto">
             Pick your role to see exactly how LYS helps you.
           </p>
