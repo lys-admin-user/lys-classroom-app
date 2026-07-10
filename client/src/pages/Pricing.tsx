@@ -1230,16 +1230,17 @@ export default function Pricing() {
             )}
           </div>
 
-          <DialogFooter className="flex flex-col sm:flex-row gap-2">
-            <Button variant="outline" onClick={() => setCheckoutOpen(false)} data-testid="button-cancel-checkout">
+          <DialogFooter className="sticky bottom-0 z-10 -mx-6 -mb-6 mt-2 flex-col gap-2 border-t bg-background px-6 py-4 sm:flex-row sm:justify-end">
+            <Button variant="outline" className="w-full sm:w-auto" onClick={() => setCheckoutOpen(false)} data-testid="button-cancel-checkout">
               Cancel
             </Button>
             {selectedPaymentMethod === "bank_transfer" && bankTransferDetails ? (
-              <Button onClick={() => setCheckoutOpen(false)} data-testid="button-done-checkout">
+              <Button className="w-full sm:w-auto" onClick={() => setCheckoutOpen(false)} data-testid="button-done-checkout">
                 Done
               </Button>
             ) : (
               <Button
+                className="w-full sm:w-auto"
                 onClick={handlePaymentSubmit}
                 disabled={!selectedPaymentMethod || isPending || 
                   (selectedPaymentMethod === "stripe" && !billingAuthorized) ||
