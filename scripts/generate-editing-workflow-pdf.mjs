@@ -212,6 +212,35 @@ paragraph(
   { color: MUTED },
 );
 
+heading("Which branch am I on, and where do I find it?", TEAL);
+paragraph(
+  "There are exactly two branches, and they already exist \u2014 you do not create them:",
+);
+bullets(
+  [
+    ["main \u2014", "the real, live copy. What's here is (or is about to be) on the public website."],
+    ["staging \u2014", "the safe practice copy. Changes here are NOT public until you copy them into main."],
+  ],
+  TEAL,
+);
+paragraph("To see or change which branch you're on, in the workspace:");
+numbered(
+  [
+    ["Open the version-control panel", "(the branching icon in the left tool strip)."],
+    ["Read the current branch name at the top of that panel", "\u2014 this tells you whether you're on main or staging right now. Check it before you start."],
+    ["Click that branch name and choose staging (or main)", "to switch. The workspace and preview reload to show that branch's version."],
+  ],
+  TEAL,
+);
+paragraph("Where you actually see each version:", { font: "Helvetica-Bold" });
+bullets(
+  [
+    ["The preview pane", "always shows the branch you currently have checked out \u2014 so when staging is selected, the preview IS your staging test view."],
+    ["A separate staging website", "(a private URL you can open in any browser, even on your phone) only exists if your developer set one up on Render. Ask them for the address and write it down: Staging site: ____________________.  Live site: https://lyslessonplanning.com"],
+  ],
+  TEAL,
+);
+
 heading("Workflow A \u2014 quick, low-risk changes", TEAL);
 paragraph(
   "Use this only for small edits you are confident about (a typo, a color, swapping an image). You work directly on the live copy (\u201Cmain\u201D):",
@@ -236,11 +265,12 @@ paragraph(
 );
 numbered(
   [
-    "Switch to the staging branch and make your change.",
-    "Preview it, then commit and push staging to GitHub.",
-    ["Test it thoroughly.", "If a staging site is connected, you can view it on a private test URL \u2014 a rehearsal with no risk to the public site. Check the affected pages on both phone and computer."],
-    ["When satisfied, merge staging into main.", "The simplest way is a Pull Request on GitHub: open one from staging into main, review the changes, and click Merge."],
-    "Once merged into main, Render publishes it to the live site automatically.",
+    ["Switch to the staging branch", "(see \u201CWhich branch am I on\u201D above). Confirm the branch name at the top of the panel now reads staging."],
+    ["Make your change and preview it", "in the preview pane \u2014 it's showing staging because that's the branch you're on."],
+    ["Commit and push", "(this pushes to the staging branch). If a staging website was set up on Render, open its address to see it live on a private URL, with no risk to the public site."],
+    ["Test it thoroughly.", "Check the affected pages on both phone and computer, and make sure nothing else broke."],
+    ["When satisfied, copy staging into main via a Pull Request on GitHub:", "go to github.com/lys-admin-user/lys-classroom-app, click Pull requests, set it to merge staging into main, review, then Merge."],
+    ["Render publishes it to the live site automatically", "(https://lyslessonplanning.com), usually within a few minutes."],
   ],
   RED,
 );
