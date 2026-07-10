@@ -58,13 +58,13 @@ function getActiveProvider(): ProviderKind {
   return "none";
 }
 
-const DEFAULT_FROM = "LYS <no-reply@laddering-your-success.local>";
+const DEFAULT_FROM = "Laddering Your Success <no-reply@laddering-your-success.local>";
 
 function getFromAddress(): string {
   if (process.env.RESEND_FROM_EMAIL) return process.env.RESEND_FROM_EMAIL;
   if (process.env.DIGEST_FROM_EMAIL) return process.env.DIGEST_FROM_EMAIL;
   if (process.env.SMTP_FROM) return process.env.SMTP_FROM;
-  if (process.env.GMAIL_USER) return `LYS <${process.env.GMAIL_USER}>`;
+  if (process.env.GMAIL_USER) return `Laddering Your Success <${process.env.GMAIL_USER}>`;
   return DEFAULT_FROM;
 }
 
