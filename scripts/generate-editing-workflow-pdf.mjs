@@ -1,6 +1,6 @@
 // Generates docs/editing-workflow.pdf — a polished, email-ready guide to how an
-// edit travels from Replit -> GitHub -> Render (live), plus the main vs staging
-// workflows. Pure pdfkit (no headless browser needed).
+// edit travels from the workspace -> GitHub -> Render (live).
+// Pure pdfkit (no headless browser needed).
 // Run: node scripts/generate-editing-workflow-pdf.mjs
 import PDFDocument from "pdfkit";
 import fs from "node:fs";
@@ -150,7 +150,7 @@ doc
   .font("Helvetica-Oblique")
   .fontSize(12)
   .text(
-    "How an edit travels from the workspace to your live website — and how to test it safely first.",
+    "How an edit travels from the workspace to your live website.",
     M,
     78,
     { width: CONTENT_W },
@@ -178,32 +178,33 @@ paragraph(
 heading("The three places involved", TEAL);
 bullets(
   [
-    ["The workspace \u2014", "where you make the edit and preview how it looks."],
+    ["The workspace \u2014", "where you make the edit and preview how it looks before publishing."],
     ["GitHub \u2014", "the official storage that holds the real copy of the site. Nothing goes live until it arrives here."],
     ["Render \u2014", "the host that runs the live website and republishes automatically when GitHub receives a new change."],
   ],
   TEAL,
 );
 
-heading("A few words in plain language", TEAL);
+heading("A couple of words in plain language", TEAL);
 bullets(
   [
-    ["Branch \u2014", "a separate copy you can change without affecting the live one. \u201Cmain\u201D is the real/live copy; \u201Cstaging\u201D is a safe practice copy."],
     ["Commit \u2014", "saving a snapshot of your changes with a short note describing them."],
-    ["Push \u2014", "sending your saved changes up to GitHub. This starts the path to going live."],
-    ["Merge \u2014", "copying finished, tested changes from one branch (staging) into another (main)."],
+    ["Push \u2014", "sending your saved changes up to GitHub. This is the step that starts the path to going live."],
   ],
   TEAL,
 );
 
-heading("How to publish (no command line needed)", RED);
-paragraph("In the workspace:");
+heading("How to publish your change", RED);
+paragraph(
+  "Make and preview your change first, and make sure it looks right. Then, in the workspace:",
+);
 numbered(
   [
     ["Open the version-control panel", "(the branching icon in the left tool strip)."],
-    ["Review the changed files", "so you know exactly what you are about to publish."],
+    ["Review the list of changed files", "so you know exactly what you are about to publish."],
     ["Write a short message", "describing the change, e.g. \u201CUpdated hero headline and button color.\u201D"],
-    ["Click Commit, then Push.", "Your change is now on its way to the live site."],
+    ["Click Commit, then Push.", "Your change is now on its way to GitHub."],
+    ["Wait a few minutes for Render to rebuild,", "then open your live website to confirm the change is there and looks right."],
   ],
   RED,
 );
@@ -212,80 +213,12 @@ paragraph(
   { color: MUTED },
 );
 
-heading("Which branch am I on, and where do I find it?", TEAL);
-paragraph(
-  "There are exactly two branches, and they already exist \u2014 you do not create them:",
-);
-bullets(
-  [
-    ["main \u2014", "the real, live copy. What's here is (or is about to be) on the public website."],
-    ["staging \u2014", "the safe practice copy. Changes here are NOT public until you copy them into main."],
-  ],
-  TEAL,
-);
-paragraph("To see or change which branch you're on, in the workspace:");
-numbered(
-  [
-    ["Open the version-control panel", "(the branching icon in the left tool strip)."],
-    ["Read the current branch name at the top of that panel", "\u2014 this tells you whether you're on main or staging right now. Check it before you start."],
-    ["Click that branch name and choose staging (or main)", "to switch. The workspace and preview reload to show that branch's version."],
-  ],
-  TEAL,
-);
-paragraph("Where you actually see each version:", { font: "Helvetica-Bold" });
-bullets(
-  [
-    ["The preview pane", "always shows the branch you currently have checked out \u2014 so when staging is selected, the preview IS your staging test view."],
-    ["A separate staging website", "(a private URL you can open in any browser, even on your phone) only exists if your developer set one up on Render. Ask them for the address and write it down: Staging site: ____________________.  Live site: https://lyslessonplanning.com"],
-  ],
-  TEAL,
-);
-
-heading("Workflow A \u2014 quick, low-risk changes", TEAL);
-paragraph(
-  "Use this only for small edits you are confident about (a typo, a color, swapping an image). You work directly on the live copy (\u201Cmain\u201D):",
-);
-numbered(
-  [
-    "Make your change on the main branch.",
-    "Preview it and confirm it looks right.",
-    "Commit with a clear message and push to GitHub.",
-    "Render republishes in a few minutes \u2014 check the live site.",
-  ],
-  TEAL,
-);
-paragraph(
-  "Because \u201Cmain\u201D is the live copy, a mistake here can appear publicly before you catch it. For anything bigger than a trivial tweak, use Workflow B.",
-  { color: MUTED },
-);
-
-heading("Workflow B \u2014 test on staging first (recommended)", RED);
-paragraph(
-  "This lets you rehearse changes safely, then publish once you are happy:",
-);
-numbered(
-  [
-    ["Switch to the staging branch", "(see \u201CWhich branch am I on\u201D above). Confirm the branch name at the top of the panel now reads staging."],
-    ["Make your change and preview it", "in the preview pane \u2014 it's showing staging because that's the branch you're on."],
-    ["Commit and push", "(this pushes to the staging branch). If a staging website was set up on Render, open its address to see it live on a private URL, with no risk to the public site."],
-    ["Test it thoroughly.", "Check the affected pages on both phone and computer, and make sure nothing else broke."],
-    ["When satisfied, copy staging into main via a Pull Request on GitHub:", "go to github.com/lys-admin-user/lys-classroom-app, click Pull requests, set it to merge staging into main, review, then Merge."],
-    ["Render publishes it to the live site automatically", "(https://lyslessonplanning.com), usually within a few minutes."],
-  ],
-  RED,
-);
-paragraph(
-  "In short: practice on staging -> prove it works -> promote to main -> it goes live.",
-  { font: "Helvetica-Oblique", color: MUTED },
-);
-
 heading("Before every publish \u2014 quick checklist", TEAL);
 bullets(
   [
     "The change is a visual / wording change (not data, logins, payments, permissions, or settings). If it touches those, stop and ask your developer.",
     "You previewed it and it looks right.",
     "Your commit message clearly says what changed.",
-    "For anything beyond a tiny tweak, you did it on staging and tested before merging to main.",
   ],
   TEAL,
 );
