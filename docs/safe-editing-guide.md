@@ -27,9 +27,9 @@ appearance or wording, it is almost always safe.
 Safe examples:
 
 - **Colors** — brand colors, button colors, background shades, light/dark mode
-  tones. (These live in `client/src/index.css` and `tailwind.config.ts`.)
+  tones. (These live in `client/src/index.css`.)
 - **Fonts** — which font is used for headings vs. body text, sizes, bold/italic.
-  (Also in `client/src/index.css` and `tailwind.config.ts`.)
+  (Also in `client/src/index.css`.)
 - **Spacing & layout** — margins, padding, how much breathing room sections have,
   the order of sections on a page.
 - **Text & wording** — headlines, button labels, descriptions, help text, the
@@ -41,12 +41,13 @@ Safe examples:
 Where these live (all inside the `client/` folder — the part people see):
 
 - `client/src/index.css` — the master list of colors and fonts.
-- `tailwind.config.ts` — how colors and fonts are named and used.
 - `client/src/pages/` — the individual pages (Dashboard, Careers, Pricing, etc.).
 - `client/src/components/` — reusable pieces like the sidebar, header, and footer.
 
-Rule of thumb: **if it is inside `client/` and it is about appearance or wording,
-it is safe.**
+Rule of thumb: **if it is inside `client/`, is about appearance or wording, and
+is not a config file, it is safe.** (Config files — anything ending in
+`.config.ts` or `.config.js`, such as `tailwind.config.ts` — should go through
+your developer, even the ones inside the project. See the off-limits section.)
 
 ---
 
