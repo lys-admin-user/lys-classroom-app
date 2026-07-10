@@ -5,6 +5,10 @@ with a Replit agent — without accidentally breaking anything important.
 
 If you are not a developer, this is written for you. Keep it open while you work.
 
+Once you've made a change, see the [Editing Workflow](editing-workflow.md) for
+how to publish it — how a change gets from Replit to GitHub to the live site, and
+when to use the `staging` branch to test first.
+
 ---
 
 ## The one big idea
