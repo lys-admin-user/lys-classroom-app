@@ -36,3 +36,9 @@ id = "7Acl8JaN7pDuUAp4Wleq2"
 uri = "file://docs/client-editing-boundaries.pdf"
 type = "pdf"
 title = "Client Editing Boundaries (email-ready PDF)"
+
+[[outputs]]
+id = "X78SrmLB3LeiSHSy6TN_2"
+uri = "file://docs/editing-workflow.pdf"
+type = "pdf"
+title = "Publishing Your Changes — Editing Workflow (email-ready PDF)"
