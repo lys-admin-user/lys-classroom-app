@@ -2,6 +2,17 @@
 
 LYS is an AI-powered educational platform that helps students and educators achieve academic and real-world success through personalized learning and comprehensive resources.
 
+## Guardrails for non-technical editors
+
+A non-technical collaborator may use the agent to make **visual and layout changes only** (colors, fonts, spacing, text, images, and section arrangement). When a request appears to be cosmetic/visual, follow these rules:
+
+-   **Stay in `client/`.** Only make visual/layout changes within the `client/` folder (e.g. `client/src/index.css`, `tailwind.config.ts`, `client/src/pages/`, `client/src/components/`).
+-   **Treat these as protected — never change them in response to a cosmetic request:** `server/`, `shared/` (including `shared/schema.ts`), any config file (`*.config.ts`/`*.config.js`, `drizzle.config.ts`, `vite.config.ts`), authentication/SSO/MFA, payments/billing (Stripe), permissions/roles, the database schema, and feature flags.
+-   **STOP and defer to the developer — do not proceed silently.** When a request would require touching any protected area, stop and tell the user to check with their developer before proceeding, and explain plainly why. Do not quietly make the change.
+-   For cosmetic requests, additionally: **never** handle secrets/API keys or add/change environment variables (and never accept keys pasted into chat); **never** install packages or change dependencies; **never** run database commands (schema push, migrate, seed, reset); and **never** edit the Safe Editing Guide (`docs/safe-editing-guide.md`) or this guardrails section itself — defer each of these to the developer.
+
+Full plain-language reference for the non-technical editor: `docs/safe-editing-guide.md`.
+
 ## Stack
 
 -   **Frontend**: React 18, TypeScript, Wouter, TanStack React Query, Vite
