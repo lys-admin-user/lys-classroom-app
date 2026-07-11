@@ -340,6 +340,9 @@ import {
   type FreeTrial,
   type InsertFreeTrial,
   freeTrials,
+  type PurchaseOrder,
+  type InsertPurchaseOrder,
+  purchaseOrders,
   type RssFeed,
   type InsertRssFeed,
   rssFeeds,
@@ -471,6 +474,33 @@ const paymentsMethods: ThisType<DatabaseStorage> = {
         gte(freeTrials.createdAt, sinceDate)
       ));
     return Number(result[0]?.count || 0);
+  },
+
+
+  // ── Purchase Orders (Task #56) ──────────────────────────────────────────────
+  async createPurchaseOrder(po: InsertPurchaseOrder): Promise<PurchaseOrder> {
+    const [created] = await db.insert(purchaseOrders).values(po as any).returning();
+    return created;
+  },
+
+
+  async listPurchaseOrders(): Promise<PurchaseOrder[]> {
+    return db.select().from(purchaseOrders).orderBy(desc(purchaseOrders.createdAt));
+  },
+
+
+  async getPurchaseOrder(id: string): Promise<PurchaseOrder | undefined> {
+    const [po] = await db.select().from(purchaseOrders).where(eq(purchaseOrders.id, id)).limit(1);
+    return po;
+  },
+
+
+  async markPurchaseOrderPaid(id: string, paidByUserId: string): Promise<PurchaseOrder | undefined> {
+    const [updated] = await db.update(purchaseOrders)
+      .set({ status: "paid", paidAt: new Date(), paidByUserId })
+      .where(eq(purchaseOrders.id, id))
+      .returning();
+    return updated;
   },
 };
 

@@ -4,7 +4,8 @@ import { storage } from "../storage";
 import { recordBillingAuthorization, consentRequestMeta } from "../services/consentService";
 import { generateLessonPlan } from "../openai";
 import { detectAfricanCountryFromText } from "@shared/africaContext";
-import { computeEnterpriseQuote } from "@shared/pricing";
+import { computeEnterpriseQuote, planPrice, type PlanId } from "@shared/pricing";
+import { sendEmail } from "../services/emailTransport";
 import { calculateLessonQualityScore, getQualityLevel } from "../lessonQualityScorer";
 import { parseDocument } from "../documentParser";
 import { 
@@ -888,11 +889,65 @@ export function registerPaymentsRoutes(app: Express): void {
         })
         .where(eq(users.id, userId));
 
+      // Persist the PO as a paper trail so the owner can track and reconcile it.
+      const monthlyAmountCents = Math.round(planPrice(tier as PlanId) * 100);
+      let savedPo: { id: string } | undefined;
+      try {
+        savedPo = await storage.createPurchaseOrder({
+          poNumber: String(poNumber),
+          organizationName: String(organizationName),
+          contactName: contactName ? String(contactName) : null,
+          billingEmail: String(contactEmail),
+          tier: String(tier),
+          monthlyAmountCents,
+          notes: notes ? String(notes) : null,
+          submittedByUserId: userId,
+        });
+      } catch (persistErr) {
+        // A failure to persist the record must not block provisioning the account.
+        console.error("[purchase-order] Failed to persist PO record:", persistErr);
+      }
+
+      // Notify the platform owner(s). Never block or fail the submission on email.
+      try {
+        const priceLabel = `$${planPrice(tier as PlanId).toFixed(2)}/mo`;
+        const subject = `New purchase order — ${organizationName}, ${tier}, ${poNumber}`;
+        const body = [
+          `A new purchase order was submitted.`,
+          ``,
+          `Organization: ${organizationName}`,
+          `Plan: ${tier} (${priceLabel})`,
+          `PO number: ${poNumber}`,
+          `Contact: ${contactName || "(not provided)"} <${contactEmail}>`,
+          notes ? `Notes: ${notes}` : `Notes: (none)`,
+          ``,
+          `The account has been provisioned immediately and marked PO-pending.`,
+          `Review it in the admin area under Billing → Purchase Orders and mark it paid once the invoice clears.`,
+        ].join("\n");
+
+        const overrideEmail = process.env.PO_NOTIFY_EMAIL || process.env.PLATFORM_OWNER_EMAIL;
+        const recipients = new Set<string>();
+        if (overrideEmail) recipients.add(overrideEmail);
+        const admins = await db
+          .select({ email: users.email })
+          .from(users)
+          .where(inArray(users.role, ["site_admin", "system_admin"]));
+        for (const a of admins) {
+          if (a.email) recipients.add(a.email);
+        }
+        for (const email of Array.from(recipients)) {
+          await sendEmail({ email }, subject, body, { logPrefix: "purchase-order" });
+        }
+      } catch (emailErr) {
+        console.error("[purchase-order] Failed to send owner notification:", emailErr);
+      }
+
       res.json({
         success: true,
         message: `Purchase order ${poNumber} submitted for ${tier} tier. Your account has been provisioned while we process the PO.`,
         tier: tier,
         poNumber: poNumber,
+        purchaseOrderId: savedPo?.id,
         status: "pending_verification",
       });
     } catch (error) {

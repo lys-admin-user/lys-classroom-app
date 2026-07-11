@@ -346,6 +346,9 @@ import {
   type FreeTrial,
   type InsertFreeTrial,
   freeTrials,
+  type PurchaseOrder,
+  type InsertPurchaseOrder,
+  purchaseOrders,
   type RssFeed,
   type InsertRssFeed,
   rssFeeds,
@@ -1163,6 +1166,10 @@ export interface IStorage {
   createFreeTrial(trial: InsertFreeTrial): Promise<FreeTrial>;
   bindTrialToUser(trialId: string, userId: string): Promise<FreeTrial | undefined>;
   flagTrialAbuse(trialId: string): Promise<FreeTrial | undefined>;
+  createPurchaseOrder(po: InsertPurchaseOrder): Promise<PurchaseOrder>;
+  listPurchaseOrders(): Promise<PurchaseOrder[]>;
+  getPurchaseOrder(id: string): Promise<PurchaseOrder | undefined>;
+  markPurchaseOrderPaid(id: string, paidByUserId: string): Promise<PurchaseOrder | undefined>;
   getActiveTrialCount(ipAddress: string, sinceDateMs: number): Promise<number>;
 
   // RSS Feeds & Content Ingestion

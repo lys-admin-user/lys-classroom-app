@@ -173,6 +173,21 @@ interface BillingData {
   recentUpgrades: { id: string; email: string | null; name: string; tier: string | null; updatedAt: Date | null }[];
 }
 
+interface PurchaseOrderRow {
+  id: string;
+  poNumber: string;
+  organizationName: string;
+  contactName: string | null;
+  billingEmail: string;
+  tier: string;
+  monthlyAmountCents: number | null;
+  notes: string | null;
+  submittedByUserId: string;
+  status: "pending" | "paid" | "cancelled";
+  paidAt: string | null;
+  createdAt: string | null;
+}
+
 export default function SystemAdminPage({ params }: { params?: { tab?: string } }) {
   const { user, isLoading: authLoading } = useAuth();
   const [, setLocation] = useLocation();
@@ -353,6 +368,25 @@ export default function SystemAdminPage({ params }: { params?: { tab?: string } 
   const { data: billingData } = useQuery<BillingData>({
     queryKey: ["/api/admin/billing"],
     enabled: adminCheck?.isSiteAdmin && activeTab === "billing",
+  });
+
+  const { data: purchaseOrders = [], isLoading: poLoading } = useQuery<PurchaseOrderRow[]>({
+    queryKey: ["/api/admin/purchase-orders"],
+    enabled: adminCheck?.isSiteAdmin && activeTab === "billing",
+  });
+
+  const markPoPaidMutation = useMutation({
+    mutationFn: async (id: string) => {
+      return await apiRequest("POST", `/api/admin/purchase-orders/${id}/mark-paid`, {});
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/purchase-orders"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/billing"] });
+      toast({ title: "Purchase order marked paid" });
+    },
+    onError: () => {
+      toast({ title: "Failed to mark purchase order paid", variant: "destructive" });
+    },
   });
 
   const { data: userAnalyticsData, isLoading: userAnalyticsLoading } = useQuery<{
@@ -1822,6 +1856,62 @@ export default function SystemAdminPage({ params }: { params?: { tab?: string } 
                 </div>
               ) : (
                 <p className="text-center text-muted-foreground py-4">No recent upgrades</p>
+              )}
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-lg">Purchase Orders</CardTitle>
+              <CardDescription>Schools and districts that submitted a purchase order. Mark one paid once the invoice clears — this activates their account.</CardDescription>
+            </CardHeader>
+            <CardContent>
+              {poLoading ? (
+                <div className="flex items-center justify-center py-8">
+                  <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+                </div>
+              ) : purchaseOrders.length === 0 ? (
+                <p className="text-center text-muted-foreground py-4" data-testid="text-no-purchase-orders">No purchase orders submitted yet</p>
+              ) : (
+                <div className="space-y-2">
+                  {purchaseOrders.map((po) => (
+                    <div
+                      key={po.id}
+                      className="flex flex-col gap-3 rounded-md bg-muted/50 p-3 sm:flex-row sm:items-center sm:justify-between"
+                      data-testid={`row-purchase-order-${po.id}`}
+                    >
+                      <div className="min-w-0 space-y-1">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <p className="font-medium" data-testid={`text-po-org-${po.id}`}>{po.organizationName}</p>
+                          <Badge className={getTierColor(po.tier)}>{po.tier}</Badge>
+                          <Badge variant={po.status === "paid" ? "default" : "secondary"} data-testid={`status-po-${po.id}`}>
+                            {po.status === "paid" ? "Paid" : po.status === "cancelled" ? "Cancelled" : "Pending"}
+                          </Badge>
+                        </div>
+                        <p className="text-sm text-muted-foreground">
+                          PO #{po.poNumber}
+                          {po.monthlyAmountCents != null && ` · $${(po.monthlyAmountCents / 100).toFixed(2)}/mo`}
+                          {" · "}{po.contactName ? `${po.contactName} ` : ""}&lt;{po.billingEmail}&gt;
+                        </p>
+                        {po.notes && <p className="text-sm text-muted-foreground">{po.notes}</p>}
+                        <p className="text-xs text-muted-foreground">
+                          Submitted {po.createdAt ? new Date(po.createdAt).toLocaleDateString() : "—"}
+                          {po.status === "paid" && po.paidAt && ` · Paid ${new Date(po.paidAt).toLocaleDateString()}`}
+                        </p>
+                      </div>
+                      {po.status === "pending" && (
+                        <Button
+                          size="sm"
+                          onClick={() => markPoPaidMutation.mutate(po.id)}
+                          disabled={markPoPaidMutation.isPending}
+                          data-testid={`button-mark-paid-${po.id}`}
+                        >
+                          Mark as paid
+                        </Button>
+                      )}
+                    </div>
+                  ))}
+                </div>
               )}
             </CardContent>
           </Card>

@@ -3473,6 +3473,73 @@ export function registerAdminRoutes(app: Express): void {
   });
 
 
+  // ============ Purchase Orders (Task #56) ============
+
+  // List all submitted purchase orders (newest first) so an admin can see who
+  // is on a PO-pending plan and reconcile payment.
+  app.get("/api/admin/purchase-orders", isAuthenticated, requireSiteAdmin, async (_req: any, res) => {
+    try {
+      const orders = await storage.listPurchaseOrders();
+      res.json(orders);
+    } catch (error) {
+      console.error("Failed to list purchase orders:", error);
+      res.status(500).json({ error: "Failed to list purchase orders" });
+    }
+  });
+
+  // Mark a PO paid: flips the PO record to "paid" and moves the linked account
+  // from po_pending to active. Audited like other sensitive billing actions.
+  app.post("/api/admin/purchase-orders/:id/mark-paid", isAuthenticated, requireSiteAdmin, async (req: any, res) => {
+    try {
+      const adminId = req.user?.claims?.sub;
+      const { id } = req.params;
+
+      const existing = await storage.getPurchaseOrder(id);
+      if (!existing) {
+        res.status(404).json({ error: "Purchase order not found" });
+        return;
+      }
+      if (existing.status === "paid") {
+        res.status(400).json({ error: "Purchase order is already marked paid" });
+        return;
+      }
+
+      const updated = await storage.markPurchaseOrderPaid(id, adminId);
+
+      // Flip the submitting account from PO-pending to active (only if it is
+      // still pending — never override a status set by another billing flow).
+      const [account] = await db.select().from(users).where(eq(users.id, existing.submittedByUserId)).limit(1);
+      if (account && account.subscriptionStatus === "po_pending") {
+        await db.update(users)
+          .set({ subscriptionStatus: "active", updatedAt: new Date() })
+          .where(eq(users.id, existing.submittedByUserId));
+      }
+
+      await logAuditEvent({
+        userId: adminId,
+        action: "purchase_order.mark_paid",
+        category: "admin_action",
+        severity: "warning",
+        resourceType: "purchase_order",
+        resourceId: id,
+        details: {
+          poNumber: existing.poNumber,
+          organizationName: existing.organizationName,
+          tier: existing.tier,
+          submittedByUserId: existing.submittedByUserId,
+        },
+        ipAddress: getClientIP(req),
+        userAgent: req.headers["user-agent"],
+      });
+
+      res.json(updated);
+    } catch (error) {
+      console.error("Failed to mark purchase order paid:", error);
+      res.status(500).json({ error: "Failed to mark purchase order paid" });
+    }
+  });
+
+
   // ============ Safety Suite & Content Moderation Routes ============
 
   app.get("/api/admin/review-queue", isAuthenticated, requireSiteAdmin, async (req: any, res) => {

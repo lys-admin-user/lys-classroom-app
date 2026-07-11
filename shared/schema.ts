@@ -113,6 +113,40 @@ export const insertGuestLeadSchema = createInsertSchema(guestLeads).omit({ id: t
 export type InsertGuestLead = z.infer<typeof insertGuestLeadSchema>;
 export type GuestLead = typeof guestLeads.$inferSelect;
 
+// Purchase Orders (Task #56) — institutional customers (schools/districts) pay by
+// PO instead of a card: their finance office issues a PO number promising
+// payment, we turn on the plan immediately (users.subscriptionStatus="po_pending")
+// and invoice them later. This table is the paper trail — who submitted which PO
+// for which plan — and lets an admin mark it paid, which flips the account active.
+export type PurchaseOrderStatus = "pending" | "paid" | "cancelled";
+
+export const purchaseOrders = pgTable("purchase_orders", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  poNumber: varchar("po_number").notNull(),
+  organizationName: varchar("organization_name").notNull(),
+  contactName: varchar("contact_name"),
+  billingEmail: varchar("billing_email").notNull(),
+  tier: varchar("tier").notNull(),
+  // Monthly plan price captured at submit time, in cents (e.g. Pro 799, Campus 29900).
+  monthlyAmountCents: integer("monthly_amount_cents"),
+  notes: text("notes"),
+  submittedByUserId: varchar("submitted_by_user_id").notNull(),
+  status: varchar("status").notNull().default("pending").$type<PurchaseOrderStatus>(),
+  paidAt: timestamp("paid_at"),
+  paidByUserId: varchar("paid_by_user_id"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertPurchaseOrderSchema = createInsertSchema(purchaseOrders).omit({
+  id: true,
+  createdAt: true,
+  status: true,
+  paidAt: true,
+  paidByUserId: true,
+});
+export type InsertPurchaseOrder = z.infer<typeof insertPurchaseOrderSchema>;
+export type PurchaseOrder = typeof purchaseOrders.$inferSelect;
+
 // Goals Table (for action plans)
 export const goals = pgTable("goals", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
