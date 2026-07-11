@@ -30,6 +30,7 @@ import {
   standardsJurisdictions,
   authorities as authoritiesTable,
   pricingTiers,
+  purchaseOrders,
   lessonGenerations,
   selfDiscoveryResults,
   studentJourneyEntries,
@@ -3504,16 +3505,24 @@ export function registerAdminRoutes(app: Express): void {
         return;
       }
 
-      const updated = await storage.markPurchaseOrderPaid(id, adminId);
+      // Mark the PO paid and activate the linked account atomically so we can
+      // never end up with a "paid" PO whose account is still po_pending.
+      const updated = await db.transaction(async (tx) => {
+        const [po] = await tx.update(purchaseOrders)
+          .set({ status: "paid", paidAt: new Date(), paidByUserId: adminId })
+          .where(eq(purchaseOrders.id, id))
+          .returning();
 
-      // Flip the submitting account from PO-pending to active (only if it is
-      // still pending — never override a status set by another billing flow).
-      const [account] = await db.select().from(users).where(eq(users.id, existing.submittedByUserId)).limit(1);
-      if (account && account.subscriptionStatus === "po_pending") {
-        await db.update(users)
-          .set({ subscriptionStatus: "active", updatedAt: new Date() })
-          .where(eq(users.id, existing.submittedByUserId));
-      }
+        // Flip the submitting account from PO-pending to active (only if it is
+        // still pending — never override a status set by another billing flow).
+        const [account] = await tx.select().from(users).where(eq(users.id, existing.submittedByUserId)).limit(1);
+        if (account && account.subscriptionStatus === "po_pending") {
+          await tx.update(users)
+            .set({ subscriptionStatus: "active", updatedAt: new Date() })
+            .where(eq(users.id, existing.submittedByUserId));
+        }
+        return po;
+      });
 
       await logAuditEvent({
         userId: adminId,

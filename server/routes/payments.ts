@@ -56,6 +56,7 @@ import {
   knowResources,
   scholarshipSyncLog,
   savedScholarships,
+  purchaseOrders,
 } from "@shared/schema";
 import { z } from "zod";
 import { setupAuth, registerAuthRoutes, isAuthenticated } from "../replit_integrations/auth";
@@ -881,19 +882,20 @@ export function registerPaymentsRoutes(app: Express): void {
         return;
       }
 
-      await db.update(users)
-        .set({
-          tier: tier,
-          subscriptionStatus: "po_pending",
-          updatedAt: new Date()
-        })
-        .where(eq(users.id, userId));
-
-      // Persist the PO as a paper trail so the owner can track and reconcile it.
+      // Persist the PO record and provision the account atomically: if the PO
+      // paper trail cannot be written, we must NOT grant paid access. Both
+      // writes share one transaction so they succeed or fail together.
       const monthlyAmountCents = Math.round(planPrice(tier as PlanId) * 100);
-      let savedPo: { id: string } | undefined;
-      try {
-        savedPo = await storage.createPurchaseOrder({
+      const savedPo = await db.transaction(async (tx) => {
+        await tx.update(users)
+          .set({
+            tier: tier,
+            subscriptionStatus: "po_pending",
+            updatedAt: new Date()
+          })
+          .where(eq(users.id, userId));
+
+        const [created] = await tx.insert(purchaseOrders).values({
           poNumber: String(poNumber),
           organizationName: String(organizationName),
           contactName: contactName ? String(contactName) : null,
@@ -902,11 +904,9 @@ export function registerPaymentsRoutes(app: Express): void {
           monthlyAmountCents,
           notes: notes ? String(notes) : null,
           submittedByUserId: userId,
-        });
-      } catch (persistErr) {
-        // A failure to persist the record must not block provisioning the account.
-        console.error("[purchase-order] Failed to persist PO record:", persistErr);
-      }
+        }).returning();
+        return created;
+      });
 
       // Notify the platform owner(s). Never block or fail the submission on email.
       try {
