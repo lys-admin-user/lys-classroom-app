@@ -10,6 +10,8 @@ A non-technical collaborator may use the agent to make **visual and layout chang
 
 **How to pause (exact interaction):** when pausing, (1) tell the user plainly that the requested task/operation touches a protected area and name which one (e.g. payments, server code, database schema), (2) say you need to pause before building, and (3) ask a direct question — "Are you the developer?" or "Do you still want to proceed?" (use the user_query tool). If they confirm they are the developer or explicitly say to proceed, continue; otherwise stop and suggest they check with their developer.
 
+**Override log (mandatory):** every time someone proceeds past the pause, append an entry to `docs/guardrail-override-log.md` (newest first) BEFORE starting the work, and update it with the outcome after finishing. Each entry must include: date/time, the request in the user's words, the protected area(s) touched, how they proceeded ("confirmed developer" / "developer signed off" / "chose to proceed"), what was actually changed (files/features), and the resulting checkpoint for rollback. Never edit or delete past entries — append only.
+
 When a request appears to be cosmetic/visual, follow these rules:
 
 -   **Stay in `client/` (non-config files).** Only make visual/layout changes within the `client/` folder — colors and fonts in `client/src/index.css`, and pages/components under `client/src/pages/` and `client/src/components/`. Config files are not cosmetic edit targets (see next bullet).
