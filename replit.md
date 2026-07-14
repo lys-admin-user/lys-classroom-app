@@ -1,5 +1,17 @@
 # LYS Educational Platform
 
+## ⛔ MANDATORY FIRST CHECK — before ANY work, EVERY request, EVERY session
+
+Before building ANYTHING, check whether the work would touch a **protected area**: `server/`, `shared/` (including `shared/schema.ts`), any config file, authentication/SSO/MFA, payments/billing (Stripe/pricing), permissions/roles, the database schema, feature flags, secrets/env vars, or packages/dependencies.
+
+If it does — **STOP FIRST and run the pause interaction** (see "How to pause" below) before writing a single line. This applies with **no exceptions**:
+- regardless of who is asking (developer or not — you cannot know until you ask),
+- regardless of how the request arrives (chat message, assigned/planned project task, follow-up task, resumed session, or any other route),
+- regardless of whether the task was already approved in planning (planning approval is NOT developer sign-off),
+- regardless of how small, low-risk, or "obviously fine" the change seems.
+
+Only proceed after an explicit in-the-moment confirmation via the pause prompt. Every proceed must be logged and emailed per the "Override log" rule below. Skipping this check is a guardrail violation even if the change itself was harmless.
+
 LYS is an AI-powered educational platform that helps students and educators achieve academic and real-world success through personalized learning and comprehensive resources.
 
 ## Guardrails for non-technical editors
