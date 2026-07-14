@@ -25,6 +25,13 @@ and where to look to undo it.
 
 ---
 
+## [2026-07-14 14:35] — Clerk development keys for preview-pane login
+- **Requested by:** confirmed they are the developer (chose to proceed after the protected-area explanation)
+- **Request (their words):** "Sure, lets roll with this option" (use Clerk development-instance keys so login works in the Replit preview pane)
+- **Protected area(s):** authentication (Clerk key selection) · secrets/env vars (new dev-only Clerk keys)
+- **What was changed:** (in progress — will be filled in on completion)
+- **Rollback:** (pending — checkpoint created after the work)
+
 ## [2026-07-14 03:45] — Purchase-order notifications sent to one central email
 - **Requested by:** confirmed they are the developer (via the guardrail pause prompt)
 - **Request (their words):** "Do you think it should just be one centralized email? I was thinking info@ladderingyoursuccess.com also this should be the email contact contact sales button on the enterprise tier"
