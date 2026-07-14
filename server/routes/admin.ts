@@ -60,6 +60,7 @@ import { setupAuth, registerAuthRoutes, isAuthenticated } from "../replit_integr
 import { randomUUID } from "crypto";
 import multer from "multer";
 import { syncJurisdictionsFromCSP, syncStandardSetFromCSP, getSyncStatus, fetchCSPJurisdictions, syncAllStandardsFromCSP, getImportProgress } from "../services/cspService";
+import { PO_ADMIN_ROLES, evaluateMarkPaid, markPaidRejectionStatus, subscriptionStatusAfterPoPaid } from "../services/purchaseOrderPolicy";
 import { extractStandardsFromText, processPdfImport, checkSourceForChanges } from "../services/llmExtractionService";
 import { syncBlsData, getLastSyncStatus, getSyncHistory, startBlsScheduler, getSchedulerStatus } from "../services/blsService";
 import { createPaypalOrder, capturePaypalOrder, loadPaypalDefault, isPayPalConfigured } from "../paypal";
@@ -3475,10 +3476,12 @@ export function registerAdminRoutes(app: Express): void {
 
 
   // ============ Purchase Orders (Task #56) ============
+  // Gate built from the shared policy so tests and routes can't drift.
+  const requirePoAdmin = requireRole(...PO_ADMIN_ROLES);
 
   // List all submitted purchase orders (newest first) so an admin can see who
   // is on a PO-pending plan and reconcile payment.
-  app.get("/api/admin/purchase-orders", isAuthenticated, requireSiteAdmin, async (_req: any, res) => {
+  app.get("/api/admin/purchase-orders", isAuthenticated, requirePoAdmin, async (_req: any, res) => {
     try {
       const orders = await storage.listPurchaseOrders();
       res.json(orders);
@@ -3490,20 +3493,22 @@ export function registerAdminRoutes(app: Express): void {
 
   // Mark a PO paid: flips the PO record to "paid" and moves the linked account
   // from po_pending to active. Audited like other sensitive billing actions.
-  app.post("/api/admin/purchase-orders/:id/mark-paid", isAuthenticated, requireSiteAdmin, async (req: any, res) => {
+  app.post("/api/admin/purchase-orders/:id/mark-paid", isAuthenticated, requirePoAdmin, async (req: any, res) => {
     try {
       const adminId = req.user?.claims?.sub;
       const { id } = req.params;
 
       const existing = await storage.getPurchaseOrder(id);
-      if (!existing) {
-        res.status(404).json({ error: "Purchase order not found" });
+      const decision = evaluateMarkPaid(existing);
+      if (decision !== "ok") {
+        res.status(markPaidRejectionStatus(decision)).json({
+          error: decision === "not_found"
+            ? "Purchase order not found"
+            : "Purchase order is already marked paid",
+        });
         return;
       }
-      if (existing.status === "paid") {
-        res.status(400).json({ error: "Purchase order is already marked paid" });
-        return;
-      }
+      if (!existing) return; // unreachable — evaluateMarkPaid already returned not_found; narrows the type
 
       // Mark the PO paid and activate the linked account atomically so we can
       // never end up with a "paid" PO whose account is still po_pending.
@@ -3516,9 +3521,10 @@ export function registerAdminRoutes(app: Express): void {
         // Flip the submitting account from PO-pending to active (only if it is
         // still pending — never override a status set by another billing flow).
         const [account] = await tx.select().from(users).where(eq(users.id, existing.submittedByUserId)).limit(1);
-        if (account && account.subscriptionStatus === "po_pending") {
+        const nextStatus = subscriptionStatusAfterPoPaid(account?.subscriptionStatus);
+        if (nextStatus) {
           await tx.update(users)
-            .set({ subscriptionStatus: "active", updatedAt: new Date() })
+            .set({ subscriptionStatus: nextStatus, updatedAt: new Date() })
             .where(eq(users.id, existing.submittedByUserId));
         }
         return po;
