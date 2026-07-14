@@ -924,16 +924,9 @@ export function registerPaymentsRoutes(app: Express): void {
           `Review it in the admin area under Billing → Purchase Orders and mark it paid once the invoice clears.`,
         ].join("\n");
 
-        const overrideEmail = process.env.PO_NOTIFY_EMAIL || process.env.PLATFORM_OWNER_EMAIL;
-        const recipients = new Set<string>();
-        if (overrideEmail) recipients.add(overrideEmail);
-        const admins = await db
-          .select({ email: users.email })
-          .from(users)
-          .where(inArray(users.role, ["site_admin", "system_admin"]));
-        for (const a of admins) {
-          if (a.email) recipients.add(a.email);
-        }
+        // One centralized sales inbox receives PO notifications (override via env).
+        const salesEmail = process.env.PO_NOTIFY_EMAIL || process.env.PLATFORM_OWNER_EMAIL || "info@ladderingyoursuccess.com";
+        const recipients = new Set<string>([salesEmail]);
         for (const email of Array.from(recipients)) {
           await sendEmail({ email }, subject, body, { logPrefix: "purchase-order" });
         }

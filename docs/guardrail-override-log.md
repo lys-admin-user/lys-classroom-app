@@ -25,6 +25,13 @@ and where to look to undo it.
 
 ---
 
+## [2026-07-14 03:45] — Purchase-order notifications sent to one central email
+- **Requested by:** confirmed they are the developer (via the guardrail pause prompt)
+- **Request (their words):** "Do you think it should just be one centralized email? I was thinking info@ladderingyoursuccess.com also this should be the email contact contact sales button on the enterprise tier"
+- **Protected area(s):** server code · payments/billing (PO notification recipients)
+- **What was changed:** Purchase-order notification emails now go to ONE centralized inbox, info@ladderingyoursuccess.com, instead of being sent to every site/system admin (`server/routes/payments.ts`; the PO_NOTIFY_EMAIL / PLATFORM_OWNER_EMAIL env override still takes priority if set). Also (cosmetic): the enterprise-tier "Contact Sales" button and the bottom-of-page Contact Sales button on the pricing page now open an email to info@ladderingyoursuccess.com (`client/src/pages/Pricing.tsx`). Typecheck clean, 175/175 tests pass.
+- **Rollback:** the checkpoint created right after this change (see the checkpoint list — "centralized purchase order email" entry).
+
 ## [2026-07-14 02:05] — Pro plan price reverted to $7.99/month
 - **Requested by:** confirmed they are the developer (via the guardrail pause prompt)
 - **Request (their words):** "I actually want to change it back to what it was before"

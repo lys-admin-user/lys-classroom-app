@@ -409,6 +409,10 @@ export default function Pricing() {
 
   const handleTierClick = (tierId: string) => {
     const action = getButtonAction(tierId);
+    if (tierId === "enterprise") {
+      window.location.href = "mailto:info@ladderingyoursuccess.com?subject=LYS%20Enterprise%20Inquiry";
+      return;
+    }
     if (action === "upgrade" && (tierId === "pro" || tierId === "campus")) {
       setCheckoutTier(tierId);
       setSelectedPaymentMethod("");
@@ -785,7 +789,13 @@ export default function Pricing() {
                     <Button
                       className="w-full"
                       variant={tier.popular ? "default" : "outline"}
-                      onClick={() => { window.location.href = "/api/login"; }}
+                      onClick={() => {
+                        if (tier.id === "enterprise") {
+                          window.location.href = "mailto:info@ladderingyoursuccess.com?subject=LYS%20Enterprise%20Inquiry";
+                        } else {
+                          window.location.href = "/api/login";
+                        }
+                      }}
                       data-testid={`button-select-${tier.name.toLowerCase()}`}
                     >
                       {tier.cta}
@@ -959,8 +969,8 @@ export default function Pricing() {
           <p className="text-muted-foreground mb-6">
             Contact our team for custom enterprise solutions or educational discounts.
           </p>
-          <Button variant="outline" data-testid="button-contact-sales">
-            Contact Sales
+          <Button variant="outline" asChild data-testid="button-contact-sales">
+            <a href="mailto:info@ladderingyoursuccess.com?subject=LYS%20Enterprise%20Inquiry">Contact Sales</a>
           </Button>
         </div>
       </div>
