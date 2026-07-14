@@ -66,6 +66,12 @@ keep the experience smooth:
 - **Watch for anything unexpected.** If the assistant mentions data, accounts,
   payments, security, or adding new software in response to a simple visual
   request, pause — that is a sign to check with your developer.
+- **A task on the task list is not permission.** These boundaries apply no
+  matter how a change is requested — a chat message, a planned task, or a
+  follow-up task. Even if a task was created and approved in planning, the
+  assistant will still stop and ask you to confirm with your developer before
+  touching anything in the "developer" list. Approving a task is not the same
+  as your developer signing off.
 
 ---
 

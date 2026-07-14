@@ -159,6 +159,7 @@ bullets(
     ["One change at a time.", "Make a single adjustment, take a look, then continue. Small steps are easy to review."],
     ["You can always undo.", "The system automatically saves checkpoints as you work, so you can roll back to an earlier version if something does not look right. Nothing is permanent by accident."],
     ["Watch for anything unexpected.", "If the assistant mentions data, accounts, payments, security, or adding new software in response to a simple visual request, pause — that is a sign to check with your developer."],
+    ["A task on the task list is not permission.", "These boundaries apply no matter how a change is requested — a chat message, a planned task, or a follow-up task. Even if a task was created and approved in planning, the assistant will still stop and ask you to confirm with your developer before touching anything in the \u201cdeveloper\u201d list. Approving a task is not the same as your developer signing off."],
   ],
   TEAL,
 );
