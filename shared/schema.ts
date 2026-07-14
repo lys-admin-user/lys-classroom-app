@@ -147,6 +147,19 @@ export const insertPurchaseOrderSchema = createInsertSchema(purchaseOrders).omit
 export type InsertPurchaseOrder = z.infer<typeof insertPurchaseOrderSchema>;
 export type PurchaseOrder = typeof purchaseOrders.$inferSelect;
 
+// Validates the raw request body of POST /api/purchase-order/submit before
+// anything is persisted or emailed. Keeps junk PO records and malformed
+// notification emails out of the admin billing area.
+export const purchaseOrderSubmitSchema = z.object({
+  tier: z.enum(["pro", "campus"]),
+  poNumber: z.string().trim().min(1, "PO number is required").max(64, "PO number must be 64 characters or fewer"),
+  organizationName: z.string().trim().min(1, "Organization name is required").max(200, "Organization name must be 200 characters or fewer"),
+  contactName: z.string().trim().max(120, "Contact name must be 120 characters or fewer").nullish().transform((v) => v || undefined),
+  contactEmail: z.string().trim().email("Billing email must be a valid email address").max(254, "Billing email must be 254 characters or fewer"),
+  notes: z.string().trim().max(2000, "Notes must be 2000 characters or fewer").nullish().transform((v) => v || undefined),
+});
+export type PurchaseOrderSubmit = z.infer<typeof purchaseOrderSubmitSchema>;
+
 // Goals Table (for action plans)
 export const goals = pgTable("goals", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),

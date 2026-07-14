@@ -57,6 +57,7 @@ import {
   scholarshipSyncLog,
   savedScholarships,
   purchaseOrders,
+  purchaseOrderSubmitSchema,
 } from "@shared/schema";
 import { z } from "zod";
 import { setupAuth, registerAuthRoutes, isAuthenticated } from "../replit_integrations/auth";
@@ -870,17 +871,15 @@ export function registerPaymentsRoutes(app: Express): void {
   app.post("/api/purchase-order/submit", isAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user?.claims?.sub;
-      const { tier, poNumber, organizationName, contactName, contactEmail, notes } = req.body;
 
-      if (!tier || !poNumber || !organizationName || !contactEmail) {
-        res.status(400).json({ error: "Missing required fields: tier, poNumber, organizationName, contactEmail" });
+      const parsed = purchaseOrderSubmitSchema.safeParse(req.body ?? {});
+      if (!parsed.success) {
+        const first = parsed.error.errors[0];
+        const field = first?.path?.join(".") || "input";
+        res.status(400).json({ error: `Invalid ${field}: ${first?.message || "invalid value"}` });
         return;
       }
-
-      if (!["pro", "campus"].includes(tier)) {
-        res.status(400).json({ error: "Invalid tier" });
-        return;
-      }
+      const { tier, poNumber, organizationName, contactName, contactEmail, notes } = parsed.data;
 
       // Persist the PO record and provision the account atomically: if the PO
       // paper trail cannot be written, we must NOT grant paid access. Both
