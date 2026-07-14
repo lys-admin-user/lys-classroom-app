@@ -25,6 +25,13 @@ and where to look to undo it.
 
 ---
 
+## [2026-07-14 02:05] — Pro plan price reverted to $7.99/month
+- **Requested by:** confirmed they are the developer (via the guardrail pause prompt)
+- **Request (their words):** "I actually want to change it back to what it was before"
+- **Protected area(s):** payments/billing (Stripe checkout amount + pricing constants)
+- **What was changed:** Pro plan price reverted from $99 back to $7.99/month in all the same places as the previous entry — Stripe checkout amount (`server/routes/payments.ts`, back to 799 cents), pricing constants (`shared/pricing.ts` PLAN_PRICES.pro back to 7.99 + PRO_REGULAR_PRICE back to 19, `shared/schema.ts` BASE_PRICES_USD.pro), org billing display (`server/routes/org.ts`), and admin MRR estimate (`server/routes/admin.ts`). Typecheck + full test suite pass.
+- **Rollback:** the checkpoint created right after this change ("reverted to $7.99" in the checkpoint list) — though rolling this one back would re-apply the $99 price.
+
 ## [2026-07-14 01:40] — Pro plan price changed to $99/month
 - **Requested by:** confirmed they are the developer (via the guardrail pause prompt)
 - **Request (their words):** "Change the price of the Pro plan to $99"

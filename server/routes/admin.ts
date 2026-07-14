@@ -2461,7 +2461,7 @@ export function registerAdminRoutes(app: Express): void {
       const proUsers = allUsers.filter(u => u.tier === "pro").length;
       const campusUsers = allUsers.filter(u => u.tier === "campus").length;
       const enterpriseUsers = allUsers.filter(u => u.tier === "enterprise").length;
-      const estimatedMRR = (proUsers * 99) + (campusUsers * 299) + (enterpriseUsers * 299);
+      const estimatedMRR = (proUsers * 7.99) + (campusUsers * 299) + (enterpriseUsers * 299);
       const runwayMonths = estimatedBurnRate > 0 ? Math.round(estimatedMRR / estimatedBurnRate * 10) / 10 : Infinity;
 
       // Retention by cohort (monthly)

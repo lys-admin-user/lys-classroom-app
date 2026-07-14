@@ -1615,7 +1615,7 @@ export function registerOrgRoutes(app: Express): void {
 
       const basePrices = {
         free: { base: 0, name: "Free" },
-        pro: { base: 99, name: "Pro" },
+        pro: { base: 7.99, name: "Pro" },
         campus: { base: 299, name: "Campus" },
         enterprise: { base: 599, name: "Enterprise" },
       };
