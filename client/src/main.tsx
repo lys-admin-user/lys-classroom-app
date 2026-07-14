@@ -6,9 +6,14 @@ import "./index.css";
 // Clerk identity. The publishable key is safe to expose to the browser. When it
 // isn't set (e.g. very first local boot before keys are configured), we render
 // the app without ClerkProvider so the dev-login switcher still works.
-const clerkPublishableKey = import.meta.env.VITE_CLERK_PUBLISHABLE_KEY as
-  | string
-  | undefined;
+// In dev builds (Replit preview), prefer the Clerk DEVELOPMENT-instance key —
+// production keys are domain-locked to lyslessonplanning.com and render a
+// blank login screen on the preview domain. Production builds ignore the dev
+// key entirely.
+const clerkPublishableKey = (import.meta.env.DEV &&
+(import.meta.env.VITE_CLERK_PUBLISHABLE_KEY_DEV as string | undefined)
+  ? import.meta.env.VITE_CLERK_PUBLISHABLE_KEY_DEV
+  : import.meta.env.VITE_CLERK_PUBLISHABLE_KEY) as string | undefined;
 
 const root = createRoot(document.getElementById("root")!);
 

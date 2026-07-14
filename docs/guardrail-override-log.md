@@ -29,8 +29,8 @@ and where to look to undo it.
 - **Requested by:** confirmed they are the developer (chose to proceed after the protected-area explanation)
 - **Request (their words):** "Sure, lets roll with this option" (use Clerk development-instance keys so login works in the Replit preview pane)
 - **Protected area(s):** authentication (Clerk key selection) · secrets/env vars (new dev-only Clerk keys)
-- **What was changed:** (in progress — will be filled in on completion)
-- **Rollback:** (pending — checkpoint created after the work)
+- **What was changed:** The preview workspace now uses Clerk's development-instance keys so login works on the Replit preview domain (production keys are domain-locked to lyslessonplanning.com and showed a blank login screen in preview). Two new secrets were added by the developer (`CLERK_SECRET_KEY_DEV`, `VITE_CLERK_PUBLISHABLE_KEY_DEV`); `server/bootstrap-env.ts` bridges them over the regular Clerk vars in development only, and `client/src/main.tsx` prefers the dev publishable key in dev builds only. The live site and its production keys are untouched — publishing works the same as before. Verified: preview sign-in page renders with Clerk "Development mode" badge; typecheck clean; 175/175 tests pass.
+- **Rollback:** the checkpoint created right after this change (look for the Clerk development keys entry in the checkpoint list); removing the two _DEV secrets also fully reverts the behavior.
 
 ## [2026-07-14 03:45] — Purchase-order notifications sent to one central email
 - **Requested by:** confirmed they are the developer (via the guardrail pause prompt)
