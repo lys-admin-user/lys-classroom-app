@@ -25,4 +25,9 @@ and where to look to undo it.
 
 ---
 
-_No overrides recorded yet._
+## [2026-07-14 01:20] — Test entry (email notification setup)
+- **Requested by:** the developer (bayo@maskil.dev) — this is a system test, not a real override
+- **Request (their words):** "Can you send each log entry that happens to bayo@maskil.dev?"
+- **Protected area(s):** none — verification of the notification pipeline only
+- **What was changed:** added `scripts/send-guardrail-override-email.ts` and the mandatory email step in the guardrails
+- **Rollback:** n/a (test entry)
