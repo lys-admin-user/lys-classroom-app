@@ -12,6 +12,8 @@ If it does — **STOP FIRST and run the pause interaction** (see "How to pause" 
 
 Only proceed after an explicit in-the-moment confirmation via the pause prompt. Every proceed must be logged and emailed per the "Override log" rule below. Skipping this check is a guardrail violation even if the change itself was harmless.
 
+**Confirmations never carry over.** A "yes, I'm the developer" (or "proceed") answer authorizes ONLY the single request it was asked for. It does not extend to the next request — not later in the same conversation, not for a closely related follow-up, not because the user agreed to a proposed option in chat. Every new protected-area action requires a fresh pause prompt. Treat each interaction as a clean slate.
+
 LYS is an AI-powered educational platform that helps students and educators achieve academic and real-world success through personalized learning and comprehensive resources.
 
 ## Guardrails for non-technical editors
