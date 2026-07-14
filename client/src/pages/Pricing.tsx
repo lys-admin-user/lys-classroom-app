@@ -15,6 +15,7 @@ import { useAuth } from "@/hooks/use-auth";
 import { PLAN_PRICES, SEAT_PRICES, SEAT_MINIMUMS, FREE_LESSON_LIMIT, PRO_REGULAR_PRICE, PRO_PROMO_END_DATE, ENTERPRISE_PER_CAMPUS_PRICE, computeEnterpriseQuote } from "@/lib/pricing";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
+import { purchaseOrderSubmitSchema } from "@shared/schema";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 
 interface SubscriptionStatus {
@@ -202,6 +203,7 @@ export default function Pricing() {
   const [checkoutTier, setCheckoutTier] = useState<string>("");
   const [selectedPaymentMethod, setSelectedPaymentMethod] = useState<string>("");
   const [poFormData, setPoFormData] = useState({ poNumber: "", organizationName: "", contactName: "", contactEmail: user?.email || "", notes: "" });
+  const [poErrors, setPoErrors] = useState<Record<string, string>>({});
   const [bankFormData, setBankFormData] = useState({ organizationName: "", contactEmail: user?.email || "" });
   const [bankTransferDetails, setBankTransferDetails] = useState<any>(null);
   const [stripeLoading, setStripeLoading] = useState(false);
@@ -320,10 +322,18 @@ export default function Pricing() {
         description: data.message,
       });
     },
-    onError: () => {
+    onError: (error: any) => {
+      // The server rejects malformed submissions with "Invalid <field>: <message>".
+      const serverMessage: string | undefined = error?.error;
+      const fieldMatch = typeof serverMessage === "string"
+        ? serverMessage.match(/^Invalid (\w+): (.*)$/)
+        : null;
+      if (fieldMatch) {
+        setPoErrors({ [fieldMatch[1]]: fieldMatch[2] });
+      }
       toast({
         title: "Submission Failed",
-        description: "Could not submit the purchase order. Please try again.",
+        description: fieldMatch ? fieldMatch[2] : (serverMessage || "Could not submit the purchase order. Please try again."),
         variant: "destructive",
       });
     },
@@ -432,10 +442,28 @@ export default function Pricing() {
       toast({ title: "PayPal Coming Soon", description: "PayPal checkout will be available soon. Please use a card or another payment method.", variant: "default" });
       return;
     } else if (selectedPaymentMethod === "purchase_order") {
-      poMutation.mutate({
+      // Validate with the same rules the server enforces, so mistakes are
+      // caught next to the field before anything is submitted.
+      const parsed = purchaseOrderSubmitSchema.safeParse({
         tier: checkoutTier,
         ...poFormData,
       });
+      if (!parsed.success) {
+        const fieldErrors: Record<string, string> = {};
+        for (const issue of parsed.error.errors) {
+          const field = String(issue.path[0] ?? "");
+          if (field && !fieldErrors[field]) fieldErrors[field] = issue.message;
+        }
+        setPoErrors(fieldErrors);
+        toast({
+          title: "Check the purchase order form",
+          description: "Please fix the highlighted fields and try again.",
+          variant: "destructive",
+        });
+        return;
+      }
+      setPoErrors({});
+      poMutation.mutate(parsed.data);
     } else if (selectedPaymentMethod === "bank_transfer") {
       bankTransferMutation.mutate({
         tier: checkoutTier,
@@ -1014,7 +1042,7 @@ export default function Pricing() {
         </DialogContent>
       </Dialog>
 
-      <Dialog open={checkoutOpen} onOpenChange={setCheckoutOpen}>
+      <Dialog open={checkoutOpen} onOpenChange={(open) => { setCheckoutOpen(open); if (!open) setPoErrors({}); }}>
         <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="font-oswald text-xl">
@@ -1120,20 +1148,24 @@ export default function Pricing() {
                     <Input
                       id="po-number"
                       value={poFormData.poNumber}
-                      onChange={(e) => setPoFormData(prev => ({ ...prev, poNumber: e.target.value }))}
+                      onChange={(e) => { setPoFormData(prev => ({ ...prev, poNumber: e.target.value })); setPoErrors(prev => ({ ...prev, poNumber: "" })); }}
                       placeholder="PO-2026-001"
+                      className={poErrors.poNumber ? "border-destructive" : undefined}
                       data-testid="input-po-number"
                     />
+                    {poErrors.poNumber && <p className="text-xs text-destructive" data-testid="error-po-number">{poErrors.poNumber}</p>}
                   </div>
                   <div className="grid gap-1.5">
                     <Label htmlFor="po-org" className="text-sm">Organization Name *</Label>
                     <Input
                       id="po-org"
                       value={poFormData.organizationName}
-                      onChange={(e) => setPoFormData(prev => ({ ...prev, organizationName: e.target.value }))}
+                      onChange={(e) => { setPoFormData(prev => ({ ...prev, organizationName: e.target.value })); setPoErrors(prev => ({ ...prev, organizationName: "" })); }}
                       placeholder="Springfield School District"
+                      className={poErrors.organizationName ? "border-destructive" : undefined}
                       data-testid="input-po-org"
                     />
+                    {poErrors.organizationName && <p className="text-xs text-destructive" data-testid="error-po-org">{poErrors.organizationName}</p>}
                   </div>
                   <div className="grid grid-cols-2 gap-3">
                     <div className="grid gap-1.5">
@@ -1141,10 +1173,12 @@ export default function Pricing() {
                       <Input
                         id="po-contact"
                         value={poFormData.contactName}
-                        onChange={(e) => setPoFormData(prev => ({ ...prev, contactName: e.target.value }))}
+                        onChange={(e) => { setPoFormData(prev => ({ ...prev, contactName: e.target.value })); setPoErrors(prev => ({ ...prev, contactName: "" })); }}
                         placeholder="Jane Doe"
+                        className={poErrors.contactName ? "border-destructive" : undefined}
                         data-testid="input-po-contact"
                       />
+                      {poErrors.contactName && <p className="text-xs text-destructive" data-testid="error-po-contact">{poErrors.contactName}</p>}
                     </div>
                     <div className="grid gap-1.5">
                       <Label htmlFor="po-email" className="text-sm">Billing Email *</Label>
@@ -1152,10 +1186,12 @@ export default function Pricing() {
                         id="po-email"
                         type="email"
                         value={poFormData.contactEmail}
-                        onChange={(e) => setPoFormData(prev => ({ ...prev, contactEmail: e.target.value }))}
+                        onChange={(e) => { setPoFormData(prev => ({ ...prev, contactEmail: e.target.value })); setPoErrors(prev => ({ ...prev, contactEmail: "" })); }}
                         placeholder="billing@school.edu"
+                        className={poErrors.contactEmail ? "border-destructive" : undefined}
                         data-testid="input-po-email"
                       />
+                      {poErrors.contactEmail && <p className="text-xs text-destructive" data-testid="error-po-email">{poErrors.contactEmail}</p>}
                     </div>
                   </div>
                   <div className="grid gap-1.5">
@@ -1163,11 +1199,12 @@ export default function Pricing() {
                     <Textarea
                       id="po-notes"
                       value={poFormData.notes}
-                      onChange={(e) => setPoFormData(prev => ({ ...prev, notes: e.target.value }))}
+                      onChange={(e) => { setPoFormData(prev => ({ ...prev, notes: e.target.value })); setPoErrors(prev => ({ ...prev, notes: "" })); }}
                       placeholder="Any additional details for the purchase order..."
-                      className="min-h-[60px]"
+                      className={`min-h-[60px]${poErrors.notes ? " border-destructive" : ""}`}
                       data-testid="textarea-po-notes"
                     />
+                    {poErrors.notes && <p className="text-xs text-destructive" data-testid="error-po-notes">{poErrors.notes}</p>}
                   </div>
                 </div>
               </div>
