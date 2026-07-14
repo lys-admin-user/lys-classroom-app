@@ -506,7 +506,7 @@ export function registerPaymentsRoutes(app: Express): void {
 
       // Campus minimum bill = $299 base + 10 seats × $12/seat = $419/mo
       const tierPrices: Record<string, { amount: number; name: string; period: string }> = {
-        pro: { amount: 799, name: "LYS Pro (Focus Mode)", period: "month" },
+        pro: { amount: 9900, name: "LYS Pro (Focus Mode)", period: "month" },
         campus: { amount: 41900, name: "LYS Campus (10-seat minimum)", period: "month" },
       };
       const tierInfo = tierPrices[tier];

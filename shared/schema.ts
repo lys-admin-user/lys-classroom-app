@@ -127,7 +127,7 @@ export const purchaseOrders = pgTable("purchase_orders", {
   contactName: varchar("contact_name"),
   billingEmail: varchar("billing_email").notNull(),
   tier: varchar("tier").notNull(),
-  // Monthly plan price captured at submit time, in cents (e.g. Pro 799, Campus 29900).
+  // Monthly plan price captured at submit time, in cents (e.g. Pro 9900, Campus 29900).
   monthlyAmountCents: integer("monthly_amount_cents"),
   notes: text("notes"),
   submittedByUserId: varchar("submitted_by_user_id").notNull(),
@@ -3022,7 +3022,7 @@ export type CAIPricing = z.infer<typeof caiPricingSchema>;
 // Base prices in USD (Global Reference Prices)
 export const BASE_PRICES_USD = {
   free: 0,
-  pro: 7.99,
+  pro: 99,
   campus: 299,
   enterprise: 299,
 } as const;

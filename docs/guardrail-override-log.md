@@ -25,6 +25,13 @@ and where to look to undo it.
 
 ---
 
+## [2026-07-14 01:40] — Pro plan price changed to $99/month
+- **Requested by:** confirmed they are the developer (via the guardrail pause prompt)
+- **Request (their words):** "Change the price of the Pro plan to $99"
+- **Protected area(s):** payments/billing (Stripe checkout amount + pricing constants)
+- **What was changed:** Pro plan price updated from $7.99 to $99/month everywhere it is defined — Stripe checkout amount (`server/routes/payments.ts`, now 9900 cents), pricing constants (`shared/pricing.ts` PLAN_PRICES.pro + PRO_REGULAR_PRICE, `shared/schema.ts` BASE_PRICES_USD.pro), org billing display (`server/routes/org.ts`), and admin MRR estimate (`server/routes/admin.ts`). Typecheck + full test suite (164 tests) pass.
+- **Rollback:** the checkpoint created right after this change ("Pro plan price" in the checkpoint list) — roll back to the one just before it to undo.
+
 ## [2026-07-14 01:20] — Test entry (email notification setup)
 - **Requested by:** the developer (bayo@maskil.dev) — this is a system test, not a real override
 - **Request (their words):** "Can you send each log entry that happens to bayo@maskil.dev?"
