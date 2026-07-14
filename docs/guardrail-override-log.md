@@ -25,6 +25,13 @@ and where to look to undo it.
 
 ---
 
+## [2026-07-14 15:30] — Real ACH Direct Debit bank payments via Stripe
+- **Requested by:** confirmed they are the developer (via the guardrail pause prompt; chose ACH Direct Debit only)
+- **Request (their words):** Set up real bank transfer / ACH payments through Stripe for subscriptions (Task: "Stripe bank transfer / ACH payments")
+- **Protected area(s):** payments/billing (Stripe checkout + webhooks) · server code
+- **What was changed:** Bank payments are now real ACH Direct Debit through Stripe checkout (the old placeholder "get transfer instructions" screen and its fake bank details are gone). Server: `server/routes/payments.ts` — create-checkout-session accepts a payment method (card or US bank account) and the placeholder `/api/bank-transfer/request` endpoint was removed; verify-checkout provisions the plan as "payment_pending" while the debit clears (~4 business days); `server/webhookHandlers.ts` — Stripe's async-payment webhooks flip payment_pending accounts to active on success or revert them to the free tier on failure, with audit-log entries for both. Client: `client/src/pages/Pricing.tsx` — "Bank Account (ACH)" option now routes through Stripe checkout with its own bank-debit authorization checkbox and a pending notice on return. Docs updated (`docs/workflow-knowledge-base.md` §1.3 + regenerated PDF). Typecheck clean, 175/175 tests pass. Note: ACH Direct Debit must be enabled once in the Stripe dashboard (Settings > Payment methods).
+- **Rollback:** the checkpoint created right after this change (look for the ACH / bank payments entry in the checkpoint list).
+
 ## [2026-07-14 14:35] — Clerk development keys for preview-pane login
 - **Requested by:** confirmed they are the developer (chose to proceed after the protected-area explanation)
 - **Request (their words):** "Sure, lets roll with this option" (use Clerk development-instance keys so login works in the Replit preview pane)

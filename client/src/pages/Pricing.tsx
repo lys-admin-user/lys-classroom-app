@@ -204,8 +204,6 @@ export default function Pricing() {
   const [selectedPaymentMethod, setSelectedPaymentMethod] = useState<string>("");
   const [poFormData, setPoFormData] = useState({ poNumber: "", organizationName: "", contactName: "", contactEmail: user?.email || "", notes: "" });
   const [poErrors, setPoErrors] = useState<Record<string, string>>({});
-  const [bankFormData, setBankFormData] = useState({ organizationName: "", contactEmail: user?.email || "" });
-  const [bankTransferDetails, setBankTransferDetails] = useState<any>(null);
   const [stripeLoading, setStripeLoading] = useState(false);
   const [billingAuthorized, setBillingAuthorized] = useState(false);
   const [downgradeDialogOpen, setDowngradeDialogOpen] = useState(false);
@@ -244,7 +242,11 @@ export default function Pricing() {
         .then((data) => {
           queryClient.invalidateQueries({ queryKey: ["/api/subscription/status"] });
           queryClient.invalidateQueries({ queryKey: ["/api/auth/user"] });
-          if (data.success) {
+          if (data.success && data.pending) {
+            const tierData = baseTiers.find(t => t.id === (tier || data.tier));
+            const displayName = tierData?.subtitle || tierData?.name || tier || data.tier;
+            toast({ title: "Bank payment processing", description: `Your ${displayName} plan is active while your bank payment clears (usually about 4 business days).` });
+          } else if (data.success) {
             const tierData = baseTiers.find(t => t.id === (tier || data.tier));
             const displayName = tierData?.subtitle || tierData?.name || tier || data.tier;
             toast({ title: "Welcome to " + displayName + "! 🎉", description: "Your payment was successful. Enjoy your new features!" });
@@ -339,25 +341,6 @@ export default function Pricing() {
     },
   });
 
-  const bankTransferMutation = useMutation({
-    mutationFn: (data: any) => apiRequest("POST", "/api/bank-transfer/request", data).then(r => r.json()),
-    onSuccess: (data: any) => {
-      setBankTransferDetails(data.bankDetails);
-      queryClient.invalidateQueries({ queryKey: ["/api/subscription/status"] });
-      toast({
-        title: "Bank Transfer Details",
-        description: data.message,
-      });
-    },
-    onError: () => {
-      toast({
-        title: "Request Failed",
-        description: "Could not get bank transfer details.",
-        variant: "destructive",
-      });
-    },
-  });
-
   const downgradeMutation = useMutation({
     mutationFn: (targetTier: string) =>
       apiRequest("POST", "/api/subscription/downgrade", { targetTier }).then(r => r.json()),
@@ -416,7 +399,6 @@ export default function Pricing() {
     if (action === "upgrade" && (tierId === "pro" || tierId === "campus")) {
       setCheckoutTier(tierId);
       setSelectedPaymentMethod("");
-      setBankTransferDetails(null);
       setBillingAuthorized(false);
       setCheckoutOpen(true);
     } else if (action === "downgrade") {
@@ -426,10 +408,14 @@ export default function Pricing() {
   };
 
   const handlePaymentSubmit = async () => {
-    if (selectedPaymentMethod === "stripe") {
+    if (selectedPaymentMethod === "stripe" || selectedPaymentMethod === "bank_transfer") {
       setStripeLoading(true);
       try {
-        const res = await apiRequest("POST", "/api/subscription/create-checkout-session", { tier: checkoutTier, billingAuthorized });
+        const res = await apiRequest("POST", "/api/subscription/create-checkout-session", {
+          tier: checkoutTier,
+          billingAuthorized,
+          paymentMethod: selectedPaymentMethod === "bank_transfer" ? "us_bank_account" : "card",
+        });
         const data = await res.json();
         if (data.url) {
           window.location.href = data.url;
@@ -468,11 +454,6 @@ export default function Pricing() {
       }
       setPoErrors({});
       poMutation.mutate(parsed.data);
-    } else if (selectedPaymentMethod === "bank_transfer") {
-      bankTransferMutation.mutate({
-        tier: checkoutTier,
-        ...bankFormData,
-      });
     }
   };
 
@@ -502,7 +483,7 @@ export default function Pricing() {
     : seatMinTotal !== null
       ? `Starts at $${seatMinTotal}`
       : selectedTierData ? `$${selectedTierData.basePrice}` : "$0";
-  const isPending = upgradeMutation.isPending || downgradeMutation.isPending || resumeMutation.isPending || poMutation.isPending || bankTransferMutation.isPending || stripeLoading;
+  const isPending = upgradeMutation.isPending || downgradeMutation.isPending || resumeMutation.isPending || poMutation.isPending || stripeLoading;
 
   const hasNetworkQuote = !!enterpriseQuote?.hasOrg && enterpriseQuote.quote !== undefined;
   const estimatorCampusCount = hasNetworkQuote ? enterpriseQuote!.quote!.campusCount : estimatorCampuses;
@@ -1078,7 +1059,6 @@ export default function Pricing() {
                       onClick={() => {
                         if (!isUnavailable) {
                           setSelectedPaymentMethod(method.id);
-                          setBankTransferDetails(null);
                         }
                       }}
                       className={`flex items-center gap-3 p-3 rounded-md border text-left transition-colors ${
@@ -1220,59 +1200,31 @@ export default function Pricing() {
               </div>
             )}
 
-            {selectedPaymentMethod === "bank_transfer" && !bankTransferDetails && (
-              <div className="space-y-3">
+            {selectedPaymentMethod === "bank_transfer" && (
+              <div className="p-4 rounded-md bg-muted/50 border space-y-2">
+                <p className="text-sm text-foreground font-medium">Pay from your US bank account (ACH)</p>
                 <p className="text-xs text-muted-foreground">
-                  Available for annual plans. Enter your organization details to receive bank transfer instructions.
+                  You'll be redirected to Stripe's secure checkout to connect your bank account
+                  (instant verification with most US banks) and authorize the payment.
                 </p>
-                <div className="grid gap-3">
-                  <div className="grid gap-1.5">
-                    <Label htmlFor="bank-org" className="text-sm">Organization Name *</Label>
-                    <Input
-                      id="bank-org"
-                      value={bankFormData.organizationName}
-                      onChange={(e) => setBankFormData(prev => ({ ...prev, organizationName: e.target.value }))}
-                      placeholder="Springfield School District"
-                      data-testid="input-bank-org"
-                    />
-                  </div>
-                  <div className="grid gap-1.5">
-                    <Label htmlFor="bank-email" className="text-sm">Contact Email *</Label>
-                    <Input
-                      id="bank-email"
-                      type="email"
-                      value={bankFormData.contactEmail}
-                      onChange={(e) => setBankFormData(prev => ({ ...prev, contactEmail: e.target.value }))}
-                      placeholder="billing@school.edu"
-                      data-testid="input-bank-email"
-                    />
-                  </div>
+                <p className="text-xs text-muted-foreground">
+                  Bank payments take about 4 business days to clear. Your plan is activated right
+                  away while the payment processes.
+                </p>
+                <div className="flex items-start gap-2 pt-2 mt-2 border-t">
+                  <Checkbox
+                    id="billing-authorized-ach"
+                    checked={billingAuthorized}
+                    onCheckedChange={(v) => setBillingAuthorized(v === true)}
+                    className="mt-0.5"
+                    data-testid="checkbox-billing-authorized-ach"
+                  />
+                  <Label htmlFor="billing-authorized-ach" className="text-xs text-muted-foreground font-normal leading-relaxed cursor-pointer">
+                    I authorize LYS to debit my bank account on a recurring basis for this
+                    subscription until I cancel. I understand I can cancel anytime from Settings,
+                    and that this authorization is separate from the Terms of Service.
+                  </Label>
                 </div>
-              </div>
-            )}
-
-            {selectedPaymentMethod === "bank_transfer" && bankTransferDetails && (
-              <div className="p-4 rounded-md bg-green-500/5 border border-green-500/20 space-y-3">
-                <p className="text-sm font-medium text-foreground">Bank Transfer Instructions</p>
-                <div className="grid gap-2 text-sm">
-                  <div className="flex justify-between gap-2">
-                    <span className="text-muted-foreground">Payee:</span>
-                    <span className="text-foreground font-medium">{bankTransferDetails.bankName}</span>
-                  </div>
-                  <div className="flex justify-between gap-2">
-                    <span className="text-muted-foreground">Account Type:</span>
-                    <span className="text-foreground">{bankTransferDetails.accountType}</span>
-                  </div>
-                  <div className="flex justify-between gap-2">
-                    <span className="text-muted-foreground">Routing Info:</span>
-                    <span className="text-foreground text-xs">{bankTransferDetails.routingNumber}</span>
-                  </div>
-                  <div className="flex justify-between gap-2">
-                    <span className="text-muted-foreground">Reference:</span>
-                    <span className="text-foreground font-mono text-xs">{bankTransferDetails.reference}</span>
-                  </div>
-                </div>
-                <p className="text-xs text-muted-foreground">{bankTransferDetails.note}</p>
               </div>
             )}
           </div>
@@ -1281,29 +1233,22 @@ export default function Pricing() {
             <Button variant="outline" className="w-full sm:w-auto" onClick={() => setCheckoutOpen(false)} data-testid="button-cancel-checkout">
               Cancel
             </Button>
-            {selectedPaymentMethod === "bank_transfer" && bankTransferDetails ? (
-              <Button className="w-full sm:w-auto" onClick={() => setCheckoutOpen(false)} data-testid="button-done-checkout">
-                Done
-              </Button>
-            ) : (
-              <Button
-                className="w-full sm:w-auto"
-                onClick={handlePaymentSubmit}
-                disabled={!selectedPaymentMethod || isPending || 
-                  (selectedPaymentMethod === "stripe" && !billingAuthorized) ||
-                  (selectedPaymentMethod === "purchase_order" && (!poFormData.poNumber || !poFormData.organizationName || !poFormData.contactEmail)) ||
-                  (selectedPaymentMethod === "bank_transfer" && (!bankFormData.organizationName || !bankFormData.contactEmail))
-                }
-                data-testid="button-confirm-checkout"
-              >
-                {isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
-                {selectedPaymentMethod === "purchase_order" ? "Submit Purchase Order" :
-                 selectedPaymentMethod === "bank_transfer" ? "Get Transfer Instructions" :
-                 selectedPaymentMethod === "paypal" ? "PayPal — Coming Soon" :
-                 selectedPaymentMethod === "stripe" ? (stripeLoading ? "Redirecting to Stripe..." : "Pay with Card") :
-                 "Select Payment Method"}
-              </Button>
-            )}
+            <Button
+              className="w-full sm:w-auto"
+              onClick={handlePaymentSubmit}
+              disabled={!selectedPaymentMethod || isPending || 
+                ((selectedPaymentMethod === "stripe" || selectedPaymentMethod === "bank_transfer") && !billingAuthorized) ||
+                (selectedPaymentMethod === "purchase_order" && (!poFormData.poNumber || !poFormData.organizationName || !poFormData.contactEmail))
+              }
+              data-testid="button-confirm-checkout"
+            >
+              {isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+              {selectedPaymentMethod === "purchase_order" ? "Submit Purchase Order" :
+               selectedPaymentMethod === "bank_transfer" ? (stripeLoading ? "Redirecting to Stripe..." : "Pay from Bank Account") :
+               selectedPaymentMethod === "paypal" ? "PayPal — Coming Soon" :
+               selectedPaymentMethod === "stripe" ? (stripeLoading ? "Redirecting to Stripe..." : "Pay with Card") :
+               "Select Payment Method"}
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

@@ -478,16 +478,21 @@ export function registerPaymentsRoutes(app: Express): void {
   });
 
 
-  // Create Stripe Checkout Session for real card payments
+  // Create Stripe Checkout Session for real payments.
+  // paymentMethod "card" (default) or "us_bank_account" (ACH Direct Debit —
+  // customer authorizes a bank-account pull in Stripe Checkout; funds clear in
+  // ~4 business days, so activation is finalized by webhook, not the redirect).
   app.post("/api/subscription/create-checkout-session", isAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user?.claims?.sub;
-      const { tier, billingAuthorized } = req.body;
+      const { tier, billingAuthorized, paymentMethod } = req.body;
 
       if (!["pro", "campus"].includes(tier)) {
         res.status(400).json({ error: "Invalid tier. Choose 'pro' or 'campus'" });
         return;
       }
+
+      const method = paymentMethod === "us_bank_account" ? "us_bank_account" : "card";
 
       // De-coupled recurring-billing authorization (FTC "Click to Cancel" /
       // ROSCA): the subscriber must give a standalone, affirmative consent to
@@ -528,7 +533,7 @@ export function registerPaymentsRoutes(app: Express): void {
 
       const session = await stripe.checkout.sessions.create({
         customer: customerId,
-        payment_method_types: ["card"],
+        payment_method_types: [method],
         mode: "subscription",
         line_items: [
           {
@@ -543,7 +548,7 @@ export function registerPaymentsRoutes(app: Express): void {
         ],
         success_url: `${origin}/pricing?checkout_success=true&session_id={CHECKOUT_SESSION_ID}&tier=${tier}`,
         cancel_url: `${origin}/pricing?checkout_cancelled=true`,
-        metadata: { userId, tier },
+        metadata: { userId, tier, paymentMethod: method },
       });
 
       // Persist the standalone billing authorization to the consent ledger.
@@ -589,22 +594,58 @@ export function registerPaymentsRoutes(app: Express): void {
         expand: ["subscription"],
       });
 
+      // Ownership check: only the user this checkout session was created for
+      // may claim it. Prevents provisioning via someone else's session id.
+      if (!session.metadata?.userId || session.metadata.userId !== userId) {
+        await logAuditEvent({
+          userId,
+          action: "billing.verify_checkout_denied",
+          category: "security",
+          severity: "warning",
+          resourceType: "subscription",
+          details: { reason: "session_owner_mismatch", sessionId },
+        }).catch(() => {});
+        res.status(403).json({ error: "This checkout session does not belong to your account" });
+        return;
+      }
+
       if (session.payment_status !== "paid" && session.status !== "complete") {
         res.status(400).json({ error: "Payment not completed" });
         return;
       }
 
-      const tier = (session.metadata?.tier || "pro") as "free" | "pro" | "campus" | "enterprise";
+      const tier = session.metadata?.tier as "pro" | "campus" | undefined;
+      if (!tier || !["pro", "campus"].includes(tier)) {
+        res.status(400).json({ error: "Invalid checkout session tier" });
+        return;
+      }
       const subscription = session.subscription as any;
+
+      // ACH Direct Debit clears in ~4 business days: the session completes with
+      // payment_status "unpaid" while the debit is processing. Provision the
+      // plan immediately (same trust model as PO submissions) but mark it
+      // payment-pending; the Stripe webhook flips it to active on
+      // checkout.session.async_payment_succeeded or reverts it on failure.
+      const isPendingAch = session.payment_status !== "paid";
 
       await db.update(users)
         .set({
           tier,
-          subscriptionStatus: "active",
+          subscriptionStatus: isPendingAch ? "payment_pending" : "active",
           stripeSubscriptionId: subscription?.id || null,
           updatedAt: new Date(),
         })
         .where(eq(users.id, userId));
+
+      if (isPendingAch) {
+        res.json({
+          success: true,
+          pending: true,
+          tier,
+          message: `Your bank payment is processing (usually about 4 business days). Your ${tier} plan is active while it clears.`,
+        });
+        return;
+      }
 
       res.json({ success: true, tier, message: `Successfully upgraded to ${tier}` });
     } catch (error: any) {
@@ -854,8 +895,8 @@ export function registerPaymentsRoutes(app: Express): void {
         },
         {
           id: "bank_transfer",
-          name: "Bank Transfer / ACH",
-          description: "Direct bank payment for annual plans (US institutions)",
+          name: "Bank Account (ACH)",
+          description: "Pay directly from a US bank account via Stripe — clears in about 4 business days",
           icon: "landmark",
           configured: true,
           available: true,
@@ -1039,29 +1080,4 @@ export function registerPaymentsRoutes(app: Express): void {
   });
 
 
-  app.post("/api/bank-transfer/request", isAuthenticated, async (req: any, res) => {
-    try {
-      const userId = req.user?.claims?.sub;
-      const { tier, organizationName, contactEmail } = req.body;
-
-      if (!tier || !organizationName || !contactEmail) {
-        res.status(400).json({ error: "Missing required fields" });
-        return;
-      }
-
-      res.json({
-        success: true,
-        message: "Bank transfer instructions have been sent to your email.",
-        bankDetails: {
-          bankName: "LYS Education Inc.",
-          routingNumber: "Contact sales@lys.edu for details",
-          accountType: "Business Checking",
-          reference: `LYS-${tier.toUpperCase()}-${userId.slice(0, 8)}`,
-          note: "Please include the reference number in your transfer memo",
-        },
-      });
-    } catch (error) {
-      res.status(500).json({ error: "Failed to process bank transfer request" });
-    }
-  });
 }

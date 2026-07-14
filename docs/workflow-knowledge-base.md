@@ -40,21 +40,21 @@ Last updated: July 14, 2026
 - The PO appears in the admin area under Billing > Purchase Orders.
 - An admin must manually mark the PO as paid once the invoice clears. Until then the account stays in the "PO pending" state.
 
-### 1.3 Paying by bank transfer / ACH
+### 1.3 Paying from a bank account (ACH Direct Debit)
 
-**Current status: placeholder only — not a working payment path yet.**
+**Current status: live — real payments through Stripe.**
 
-**What the user experiences today:**
+**What the user experiences:**
 
-- In the checkout dialog they can pick "Bank Transfer / ACH" and enter an organization name and contact email.
-- The screen then shows a reference number and generic instructions — but no real bank account details.
+- In the checkout dialog they pick "Bank Account (ACH)", check the bank-debit authorization box, and click "Pay from Bank Account".
+- They are redirected to Stripe's secure checkout, where they connect their US bank account (instant verification with most banks) and authorize the payment.
+- Back in the app, their plan is activated right away with a "bank payment processing" notice. The debit itself clears in about 4 business days.
 
-**What admins/devs should expect today:**
+**What admins/devs should expect:**
 
-- Nothing is recorded, no email is sent, and the plan does NOT activate. There is no follow-up process.
-- Recommendation: steer bank-transfer requests to the purchase-order flow (which works end to end) until the real version ships.
-
-**Planned upgrade:** Task #62 (Stripe bank transfer / ACH payments) is queued. Once built, bank payments will run through the same Stripe checkout as cards: the customer gets official Stripe payment instructions, the money clears in about 4 business days, and the plan activates automatically via webhook — with pending/failed states handled properly.
+- On checkout completion the account is provisioned with subscription status "payment_pending" (same trust model as PO pending).
+- A Stripe webhook finalizes it: if the debit succeeds the status flips to active; if it fails (insufficient funds, closed account) the account reverts to the free tier automatically. Both outcomes are written to the audit log.
+- One-time setup: ACH Direct Debit must be enabled in the Stripe dashboard (Settings > Payment methods), otherwise Stripe checkout will reject the session.
 
 ### 1.4 Enterprise (districts, charter networks, multi-site orgs)
 
@@ -77,5 +77,5 @@ Last updated: July 14, 2026
 | --- | --- | --- | --- |
 | Card (Stripe) | Instantly | None | Stripe dashboard |
 | Purchase order | Instantly (PO pending) | Mark paid when invoice clears | Admin > Billing > Purchase Orders |
-| Bank transfer / ACH | Not yet (placeholder) | N/A — steer to PO for now | Nowhere yet (Task #62 planned) |
+| Bank account (ACH) | Instantly (payment pending ~4 business days) | None — webhook activates or reverts automatically | Stripe dashboard |
 | Enterprise | After deal closes | Handle inquiry by email; then PO flow | Email + PO flow |
