@@ -25,6 +25,13 @@ and where to look to undo it.
 
 ---
 
+## [2026-07-14 15:45] — Automated safety tests for ACH bank-payment code
+- **Requested by:** confirmed they are the developer (via the guardrail pause prompt)
+- **Protected area(s):** server code (new test files in `server/__tests__/` only — no app behavior changes)
+- **Request (their words):** Task: "Catch broken bank-payment activation before it affects real customers" (automated tests for the ACH webhook + checkout-verification code)
+- **What was changed:** Added 19 automated safety tests for the ACH bank-payment lifecycle (`server/__tests__/ach-payment-policy.test.ts`). To make the safety-critical branches testable without a live database, the decision logic was extracted into a new pure module `server/services/achPaymentPolicy.ts` and the existing code now calls it — `server/webhookHandlers.ts` (which events count, stale-event correlation) and the verify-checkout endpoint in `server/routes/payments.ts` (session ownership, completion, tier validity, pending-vs-paid). Behavior is unchanged; the tests lock in: success activates only the matching pending payment, failure reverts only the matching one, stale/mismatched subscription ids are ignored, and someone else's checkout session can never upgrade your account. Typecheck clean; 194/194 tests pass (was 175).
+- **Rollback:** the checkpoint created right after this change (look for the ACH safety tests entry in the checkpoint list).
+
 ## [2026-07-14 15:30] — Real ACH Direct Debit bank payments via Stripe
 - **Requested by:** confirmed they are the developer (via the guardrail pause prompt; chose ACH Direct Debit only)
 - **Request (their words):** Set up real bank transfer / ACH payments through Stripe for subscriptions (Task: "Stripe bank transfer / ACH payments")

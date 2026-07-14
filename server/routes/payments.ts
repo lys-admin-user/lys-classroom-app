@@ -6,6 +6,7 @@ import { generateLessonPlan } from "../openai";
 import { detectAfricanCountryFromText } from "@shared/africaContext";
 import { computeEnterpriseQuote, planPrice, type PlanId } from "@shared/pricing";
 import { sendEmail } from "../services/emailTransport";
+import { evaluateVerifyCheckout } from "../services/achPaymentPolicy";
 import { calculateLessonQualityScore, getQualityLevel } from "../lessonQualityScorer";
 import { parseDocument } from "../documentParser";
 import { 
@@ -594,31 +595,31 @@ export function registerPaymentsRoutes(app: Express): void {
         expand: ["subscription"],
       });
 
-      // Ownership check: only the user this checkout session was created for
-      // may claim it. Prevents provisioning via someone else's session id.
-      if (!session.metadata?.userId || session.metadata.userId !== userId) {
-        await logAuditEvent({
-          userId,
-          action: "billing.verify_checkout_denied",
-          category: "security",
-          severity: "warning",
-          resourceType: "subscription",
-          details: { reason: "session_owner_mismatch", sessionId },
-        }).catch(() => {});
-        res.status(403).json({ error: "This checkout session does not belong to your account" });
+      // Decision logic (ownership, completion, tier validity, pending-vs-paid)
+      // lives in achPaymentPolicy.ts so it is unit tested.
+      const decision = evaluateVerifyCheckout(session as any, userId);
+      if (decision.kind === "reject") {
+        if (decision.reason === "owner_mismatch") {
+          await logAuditEvent({
+            userId,
+            action: "billing.verify_checkout_denied",
+            category: "security",
+            severity: "warning",
+            resourceType: "subscription",
+            details: { reason: "session_owner_mismatch", sessionId },
+          }).catch(() => {});
+        }
+        const message =
+          decision.reason === "owner_mismatch"
+            ? "This checkout session does not belong to your account"
+            : decision.reason === "not_completed"
+              ? "Payment not completed"
+              : "Invalid checkout session tier";
+        res.status(decision.httpStatus).json({ error: message });
         return;
       }
 
-      if (session.payment_status !== "paid" && session.status !== "complete") {
-        res.status(400).json({ error: "Payment not completed" });
-        return;
-      }
-
-      const tier = session.metadata?.tier as "pro" | "campus" | undefined;
-      if (!tier || !["pro", "campus"].includes(tier)) {
-        res.status(400).json({ error: "Invalid checkout session tier" });
-        return;
-      }
+      const tier = decision.tier;
       const subscription = session.subscription as any;
 
       // ACH Direct Debit clears in ~4 business days: the session completes with
@@ -626,7 +627,7 @@ export function registerPaymentsRoutes(app: Express): void {
       // plan immediately (same trust model as PO submissions) but mark it
       // payment-pending; the Stripe webhook flips it to active on
       // checkout.session.async_payment_succeeded or reverts it on failure.
-      const isPendingAch = session.payment_status !== "paid";
+      const isPendingAch = decision.pending;
 
       await db.update(users)
         .set({

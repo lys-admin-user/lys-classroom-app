@@ -3,6 +3,7 @@ import { db } from './db';
 import { users } from '@shared/schema';
 import { eq, and } from 'drizzle-orm';
 import { logAuditEvent } from './services/auditLog';
+import { evaluateAsyncPaymentEvent } from './services/achPaymentPolicy';
 
 export class WebhookHandlers {
   static async processWebhook(payload: Buffer, signature: string): Promise<void> {
@@ -35,41 +36,29 @@ export class WebhookHandlers {
   // checkout redirect provisions the plan as "payment_pending"; these events
   // finalize it: activate on success, revert to free on failure.
   private static async handleSubscriptionLifecycle(event: any): Promise<void> {
-    const type = event?.type;
-    if (
-      type !== 'checkout.session.async_payment_succeeded' &&
-      type !== 'checkout.session.async_payment_failed'
-    ) {
+    // All decisions (which events count, missing metadata, stale-event
+    // correlation) live in achPaymentPolicy.ts so they are unit tested.
+    const decision = evaluateAsyncPaymentEvent(event);
+    if (decision.kind === 'ignore') {
+      if (decision.reason !== 'irrelevant_event') {
+        console.warn(`[stripe-webhook] ${event?.type} skipped: ${decision.reason}`);
+      }
       return;
     }
 
-    const session = event.data?.object;
-    const userId = session?.metadata?.userId;
-    const tier = session?.metadata?.tier;
-    if (!userId) {
-      console.warn(`[stripe-webhook] ${type} without metadata.userId — skipping`);
-      return;
-    }
+    const { userId, tier, subscriptionId, checkoutSessionId } = decision;
 
     // Correlate to the EXACT pending payment: only touch the row if the stored
     // subscription id matches this session's subscription. Otherwise a stale
     // event from an abandoned earlier checkout could flip/revert a NEWER
-    // pending payment.
-    const sessionSubscriptionId: string | null =
-      typeof session.subscription === 'string'
-        ? session.subscription
-        : session.subscription?.id || null;
-    if (!sessionSubscriptionId) {
-      console.warn(`[stripe-webhook] ${type} without a subscription id — skipping`);
-      return;
-    }
+    // pending payment. (SQL twin of canApplyAsyncPaymentToUser.)
     const pendingMatch = and(
       eq(users.id, userId),
       eq(users.subscriptionStatus, 'payment_pending'),
-      eq(users.stripeSubscriptionId, sessionSubscriptionId),
+      eq(users.stripeSubscriptionId, subscriptionId),
     );
 
-    if (type === 'checkout.session.async_payment_succeeded') {
+    if (decision.kind === 'activate') {
       // Activate only the account still waiting on THIS payment; don't stomp a
       // status that changed in the meantime (e.g. user already canceled).
       await db.update(users)
@@ -85,7 +74,7 @@ export class WebhookHandlers {
         category: 'data_modify',
         severity: 'info',
         resourceType: 'subscription',
-        details: { tier: tier ?? null, checkoutSessionId: session?.id ?? null },
+        details: { tier: tier ?? null, checkoutSessionId },
       }).catch(() => {});
       console.log(`[stripe-webhook] ACH payment succeeded — activated ${tier ?? 'plan'} for user ${userId}`);
       return;
@@ -108,7 +97,7 @@ export class WebhookHandlers {
       category: 'data_modify',
       severity: 'warning',
       resourceType: 'subscription',
-      details: { tier: tier ?? null, checkoutSessionId: session?.id ?? null },
+      details: { tier: tier ?? null, checkoutSessionId },
     }).catch(() => {});
     console.warn(`[stripe-webhook] ACH payment FAILED — reverted user ${userId} to free tier`);
   }
