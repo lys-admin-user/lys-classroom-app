@@ -42,3 +42,9 @@ id = "X78SrmLB3LeiSHSy6TN_2"
 uri = "file://docs/editing-workflow.pdf"
 type = "pdf"
 title = "Publishing Your Changes — Editing Workflow (updated, email-ready PDF)"
+
+[[outputs]]
+id = "hiGIeTZJ193M58Tb9rBxU"
+uri = "file://docs/workflow-knowledge-base.pdf"
+type = "pdf"
+title = "LYS Workflow Knowledge Base (Billing)"
