@@ -122,6 +122,11 @@ Small habits that keep you out of trouble:
   says it will do. If you see words like *database, migrate, schema, secret, API
   key, environment variable, authentication, login, payment, permission, install,
   or dependency*, pause and check with the developer.
+- **A task on the task list is not permission.** These rules apply no matter how
+  a change is requested — a chat message, a planned task, or a follow-up task.
+  Even if a task was created and approved in planning, the agent should still
+  stop and ask you to confirm with the developer before touching any off-limits
+  area. Approving a task is not the same as the developer signing off.
 - **Check that login still works.** After a round of changes, sign out and sign
   back in. If sign-in still works and the pages still load, you are in good
   shape.

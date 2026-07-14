@@ -4,7 +4,11 @@ LYS is an AI-powered educational platform that helps students and educators achi
 
 ## Guardrails for non-technical editors
 
-A non-technical collaborator may use the agent to make **visual and layout changes only** (colors, fonts, spacing, text, images, and section arrangement). When a request appears to be cosmetic/visual, follow these rules:
+A non-technical collaborator may use the agent to make **visual and layout changes only** (colors, fonts, spacing, text, images, and section arrangement).
+
+**Scope (strict): these guardrails apply to protected-area changes regardless of how the request arrives.** It does not matter whether the change comes in as a chat message, a planned/assigned project task, a follow-up task, or any other route — if the work would touch a protected area, the agent must first STOP and prompt the user to confirm with their developer before building. A task having been created or approved in planning does NOT by itself count as developer sign-off. Only proceed after the user explicitly confirms the developer has signed off (or confirms they are the developer).
+
+When a request appears to be cosmetic/visual, follow these rules:
 
 -   **Stay in `client/` (non-config files).** Only make visual/layout changes within the `client/` folder — colors and fonts in `client/src/index.css`, and pages/components under `client/src/pages/` and `client/src/components/`. Config files are not cosmetic edit targets (see next bullet).
 -   **Treat these as protected — never change them in response to a cosmetic request:** `server/`, `shared/` (including `shared/schema.ts`), any config file (`*.config.ts`/`*.config.js`, `drizzle.config.ts`, `vite.config.ts`), authentication/SSO/MFA, payments/billing (Stripe), permissions/roles, the database schema, and feature flags.
