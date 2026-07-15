@@ -3,6 +3,10 @@ import {
   evaluateAsyncPaymentEvent,
   canApplyAsyncPaymentToUser,
   evaluateVerifyCheckout,
+  evaluateCheckoutCompletedEvent,
+  canProvisionFromCompletedCheckout,
+  canActivateFromAsyncSuccess,
+  isCheckoutTier,
   CHECKOUT_TIERS,
 } from "../services/achPaymentPolicy";
 
@@ -153,6 +157,202 @@ describe("Stale-event correlation (canApplyAsyncPaymentToUser)", () => {
         }),
       ).toBe(false);
     }
+  });
+});
+
+describe("Out-of-order success activation (canActivateFromAsyncSuccess)", () => {
+  const decision = { userId: "user-1", subscriptionId: "sub_new", tier: "pro" };
+
+  it("activates the matching pending payment (normal ordering)", () => {
+    expect(
+      canActivateFromAsyncSuccess(decision, {
+        id: "user-1",
+        subscriptionStatus: "payment_pending",
+        stripeSubscriptionId: "sub_new",
+      }),
+    ).toBe(true);
+  });
+
+  it("activates a never-provisioned row when success arrives before the completed event", () => {
+    // Stripe doesn't guarantee ordering: async_payment_succeeded can land
+    // before checkout.session.completed / verify-checkout. The row has no
+    // subscription yet and the event carries a valid tier — activate fully.
+    expect(
+      canActivateFromAsyncSuccess(decision, {
+        id: "user-1",
+        subscriptionStatus: null,
+        stripeSubscriptionId: null,
+      }),
+    ).toBe(true);
+  });
+
+  it("does not do a full activation without a valid tier on the event", () => {
+    for (const tier of [null, "", "enterprise"]) {
+      expect(
+        canActivateFromAsyncSuccess(
+          { ...decision, tier },
+          { id: "user-1", subscriptionStatus: null, stripeSubscriptionId: null },
+        ),
+      ).toBe(false);
+    }
+  });
+
+  it("never touches a row carrying a DIFFERENT subscription id", () => {
+    expect(
+      canActivateFromAsyncSuccess(decision, {
+        id: "user-1",
+        subscriptionStatus: "payment_pending",
+        stripeSubscriptionId: "sub_other",
+      }),
+    ).toBe(false);
+    expect(
+      canActivateFromAsyncSuccess(decision, {
+        id: "user-1",
+        subscriptionStatus: "active",
+        stripeSubscriptionId: "sub_other",
+      }),
+    ).toBe(false);
+  });
+
+  it("never touches a different user's row", () => {
+    expect(
+      canActivateFromAsyncSuccess(decision, {
+        id: "user-2",
+        subscriptionStatus: null,
+        stripeSubscriptionId: null,
+      }),
+    ).toBe(false);
+  });
+
+  it("isCheckoutTier accepts exactly the self-serve tiers", () => {
+    expect(isCheckoutTier("pro")).toBe(true);
+    expect(isCheckoutTier("campus")).toBe(true);
+    for (const bad of ["free", "enterprise", "", null, undefined, 42]) {
+      expect(isCheckoutTier(bad)).toBe(false);
+    }
+  });
+});
+
+describe("No-return safety net (evaluateCheckoutCompletedEvent)", () => {
+  const completedEvent = (overrides: any = {}) => ({
+    type: "checkout.session.completed",
+    data: {
+      object: {
+        id: "cs_done_1",
+        metadata: { userId: "user-1", tier: "pro" },
+        subscription: "sub_abc",
+        payment_status: "unpaid",
+        status: "complete",
+        ...overrides,
+      },
+    },
+  });
+
+  it("provisions a completed ACH session as payment-pending (customer never returned)", () => {
+    expect(evaluateCheckoutCompletedEvent(completedEvent())).toEqual({
+      kind: "provision",
+      userId: "user-1",
+      tier: "pro",
+      pending: true,
+      subscriptionId: "sub_abc",
+      checkoutSessionId: "cs_done_1",
+    });
+  });
+
+  it("provisions a paid card session as active (pending=false)", () => {
+    const d = evaluateCheckoutCompletedEvent(completedEvent({ payment_status: "paid" }));
+    expect(d.kind).toBe("provision");
+    expect((d as any).pending).toBe(false);
+  });
+
+  it("ignores all other event types", () => {
+    for (const type of [
+      "checkout.session.async_payment_succeeded",
+      "invoice.paid",
+      "",
+    ]) {
+      const e = { ...completedEvent(), type };
+      expect(evaluateCheckoutCompletedEvent(e)).toEqual({
+        kind: "ignore",
+        reason: "irrelevant_event",
+      });
+    }
+    expect(evaluateCheckoutCompletedEvent(null)).toEqual({
+      kind: "ignore",
+      reason: "irrelevant_event",
+    });
+  });
+
+  it("ignores sessions without a userId or subscription (nothing to provision)", () => {
+    expect(evaluateCheckoutCompletedEvent(completedEvent({ metadata: { tier: "pro" } }))).toEqual({
+      kind: "ignore",
+      reason: "missing_user",
+    });
+    expect(evaluateCheckoutCompletedEvent(completedEvent({ subscription: null }))).toEqual({
+      kind: "ignore",
+      reason: "missing_subscription",
+    });
+  });
+
+  it("ignores incomplete sessions and invalid tiers (same rules as verify-checkout)", () => {
+    expect(
+      evaluateCheckoutCompletedEvent(completedEvent({ status: "open", payment_status: "unpaid" })),
+    ).toEqual({ kind: "ignore", reason: "not_completed" });
+    for (const tier of [undefined, "enterprise", "free"]) {
+      expect(
+        evaluateCheckoutCompletedEvent(completedEvent({ metadata: { userId: "user-1", tier } })),
+      ).toEqual({ kind: "ignore", reason: "invalid_tier" });
+    }
+  });
+});
+
+describe("Completed-checkout idempotency (canProvisionFromCompletedCheckout)", () => {
+  const decision = { userId: "user-1", subscriptionId: "sub_new" };
+
+  it("provisions a user with no subscription yet", () => {
+    expect(
+      canProvisionFromCompletedCheckout(decision, { id: "user-1", stripeSubscriptionId: null }),
+    ).toBe(true);
+    expect(
+      canProvisionFromCompletedCheckout(decision, { id: "user-1" }),
+    ).toBe(true);
+  });
+
+  it("skips a row already carrying THIS subscription (verify-checkout or a retry already ran) — never regresses active back to pending", () => {
+    expect(
+      canProvisionFromCompletedCheckout(decision, {
+        id: "user-1",
+        stripeSubscriptionId: "sub_new",
+      }),
+    ).toBe(false);
+  });
+
+  it("overwrites an older non-active subscription (abandoned pending checkout)", () => {
+    for (const subscriptionStatus of ["payment_pending", "cancelled", null, undefined]) {
+      expect(
+        canProvisionFromCompletedCheckout(decision, {
+          id: "user-1",
+          subscriptionStatus,
+          stripeSubscriptionId: "sub_old",
+        }),
+      ).toBe(true);
+    }
+  });
+
+  it("never overwrites an ACTIVE different subscription (stale replayed completed event)", () => {
+    expect(
+      canProvisionFromCompletedCheckout(decision, {
+        id: "user-1",
+        subscriptionStatus: "active",
+        stripeSubscriptionId: "sub_old",
+      }),
+    ).toBe(false);
+  });
+
+  it("never touches a different user's row", () => {
+    expect(
+      canProvisionFromCompletedCheckout(decision, { id: "user-2", stripeSubscriptionId: null }),
+    ).toBe(false);
   });
 });
 

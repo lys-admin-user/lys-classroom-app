@@ -6,6 +6,10 @@
 export const CHECKOUT_TIERS = ["pro", "campus"] as const;
 export type CheckoutTier = (typeof CHECKOUT_TIERS)[number];
 
+export function isCheckoutTier(tier: unknown): tier is CheckoutTier {
+  return typeof tier === "string" && (CHECKOUT_TIERS as readonly string[]).includes(tier);
+}
+
 // ---------------------------------------------------------------------------
 // Webhook side: checkout.session.async_payment_succeeded / _failed
 // ---------------------------------------------------------------------------
@@ -78,6 +82,129 @@ export function canApplyAsyncPaymentToUser(
     !!user.stripeSubscriptionId &&
     user.stripeSubscriptionId === decision.subscriptionId
   );
+}
+
+/**
+ * Whether an async-payment SUCCESS may fully activate a user row even though
+ * the row is not (yet) payment_pending for this subscription. Stripe does not
+ * guarantee event ordering: async_payment_succeeded can arrive BEFORE
+ * checkout.session.completed / verify-checkout has provisioned anything. In
+ * that case the row has no stripeSubscriptionId at all, and it is safe to
+ * activate directly (the event carries a validated tier). A row that already
+ * carries a DIFFERENT subscription id is never touched — that would let a
+ * stale success from an abandoned checkout stomp a newer purchase.
+ */
+export function canActivateFromAsyncSuccess(
+  decision: { userId: string; subscriptionId: string; tier: string | null },
+  user: {
+    id: string;
+    subscriptionStatus?: string | null;
+    stripeSubscriptionId?: string | null;
+  },
+): boolean {
+  if (canApplyAsyncPaymentToUser(decision, user)) return true;
+  return (
+    user.id === decision.userId &&
+    isCheckoutTier(decision.tier) &&
+    !user.stripeSubscriptionId
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Webhook side: checkout.session.completed (no-browser-return safety net)
+// ---------------------------------------------------------------------------
+
+export type CheckoutCompletedDecision =
+  | {
+      kind: "ignore";
+      reason:
+        | "irrelevant_event"
+        | "missing_user"
+        | "missing_subscription"
+        | "not_completed"
+        | "invalid_tier";
+    }
+  | {
+      kind: "provision";
+      userId: string;
+      tier: CheckoutTier;
+      pending: boolean;
+      subscriptionId: string;
+      checkoutSessionId: string | null;
+    };
+
+/**
+ * Decide whether a checkout.session.completed webhook event should provision
+ * a plan. This is the safety net for customers who complete Stripe checkout
+ * but never return to the site (so verify-checkout is never called).
+ * Ownership is implied — the webhook is signature-verified and the session's
+ * own metadata.userId identifies the buyer. The same completion/tier rules as
+ * verify-checkout apply (via evaluateVerifyCheckout).
+ */
+export function evaluateCheckoutCompletedEvent(event: any): CheckoutCompletedDecision {
+  if (event?.type !== "checkout.session.completed") {
+    return { kind: "ignore", reason: "irrelevant_event" };
+  }
+
+  const session = event?.data?.object;
+  const userId = session?.metadata?.userId;
+  if (!userId || typeof userId !== "string") {
+    return { kind: "ignore", reason: "missing_user" };
+  }
+
+  const subscriptionId =
+    typeof session?.subscription === "string"
+      ? session.subscription
+      : session?.subscription?.id || null;
+  if (!subscriptionId) {
+    return { kind: "ignore", reason: "missing_subscription" };
+  }
+
+  const decision = evaluateVerifyCheckout(session, userId);
+  if (decision.kind === "reject") {
+    // owner_mismatch is impossible here (we passed the session's own userId).
+    return {
+      kind: "ignore",
+      reason: decision.reason === "not_completed" ? "not_completed" : "invalid_tier",
+    };
+  }
+
+  return {
+    kind: "provision",
+    userId,
+    tier: decision.tier,
+    pending: decision.pending,
+    subscriptionId,
+    checkoutSessionId: session?.id ?? null,
+  };
+}
+
+/**
+ * Whether a completed-checkout provisioning may be applied to a user row.
+ * Two guards:
+ * - Idempotency: if the row already carries THIS subscription id, the plan
+ *   was already provisioned (by verify-checkout, an out-of-order success
+ *   event, or an earlier delivery of this event) — re-applying could regress
+ *   an already-activated ACH payment back to payment_pending.
+ * - Monotonicity: a row that is ACTIVE on a different subscription is never
+ *   overwritten — a stale replayed completed event from an old checkout must
+ *   not downgrade a newer active subscription. (Legitimate plan changes go
+ *   through verify-checkout on return, which handles them explicitly.)
+ * Rows with no subscription, or in a transitional/inactive state, may be
+ * provisioned.
+ */
+export function canProvisionFromCompletedCheckout(
+  decision: { userId: string; subscriptionId: string },
+  user: {
+    id: string;
+    subscriptionStatus?: string | null;
+    stripeSubscriptionId?: string | null;
+  },
+): boolean {
+  if (user.id !== decision.userId) return false;
+  if (!user.stripeSubscriptionId) return true;
+  if (user.stripeSubscriptionId === decision.subscriptionId) return false;
+  return user.subscriptionStatus !== "active";
 }
 
 // ---------------------------------------------------------------------------

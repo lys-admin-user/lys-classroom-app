@@ -1,9 +1,14 @@
 import { getStripeSync } from './stripeClient';
 import { db } from './db';
 import { users } from '@shared/schema';
-import { eq, and } from 'drizzle-orm';
+import { eq, and, or, ne, isNull } from 'drizzle-orm';
 import { logAuditEvent } from './services/auditLog';
-import { evaluateAsyncPaymentEvent } from './services/achPaymentPolicy';
+import {
+  evaluateAsyncPaymentEvent,
+  evaluateCheckoutCompletedEvent,
+  isCheckoutTier,
+  type CheckoutTier,
+} from './services/achPaymentPolicy';
 
 export class WebhookHandlers {
   static async processWebhook(payload: Buffer, signature: string): Promise<void> {
@@ -36,6 +41,15 @@ export class WebhookHandlers {
   // checkout redirect provisions the plan as "payment_pending"; these events
   // finalize it: activate on success, revert to free on failure.
   private static async handleSubscriptionLifecycle(event: any): Promise<void> {
+    // Safety net: provision on checkout.session.completed so a paid checkout
+    // still activates even if the customer never returns to the site (and
+    // verify-checkout is never called).
+    const completed = evaluateCheckoutCompletedEvent(event);
+    if (completed.kind === 'provision') {
+      await WebhookHandlers.provisionFromCompletedCheckout(completed);
+      return;
+    }
+
     // All decisions (which events count, missing metadata, stale-event
     // correlation) live in achPaymentPolicy.ts so they are unit tested.
     const decision = evaluateAsyncPaymentEvent(event);
@@ -59,14 +73,40 @@ export class WebhookHandlers {
     );
 
     if (decision.kind === 'activate') {
-      // Activate only the account still waiting on THIS payment; don't stomp a
-      // status that changed in the meantime (e.g. user already canceled).
-      await db.update(users)
-        .set({
-          subscriptionStatus: 'active',
-          updatedAt: new Date(),
-        })
-        .where(pendingMatch);
+      // Activate the account waiting on THIS payment. Stripe does not
+      // guarantee event ordering, so success may arrive BEFORE the completed
+      // event / verify-checkout provisioned anything — in that case (row has
+      // no subscription id at all, and the event carries a valid tier) do a
+      // full provision-and-activate. Never touch a row carrying a DIFFERENT
+      // subscription id. (SQL twin of canActivateFromAsyncSuccess.)
+      if (isCheckoutTier(tier)) {
+        await db.update(users)
+          .set({
+            tier,
+            subscriptionStatus: 'active',
+            stripeSubscriptionId: subscriptionId,
+            updatedAt: new Date(),
+          })
+          .where(and(
+            eq(users.id, userId),
+            or(
+              and(
+                eq(users.subscriptionStatus, 'payment_pending'),
+                eq(users.stripeSubscriptionId, subscriptionId),
+              ),
+              isNull(users.stripeSubscriptionId),
+            ),
+          ));
+      } else {
+        // No trustworthy tier on the event: only flip an existing matching
+        // pending payment to active (legacy-safe path).
+        await db.update(users)
+          .set({
+            subscriptionStatus: 'active',
+            updatedAt: new Date(),
+          })
+          .where(pendingMatch);
+      }
 
       await logAuditEvent({
         userId,
@@ -100,5 +140,56 @@ export class WebhookHandlers {
       details: { tier: tier ?? null, checkoutSessionId },
     }).catch(() => {});
     console.warn(`[stripe-webhook] ACH payment FAILED — reverted user ${userId} to free tier`);
+  }
+
+  // Mirrors verify-checkout provisioning, driven by the webhook instead of the
+  // browser redirect. Idempotency (SQL twin of canProvisionFromCompletedCheckout):
+  // skip rows that already carry THIS subscription id — re-applying could
+  // regress an already-activated ACH payment back to payment_pending.
+  private static async provisionFromCompletedCheckout(decision: {
+    userId: string;
+    tier: CheckoutTier;
+    pending: boolean;
+    subscriptionId: string;
+    checkoutSessionId: string | null;
+  }): Promise<void> {
+    const { userId, tier, pending, subscriptionId, checkoutSessionId } = decision;
+
+    await db.update(users)
+      .set({
+        tier,
+        subscriptionStatus: pending ? 'payment_pending' : 'active',
+        stripeSubscriptionId: subscriptionId,
+        updatedAt: new Date(),
+      })
+      .where(and(
+        eq(users.id, userId),
+        or(
+          // No subscription yet — the normal no-return case.
+          isNull(users.stripeSubscriptionId),
+          // A different subscription that is NOT active may be replaced
+          // (e.g. an abandoned pending checkout). An ACTIVE different
+          // subscription is never overwritten by a webhook replay.
+          and(
+            ne(users.stripeSubscriptionId, subscriptionId),
+            or(
+              isNull(users.subscriptionStatus),
+              ne(users.subscriptionStatus, 'active'),
+            ),
+          ),
+        ),
+      ));
+
+    await logAuditEvent({
+      userId,
+      action: 'billing.checkout_completed_provisioned',
+      category: 'data_modify',
+      severity: 'info',
+      resourceType: 'subscription',
+      details: { tier, pending, checkoutSessionId },
+    }).catch(() => {});
+    console.log(
+      `[stripe-webhook] checkout completed — provisioned ${tier} (${pending ? 'payment_pending' : 'active'}) for user ${userId}`,
+    );
   }
 }

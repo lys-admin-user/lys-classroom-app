@@ -25,6 +25,13 @@ and where to look to undo it.
 
 ---
 
+## [2026-07-14 17:20] — Provision bank payments from Stripe webhook (no-return safety net)
+- **Requested by:** confirmed they are the developer (via the guardrail pause prompt)
+- **Protected area(s):** payments · server code (Stripe webhook + billing policy)
+- **Request (their words):** Task: "Make sure a bank payment still activates even if the customer never returns to the site"
+- **What was changed:** The Stripe webhook now provisions a plan when a checkout completes, so a customer who pays but never returns to the site still gets their subscription. New decision logic in `server/services/achPaymentPolicy.ts` (`evaluateCheckoutCompletedEvent` — reuses the same completion/tier rules as verify-checkout; `canProvisionFromCompletedCheckout` — idempotency rule) and a new `checkout.session.completed` branch in `server/webhookHandlers.ts` (ACH provisions as payment_pending, card as active; skips rows already carrying the same subscription id so an already-activated ACH payment is never regressed back to pending; audit event `billing.checkout_completed_provisioned`). verify-checkout is unchanged and remains idempotent with this path. After an independent review round, two hardening fixes were added: (1) out-of-order webhook delivery — an ACH "payment succeeded" event that arrives before the "checkout completed" event now fully provisions and activates the plan itself (only when the account has no subscription yet and the event carries a valid pro/campus tier; `canActivateFromAsyncSuccess`/`isCheckoutTier`); (2) a stale replayed "checkout completed" event can never overwrite an account that is already ACTIVE on a different subscription. 16 new tests (210/210 pass), typecheck clean.
+- **Rollback:** the checkpoint created right after this change (look for the webhook no-return provisioning entry in the checkpoint list).
+
 ## [2026-07-14 15:45] — Automated safety tests for ACH bank-payment code
 - **Requested by:** confirmed they are the developer (via the guardrail pause prompt)
 - **Protected area(s):** server code (new test files in `server/__tests__/` only — no app behavior changes)
