@@ -7,6 +7,7 @@ import { detectAfricanCountryFromText } from "@shared/africaContext";
 import { computeEnterpriseQuote, planPrice, type PlanId } from "@shared/pricing";
 import { sendEmail } from "../services/emailTransport";
 import { createVerifyCheckoutHandler } from "./verifyCheckoutHandler";
+import { notifyAchPaymentOutcome } from "../services/achPaymentEmails";
 import { calculateLessonQualityScore, getQualityLevel } from "../lessonQualityScorer";
 import { parseDocument } from "../documentParser";
 import { 
@@ -589,6 +590,7 @@ export function registerPaymentsRoutes(app: Express): void {
       getStripeClient: getUncachableStripeClient,
       db,
       logAuditEvent,
+      notifyAchPaymentOutcome,
     }),
   );
 

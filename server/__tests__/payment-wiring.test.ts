@@ -330,9 +330,10 @@ const makeRes = (): FakeRes => {
   return res;
 };
 
-const makeHandlerHarness = (session: any) => {
+const makeHandlerHarness = (session: any, opts: { rowCount?: number } = {}) => {
   const updates: CapturedUpdate[] = [];
   const audits: Array<Record<string, unknown>> = [];
+  const notices: Array<{ userId: string; outcome: string; tier: string | null }> = [];
   const handler = createVerifyCheckoutHandler({
     getStripeClient: async () =>
       ({
@@ -343,7 +344,7 @@ const makeHandlerHarness = (session: any) => {
         set: (values: Record<string, unknown>) => ({
           where: (condition: unknown) => {
             updates.push({ values, where: condition as SQL });
-            return Promise.resolve();
+            return Promise.resolve({ rowCount: opts.rowCount ?? 1 });
           },
         }),
       }),
@@ -351,13 +352,30 @@ const makeHandlerHarness = (session: any) => {
     logAuditEvent: async (entry) => {
       audits.push(entry);
     },
+    notifyAchPaymentOutcome: async (userId, outcome, tier) => {
+      notices.push({ userId, outcome, tier: tier ?? null });
+    },
   });
   const req = {
     user: { claims: { sub: "user-9" } },
     body: { sessionId: "cs_verify_1" },
   };
-  return { handler, req, updates, audits };
+  return { handler, req, updates, audits, notices };
 };
+
+// WHERE twin for verify-checkout's pending-provision dedupe: match the user
+// UNLESS the webhook already provisioned payment_pending for this exact
+// subscription (in which case verify-checkout must not re-write or re-email).
+const refVerifyPendingProvision = (userId: string, subscriptionId: string) =>
+  and(
+    eq(users.id, userId),
+    or(
+      isNull(users.subscriptionStatus),
+      ne(users.subscriptionStatus, "payment_pending"),
+      isNull(users.stripeSubscriptionId),
+      ne(users.stripeSubscriptionId, subscriptionId),
+    ),
+  )!;
 
 describe("verify-checkout handler wiring", () => {
   it("owner_mismatch maps to 403 with the ownership message, audits the denial, and writes nothing", async () => {
@@ -437,8 +455,8 @@ describe("verify-checkout handler wiring", () => {
     expect(render(updates[0].where)).toEqual(render(eq(users.id, "user-9")));
   });
 
-  it("complete-but-unpaid ACH checkout provisions PAYMENT_PENDING and reports pending", async () => {
-    const { handler, req, updates } = makeHandlerHarness({
+  it("complete-but-unpaid ACH checkout provisions PAYMENT_PENDING (webhook-dedupe WHERE twin), reports pending, and sends ONE processing email", async () => {
+    const { handler, req, updates, notices } = makeHandlerHarness({
       metadata: { userId: "user-9", tier: "campus" },
       payment_status: "unpaid",
       status: "complete",
@@ -455,6 +473,44 @@ describe("verify-checkout handler wiring", () => {
       subscriptionStatus: "payment_pending",
       stripeSubscriptionId: "sub_ach_1",
     });
-    expect(render(updates[0].where)).toEqual(render(eq(users.id, "user-9")));
+    expect(render(updates[0].where)).toEqual(
+      render(refVerifyPendingProvision("user-9", "sub_ach_1")),
+    );
+    expect(notices).toEqual([
+      { userId: "user-9", outcome: "processing", tier: "campus" },
+    ]);
+  });
+
+  it("verify-first race: when the webhook already provisioned (zero rows) NO second processing email is sent, but the response still reports pending", async () => {
+    const { handler, req, updates, notices } = makeHandlerHarness(
+      {
+        metadata: { userId: "user-9", tier: "campus" },
+        payment_status: "unpaid",
+        status: "complete",
+        subscription: { id: "sub_ach_1" },
+      },
+      { rowCount: 0 },
+    );
+    const res = makeRes();
+    await handler(req, res);
+
+    expect(res.statusCode).toBe(200);
+    expect(res.body).toMatchObject({ success: true, pending: true, tier: "campus" });
+    expect(updates).toHaveLength(1);
+    expect(notices).toHaveLength(0);
+  });
+
+  it("paid card checkout sends NO processing email", async () => {
+    const { handler, req, notices } = makeHandlerHarness({
+      metadata: { userId: "user-9", tier: "pro" },
+      payment_status: "paid",
+      status: "complete",
+      subscription: { id: "sub_789" },
+    });
+    const res = makeRes();
+    await handler(req, res);
+
+    expect(res.statusCode).toBe(200);
+    expect(notices).toHaveLength(0);
   });
 });

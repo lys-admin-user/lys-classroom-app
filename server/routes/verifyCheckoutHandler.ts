@@ -1,6 +1,7 @@
 import { users } from "@shared/schema";
-import { eq, type SQL } from "drizzle-orm";
+import { and, eq, ne, or, isNull, type SQL } from "drizzle-orm";
 import { evaluateVerifyCheckout } from "../services/achPaymentPolicy";
+import type { AchEmailOutcome } from "../services/achPaymentEmails";
 
 // Dependencies are injected so the REAL handler (not a copy) can be exercised
 // hermetically in tests — locking the HTTP status/message mapping and the
@@ -17,6 +18,19 @@ export interface VerifyCheckoutDeps {
     };
   };
   logAuditEvent: (entry: any) => Promise<unknown>;
+  // Best-effort "payment is processing" notice for ACH checkouts. Optional so
+  // existing call sites/tests that don't care about email keep working.
+  notifyAchPaymentOutcome?: (
+    userId: string,
+    outcome: AchEmailOutcome,
+    tier: string | null | undefined,
+  ) => Promise<void>;
+}
+
+// node-postgres reports matched rows via rowCount; drizzle passes it through.
+function rowsChanged(result: unknown): boolean {
+  const rowCount = (result as { rowCount?: number | null } | null | undefined)?.rowCount;
+  return typeof rowCount === "number" && rowCount > 0;
 }
 
 export function createVerifyCheckoutHandler(deps: VerifyCheckoutDeps) {
@@ -67,22 +81,48 @@ export function createVerifyCheckoutHandler(deps: VerifyCheckoutDeps) {
       // plan immediately (same trust model as PO submissions) but mark it
       // payment-pending; the Stripe webhook flips it to active on
       // checkout.session.async_payment_succeeded or reverts it on failure.
-      // NOTE: the "payment is processing" email is deliberately sent ONLY from
-      // the webhook's provisionFromCompletedCheckout path (rowsChanged-guarded,
-      // exactly-once). Do not also send it here — the user is on-site and sees
-      // the pending message/banner, and sending from both paths would double-email.
       const isPendingAch = decision.pending;
 
-      await deps.db.update(users)
-        .set({
-          tier,
-          subscriptionStatus: isPendingAch ? "payment_pending" : "active",
-          stripeSubscriptionId: subscription?.id || null,
-          updatedAt: new Date(),
-        })
-        .where(eq(users.id, userId));
-
       if (isPendingAch) {
+        // Dedupe against the webhook race: the webhook's completed-checkout
+        // path may have already provisioned payment_pending for THIS
+        // subscription (and sent the "payment is processing" email). Guard the
+        // UPDATE so it matches zero rows in that case — then we skip the email
+        // here, guaranteeing the customer gets exactly ONE processing notice
+        // whichever path provisions first.
+        const subscriptionId = subscription?.id || null;
+        const alreadyProvisionedByWebhook = subscriptionId
+          ? and(
+              eq(users.subscriptionStatus, "payment_pending"),
+              eq(users.stripeSubscriptionId, subscriptionId),
+            )
+          : undefined;
+        const result = await deps.db.update(users)
+          .set({
+            tier,
+            subscriptionStatus: "payment_pending",
+            stripeSubscriptionId: subscriptionId,
+            updatedAt: new Date(),
+          })
+          .where(
+            alreadyProvisionedByWebhook
+              ? and(
+                  eq(users.id, userId),
+                  or(
+                    isNull(users.subscriptionStatus),
+                    ne(users.subscriptionStatus, "payment_pending"),
+                    isNull(users.stripeSubscriptionId),
+                    ne(users.stripeSubscriptionId, subscriptionId!),
+                  ),
+                )!
+              : eq(users.id, userId),
+          );
+
+        if (rowsChanged(result) && deps.notifyAchPaymentOutcome) {
+          // Best-effort — never fail the checkout response over email.
+          await deps.notifyAchPaymentOutcome(userId, "processing", tier).catch(() => {});
+        }
+
         res.json({
           success: true,
           pending: true,
@@ -91,6 +131,17 @@ export function createVerifyCheckoutHandler(deps: VerifyCheckoutDeps) {
         });
         return;
       }
+
+      // Paid (card) checkout — activate immediately. No email here: card
+      // payments are instant, and receipts come from Stripe itself.
+      await deps.db.update(users)
+        .set({
+          tier,
+          subscriptionStatus: "active",
+          stripeSubscriptionId: subscription?.id || null,
+          updatedAt: new Date(),
+        })
+        .where(eq(users.id, userId));
 
       res.json({ success: true, tier, message: `Successfully upgraded to ${tier}` });
     } catch (error: any) {
