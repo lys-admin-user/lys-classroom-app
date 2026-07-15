@@ -25,6 +25,13 @@ and where to look to undo it.
 
 ---
 
+## [2026-07-15 21:05] — "Payment is processing" email right after bank checkout
+- **Requested by:** confirmed they are the developer (via the guardrail pause prompt)
+- **Protected area(s):** payments · server code (Stripe webhook / checkout + outbound email)
+- **Request (their words):** Task: "Send a 'payment is processing' email right after bank checkout"
+- **What was changed:** Extended `server/services/achPaymentEmails.ts` with a "processing" email: "we received your order — your bank payment is processing (about 4 business days), your plan is already active, and we'll email you when it clears (or if anything goes wrong)". Sent from the Stripe webhook (`server/webhookHandlers.ts`) only when an ACH checkout actually lands in payment-pending — replays/duplicates send nothing, and email problems can never break payment processing. Sent from the webhook path only (not the browser return page, which already shows the pending message) so customers never get the email twice. Covered by 4 new tests; full suite 242/242 pass, typecheck clean, independent review passed. Also hardened one flaky banner test.
+- **Rollback:** the checkpoint created right after this change (look for the ACH "payment processing" email entry in the checkpoint list).
+
 ## [2026-07-15 20:55] — Emails when a bank (ACH) payment clears or fails
 - **Requested by:** confirmed they are the developer (via the guardrail pause prompt)
 - **Protected area(s):** payments · server code (Stripe webhook + outbound email)

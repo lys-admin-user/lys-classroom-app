@@ -26,14 +26,33 @@ export function tierLabel(tier: string | null | undefined): string {
   return TIER_LABELS[tier] ?? "your plan";
 }
 
+export type AchEmailOutcome = "succeeded" | "failed" | "processing";
+
 export function buildAchOutcomeEmail(
-  outcome: "succeeded" | "failed",
+  outcome: AchEmailOutcome,
   opts: { firstName?: string | null; tier?: string | null; baseUrl: string },
 ): { subject: string; body: string } {
   const greeting = opts.firstName ? `Hi ${opts.firstName},` : "Hi,";
   const label = tierLabel(opts.tier);
   // "Pro plan" for a known tier, plain "your plan" when the tier is unknown.
   const plan = label === "your plan" ? label : `${label} plan`;
+
+  if (outcome === "processing") {
+    return {
+      subject: "We received your order — your bank payment is processing",
+      body: [
+        greeting,
+        "",
+        `Thanks for your order! Your bank (ACH) payment is now processing — this usually takes about 4 business days to clear.`,
+        "",
+        `In the meantime, your ${plan} is already active, so you can start using it right away: ${opts.baseUrl}`,
+        "",
+        "We'll email you as soon as the payment clears (or if anything goes wrong).",
+        "",
+        "— The LYS team",
+      ].join("\n"),
+    };
+  }
 
   if (outcome === "succeeded") {
     return {
@@ -73,7 +92,7 @@ export function buildAchOutcomeEmail(
 // Look up the user's email and send the outcome notice. Best-effort by design.
 export async function notifyAchPaymentOutcome(
   userId: string,
-  outcome: "succeeded" | "failed",
+  outcome: AchEmailOutcome,
   tier: string | null | undefined,
 ): Promise<void> {
   try {

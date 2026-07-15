@@ -59,6 +59,20 @@ describe("buildAchOutcomeEmail", () => {
     expect(body).toContain("https://lyslessonplanning.com/pricing");
   });
 
+  it("processing email sets the ~4 business day expectation and promises a follow-up", () => {
+    const { subject, body } = buildAchOutcomeEmail("processing", {
+      firstName: "Bayo",
+      tier: "pro",
+      baseUrl: "https://lyslessonplanning.com",
+    });
+    expect(subject).toContain("processing");
+    expect(body).toContain("Hi Bayo,");
+    expect(body).toContain("4 business days");
+    expect(body).toContain("Pro plan is already active");
+    expect(body).toContain("We'll email you");
+    expect(body).toContain("https://lyslessonplanning.com");
+  });
+
   it("unknown or missing tiers degrade to a generic label (never echoed into copy)", () => {
     expect(tierLabel(null)).toBe("your plan");
     expect(tierLabel("mystery")).toBe("your plan");

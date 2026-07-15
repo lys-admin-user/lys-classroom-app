@@ -252,5 +252,12 @@ export class WebhookHandlers {
     console.log(
       `[stripe-webhook] checkout completed — provisioned ${tier} (${pending ? 'payment_pending' : 'active'}) for user ${userId}`,
     );
+    // ACH checkout just landed in payment_pending: tell the customer their
+    // bank payment is processing (~4 business days) and that we'll email the
+    // outcome. Only sent when the row actually changed, so webhook replays
+    // never re-email. Best-effort — never fail the webhook over email.
+    if (pending) {
+      await notifyAchPaymentOutcome(userId, 'processing', tier).catch(() => {});
+    }
   }
 }

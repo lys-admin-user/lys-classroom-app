@@ -244,6 +244,8 @@ describe("webhook wiring: checkout.session.completed provisioning", () => {
     expect(auditEvents.map((e) => e.action)).toContain(
       "billing.checkout_completed_provisioned",
     );
+    // Card payments are instant — no "processing" notice.
+    expect(emailNotices).toHaveLength(0);
   });
 
   it("complete-but-unpaid (ACH clearing) provisions PAYMENT_PENDING with the same WHERE twin", async () => {
@@ -259,6 +261,11 @@ describe("webhook wiring: checkout.session.completed provisioning", () => {
     expect(render(upd.where)).toEqual(
       render(refProvisionFromCompleted("user-2", "sub_456")),
     );
+    // ACH is still clearing: the customer gets a "payment is processing"
+    // heads-up exactly once, tied to the real row change.
+    expect(emailNotices).toEqual([
+      { userId: "user-2", outcome: "processing", tier: "campus" },
+    ]);
   });
 
   it("completed provisioning matching ZERO rows logs a skip, not a state change", async () => {
@@ -273,6 +280,14 @@ describe("webhook wiring: checkout.session.completed provisioning", () => {
       intendedAction: "checkout_completed_provisioned",
       tier: "campus",
     });
+  });
+
+  it("pending provisioning matching ZERO rows (replay) sends NO processing email", async () => {
+    nextRowCount = 0;
+    await runLifecycle(completedEvent({ payment_status: "unpaid" }));
+
+    expect(auditEvents.map((e) => e.action)).toContain("billing.webhook_skipped_idempotent");
+    expect(emailNotices).toHaveLength(0);
   });
 
   it("not-completed or invalid-tier completed events touch nothing", async () => {

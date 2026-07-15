@@ -67,6 +67,10 @@ export function createVerifyCheckoutHandler(deps: VerifyCheckoutDeps) {
       // plan immediately (same trust model as PO submissions) but mark it
       // payment-pending; the Stripe webhook flips it to active on
       // checkout.session.async_payment_succeeded or reverts it on failure.
+      // NOTE: the "payment is processing" email is deliberately sent ONLY from
+      // the webhook's provisionFromCompletedCheckout path (rowsChanged-guarded,
+      // exactly-once). Do not also send it here — the user is on-site and sees
+      // the pending message/banner, and sending from both paths would double-email.
       const isPendingAch = decision.pending;
 
       await deps.db.update(users)

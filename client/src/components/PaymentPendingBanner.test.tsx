@@ -125,6 +125,8 @@ describe("PaymentPendingBanner", () => {
     const { queryClient } = renderBanner(makeUser());
     await waitForSettled(queryClient);
 
-    expect(screen.getByTestId("banner-payment-pending")).toBeTruthy();
+    // findByTestId retries until the query result renders — the settle helper
+    // alone is not always enough under jsdom timing.
+    expect(await screen.findByTestId("banner-payment-pending")).toBeTruthy();
   });
 });
