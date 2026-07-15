@@ -25,6 +25,13 @@ and where to look to undo it.
 
 ---
 
+## [2026-07-14 18:25] — Accurate payment audit records (skip-aware webhook auditing)
+- **Requested by:** confirmed they are the developer (via the guardrail pause prompt)
+- **Protected area(s):** payments · server code (Stripe webhook auditing)
+- **Request (their words):** Task: "Stop payment audit records from claiming changes that never happened"
+- **What was changed:** The Stripe webhook (`server/webhookHandlers.ts`) now checks how many database rows each guarded update actually changed. When a webhook event was correctly skipped (a replay or out-of-order delivery that matched zero rows), the audit trail no longer records a state change (`billing.ach_payment_succeeded` / `billing.ach_payment_failed` / `billing.checkout_completed_provisioned`); instead it records a distinct `billing.webhook_skipped_idempotent` event (with the intended action and context) so real-world delivery anomalies stay visible without overstating changes. No change to the payment rules themselves or the SQL guards. 3 new tests in `server/__tests__/payment-wiring.test.ts` (226/226 pass), typecheck clean, independent review passed.
+- **Rollback:** the checkpoint created right after this change (look for the skip-aware webhook auditing entry in the checkpoint list).
+
 ## [2026-07-14 17:55] — Wiring-parity tests for payment webhook + checkout verification
 - **Requested by:** confirmed they are the developer (via the guardrail pause prompt)
 - **Protected area(s):** payments · server code (test coverage around Stripe webhook + verify-checkout)

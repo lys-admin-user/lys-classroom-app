@@ -20,6 +20,9 @@ import { users } from "@shared/schema";
 
 type CapturedUpdate = { values: Record<string, unknown>; where: SQL };
 const capturedUpdates: CapturedUpdate[] = [];
+// How many rows the next mocked UPDATE reports as matched (node-postgres
+// rowCount). 1 = a real change; 0 = a correctly-skipped replay.
+let nextRowCount = 1;
 
 vi.mock("../db", () => ({
   db: {
@@ -27,7 +30,7 @@ vi.mock("../db", () => ({
       set: (values: Record<string, unknown>) => ({
         where: (condition: SQL) => {
           capturedUpdates.push({ values, where: condition });
-          return Promise.resolve();
+          return Promise.resolve({ rowCount: nextRowCount });
         },
       }),
     }),
@@ -61,6 +64,7 @@ const runLifecycle = (event: unknown) =>
 beforeEach(() => {
   capturedUpdates.length = 0;
   auditEvents.length = 0;
+  nextRowCount = 1;
 });
 
 // Reference WHERE twins, built here directly from the policy-function
@@ -157,6 +161,28 @@ describe("webhook wiring: async payment events", () => {
     expect(auditEvents.map((e) => e.action)).toContain("billing.ach_payment_failed");
   });
 
+  it("success matching ZERO rows logs a skip, not a state change", async () => {
+    nextRowCount = 0;
+    await runLifecycle(asyncEvent("checkout.session.async_payment_succeeded"));
+
+    const actions = auditEvents.map((e) => e.action);
+    expect(actions).toContain("billing.webhook_skipped_idempotent");
+    expect(actions).not.toContain("billing.ach_payment_succeeded");
+    const skip = auditEvents.find((e) => e.action === "billing.webhook_skipped_idempotent")!;
+    expect(skip.details).toMatchObject({ intendedAction: "ach_payment_succeeded" });
+  });
+
+  it("failure matching ZERO rows logs a skip, not a state change", async () => {
+    nextRowCount = 0;
+    await runLifecycle(asyncEvent("checkout.session.async_payment_failed"));
+
+    const actions = auditEvents.map((e) => e.action);
+    expect(actions).toContain("billing.webhook_skipped_idempotent");
+    expect(actions).not.toContain("billing.ach_payment_failed");
+    const skip = auditEvents.find((e) => e.action === "billing.webhook_skipped_idempotent")!;
+    expect(skip.details).toMatchObject({ intendedAction: "ach_payment_failed" });
+  });
+
   it("irrelevant events and uncorrelatable events touch nothing", async () => {
     await runLifecycle({ type: "invoice.paid", data: { object: {} } });
     await runLifecycle(
@@ -217,6 +243,20 @@ describe("webhook wiring: checkout.session.completed provisioning", () => {
     expect(render(upd.where)).toEqual(
       render(refProvisionFromCompleted("user-2", "sub_456")),
     );
+  });
+
+  it("completed provisioning matching ZERO rows logs a skip, not a state change", async () => {
+    nextRowCount = 0;
+    await runLifecycle(completedEvent());
+
+    const actions = auditEvents.map((e) => e.action);
+    expect(actions).toContain("billing.webhook_skipped_idempotent");
+    expect(actions).not.toContain("billing.checkout_completed_provisioned");
+    const skip = auditEvents.find((e) => e.action === "billing.webhook_skipped_idempotent")!;
+    expect(skip.details).toMatchObject({
+      intendedAction: "checkout_completed_provisioned",
+      tier: "campus",
+    });
   });
 
   it("not-completed or invalid-tier completed events touch nothing", async () => {

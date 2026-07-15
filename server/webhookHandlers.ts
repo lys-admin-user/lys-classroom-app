@@ -10,7 +10,33 @@ import {
   type CheckoutTier,
 } from './services/achPaymentPolicy';
 
+// node-postgres reports how many rows an UPDATE actually matched via rowCount.
+// A guarded webhook UPDATE that matches zero rows means the event was a
+// replay / out-of-order delivery that was correctly skipped — the audit trail
+// must record a skip, not a state change.
+function rowsChanged(result: unknown): boolean {
+  const rowCount = (result as { rowCount?: number | null } | null | undefined)?.rowCount;
+  return typeof rowCount === 'number' && rowCount > 0;
+}
+
 export class WebhookHandlers {
+  // Distinct audit action for correctly-skipped replays/out-of-order events so
+  // real-world delivery anomalies stay visible without overstating changes.
+  private static async auditSkipped(
+    userId: string,
+    intendedAction: string,
+    details: Record<string, unknown>,
+  ): Promise<void> {
+    await logAuditEvent({
+      userId,
+      action: 'billing.webhook_skipped_idempotent',
+      category: 'data_modify',
+      severity: 'info',
+      resourceType: 'subscription',
+      details: { intendedAction, ...details },
+    }).catch(() => {});
+  }
+
   static async processWebhook(payload: Buffer, signature: string): Promise<void> {
     if (!Buffer.isBuffer(payload)) {
       throw new Error(
@@ -73,6 +99,7 @@ export class WebhookHandlers {
     );
 
     if (decision.kind === 'activate') {
+      let result: unknown;
       // Activate the account waiting on THIS payment. Stripe does not
       // guarantee event ordering, so success may arrive BEFORE the completed
       // event / verify-checkout provisioned anything — in that case (row has
@@ -80,7 +107,7 @@ export class WebhookHandlers {
       // full provision-and-activate. Never touch a row carrying a DIFFERENT
       // subscription id. (SQL twin of canActivateFromAsyncSuccess.)
       if (isCheckoutTier(tier)) {
-        await db.update(users)
+        result = await db.update(users)
           .set({
             tier,
             subscriptionStatus: 'active',
@@ -100,12 +127,21 @@ export class WebhookHandlers {
       } else {
         // No trustworthy tier on the event: only flip an existing matching
         // pending payment to active (legacy-safe path).
-        await db.update(users)
+        result = await db.update(users)
           .set({
             subscriptionStatus: 'active',
             updatedAt: new Date(),
           })
           .where(pendingMatch);
+      }
+
+      if (!rowsChanged(result)) {
+        await WebhookHandlers.auditSkipped(userId, 'ach_payment_succeeded', {
+          tier: tier ?? null,
+          checkoutSessionId,
+        });
+        console.warn(`[stripe-webhook] ACH success matched no row for user ${userId} — skipped (replay/out-of-order?)`);
+        return;
       }
 
       await logAuditEvent({
@@ -122,7 +158,7 @@ export class WebhookHandlers {
 
     // Failed ACH debit (insufficient funds, closed account, disputed…):
     // revert the provisional upgrade back to the free tier.
-    await db.update(users)
+    const revertResult = await db.update(users)
       .set({
         tier: 'free',
         subscriptionStatus: null,
@@ -130,6 +166,15 @@ export class WebhookHandlers {
         updatedAt: new Date(),
       })
       .where(pendingMatch);
+
+    if (!rowsChanged(revertResult)) {
+      await WebhookHandlers.auditSkipped(userId, 'ach_payment_failed', {
+        tier: tier ?? null,
+        checkoutSessionId,
+      });
+      console.warn(`[stripe-webhook] ACH failure matched no row for user ${userId} — skipped (replay/stale?)`);
+      return;
+    }
 
     await logAuditEvent({
       userId,
@@ -155,7 +200,7 @@ export class WebhookHandlers {
   }): Promise<void> {
     const { userId, tier, pending, subscriptionId, checkoutSessionId } = decision;
 
-    await db.update(users)
+    const result = await db.update(users)
       .set({
         tier,
         subscriptionStatus: pending ? 'payment_pending' : 'active',
@@ -179,6 +224,16 @@ export class WebhookHandlers {
           ),
         ),
       ));
+
+    if (!rowsChanged(result)) {
+      await WebhookHandlers.auditSkipped(userId, 'checkout_completed_provisioned', {
+        tier,
+        pending,
+        checkoutSessionId,
+      });
+      console.warn(`[stripe-webhook] checkout completed matched no row for user ${userId} — skipped (already provisioned or active on another subscription)`);
+      return;
+    }
 
     await logAuditEvent({
       userId,
