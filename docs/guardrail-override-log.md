@@ -25,6 +25,13 @@ and where to look to undo it.
 
 ---
 
+## [2026-07-15 21:30] — Remove expired "offer ends June 30, 2026" promo text on pricing page
+- **Requested by:** confirmed they are the developer (via the guardrail pause prompt)
+- **Request (their words):** Task: "Remove the expired 'offer ends June 30, 2026' promo text on the pricing page"
+- **Protected area(s):** payments/pricing (display only — no prices, checkout, or Stripe amounts changed)
+- **What was changed:** Removed the expired Pro-plan promo block from `client/src/pages/Pricing.tsx` — the struck-through $19 "regular" price, the "Limited time" badge, and the "Promo ends Jun 30, 2026" note. The Pro card now shows its normal price ($7.99/month) the same way the other plans do, including the country-discount display when applicable. No prices, checkout amounts, or server code were touched; typecheck passes and the pricing page renders without errors.
+- **Rollback:** the checkpoint created right after this change (look for the expired-promo-removal entry in the checkpoint list).
+
 ## [2026-07-15 21:05] — "Payment is processing" email right after bank checkout
 - **Requested by:** confirmed they are the developer (via the guardrail pause prompt)
 - **Protected area(s):** payments · server code (Stripe webhook / checkout + outbound email)
