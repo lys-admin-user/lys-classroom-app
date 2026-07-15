@@ -25,6 +25,13 @@ and where to look to undo it.
 
 ---
 
+## [2026-07-15 20:30] — Automated tests for the "bank payment processing" banner
+- **Requested by:** confirmed they are the developer (via the guardrail pause prompt)
+- **Protected area(s):** packages/dependencies (test-only libraries) · config file (`vitest.config.ts`)
+- **Request (their words):** Task: "Confirm the 'bank payment processing' banner shows and clears correctly"
+- **What was changed:** Test-only work — no app behavior changed. Installed three test-only development packages (`@testing-library/react`, `@testing-library/user-event`, `jsdom`) and updated `vitest.config.ts` so browser-style component tests can run (client test files included, jsdom environment for `client/**`, `@` import alias, automatic JSX). Added `client/src/components/PaymentPendingBanner.test.tsx` with 8 tests locking in the banner's behavior: shows while a bank payment is pending (naming the plan), hidden for active/no-status/anonymous users, disappears automatically when the status flips to active, dismiss hides it for the session (`sessionStorage` flag) and it returns in a fresh session while still pending. Full suite 234/234 pass, typecheck clean, independent review passed.
+- **Rollback:** the checkpoint created right after this change (look for the payment-banner tests entry in the checkpoint list).
+
 ## [2026-07-15 19:55] — "Bank payment processing" banner while ACH payment clears
 - **Requested by:** confirmed they are the developer (via the guardrail pause prompt)
 - **Protected area(s):** payments/billing (subscription-status display; client-only visual work)
