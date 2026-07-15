@@ -25,6 +25,13 @@ and where to look to undo it.
 
 ---
 
+## [2026-07-14 17:55] — Wiring-parity tests for payment webhook + checkout verification
+- **Requested by:** confirmed they are the developer (via the guardrail pause prompt)
+- **Protected area(s):** payments · server code (test coverage around Stripe webhook + verify-checkout)
+- **Request (their words):** Task: "Confirm webhook and checkout wiring can't silently drift from the tested rules"
+- **What was changed:** Added automated "wiring parity" tests so the payment webhook and checkout verification can never quietly drift from the safety rules that are unit tested. The verify-checkout logic was moved unchanged from `server/routes/payments.ts` into `server/routes/verifyCheckoutHandler.ts` (dependency-injected so tests exercise the REAL handler, not a copy). New test suite `server/__tests__/payment-wiring.test.ts` (13 tests, no live database): renders the webhook's actual SQL update filters and compares them to reference twins of the policy rules (`canApplyAsyncPaymentToUser`, `canActivateFromAsyncSuccess`, `canProvisionFromCompletedCheckout`), and confirms verify-checkout maps a session belonging to someone else to 403 and incomplete/invalid sessions to 400, provisioning active vs payment-pending correctly. No behavior change to payments; 223/223 tests pass, typecheck clean; independent review passed.
+- **Rollback:** the checkpoint created right after this change (look for the payment wiring-parity tests entry in the checkpoint list).
+
 ## [2026-07-14 17:20] — Provision bank payments from Stripe webhook (no-return safety net)
 - **Requested by:** confirmed they are the developer (via the guardrail pause prompt)
 - **Protected area(s):** payments · server code (Stripe webhook + billing policy)

@@ -1,0 +1,389 @@
+// Wiring-parity tests (Task: webhook/checkout wiring can't silently drift).
+//
+// The pure decision rules in achPaymentPolicy.ts are unit tested, but the SQL
+// WHERE filters in webhookHandlers.ts and the HTTP status/message mapping in
+// verify-checkout are separate code. These tests exercise the REAL wiring
+// hermetically (mocked db/stripe/audit — no live DB):
+// - the webhook's UPDATE ... WHERE clauses are rendered to SQL and compared
+//   against reference twins built from the policy semantics
+//   (canApplyAsyncPaymentToUser / canActivateFromAsyncSuccess /
+//   canProvisionFromCompletedCheckout);
+// - the real verify-checkout handler maps owner_mismatch→403 and
+//   not_completed/invalid_tier→400, and provisions pending-vs-active correctly.
+
+import { describe, it, expect, vi, beforeEach } from "vitest";
+import { PgDialect } from "drizzle-orm/pg-core";
+import { and, or, eq, ne, isNull, type SQL } from "drizzle-orm";
+import { users } from "@shared/schema";
+
+// --- hermetic module mocks (must be declared before importing the handlers) ---
+
+type CapturedUpdate = { values: Record<string, unknown>; where: SQL };
+const capturedUpdates: CapturedUpdate[] = [];
+
+vi.mock("../db", () => ({
+  db: {
+    update: (_table: unknown) => ({
+      set: (values: Record<string, unknown>) => ({
+        where: (condition: SQL) => {
+          capturedUpdates.push({ values, where: condition });
+          return Promise.resolve();
+        },
+      }),
+    }),
+  },
+}));
+
+const auditEvents: Array<Record<string, unknown>> = [];
+vi.mock("../services/auditLog", () => ({
+  logAuditEvent: vi.fn(async (entry: Record<string, unknown>) => {
+    auditEvents.push(entry);
+  }),
+}));
+
+vi.mock("../stripeClient", () => ({
+  getStripeSync: vi.fn(),
+  getUncachableStripeClient: vi.fn(),
+}));
+
+import { WebhookHandlers } from "../webhookHandlers";
+import { createVerifyCheckoutHandler } from "../routes/verifyCheckoutHandler";
+
+const dialect = new PgDialect();
+const render = (condition: SQL) => {
+  const q = dialect.sqlToQuery(condition);
+  return { sql: q.sql, params: q.params };
+};
+
+const runLifecycle = (event: unknown) =>
+  (WebhookHandlers as any).handleSubscriptionLifecycle(event);
+
+beforeEach(() => {
+  capturedUpdates.length = 0;
+  auditEvents.length = 0;
+});
+
+// Reference WHERE twins, built here directly from the policy-function
+// semantics. If the handler's SQL ever drifts from these, the rendered
+// SQL/params comparison fails.
+const refPendingMatch = (userId: string, subscriptionId: string) =>
+  and(
+    eq(users.id, userId),
+    eq(users.subscriptionStatus, "payment_pending"),
+    eq(users.stripeSubscriptionId, subscriptionId),
+  )!;
+
+const refActivateFromAsyncSuccess = (userId: string, subscriptionId: string) =>
+  and(
+    eq(users.id, userId),
+    or(
+      and(
+        eq(users.subscriptionStatus, "payment_pending"),
+        eq(users.stripeSubscriptionId, subscriptionId),
+      ),
+      isNull(users.stripeSubscriptionId),
+    ),
+  )!;
+
+const refProvisionFromCompleted = (userId: string, subscriptionId: string) =>
+  and(
+    eq(users.id, userId),
+    or(
+      isNull(users.stripeSubscriptionId),
+      and(
+        ne(users.stripeSubscriptionId, subscriptionId),
+        or(isNull(users.subscriptionStatus), ne(users.subscriptionStatus, "active")),
+      ),
+    ),
+  )!;
+
+const asyncEvent = (
+  type: string,
+  overrides: Record<string, unknown> = {},
+) => ({
+  type,
+  data: {
+    object: {
+      id: "cs_test_1",
+      subscription: "sub_123",
+      metadata: { userId: "user-1", tier: "pro" },
+      ...overrides,
+    },
+  },
+});
+
+describe("webhook wiring: async payment events", () => {
+  it("success with a valid tier uses the canActivateFromAsyncSuccess WHERE twin", async () => {
+    await runLifecycle(asyncEvent("checkout.session.async_payment_succeeded"));
+
+    expect(capturedUpdates).toHaveLength(1);
+    const upd = capturedUpdates[0];
+    expect(upd.values).toMatchObject({
+      tier: "pro",
+      subscriptionStatus: "active",
+      stripeSubscriptionId: "sub_123",
+    });
+    expect(render(upd.where)).toEqual(
+      render(refActivateFromAsyncSuccess("user-1", "sub_123")),
+    );
+    expect(auditEvents.map((e) => e.action)).toContain("billing.ach_payment_succeeded");
+  });
+
+  it("success WITHOUT a trustworthy tier falls back to the canApplyAsyncPaymentToUser WHERE twin (pending-match only)", async () => {
+    await runLifecycle(
+      asyncEvent("checkout.session.async_payment_succeeded", {
+        metadata: { userId: "user-1", tier: "enterprise-typo" },
+      }),
+    );
+
+    expect(capturedUpdates).toHaveLength(1);
+    const upd = capturedUpdates[0];
+    expect(upd.values).toMatchObject({ subscriptionStatus: "active" });
+    expect(upd.values).not.toHaveProperty("tier");
+    expect(render(upd.where)).toEqual(render(refPendingMatch("user-1", "sub_123")));
+  });
+
+  it("failure reverts to free using the canApplyAsyncPaymentToUser WHERE twin", async () => {
+    await runLifecycle(asyncEvent("checkout.session.async_payment_failed"));
+
+    expect(capturedUpdates).toHaveLength(1);
+    const upd = capturedUpdates[0];
+    expect(upd.values).toMatchObject({
+      tier: "free",
+      subscriptionStatus: null,
+      stripeSubscriptionId: null,
+    });
+    expect(render(upd.where)).toEqual(render(refPendingMatch("user-1", "sub_123")));
+    expect(auditEvents.map((e) => e.action)).toContain("billing.ach_payment_failed");
+  });
+
+  it("irrelevant events and uncorrelatable events touch nothing", async () => {
+    await runLifecycle({ type: "invoice.paid", data: { object: {} } });
+    await runLifecycle(
+      asyncEvent("checkout.session.async_payment_succeeded", { metadata: {} }),
+    );
+    await runLifecycle(
+      asyncEvent("checkout.session.async_payment_succeeded", { subscription: null }),
+    );
+
+    expect(capturedUpdates).toHaveLength(0);
+    expect(auditEvents).toHaveLength(0);
+  });
+});
+
+describe("webhook wiring: checkout.session.completed provisioning", () => {
+  const completedEvent = (overrides: Record<string, unknown> = {}) => ({
+    type: "checkout.session.completed",
+    data: {
+      object: {
+        id: "cs_test_2",
+        subscription: { id: "sub_456" },
+        status: "complete",
+        payment_status: "paid",
+        metadata: { userId: "user-2", tier: "campus" },
+        ...overrides,
+      },
+    },
+  });
+
+  it("paid card checkout provisions ACTIVE using the canProvisionFromCompletedCheckout WHERE twin", async () => {
+    await runLifecycle(completedEvent());
+
+    expect(capturedUpdates).toHaveLength(1);
+    const upd = capturedUpdates[0];
+    expect(upd.values).toMatchObject({
+      tier: "campus",
+      subscriptionStatus: "active",
+      stripeSubscriptionId: "sub_456",
+    });
+    expect(render(upd.where)).toEqual(
+      render(refProvisionFromCompleted("user-2", "sub_456")),
+    );
+    expect(auditEvents.map((e) => e.action)).toContain(
+      "billing.checkout_completed_provisioned",
+    );
+  });
+
+  it("complete-but-unpaid (ACH clearing) provisions PAYMENT_PENDING with the same WHERE twin", async () => {
+    await runLifecycle(completedEvent({ payment_status: "unpaid" }));
+
+    expect(capturedUpdates).toHaveLength(1);
+    const upd = capturedUpdates[0];
+    expect(upd.values).toMatchObject({
+      tier: "campus",
+      subscriptionStatus: "payment_pending",
+      stripeSubscriptionId: "sub_456",
+    });
+    expect(render(upd.where)).toEqual(
+      render(refProvisionFromCompleted("user-2", "sub_456")),
+    );
+  });
+
+  it("not-completed or invalid-tier completed events touch nothing", async () => {
+    await runLifecycle(
+      completedEvent({ status: "open", payment_status: "unpaid" }),
+    );
+    await runLifecycle(
+      completedEvent({ metadata: { userId: "user-2", tier: "bogus" } }),
+    );
+
+    expect(capturedUpdates).toHaveLength(0);
+    expect(auditEvents).toHaveLength(0);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// verify-checkout handler-level mapping (real handler, injected fakes)
+// ---------------------------------------------------------------------------
+
+type FakeRes = {
+  statusCode: number;
+  body: any;
+  status: (code: number) => FakeRes;
+  json: (body: any) => FakeRes;
+};
+
+const makeRes = (): FakeRes => {
+  const res: FakeRes = {
+    statusCode: 200,
+    body: undefined,
+    status(code: number) {
+      res.statusCode = code;
+      return res;
+    },
+    json(body: any) {
+      res.body = body;
+      return res;
+    },
+  };
+  return res;
+};
+
+const makeHandlerHarness = (session: any) => {
+  const updates: CapturedUpdate[] = [];
+  const audits: Array<Record<string, unknown>> = [];
+  const handler = createVerifyCheckoutHandler({
+    getStripeClient: async () =>
+      ({
+        checkout: { sessions: { retrieve: async () => session } },
+      }) as any,
+    db: {
+      update: (_table: typeof users) => ({
+        set: (values: Record<string, unknown>) => ({
+          where: (condition: unknown) => {
+            updates.push({ values, where: condition as SQL });
+            return Promise.resolve();
+          },
+        }),
+      }),
+    },
+    logAuditEvent: async (entry) => {
+      audits.push(entry);
+    },
+  });
+  const req = {
+    user: { claims: { sub: "user-9" } },
+    body: { sessionId: "cs_verify_1" },
+  };
+  return { handler, req, updates, audits };
+};
+
+describe("verify-checkout handler wiring", () => {
+  it("owner_mismatch maps to 403 with the ownership message, audits the denial, and writes nothing", async () => {
+    const { handler, req, updates, audits } = makeHandlerHarness({
+      metadata: { userId: "someone-else", tier: "pro" },
+      payment_status: "paid",
+      status: "complete",
+    });
+    const res = makeRes();
+    await handler(req, res);
+
+    expect(res.statusCode).toBe(403);
+    expect(res.body).toEqual({
+      error: "This checkout session does not belong to your account",
+    });
+    expect(updates).toHaveLength(0);
+    expect(audits.map((a) => a.action)).toContain("billing.verify_checkout_denied");
+  });
+
+  it("not_completed maps to 400 with 'Payment not completed'", async () => {
+    const { handler, req, updates } = makeHandlerHarness({
+      metadata: { userId: "user-9", tier: "pro" },
+      payment_status: "unpaid",
+      status: "open",
+    });
+    const res = makeRes();
+    await handler(req, res);
+
+    expect(res.statusCode).toBe(400);
+    expect(res.body).toEqual({ error: "Payment not completed" });
+    expect(updates).toHaveLength(0);
+  });
+
+  it("invalid_tier maps to 400 with 'Invalid checkout session tier'", async () => {
+    const { handler, req, updates } = makeHandlerHarness({
+      metadata: { userId: "user-9", tier: "not-a-tier" },
+      payment_status: "paid",
+      status: "complete",
+    });
+    const res = makeRes();
+    await handler(req, res);
+
+    expect(res.statusCode).toBe(400);
+    expect(res.body).toEqual({ error: "Invalid checkout session tier" });
+    expect(updates).toHaveLength(0);
+  });
+
+  it("missing sessionId maps to 400 before calling Stripe", async () => {
+    const { handler, updates } = makeHandlerHarness({});
+    const res = makeRes();
+    await handler({ user: { claims: { sub: "user-9" } }, body: {} }, res);
+
+    expect(res.statusCode).toBe(400);
+    expect(res.body).toEqual({ error: "Missing sessionId" });
+    expect(updates).toHaveLength(0);
+  });
+
+  it("paid card checkout provisions ACTIVE for the requesting user only", async () => {
+    const { handler, req, updates } = makeHandlerHarness({
+      metadata: { userId: "user-9", tier: "pro" },
+      payment_status: "paid",
+      status: "complete",
+      subscription: { id: "sub_789" },
+    });
+    const res = makeRes();
+    await handler(req, res);
+
+    expect(res.statusCode).toBe(200);
+    expect(res.body).toMatchObject({ success: true, tier: "pro" });
+    expect(res.body.pending).toBeUndefined();
+    expect(updates).toHaveLength(1);
+    expect(updates[0].values).toMatchObject({
+      tier: "pro",
+      subscriptionStatus: "active",
+      stripeSubscriptionId: "sub_789",
+    });
+    expect(render(updates[0].where)).toEqual(render(eq(users.id, "user-9")));
+  });
+
+  it("complete-but-unpaid ACH checkout provisions PAYMENT_PENDING and reports pending", async () => {
+    const { handler, req, updates } = makeHandlerHarness({
+      metadata: { userId: "user-9", tier: "campus" },
+      payment_status: "unpaid",
+      status: "complete",
+      subscription: { id: "sub_ach_1" },
+    });
+    const res = makeRes();
+    await handler(req, res);
+
+    expect(res.statusCode).toBe(200);
+    expect(res.body).toMatchObject({ success: true, pending: true, tier: "campus" });
+    expect(updates).toHaveLength(1);
+    expect(updates[0].values).toMatchObject({
+      tier: "campus",
+      subscriptionStatus: "payment_pending",
+      stripeSubscriptionId: "sub_ach_1",
+    });
+    expect(render(updates[0].where)).toEqual(render(eq(users.id, "user-9")));
+  });
+});
