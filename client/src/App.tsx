@@ -11,6 +11,7 @@ import { Footer } from "@/components/Footer";
 import { NeedsAnalyzerModal } from "@/components/NeedsAnalyzerModal";
 import { OnboardingReminderBanner } from "@/components/OnboardingReminderBanner";
 import { TrialBanner } from "@/components/TrialBanner";
+import { PaymentPendingBanner } from "@/components/PaymentPendingBanner";
 import { ImpersonationBanner } from "@/components/ImpersonationBanner";
 import { OnboardingTour } from "@/components/OnboardingTour";
 import { CommandPalette } from "@/components/CommandPalette";
@@ -541,6 +542,7 @@ function AppShell() {
         <SidebarInset className="flex flex-col flex-1">
           <ImpersonationBanner />
           <ViewAsStudentBanner />
+          <PaymentPendingBanner />
           <TrialBanner />
           <OnboardingReminderBanner />
           <Header />

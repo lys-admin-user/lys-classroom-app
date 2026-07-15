@@ -25,6 +25,13 @@ and where to look to undo it.
 
 ---
 
+## [2026-07-15 19:55] — "Bank payment processing" banner while ACH payment clears
+- **Requested by:** confirmed they are the developer (via the guardrail pause prompt)
+- **Protected area(s):** payments/billing (subscription-status display; client-only visual work)
+- **Request (their words):** Task: "Show customers a clear 'bank payment processing' banner until their payment clears"
+- **What was changed:** Added `client/src/components/PaymentPendingBanner.tsx` and wired it into the app shell (`client/src/App.tsx`, above the trial banner). Signed-in users whose subscription status is `payment_pending` (bank/ACH payment still clearing) now see a persistent banner explaining the payment usually takes about 4 business days and their plan unlocks automatically. It can be dismissed for the current browser session but returns on the next visit while still pending, and it checks the account status every minute so it disappears on its own once the Stripe webhook flips the status to active. Client-only visual work — no server, payment-rule, or schema changes. Typecheck clean, independent review passed.
+- **Rollback:** the checkpoint created right after this change (look for the payment-pending banner entry in the checkpoint list).
+
 ## [2026-07-14 18:25] — Accurate payment audit records (skip-aware webhook auditing)
 - **Requested by:** confirmed they are the developer (via the guardrail pause prompt)
 - **Protected area(s):** payments · server code (Stripe webhook auditing)
