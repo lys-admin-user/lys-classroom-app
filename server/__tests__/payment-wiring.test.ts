@@ -44,6 +44,16 @@ vi.mock("../services/auditLog", () => ({
   }),
 }));
 
+// Outcome emails (Task: notify customers when an ACH payment clears/fails).
+// Mocked so the wiring tests stay hermetic; assertions below pin down that a
+// notice is sent exactly when the DB row actually changed.
+const emailNotices: Array<{ userId: string; outcome: string; tier: string | null }> = [];
+vi.mock("../services/achPaymentEmails", () => ({
+  notifyAchPaymentOutcome: vi.fn(async (userId: string, outcome: string, tier: string | null) => {
+    emailNotices.push({ userId, outcome, tier });
+  }),
+}));
+
 vi.mock("../stripeClient", () => ({
   getStripeSync: vi.fn(),
   getUncachableStripeClient: vi.fn(),
@@ -64,6 +74,7 @@ const runLifecycle = (event: unknown) =>
 beforeEach(() => {
   capturedUpdates.length = 0;
   auditEvents.length = 0;
+  emailNotices.length = 0;
   nextRowCount = 1;
 });
 
@@ -131,6 +142,7 @@ describe("webhook wiring: async payment events", () => {
       render(refActivateFromAsyncSuccess("user-1", "sub_123")),
     );
     expect(auditEvents.map((e) => e.action)).toContain("billing.ach_payment_succeeded");
+    expect(emailNotices).toEqual([{ userId: "user-1", outcome: "succeeded", tier: "pro" }]);
   });
 
   it("success WITHOUT a trustworthy tier falls back to the canApplyAsyncPaymentToUser WHERE twin (pending-match only)", async () => {
@@ -159,6 +171,7 @@ describe("webhook wiring: async payment events", () => {
     });
     expect(render(upd.where)).toEqual(render(refPendingMatch("user-1", "sub_123")));
     expect(auditEvents.map((e) => e.action)).toContain("billing.ach_payment_failed");
+    expect(emailNotices).toEqual([{ userId: "user-1", outcome: "failed", tier: "pro" }]);
   });
 
   it("success matching ZERO rows logs a skip, not a state change", async () => {
@@ -170,6 +183,7 @@ describe("webhook wiring: async payment events", () => {
     expect(actions).not.toContain("billing.ach_payment_succeeded");
     const skip = auditEvents.find((e) => e.action === "billing.webhook_skipped_idempotent")!;
     expect(skip.details).toMatchObject({ intendedAction: "ach_payment_succeeded" });
+    expect(emailNotices).toHaveLength(0);
   });
 
   it("failure matching ZERO rows logs a skip, not a state change", async () => {
@@ -181,6 +195,7 @@ describe("webhook wiring: async payment events", () => {
     expect(actions).not.toContain("billing.ach_payment_failed");
     const skip = auditEvents.find((e) => e.action === "billing.webhook_skipped_idempotent")!;
     expect(skip.details).toMatchObject({ intendedAction: "ach_payment_failed" });
+    expect(emailNotices).toHaveLength(0);
   });
 
   it("irrelevant events and uncorrelatable events touch nothing", async () => {
@@ -194,6 +209,7 @@ describe("webhook wiring: async payment events", () => {
 
     expect(capturedUpdates).toHaveLength(0);
     expect(auditEvents).toHaveLength(0);
+    expect(emailNotices).toHaveLength(0);
   });
 });
 

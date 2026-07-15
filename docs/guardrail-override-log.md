@@ -25,6 +25,13 @@ and where to look to undo it.
 
 ---
 
+## [2026-07-15 20:55] — Emails when a bank (ACH) payment clears or fails
+- **Requested by:** confirmed they are the developer (via the guardrail pause prompt)
+- **Protected area(s):** payments · server code (Stripe webhook + outbound email)
+- **Request (their words):** Task: "Tell customers by email when their bank payment clears or fails"
+- **What was changed:** New `server/services/achPaymentEmails.ts` builds and sends plain-language outcome emails through the existing email transport (Resend key first): a "your bank payment cleared — your plan is now active" notice on success, and a "your bank payment didn't go through — your plan was reverted to free" notice on failure with a link to /pricing to retry or pay by card. Wired into the Stripe webhook (`server/webhookHandlers.ts`) so an email goes out only when the account state actually changed — skipped replays/duplicates send nothing — and email problems can never break payment processing. Unknown plan names from Stripe metadata are never echoed into customer copy. Covered by 9 new/updated tests; full suite 240/240 pass, typecheck clean, independent review passed.
+- **Rollback:** the checkpoint created right after this change (look for the ACH outcome-email entry in the checkpoint list).
+
 ## [2026-07-15 20:30] — Automated tests for the "bank payment processing" banner
 - **Requested by:** confirmed they are the developer (via the guardrail pause prompt)
 - **Protected area(s):** packages/dependencies (test-only libraries) · config file (`vitest.config.ts`)

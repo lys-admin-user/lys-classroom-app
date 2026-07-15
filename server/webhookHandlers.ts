@@ -9,6 +9,7 @@ import {
   isCheckoutTier,
   type CheckoutTier,
 } from './services/achPaymentPolicy';
+import { notifyAchPaymentOutcome } from './services/achPaymentEmails';
 
 // node-postgres reports how many rows an UPDATE actually matched via rowCount.
 // A guarded webhook UPDATE that matches zero rows means the event was a
@@ -153,6 +154,9 @@ export class WebhookHandlers {
         details: { tier: tier ?? null, checkoutSessionId },
       }).catch(() => {});
       console.log(`[stripe-webhook] ACH payment succeeded — activated ${tier ?? 'plan'} for user ${userId}`);
+      // Tell the customer their bank payment cleared. Best-effort — never
+      // fail the webhook over email delivery.
+      await notifyAchPaymentOutcome(userId, 'succeeded', tier ?? null).catch(() => {});
       return;
     }
 
@@ -185,6 +189,8 @@ export class WebhookHandlers {
       details: { tier: tier ?? null, checkoutSessionId },
     }).catch(() => {});
     console.warn(`[stripe-webhook] ACH payment FAILED — reverted user ${userId} to free tier`);
+    // Tell the customer their bank payment failed and how to retry.
+    await notifyAchPaymentOutcome(userId, 'failed', tier ?? null).catch(() => {});
   }
 
   // Mirrors verify-checkout provisioning, driven by the webhook instead of the

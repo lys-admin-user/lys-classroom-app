@@ -55,7 +55,7 @@ describe("PaymentPendingBanner", () => {
     const { queryClient } = renderBanner(makeUser());
     await waitForSettled(queryClient);
 
-    expect(screen.getByTestId("banner-payment-pending")).toBeTruthy();
+    expect(await screen.findByTestId("banner-payment-pending")).toBeTruthy();
     expect(screen.getByTestId("text-payment-pending-title").textContent).toContain(
       "bank payment is processing",
     );
