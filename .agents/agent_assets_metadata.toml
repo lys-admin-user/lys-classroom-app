@@ -48,3 +48,9 @@ id = "hiGIeTZJ193M58Tb9rBxU"
 uri = "file://docs/workflow-knowledge-base.pdf"
 type = "pdf"
 title = "LYS Workflow Knowledge Base (Billing)"
+
+[[outputs]]
+id = "XHiYzbQx2oqu9xLDPDFJL"
+uri = "file://docs/app-feature-audit.md"
+type = "text"
+title = "LYS Feature Audit — Full Inventory + Prioritized Gaps"

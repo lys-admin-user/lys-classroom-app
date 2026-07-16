@@ -102,7 +102,9 @@ describe("PaymentPendingBanner", () => {
     const { queryClient } = renderBanner(makeUser());
     await waitForSettled(queryClient);
 
-    await userEvent.click(screen.getByTestId("button-dismiss-payment-pending"));
+    // findByTestId retries until the banner renders — the settle helper alone
+    // is not always enough under jsdom timing.
+    await userEvent.click(await screen.findByTestId("button-dismiss-payment-pending"));
 
     expect(screen.queryByTestId("banner-payment-pending")).toBeNull();
     expect(sessionStorage.getItem(DISMISS_KEY)).toBe("1");
