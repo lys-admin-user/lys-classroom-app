@@ -94,6 +94,8 @@ const AiPolicy = lazy(() => import("@/pages/AiPolicy"));
 const EmbedRouter = lazy(() => import("@/pages/EmbedRouter").then(m => ({ default: m.EmbedRouter })));
 const SignInPage = lazy(() => import("@/pages/SignIn"));
 const SignUpPage = lazy(() => import("@/pages/SignUp"));
+const TeacherSignupQuiz = lazy(() => import("@/pages/TeacherSignupQuiz"));
+const SignupInsights = lazy(() => import("@/pages/SignupInsights"));
 
 const EXEMPT_PATHS = ["/onboarding", "/pricing", "/shared", "/p/", "/embed/", "/terms", "/privacy", "/ai-policy"];
 const MAX_ONBOARDING_SKIPS = 3;
@@ -307,6 +309,7 @@ const AuthDistrictAdmin = withAuth(DistrictAdmin);
 const AuthStandardsAdmin = withAuth(StandardsAdmin);
 const AuthOnboarding = withAuth(Onboarding);
 const AuthDevDocs = withAuth(DevDocs);
+const AuthSignupInsights = withAuth(SignupInsights);
 const AuthTeamHub = withAuth(TeamHub);
 
 function RedirectTo({ to }: { to: string }) {
@@ -326,6 +329,7 @@ function Router() {
         {/* Public exploration pages — no sign-in required */}
         <Route path="/" component={Dashboard} />
         <Route path="/start" component={NeedsAnalyzerPage} />
+        <Route path="/teacher-signup" component={TeacherSignupQuiz} />
         <Route path="/lesson-generator" component={LessonGenerator} />
         <Route path="/practice" component={PracticeGenerator} />
         <Route path="/for-schools" component={ForSchools} />
@@ -373,6 +377,7 @@ function Router() {
         <Route path="/collaboration/:id" component={AuthCollaboration} />
         <Route path="/resource-library" component={AuthResourceLibrary} />
         <Route path="/admin" component={AuthSiteAdmin} />
+        <Route path="/admin/signup-insights" component={AuthSignupInsights} />
         <Route path="/system-admin/:tab" component={AuthSystemAdmin} />
         <Route path="/system-admin" component={AuthSystemAdmin} />
         <Route path="/parent-portal" component={AuthParentPortal} />

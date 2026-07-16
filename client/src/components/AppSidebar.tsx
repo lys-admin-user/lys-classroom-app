@@ -218,6 +218,7 @@ export const navigationGroups: NavGroup[] = [
       { title: "Manage Users", url: "/system-admin/users", icon: Users, requiresAuth: true },
       { title: "Standards Ingestion", url: "/admin/standards-ingestion", icon: BookOpen, requiresAuth: true },
       { title: "Standards Catalog", url: "/admin/standards", icon: Library, requiresAuth: true },
+      { title: "Signup Insights", url: "/admin/signup-insights", icon: BarChart3, requiresAuth: true },
       { title: "Dev Docs", url: "/dev-docs", icon: FileText, requiresAuth: true, minRole: "site_admin" },
     ],
   },

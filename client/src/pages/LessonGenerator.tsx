@@ -25,6 +25,7 @@ import { PLAN_PRICES } from "@/lib/pricing";
 import { resolveCountryName } from "@/lib/countries";
 import { isAfricanCountry, getAfricanProfile, isWAECCountry } from "@shared/africaContext";
 import { US_GRADE_OPTIONS, US_GRADE_VALUES, type GradeOption } from "@shared/gradeLevels";
+import { loadTeacherSignupAnswers, FRUSTRATION_CALLOUTS } from "@/lib/teacherSignup";
 import { AdBanner } from "@/components/AdBanner";
 import type { LessonPlan, EducatorProfile, Lesson } from "@shared/schema";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
@@ -306,6 +307,27 @@ export default function LessonGenerator() {
       setProfileApplied(true);
     }
   }, [educatorProfile, profileApplied, hasUrlStandardsParams, shouldRestoreGuestState]);
+
+  // Teacher pre-signup quiz answers — lowest-precedence prefill (URL params >
+  // guest restore > educator profile > quiz) plus the personalized pain-point
+  // callout shown during generation and in the finished lesson.
+  const teacherSignupAnswers = useMemo(() => loadTeacherSignupAnswers(), []);
+  const painCallout = teacherSignupAnswers?.frustration
+    ? FRUSTRATION_CALLOUTS[teacherSignupAnswers.frustration]
+    : null;
+
+  useEffect(() => {
+    if (!teacherSignupAnswers) return;
+    if (shouldRestoreGuestState || hasUrlStandardsParams) return;
+    // Educator profile wins — wait until it has settled (unauth users have none).
+    if (isAuthenticated && !profileData) return;
+    if (profileData?.profile?.country && profileData.profile.state) return;
+    if (teacherSignupAnswers.country) setSelectedCountry((prev) => prev || teacherSignupAnswers.country!);
+    if (teacherSignupAnswers.state) setSelectedState((prev) => prev || teacherSignupAnswers.state!);
+    if (teacherSignupAnswers.subject) setSelectedSubject((prev) => prev || teacherSignupAnswers.subject!);
+    if (teacherSignupAnswers.gradeLevel) setGradeLevel((prev) => prev || teacherSignupAnswers.gradeLevel!);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [teacherSignupAnswers, shouldRestoreGuestState, hasUrlStandardsParams, isAuthenticated, profileData]);
 
   // Fetch standards from API instead of hardcoded data
   const { data: countriesData } = useQuery<string[]>({
@@ -1413,6 +1435,7 @@ ${addedResources.length > 0 ? addedResources.map(r => `- ${r.title}: ${r.url}`).
                       deltaTail={lessonStreamDeltaTail}
                       fallbackSource={lessonStreamFallbackSource}
                       fallbackWarning={lessonStreamFallbackWarning}
+                      personalNote={painCallout?.waiting}
                     />
                   </div>
                 ) : generatedLesson ? (
@@ -1427,6 +1450,15 @@ ${addedResources.length > 0 ? addedResources.map(r => `- ${r.title}: ${r.url}`).
                       </div>
                     )}
                     <div className="p-6 space-y-6">
+                      {painCallout && (
+                        <div
+                          data-testid="text-pain-highlight"
+                          className="flex items-start gap-2 rounded-lg border border-lys-teal/30 bg-lys-teal/5 p-3 text-sm font-roboto print:hidden"
+                        >
+                          <Sparkles className="mt-0.5 h-4 w-4 shrink-0 text-lys-teal" />
+                          <div className="text-foreground">{painCallout.result}</div>
+                        </div>
+                      )}
                       <div className="border-b pb-4">
                         {isEditingLesson ? (
                           <div className="space-y-1 mb-3">

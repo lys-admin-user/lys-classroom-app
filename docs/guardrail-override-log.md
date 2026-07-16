@@ -25,6 +25,13 @@ and where to look to undo it.
 
 ---
 
+## [2026-07-16 05:15] — Teacher pre-signup needs flow + Signup Insights admin page
+- **Requested by:** chose to proceed after a risk rundown (via the guardrail pause prompt)
+- **Request (their words):** "Between the public landing page and the signup process, each user type needs to see the functions or features that are most valuable to them... look at ways to better blend the needs analyzer with the sign up process to reduce redundancy and improve the process." (starting with teachers/educators per their choice)
+- **Protected area(s):** server code (new routes/storage) · database schema (one new table for pre-signup answers) · admin pages (new read-only Signup Insights page)
+- **What was changed:** New anonymous teacher pre-signup quiz at `/teacher-signup` (3 optional questions + optional email, fully skippable) shown when a visitor picks "Teacher" on the landing page or the needs analyzer; answers prefill onboarding and the lesson generator and drive a personalized pain-point callout during/after lesson generation. Database: one new table `teacher_signup_responses` (schema pushed). Server: `server/routes/teacherSignup.ts` — anonymous submit (rate-limited 20/hr per IP, session-keyed upsert), authed bind-on-signup (first-writer-wins so conversions can't be re-attributed), and a site_admin-only `/api/admin/signup-insights` aggregate endpoint. Client: `TeacherSignupQuiz.tsx`, `client/src/lib/teacherSignup.ts`, prefill hooks in `Onboarding.tsx` + `LessonGenerator.tsx`, `personalNote` prop on `GenerationCountdown`, admin `SignupInsights.tsx` page + sidebar entry. No existing payments/auth/roles behavior changed. Typecheck clean, 244/244 tests pass, endpoints smoke-tested, independent review passed (its two hardening suggestions — rate limit + bind ownership guard — were applied).
+- **Rollback:** the checkpoint created right after this change (look for the teacher pre-signup quiz entry in the checkpoint list).
+
 ## [2026-07-15 21:30] — Remove expired "offer ends June 30, 2026" promo text on pricing page
 - **Requested by:** confirmed they are the developer (via the guardrail pause prompt)
 - **Request (their words):** Task: "Remove the expired 'offer ends June 30, 2026' promo text on the pricing page"

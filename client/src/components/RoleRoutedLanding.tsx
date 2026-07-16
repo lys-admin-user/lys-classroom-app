@@ -44,7 +44,7 @@ const ROLES: LandingRole[] = [
       "TEKS & Common Core aligned",
       "Export to PDF / Word in one click",
     ],
-    route: "/lesson-generator",
+    route: "/teacher-signup",
   },
   {
     id: "student",

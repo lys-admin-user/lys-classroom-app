@@ -3873,6 +3873,45 @@ export const insertNeedsAnalyzerResponseSchema = createInsertSchema(needsAnalyze
 export type InsertNeedsAnalyzerResponse = z.infer<typeof insertNeedsAnalyzerResponseSchema>;
 export type NeedsAnalyzerResponse = typeof needsAnalyzerResponses.$inferSelect;
 
+// ----- Teacher pre-signup quiz -------------------------------------------------
+// Three optional pain/gain questions shown to teachers between "Sign up" intent
+// and account creation (plus an email capture so we can follow up with
+// non-converters). Keyed by a localStorage sessionId like the needs analyzer;
+// after signup the onboarding flow binds userId + convertedAt so the admin
+// Signup Insights page can report conversion by answer.
+export const teacherSignupResponses = pgTable(
+  "teacher_signup_responses",
+  {
+    id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+    sessionId: varchar("session_id").notNull(),
+    userId: varchar("user_id"),
+    email: varchar("email"),
+    frustration: varchar("frustration"),
+    planningStyle: varchar("planning_style"),
+    country: varchar("country"),
+    state: varchar("state"),
+    subject: varchar("subject"),
+    gradeLevel: varchar("grade_level"),
+    skipped: boolean("skipped").notNull().default(false),
+    convertedAt: timestamp("converted_at"),
+    ipAddress: varchar("ip_address"),
+    createdAt: timestamp("created_at").defaultNow(),
+  },
+  (t) => ({
+    sessionIdx: index("teacher_signup_session_id_idx").on(t.sessionId),
+    frustrationIdx: index("teacher_signup_frustration_idx").on(t.frustration),
+  }),
+);
+export const insertTeacherSignupResponseSchema = createInsertSchema(teacherSignupResponses).omit({
+  id: true,
+  userId: true,
+  convertedAt: true,
+  ipAddress: true,
+  createdAt: true,
+});
+export type InsertTeacherSignupResponse = z.infer<typeof insertTeacherSignupResponseSchema>;
+export type TeacherSignupResponse = typeof teacherSignupResponses.$inferSelect;
+
 // RSS Feeds (System-level content ingestion)
 export type RssFeedType = "podcast" | "blog";
 export type RssContentStatus = "pending" | "approved" | "rejected" | "archived";

@@ -241,6 +241,14 @@ const demoRequestLimiter = rateLimit({
 });
 app.use("/api/demo-requests", demoRequestLimiter);
 
+// Anonymous teacher pre-signup quiz — throttle to deter bot spam polluting lead analytics.
+const teacherSignupLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000,
+  max: 20,
+  message: { error: "Too many submissions. Please try again later." },
+});
+app.use("/api/teacher-signup/submit", teacherSignupLimiter);
+
 // Bulk data exports (e.g. gradebook CSV) — throttle to deter scraping/exfiltration.
 const exportLimiter = rateLimit({
   windowMs: 60 * 60 * 1000,

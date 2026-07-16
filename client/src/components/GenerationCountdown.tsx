@@ -24,10 +24,11 @@ interface Props {
   deltaTail: string;
   fallbackSource?: FallbackSource;
   fallbackWarning?: string | null;
+  personalNote?: string | null;
   className?: string;
 }
 
-export function GenerationCountdown({ phase, deltaTail, fallbackSource, fallbackWarning, className }: Props) {
+export function GenerationCountdown({ phase, deltaTail, fallbackSource, fallbackWarning, personalNote, className }: Props) {
   const phaseIndex = Math.max(0, PHASES.findIndex((p) => p.key === phase));
   const totalEta = PHASES.reduce((s, p) => s + p.etaSeconds, 0);
   const elapsedEta = PHASES.slice(0, phaseIndex).reduce((s, p) => s + p.etaSeconds, 0);
@@ -61,6 +62,16 @@ export function GenerationCountdown({ phase, deltaTail, fallbackSource, fallback
           <div className="text-amber-900 dark:text-amber-100">
             <strong>Heads up:</strong> {fallbackWarning ?? "Live AI was unavailable — showing the closest match we have on file."}
           </div>
+        </div>
+      )}
+
+      {personalNote && (
+        <div
+          data-testid="text-personal-note"
+          className="mb-4 flex items-start gap-2 rounded-lg border border-primary/25 bg-primary/5 p-3 text-sm"
+        >
+          <Sparkles className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
+          <div className="text-foreground">{personalNote}</div>
         </div>
       )}
 

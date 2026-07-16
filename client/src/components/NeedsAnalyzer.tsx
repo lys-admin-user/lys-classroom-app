@@ -162,6 +162,12 @@ export function NeedsAnalyzer({ onComplete, className }: NeedsAnalyzerProps) {
                   variant="outline"
                   className="h-auto justify-start py-4 px-4 text-left hover-elevate active-elevate-2"
                   onClick={() => {
+                    if (id === "educator") {
+                      // Teachers get the dedicated pre-signup quiz instead of
+                      // the generic funnel — answers prefill their free lesson.
+                      window.location.href = "/teacher-signup";
+                      return;
+                    }
                     setIdentity(id);
                     setStep(2);
                   }}

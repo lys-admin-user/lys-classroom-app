@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { useLocation } from "wouter";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from "@/components/ui/card";
@@ -15,6 +15,16 @@ import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { COUNTRIES, codeToCountryName } from "@/lib/countries";
 import { TurnstileWidget, isCaptchaEnabled } from "@/components/TurnstileWidget";
+import { loadTeacherSignupAnswers, getTeacherSignupSessionId } from "@/lib/teacherSignup";
+
+// Map teacher-signup quiz grade values ("Grade 5", "Kindergarten", "Pre-K")
+// onto onboarding grade ids ("5", "K", "pre_k").
+function quizGradeToOnboardingId(grade: string): string | null {
+  if (grade === "Pre-K") return "pre_k";
+  if (grade === "Kindergarten") return "K";
+  const m = grade.match(/^Grade (\d{1,2})$/);
+  return m ? m[1] : null;
+}
 
 const LANGUAGES = [
   // Top 25 most spoken languages in the world
@@ -138,6 +148,23 @@ export default function Onboarding() {
   const [stateValue, setStateValue] = useState("");
   const [captchaToken, setCaptchaToken] = useState("");
 
+  // Prefill from the teacher pre-signup quiz (if taken) so teachers never
+  // answer the same question twice. Runs once on mount; only fills blanks.
+  useEffect(() => {
+    const answers = loadTeacherSignupAnswers();
+    if (!answers) return;
+    setRole((prev) => prev || "educator");
+    if (answers.gradeLevel) {
+      const id = quizGradeToOnboardingId(answers.gradeLevel);
+      if (id) setSelectedGradeLevels((prev) => (prev.length > 0 ? prev : [id]));
+    }
+    if (answers.country === "United States") {
+      setCountry((prev) => prev || "US");
+      if (answers.state) setStateValue((prev) => prev || answers.state!);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   const { data: statesData } = useQuery<{ state: string; abbreviation: string; standardsName: string }[]>({
     queryKey: ["/api/standards/states", codeToCountryName(country)],
     enabled: !!country,
@@ -192,6 +219,17 @@ export default function Onboarding() {
           : null;
         if (sessionId) {
           await apiRequest("POST", "/api/needs-analyzer/bind", { sessionId });
+        }
+      } catch {
+        /* non-fatal */
+      }
+
+      // Same best-effort bind for the teacher pre-signup quiz so the admin
+      // Signup Insights page can report conversion per answer.
+      try {
+        const teacherSessionId = getTeacherSignupSessionId();
+        if (teacherSessionId) {
+          await apiRequest("POST", "/api/teacher-signup/bind", { sessionId: teacherSessionId });
         }
       } catch {
         /* non-fatal */
