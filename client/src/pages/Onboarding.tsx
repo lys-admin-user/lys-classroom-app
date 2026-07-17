@@ -16,6 +16,12 @@ import { useToast } from "@/hooks/use-toast";
 import { COUNTRIES, codeToCountryName } from "@/lib/countries";
 import { TurnstileWidget, isCaptchaEnabled } from "@/components/TurnstileWidget";
 import { loadTeacherSignupAnswers, getTeacherSignupSessionId } from "@/lib/teacherSignup";
+import {
+  loadStudentSignupAnswers,
+  getStudentSignupSessionId,
+  FEATURE_SPOTLIGHTS,
+  type StudentRecommendedFeature,
+} from "@/lib/studentSignup";
 
 // Map teacher-signup quiz grade values ("Grade 5", "Kindergarten", "Pre-K")
 // onto onboarding grade ids ("5", "K", "pre_k").
@@ -25,6 +31,23 @@ function quizGradeToOnboardingId(grade: string): string | null {
   const m = grade.match(/^Grade (\d{1,2})$/);
   return m ? m[1] : null;
 }
+
+// Map student-signup quiz grade values ("9th") onto onboarding grade ids
+// ("9"). "College / other" intentionally maps to null — post-secondary is
+// still "coming soon" (disabled) in the onboarding grade list.
+function studentQuizGradeToOnboardingId(grade: string): string | null {
+  const m = grade.match(/^(\d{1,2})th$/);
+  if (m) return m[1];
+  return null;
+}
+
+// Student quiz pain points map onto the two student primary goals.
+const STUDENT_PAIN_TO_GOAL: Record<string, string> = {
+  career_direction: "career",
+  know_strengths: "discover",
+  stay_on_track: "discover",
+  show_work: "discover",
+};
 
 const LANGUAGES = [
   // Top 25 most spoken languages in the world
@@ -148,11 +171,33 @@ export default function Onboarding() {
   const [stateValue, setStateValue] = useState("");
   const [captchaToken, setCaptchaToken] = useState("");
 
+  // Prefill from the student pre-signup quiz (if taken) so students get the
+  // streamlined 2-step path with their answers already filled in.
+  useEffect(() => {
+    const answers = loadStudentSignupAnswers();
+    if (!answers) return;
+    setRole((prev) => prev || "student");
+    if (answers.gradeLevel) {
+      const id = studentQuizGradeToOnboardingId(answers.gradeLevel);
+      if (id) setSelectedGradeLevels((prev) => (prev.length > 0 ? prev : [id]));
+    }
+    if (answers.state) {
+      setCountry((prev) => prev || "US");
+      setStateValue((prev) => prev || answers.state!);
+    }
+    if (answers.painPoint && STUDENT_PAIN_TO_GOAL[answers.painPoint]) {
+      setPrimaryGoal((prev) => prev || STUDENT_PAIN_TO_GOAL[answers.painPoint!]);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   // Prefill from the teacher pre-signup quiz (if taken) so teachers never
   // answer the same question twice. Runs once on mount; only fills blanks.
   useEffect(() => {
     const answers = loadTeacherSignupAnswers();
     if (!answers) return;
+    // The student quiz prefill wins — don't flip a student to educator.
+    if (loadStudentSignupAnswers()) return;
     setRole((prev) => prev || "educator");
     if (answers.gradeLevel) {
       const id = quizGradeToOnboardingId(answers.gradeLevel);
@@ -235,6 +280,16 @@ export default function Onboarding() {
         /* non-fatal */
       }
 
+      // And for the student pre-signup quiz.
+      try {
+        const studentSessionId = getStudentSignupSessionId();
+        if (studentSessionId) {
+          await apiRequest("POST", "/api/student-signup/bind", { sessionId: studentSessionId });
+        }
+      } catch {
+        /* non-fatal */
+      }
+
       const redirectPath = getRecommendedPath();
       setLocation(`${redirectPath}?tour=true&role=${encodeURIComponent(role)}&goal=${encodeURIComponent(primaryGoal)}`);
     },
@@ -288,6 +343,13 @@ export default function Onboarding() {
   };
 
   const getRecommendedPath = () => {
+    // Students who took the pre-signup quiz land directly on their matched
+    // feature (spotlight destination) instead of the generic goal route.
+    if (role === "student") {
+      const quiz = loadStudentSignupAnswers();
+      const feature = quiz?.recommendedFeature as StudentRecommendedFeature | undefined;
+      if (feature && FEATURE_SPOTLIGHTS[feature]) return FEATURE_SPOTLIGHTS[feature].route;
+    }
     if (primaryGoal === "discover") {
       if (role === "educator" || role === "homeschool_parent") return "/professional-development";
       return "/self-discovery";
@@ -350,6 +412,13 @@ export default function Onboarding() {
         { key: "goals", label: "Your Goals" },
         { key: "location", label: "Get Started" },
       ]
+    : role === "student"
+    ? [
+        // Streamlined 2-step student path — goals are folded into the final
+        // step (and usually prefilled from the pre-signup quiz).
+        { key: "role", label: "About You" },
+        { key: "location", label: "Get Started" },
+      ]
     : [
         { key: "role", label: "Your Role" },
         { key: "goals", label: "Your Goals" },
@@ -363,7 +432,13 @@ export default function Onboarding() {
     if (step === "role") return !!role && !!birthdate;
     if (step === "classes") return selectedGradeLevels.length > 0;
     if (step === "goals") return !!primaryGoal;
-    if (step === "location") return !!language && !!country && agreedToTerms;
+    if (step === "location")
+      return (
+        !!language &&
+        !!country &&
+        agreedToTerms &&
+        (role !== "student" || (!!primaryGoal && selectedGradeLevels.length > 0))
+      );
     return true;
   };
 
@@ -588,6 +663,43 @@ export default function Onboarding() {
           {step === "location" && (
             <div className="space-y-6">
               <div className="grid gap-4">
+                {role === "student" && (
+                  <div>
+                    <Label className="font-oswald">Your Grade Level</Label>
+                    <Select
+                      value={selectedGradeLevels[0] ?? ""}
+                      onValueChange={(v) => setSelectedGradeLevels([v])}
+                    >
+                      <SelectTrigger className="mt-2" data-testid="select-student-grade">
+                        <SelectValue placeholder="Select your grade" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {GRADE_LEVELS.filter((g) => !g.disabled).map((g) => (
+                          <SelectItem key={g.id} value={g.id}>{g.label}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                )}
+                {role === "student" && (
+                  <div>
+                    <Label className="font-oswald">What do you want to focus on first?</Label>
+                    <RadioGroup value={primaryGoal} onValueChange={setPrimaryGoal} className="grid gap-2 mt-2">
+                      {PRIMARY_GOALS_STUDENT.map((goal) => (
+                        <div
+                          key={goal.id}
+                          className={`flex items-center gap-3 p-3 rounded-md border cursor-pointer hover-elevate ${primaryGoal === goal.id ? "border-lys-red bg-muted" : ""}`}
+                          onClick={() => setPrimaryGoal(goal.id)}
+                          data-testid={`goal-student-${goal.id}`}
+                        >
+                          <RadioGroupItem value={goal.id} id={`student-${goal.id}`} />
+                          <goal.icon className="h-5 w-5 text-muted-foreground" />
+                          <Label htmlFor={`student-${goal.id}`} className="cursor-pointer">{goal.label}</Label>
+                        </div>
+                      ))}
+                    </RadioGroup>
+                  </div>
+                )}
                 <div>
                   <Label className="font-oswald">Preferred Language</Label>
                   <Select value={language} onValueChange={setLanguage}>

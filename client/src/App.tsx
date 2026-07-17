@@ -37,7 +37,7 @@ import NotFound from "@/pages/not-found";
 
 // Lazy — every other page is fetched on demand
 const LessonGenerator = lazy(() => import("@/pages/LessonGenerator"));
-const PracticeGenerator = lazy(() => import("@/pages/PracticeGenerator"));
+const StudentSignupQuiz = lazy(() => import("@/pages/StudentSignupQuiz"));
 const ForSchools = lazy(() => import("@/pages/ForSchools"));
 const HomeschoolPlanner = lazy(() => import("@/pages/HomeschoolPlanner"));
 const Assessments = lazy(() => import("@/pages/Assessments"));
@@ -331,7 +331,7 @@ function Router() {
         <Route path="/start" component={NeedsAnalyzerPage} />
         <Route path="/teacher-signup" component={TeacherSignupQuiz} />
         <Route path="/lesson-generator" component={LessonGenerator} />
-        <Route path="/practice" component={PracticeGenerator} />
+        <Route path="/student-signup" component={StudentSignupQuiz} />
         <Route path="/for-schools" component={ForSchools} />
         <Route path="/homeschool" component={HomeschoolPlanner} />
         <Route path="/assessments" component={Assessments} />

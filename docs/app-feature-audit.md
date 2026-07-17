@@ -27,7 +27,7 @@ This audit deliberately **excludes** items already sitting in the project task l
 |---|---|---|
 | AI Lesson Generator | Creates full lesson plans from a topic + academic standards, with a live 5-phase progress screen | Working |
 | AI Assignment Generator | Creates quizzes, worksheets, and projects to go with lessons | Working |
-| Student Practice Generator | Students (or guests) generate practice work at `/practice` | Working |
+| Student Pre-Signup Quiz | Public pain-point quiz at `/student-signup` matches students to a spotlight feature (replaced the Practice Generator, which was removed) | Working |
 | Essay Builder | AI-assisted college/personal essay drafting | Working |
 | Homeschool Weekly Planner | Builds a week of homeschool plans at `/homeschool` | Working |
 | Content safety | Student names and personal info are stripped out before anything is sent to the AI; sensitive topics filtered; flagged content goes to a review queue | Working |

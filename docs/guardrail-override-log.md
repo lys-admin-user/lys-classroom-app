@@ -25,6 +25,13 @@ and where to look to undo it.
 
 ---
 
+## [2026-07-17 03:40] — Student signup rework: pre-signup mini-quiz + streamlined wizard + full removal of the Practice feature
+- **Requested by:** confirmed they are the developer (via the guardrail pause prompt)
+- **Request (their words):** "Let's improve the student signup wizard experience" · "I want to get rid of the student practice feature. We should remove it all together. But we need to highlight a feature that students would use to encourage signup" · "Is there a way we can ask 2-3 questions to find out their pain points so that we can integrate the needs analyzer to find out exactly what their need is?" — approved plan: public student pain-point quiz before signup (with lead capture), grade + state collected for students, streamlined 2-step student wizard, complete removal of practice (page, backend, links)
+- **Protected area(s):** server code (new student quiz routes, practice route removal, onboarding changes) · database schema (new student signup responses table)
+- **What was changed:** (1) Practice feature fully removed — `/practice` page, `server/routes/practice.ts`, `server/practiceGenerator.ts`, practice schemas, links, and docs references all deleted. (2) New public student pain-point quiz at `/student-signup` (`client/src/pages/StudentSignupQuiz.tsx`, `client/src/lib/studentSignup.ts`) with email lead capture; new `student_signup_responses` table; routes in `server/routes/studentSignup.ts` (anonymous submit with captcha + 20/hour rate limit, server-side pain-point→feature mapping, authed `/bind` first-writer-wins). (3) Streamlined 2-step student onboarding in `client/src/pages/Onboarding.tsx` (quiz answers prefill grade/state/goal; grade + goal collected inline on the final step; post-onboarding redirect to the matched feature). (4) "Picked for you" spotlight card on the student home (`client/src/pages/StudentDashboard.tsx`, self view only). Verified: typecheck clean, 244/244 tests pass, endpoints smoke-tested, quiz page renders.
+- **Rollback:** the checkpoint created at the end of this change (July 17, 2026)
+
 ## [2026-07-17 03:20] — Turnstile on 3 remaining public forms + full user-role tally in System Admin
 - **Requested by:** confirmed they are the developer (via the guardrail pause prompt)
 - **Request (their words):** "We can do both....what exactly is the Turstile check that exisit and if that exists, why does it need the key" (approving: wiring Turnstile into the teacher quiz, needs analyzer, and trial starter; plus Task: "Full user role tally in System Admin")

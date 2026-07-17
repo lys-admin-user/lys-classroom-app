@@ -518,40 +518,6 @@ export const generateLessonRequestSchema = z.object({
 
 export type GenerateLessonRequest = z.infer<typeof generateLessonRequestSchema>;
 
-// Student Practice Generation — a lightweight, student-facing flow that turns a
-// subject/grade/topic into a set of practice questions with progressive,
-// step-by-step hints (not just the final answer). Open to anonymous visitors via
-// the same guest email-gate + monthly free quota used by lesson generation.
-export const generatePracticeRequestSchema = z.object({
-  subject: z.string().min(1, "Subject is required"),
-  gradeLevel: z.string().min(1, "Grade level is required"),
-  topic: z.string().min(1, "Topic is required"),
-  questionCount: z.coerce.number().int().min(1).max(10).default(5),
-  difficulty: z.enum(["easy", "medium", "hard"]).default("medium"),
-});
-
-export type GeneratePracticeRequest = z.infer<typeof generatePracticeRequestSchema>;
-
-export interface PracticeQuestion {
-  id: string;
-  type: "multiple_choice" | "short_answer";
-  question: string;
-  options?: string[];
-  hints: string[];
-  answer: string;
-  explanation: string;
-}
-
-export interface GeneratedPracticeSet {
-  id: string;
-  title: string;
-  subject: string;
-  topic: string;
-  gradeLevel: string;
-  difficulty: "easy" | "medium" | "hard";
-  questions: PracticeQuestion[];
-}
-
 // School / district "Request a demo" lead capture, submitted from the public
 // "See it for your school" page (`/for-schools`). Doubles as a sales lead list.
 export const demoRequests = pgTable("demo_requests", {
@@ -3911,6 +3877,45 @@ export const insertTeacherSignupResponseSchema = createInsertSchema(teacherSignu
 });
 export type InsertTeacherSignupResponse = z.infer<typeof insertTeacherSignupResponseSchema>;
 export type TeacherSignupResponse = typeof teacherSignupResponses.$inferSelect;
+
+// ----- Student pre-signup quiz -------------------------------------------------
+// Short pain-point quiz shown to students before account creation. Answers map
+// to a recommended feature (career explorer, self-discovery, goals, portfolio)
+// that is spotlighted during signup and on the student's home. Email capture
+// replaces the retired practice-generator guest gate as the student lead
+// channel. Keyed by a localStorage sessionId like the teacher quiz; after
+// signup, onboarding binds userId + convertedAt.
+export const studentSignupResponses = pgTable(
+  "student_signup_responses",
+  {
+    id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+    sessionId: varchar("session_id").notNull(),
+    userId: varchar("user_id"),
+    email: varchar("email"),
+    painPoint: varchar("pain_point"),
+    motivation: varchar("motivation"),
+    gradeLevel: varchar("grade_level"),
+    state: varchar("state"),
+    recommendedFeature: varchar("recommended_feature"),
+    skipped: boolean("skipped").notNull().default(false),
+    convertedAt: timestamp("converted_at"),
+    ipAddress: varchar("ip_address"),
+    createdAt: timestamp("created_at").defaultNow(),
+  },
+  (t) => ({
+    sessionIdx: index("student_signup_session_id_idx").on(t.sessionId),
+    painPointIdx: index("student_signup_pain_point_idx").on(t.painPoint),
+  }),
+);
+export const insertStudentSignupResponseSchema = createInsertSchema(studentSignupResponses).omit({
+  id: true,
+  userId: true,
+  convertedAt: true,
+  ipAddress: true,
+  createdAt: true,
+});
+export type InsertStudentSignupResponse = z.infer<typeof insertStudentSignupResponseSchema>;
+export type StudentSignupResponse = typeof studentSignupResponses.$inferSelect;
 
 // RSS Feeds (System-level content ingestion)
 export type RssFeedType = "podcast" | "blog";

@@ -230,7 +230,6 @@ const aiLimiter = rateLimit({
 });
 app.use("/api/lessons/generate", aiLimiter);
 app.use("/api/assignments/generate", aiLimiter);
-app.use("/api/practice/generate", aiLimiter);
 app.use("/api/homeschool/generate", aiLimiter);
 
 // Public, unauthenticated write endpoint — throttle to deter spam submissions.
@@ -248,6 +247,14 @@ const teacherSignupLimiter = rateLimit({
   message: { error: "Too many submissions. Please try again later." },
 });
 app.use("/api/teacher-signup/submit", teacherSignupLimiter);
+
+// Anonymous student pre-signup quiz — same throttle rationale as the teacher quiz.
+const studentSignupLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000,
+  max: 20,
+  message: { error: "Too many submissions. Please try again later." },
+});
+app.use("/api/student-signup/submit", studentSignupLimiter);
 
 // Bulk data exports (e.g. gradebook CSV) — throttle to deter scraping/exfiltration.
 const exportLimiter = rateLimit({

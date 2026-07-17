@@ -48,6 +48,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/use-auth";
 import { hasRolePrivilege } from "@shared/models/auth";
+import { loadStudentSignupAnswers, FEATURE_SPOTLIGHTS } from "@/lib/studentSignup";
 
 interface JourneyData {
   progress: StudentJourneyProgress;
@@ -364,6 +365,13 @@ export default function StudentDashboard() {
     ? { label: "On track", className: "bg-emerald-100 text-emerald-700" }
     : { label: "Getting started", className: "bg-amber-100 text-amber-800" };
   
+  // Spotlight the feature matched to the student's pre-signup quiz answer
+  // (self view only — educators viewing a student's record never see this).
+  const quizAnswers = loadStudentSignupAnswers();
+  const spotlight = quizAnswers?.recommendedFeature
+    ? FEATURE_SPOTLIGHTS[quizAnswers.recommendedFeature]
+    : null;
+
   const pendingAssignments = assignments.filter(a => a.recipient.status === "assigned" || a.recipient.status === "in_progress");
   const completedAssignments = assignments.filter(a => a.recipient.status === "submitted" || a.recipient.status === "graded");
 
@@ -397,6 +405,23 @@ export default function StudentDashboard() {
             </div>
           )}
         </div>
+
+        {!isEducatorView && !studentId && spotlight && (
+          <Card className="mb-6 border-lys-teal/40 bg-lys-teal/5" data-testid="card-feature-spotlight">
+            <CardContent className="flex flex-col sm:flex-row sm:items-center gap-4 p-5">
+              <div className="flex-1">
+                <p className="text-xs font-medium uppercase tracking-wide text-lys-teal font-roboto mb-1">
+                  Picked for you
+                </p>
+                <h2 className="font-oswald text-lg" data-testid="text-spotlight-title">{spotlight.title}</h2>
+                <p className="text-sm text-muted-foreground font-roboto">{spotlight.description}</p>
+              </div>
+              <Button asChild data-testid="button-spotlight-cta">
+                <Link href={spotlight.route}>{spotlight.cta}</Link>
+              </Button>
+            </CardContent>
+          </Card>
+        )}
 
         <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
           <div className="lg:col-span-1">

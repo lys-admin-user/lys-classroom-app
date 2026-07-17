@@ -54,13 +54,13 @@ const ROLES: LandingRole[] = [
     headline: "Are you ready for success after highschool?",
     description:
       "Stuck figuring out college vs. trades? Need help with scholarships? Get clear, step-by-step resources that meet you where you are — without just handing you the answer.",
-    cta: "Try a practice set",
+    cta: "Find your path",
     benefits: [
-      "Step-by-step hints, not just answers",
-      "Practice that adapts to you",
-      "Study guides in seconds",
+      "Explore 800+ real careers",
+      "Discover what you're good at",
+      "A plan and portfolio that show it",
     ],
-    route: "/practice",
+    route: "/student-signup",
   },
   {
     id: "parent",
