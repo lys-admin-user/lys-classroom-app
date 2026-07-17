@@ -256,7 +256,7 @@ export function registerLessonsRoutes(app: Express): void {
       
       let hasActiveTrial = false;
       if (tier === "free") {
-        const userTrial = await storage.getActiveTrialByUserId(userId);
+        const userTrial = await storage.getOrBindActiveTrialForUser(userId, getClientIP(req), (req.headers["x-trial-fingerprint"] as string) || null);
         hasActiveTrial = !!userTrial;
       }
 
@@ -594,7 +594,7 @@ export function registerLessonsRoutes(app: Express): void {
       
       let hasActiveTrial = false;
       if (tier === "free") {
-        const userTrial = await storage.getActiveTrialByUserId(userId);
+        const userTrial = await storage.getOrBindActiveTrialForUser(userId, getClientIP(req), (req.headers["x-trial-fingerprint"] as string) || null);
         hasActiveTrial = !!userTrial;
       }
 
@@ -678,7 +678,7 @@ export function registerLessonsRoutes(app: Express): void {
       const tier = await storage.getUserTier(userId);
       let hasActiveTrial = false;
       if (tier === "free") {
-        const userTrial = await storage.getActiveTrialByUserId(userId);
+        const userTrial = await storage.getOrBindActiveTrialForUser(userId, getClientIP(req), (req.headers["x-trial-fingerprint"] as string) || null);
         hasActiveTrial = !!userTrial;
       }
       if (tier === "free" && !hasActiveTrial) {

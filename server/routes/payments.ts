@@ -240,13 +240,17 @@ export function registerPaymentsRoutes(app: Express): void {
       let activeTrial = null;
 
       if (userId) {
-        activeTrial = await storage.getActiveTrialByUserId(userId);
-      }
-      if (!activeTrial) {
+        // Logged-in users only see a trial that is actually THEIRS. An unbound
+        // network/device trial (started as a guest before signup) is claimed
+        // for them here; a trial bound to a different account is NOT shown —
+        // previously it made the banner say "trial active" while the lesson
+        // quota (user-bound lookup) still enforced the free limit.
+        activeTrial = (await storage.getOrBindActiveTrialForUser(userId, ipAddress, fingerprint)) || null;
+      } else {
         activeTrial = await storage.getActiveTrialByIP(ipAddress);
-      }
-      if (!activeTrial && fingerprint) {
-        activeTrial = await storage.getActiveTrialByFingerprint(fingerprint);
+        if (!activeTrial && fingerprint) {
+          activeTrial = await storage.getActiveTrialByFingerprint(fingerprint);
+        }
       }
 
       if (activeTrial) {

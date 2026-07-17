@@ -1,5 +1,6 @@
 // Tiny SSE consumer for our /api/.../generate-stream endpoints. Server emits
 // `data: {json}\n\n` frames; we parse each frame as a typed event.
+import { getFingerprint } from "@/lib/fingerprint";
 
 export type StreamEventType = "phase" | "delta" | "done" | "error";
 export interface StreamEvent {
@@ -14,7 +15,11 @@ export async function streamGeneration<T = any>(
 ): Promise<T> {
   const response = await fetch(url, {
     method: "POST",
-    headers: { "Content-Type": "application/json", Accept: "text/event-stream" },
+    headers: {
+      "Content-Type": "application/json",
+      Accept: "text/event-stream",
+      "X-Trial-Fingerprint": getFingerprint(),
+    },
     body: JSON.stringify(body),
     credentials: "include",
   });

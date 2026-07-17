@@ -353,7 +353,7 @@ import {
   type RssPlacement,
 } from "@shared/schema";
 import { db } from "../db";
-import { eq, desc, and, asc, gte, sql, or, inArray } from "drizzle-orm";
+import { eq, desc, and, asc, gte, sql, or, inArray, isNull } from "drizzle-orm";
 import { randomUUID } from "crypto";
 
 import {
@@ -416,6 +416,54 @@ const paymentsMethods: ThisType<DatabaseStorage> = {
       .orderBy(desc(freeTrials.createdAt))
       .limit(1);
     return trial;
+  },
+
+
+  // Resolve the user's active trial, auto-claiming an unbound network/device
+  // trial if one exists. Guests who start a trial before signing up leave an
+  // IP/fingerprint-bound row with no userId; without this, the banner shows
+  // "trial active" while the lesson quota (user-bound lookup only) still
+  // enforces the free limit. Trials already bound to a DIFFERENT user are
+  // never returned or re-bound.
+  async getOrBindActiveTrialForUser(
+    userId: string,
+    ipAddress?: string | null,
+    fingerprint?: string | null,
+  ): Promise<FreeTrial | undefined> {
+    const own = await this.getActiveTrialByUserId(userId);
+    if (own) return own;
+
+    // Atomic claim: only binds if the trial is STILL unbound at update time
+    // (userId IS NULL guard in the WHERE), so a concurrent request that claims
+    // the trial first wins and we never rebind another user's trial.
+    const claimUnbound = async (trialId: string): Promise<FreeTrial | undefined> => {
+      const [claimed] = await db.update(freeTrials)
+        .set({ userId, updatedAt: new Date() })
+        .where(and(
+          eq(freeTrials.id, trialId),
+          isNull(freeTrials.userId),
+          eq(freeTrials.isActive, true),
+        ))
+        .returning();
+      return claimed;
+    };
+
+    if (ipAddress) {
+      const ipTrial = await this.getActiveTrialByIP(ipAddress);
+      if (ipTrial && !ipTrial.userId) {
+        const claimed = await claimUnbound(ipTrial.id);
+        if (claimed) return claimed;
+      }
+    }
+    if (fingerprint) {
+      const fpTrial = await this.getActiveTrialByFingerprint(fingerprint);
+      if (fpTrial && !fpTrial.userId) {
+        const claimed = await claimUnbound(fpTrial.id);
+        if (claimed) return claimed;
+      }
+    }
+    // A concurrent request (e.g. same user, two tabs) may have just bound it.
+    return await this.getActiveTrialByUserId(userId);
   },
 
 

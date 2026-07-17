@@ -1,4 +1,5 @@
 import { QueryClient, QueryFunction } from "@tanstack/react-query";
+import { getFingerprint } from "@/lib/fingerprint";
 
 async function throwIfResNotOk(res: Response) {
   if (!res.ok) {
@@ -20,7 +21,10 @@ export async function apiRequest(
 ): Promise<Response> {
   const res = await fetch(url, {
     method,
-    headers: data ? { "Content-Type": "application/json" } : {},
+    headers: {
+      ...(data ? { "Content-Type": "application/json" } : {}),
+      "X-Trial-Fingerprint": getFingerprint(),
+    },
     body: data ? JSON.stringify(data) : undefined,
     credentials: "include",
   });
@@ -37,6 +41,7 @@ export const getQueryFn: <T>(options: {
   async ({ queryKey }) => {
     const res = await fetch(queryKey.join("/") as string, {
       credentials: "include",
+      headers: { "X-Trial-Fingerprint": getFingerprint() },
     });
 
     if (res.status === 401) {

@@ -1161,6 +1161,7 @@ export interface IStorage {
   getActiveTrialByIP(ipAddress: string): Promise<FreeTrial | undefined>;
   getActiveTrialByFingerprint(fingerprint: string): Promise<FreeTrial | undefined>;
   getActiveTrialByUserId(userId: string): Promise<FreeTrial | undefined>;
+  getOrBindActiveTrialForUser(userId: string, ipAddress?: string | null, fingerprint?: string | null): Promise<FreeTrial | undefined>;
   getTrialsByIP(ipAddress: string, sinceDateMs: number): Promise<FreeTrial[]>;
   getTrialsByFingerprint(fingerprint: string, sinceDateMs: number): Promise<FreeTrial[]>;
   createFreeTrial(trial: InsertFreeTrial): Promise<FreeTrial>;
