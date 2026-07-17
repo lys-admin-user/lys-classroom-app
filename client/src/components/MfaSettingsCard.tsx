@@ -14,7 +14,9 @@ import {
   useTrustedDevices,
   useRevokeTrustedDevice,
   useDismissMfaPrompt,
+  invalidateMfaStatus,
 } from "@/hooks/use-mfa";
+import { MfaStepUpDialog } from "@/components/MfaStepUpDialog";
 import { useToast } from "@/hooks/use-toast";
 
 // Self-service card to manage two-factor authentication: enable/disable TOTP,
@@ -280,9 +282,17 @@ function RecoverySection({
 
 function TrustedDevicesSection() {
   const { toast } = useToast();
+  const { data: mfaStatus } = useMfaStatus();
   const { data, isLoading } = useTrustedDevices();
   const revoke = useRevokeTrustedDevice();
   const devices = data?.devices ?? [];
+
+  // "Remove all" revokes the current device's cookie, which immediately drops
+  // loginMfaRequired back to true — triggering the non-dismissable login gate.
+  // To prevent that, we require a fresh step-up BEFORE the revoke so the session
+  // stays verified after the cookie is cleared. The dialog is dismissable (Cancel
+  // works) so the user is never trapped.
+  const [stepUpOpen, setStepUpOpen] = useState(false);
 
   const doRevoke = async (input: { id?: string; all?: boolean }) => {
     try {
@@ -293,8 +303,32 @@ function TrustedDevicesSection() {
     }
   };
 
+  const handleRemoveAll = () => {
+    // If MFA is enabled for this user, verify first so the session stays fresh
+    // after the trusted-device cookie is cleared (avoids the non-dismissable gate).
+    if (mfaStatus?.enabled) {
+      setStepUpOpen(true);
+    } else {
+      doRevoke({ all: true });
+    }
+  };
+
   return (
     <div className="space-y-3 border-t pt-4" data-testid="section-trusted-devices">
+      <MfaStepUpDialog
+        open={stepUpOpen}
+        enrollmentRequired={false}
+        dismissable
+        methods={mfaStatus?.methods}
+        title="Confirm removing all devices"
+        description="Enter your authenticator code to sign out of all remembered devices. You can close this if you changed your mind."
+        onClose={() => setStepUpOpen(false)}
+        onVerified={async () => {
+          setStepUpOpen(false);
+          invalidateMfaStatus();
+          await doRevoke({ all: true });
+        }}
+      />
       <div className="flex items-center gap-2">
         <MonitorSmartphone className="h-4 w-4 text-muted-foreground" />
         <h4 className="font-medium">Remembered devices</h4>
@@ -333,7 +367,7 @@ function TrustedDevicesSection() {
           <Button
             variant="outline"
             size="sm"
-            onClick={() => doRevoke({ all: true })}
+            onClick={handleRemoveAll}
             disabled={revoke.isPending}
             data-testid="button-revoke-all-devices"
           >
