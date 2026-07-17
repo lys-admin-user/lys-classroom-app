@@ -31,7 +31,7 @@ and where to look to undo it.
 - **Protected area(s):** server code (`server/routes/mfa.ts`, `server/services/recoveryCodeService.ts`)
 - **What was changed:** Added `console.log` statements in `verifyRecoveryCode` (userId, normalized code, hash, updated row count) and in the `/api/mfa/disable` handler (userId, token, user lookup result, totpOk, recoveryOk). All logging is temporary for diagnosis — to be removed once root cause is found.
 - **Rollback:** checkpoint before this change: 672f42c85d1bf02263221e0139fd5e9b98eed808
-- **Outcome:** IN PROGRESS — awaiting runtime log output from user attempting a recovery code disable.
+- **Outcome:** RESOLVED. Root cause was user error — the 3 previous failed attempts used the TOTP authenticator code, not a recovery code. After being prompted to use an actual recovery code, it succeeded immediately. The recovery code logic, hashing, and DB path are all correct. Debug logging removed (token value was temporarily logged — no long-term exposure). Checkpoint after cleanup: see next checkpoint.
 
 ## [2026-07-17 15:45] — MFA disable endpoint: accept recovery codes as a valid factor
 - **Requested by:** confirmed they are the developer ("Yes, I'm the developer — go ahead")
