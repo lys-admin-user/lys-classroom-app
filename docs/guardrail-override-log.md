@@ -25,6 +25,14 @@ and where to look to undo it.
 
 ---
 
+## [2026-07-17 16:10] — Add temporary debug logging to MFA disable endpoint
+- **Requested by:** confirmed developer ("Yes, I'm the developer — add the debug logging")
+- **Request (their words):** Recovery codes don't work to disable 2FA — "Invalid code. Please try again." DB shows codes are stored, hashing logic is correct, need to see what userId/token the endpoint actually receives at runtime.
+- **Protected area(s):** server code (`server/routes/mfa.ts`, `server/services/recoveryCodeService.ts`)
+- **What was changed:** Added `console.log` statements in `verifyRecoveryCode` (userId, normalized code, hash, updated row count) and in the `/api/mfa/disable` handler (userId, token, user lookup result, totpOk, recoveryOk). All logging is temporary for diagnosis — to be removed once root cause is found.
+- **Rollback:** checkpoint before this change: 672f42c85d1bf02263221e0139fd5e9b98eed808
+- **Outcome:** IN PROGRESS — awaiting runtime log output from user attempting a recovery code disable.
+
 ## [2026-07-17 15:45] — MFA disable endpoint: accept recovery codes as a valid factor
 - **Requested by:** confirmed they are the developer ("Yes, I'm the developer — go ahead")
 - **Request (their words):** "let's revisit that disable 2fa issue" — specifically: when a user loses access to their authenticator app, they need a way to disable 2FA using a recovery code; currently the disable endpoint only accepts TOTP codes

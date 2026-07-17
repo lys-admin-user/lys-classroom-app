@@ -77,8 +77,10 @@ export async function countRemainingRecoveryCodes(userId: string): Promise<numbe
 // exactly one UPDATE affects a row. This enforces true single-use semantics.
 export async function verifyRecoveryCode(userId: string, code: string): Promise<boolean> {
   const normalized = normalizeRecoveryCode(code);
+  console.log("[RECOVERY-DEBUG] userId:", JSON.stringify(userId), "normalized:", JSON.stringify(normalized), "len:", normalized.length);
   if (normalized.length < 6) return false;
   const target = hashRecoveryCode(normalized);
+  console.log("[RECOVERY-DEBUG] target hash:", target);
 
   const updated = await db
     .update(mfaRecoveryCodes)
@@ -92,5 +94,6 @@ export async function verifyRecoveryCode(userId: string, code: string): Promise<
     )
     .returning({ id: mfaRecoveryCodes.id });
 
+  console.log("[RECOVERY-DEBUG] updated rows:", updated.length);
   return updated.length === 1;
 }

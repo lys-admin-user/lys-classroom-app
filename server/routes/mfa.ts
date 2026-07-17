@@ -456,14 +456,18 @@ export function registerMfaRoutes(app: Express): void {
     try {
       const userId = getUserId(req);
       const token = String(req.body?.token || "");
+      console.log("[MFA-DISABLE-DEBUG] userId:", JSON.stringify(userId), "token length:", token.length, "token:", JSON.stringify(token));
       const user = await storage.getUser(userId);
+      console.log("[MFA-DISABLE-DEBUG] user found:", !!user, "mfaEnabled:", user?.mfaEnabled, "hasSecret:", !!user?.mfaSecret);
       if (!user?.mfaEnabled || !user.mfaSecret) {
         return res.status(400).json({ error: "MFA is not enabled." });
       }
       // Accept either a live TOTP code or a one-time recovery code so users
       // who have lost access to their authenticator app can still disable MFA.
       const totpOk = verifyTokenAgainstEncrypted(token, user.mfaSecret);
+      console.log("[MFA-DISABLE-DEBUG] totpOk:", totpOk);
       const recoveryOk = !totpOk && await verifyRecoveryCode(userId, token);
+      console.log("[MFA-DISABLE-DEBUG] recoveryOk:", recoveryOk);
       if (!totpOk && !recoveryOk) {
         return res.status(400).json({ error: "Invalid code. Please try again." });
       }
