@@ -150,15 +150,18 @@ export function MfaSettingsCard() {
               </Button>
             ) : (
               <div className="space-y-2 max-w-xs">
-                <Label htmlFor="mfa-disable-code">Enter a current code to confirm</Label>
+                <Label htmlFor="mfa-disable-code">Enter your authenticator code or a recovery code</Label>
                 <Input
                   id="mfa-disable-code"
-                  inputMode="numeric"
-                  placeholder="123456"
+                  inputMode="text"
+                  placeholder="6-digit code or XXXXX-XXXXX recovery code"
                   value={disableToken}
                   onChange={(e) => setDisableToken(e.target.value)}
                   data-testid="input-mfa-disable-code"
                 />
+                <p className="text-xs text-muted-foreground">
+                  Lost access to your authenticator app? Enter one of the recovery codes you saved when you set up 2FA.
+                </p>
                 <div className="flex gap-2">
                   <Button variant="ghost" onClick={() => { setShowDisable(false); setDisableToken(""); }}>Cancel</Button>
                   <Button variant="destructive" onClick={confirmDisable} disabled={disable.isPending || disableToken.trim().length < 6} data-testid="button-mfa-disable-confirm">
