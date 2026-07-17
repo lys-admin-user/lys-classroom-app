@@ -460,7 +460,11 @@ export function registerMfaRoutes(app: Express): void {
       if (!user?.mfaEnabled || !user.mfaSecret) {
         return res.status(400).json({ error: "MFA is not enabled." });
       }
-      if (!verifyTokenAgainstEncrypted(token, user.mfaSecret)) {
+      // Accept either a live TOTP code or a one-time recovery code so users
+      // who have lost access to their authenticator app can still disable MFA.
+      const totpOk = verifyTokenAgainstEncrypted(token, user.mfaSecret);
+      const recoveryOk = !totpOk && await verifyRecoveryCode(userId, token);
+      if (!totpOk && !recoveryOk) {
         return res.status(400).json({ error: "Invalid code. Please try again." });
       }
       await db.update(users)
@@ -482,7 +486,7 @@ export function registerMfaRoutes(app: Express): void {
         resourceId: userId,
         ipAddress: getClientIP(req),
         userAgent: req.get("user-agent"),
-        details: { devicesRevoked, codesInvalidated },
+        details: { devicesRevoked, codesInvalidated, factor: recoveryOk ? "recovery_code" : "totp" },
       });
       res.json({ success: true });
     } catch (err) {

@@ -25,6 +25,16 @@ and where to look to undo it.
 
 ---
 
+## [2026-07-17 15:45] — MFA disable endpoint: accept recovery codes as a valid factor
+- **Requested by:** confirmed they are the developer ("Yes, I'm the developer — go ahead")
+- **Request (their words):** "let's revisit that disable 2fa issue" — specifically: when a user loses access to their authenticator app, they need a way to disable 2FA using a recovery code; currently the disable endpoint only accepts TOTP codes
+- **Protected area(s):** server code (`server/routes/mfa.ts`)
+- **What was changed:** `server/routes/mfa.ts` — `/api/mfa/disable` now also accepts a recovery code (via `verifyRecoveryCode`) if the TOTP check fails; `client/src/components/MfaSettingsCard.tsx` — UI label, placeholder, and helper text updated to tell users recovery codes are accepted
+- **Outcome:** Both TOTP codes and recovery codes now work in the disable form; recovery code is consumed (single-use) on success; audit log updated to record which factor was used
+- **Rollback:** checkpoint `8f7ab71` (before server edit)
+
+---
+
 ## [2026-07-17 04:55] — Trial-binding bug fix: auto-bind network trials to new accounts + honest trial banner
 - **Requested by:** confirmed they are the developer / chose to proceed ("Go ahead with the recommendations that you put forth. I like them.")
 - **Request (their words):** "if a homeschool parent is attempting to use the signup wizard, they are hitting the limit of 5 free. That should not be the case. Tell me what you find and recommend a few courses of action." — approved recommendations 1+2: auto-bind the network's unclaimed trial to the signed-in user, and only show the trial banner as active when the trial actually belongs to that user
