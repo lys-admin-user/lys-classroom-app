@@ -5,6 +5,7 @@ import { db } from "../db";
 import { teacherSignupResponses } from "@shared/schema";
 import { isAuthenticated } from "../replit_integrations/auth";
 import { isSiteAdmin, ANALYZER_SESSION_REGEX } from "./_helpers";
+import { requireCaptcha } from "../services/captcha";
 
 // ===== Teacher pre-signup quiz ===============================================
 // Three optional pain/gain questions (plus an email capture) shown to teachers
@@ -43,7 +44,7 @@ const bindSchema = z.object({
 
 export function registerTeacherSignupRoutes(app: Express) {
   // Anonymous upsert — same visitor revising answers updates in place.
-  app.post("/api/teacher-signup/submit", async (req: any, res) => {
+  app.post("/api/teacher-signup/submit", requireCaptcha(), async (req: any, res) => {
     try {
       const parsed = submitSchema.safeParse(req.body);
       if (!parsed.success) {

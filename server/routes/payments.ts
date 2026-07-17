@@ -64,6 +64,7 @@ import {
 import { z } from "zod";
 import { setupAuth, registerAuthRoutes, isAuthenticated } from "../replit_integrations/auth";
 import { requireFreshMfa } from "./mfa";
+import { requireCaptcha } from "../services/captcha";
 import { randomUUID } from "crypto";
 import multer from "multer";
 import { syncJurisdictionsFromCSP, syncStandardSetFromCSP, getSyncStatus, fetchCSPJurisdictions, syncAllStandardsFromCSP, getImportProgress } from "../services/cspService";
@@ -299,7 +300,15 @@ export function registerPaymentsRoutes(app: Express): void {
   });
 
 
-  app.post("/api/trial/start", async (req: any, res) => {
+  // Captcha applies only to ANONYMOUS trial starts (bot defense). Logged-in
+  // users skip it because the trial banner auto-starts trials right after
+  // signup with no user interaction — a captcha there would silently break it.
+  const captchaForAnonymous = (req: any, res: any, next: any) => {
+    if (req.user?.claims?.sub) return next();
+    return requireCaptcha()(req, res, next);
+  };
+
+  app.post("/api/trial/start", captchaForAnonymous, async (req: any, res) => {
     try {
       const ipAddress = getClientIP(req);
       const userId = req.user?.claims?.sub || null;

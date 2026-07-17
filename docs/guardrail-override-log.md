@@ -25,6 +25,13 @@ and where to look to undo it.
 
 ---
 
+## [2026-07-17 03:20] — Turnstile on 3 remaining public forms + full user-role tally in System Admin
+- **Requested by:** confirmed they are the developer (via the guardrail pause prompt)
+- **Request (their words):** "We can do both....what exactly is the Turstile check that exisit and if that exists, why does it need the key" (approving: wiring Turnstile into the teacher quiz, needs analyzer, and trial starter; plus Task: "Full user role tally in System Admin")
+- **Protected area(s):** server code (captcha middleware on 3 public endpoints · admin analytics endpoint role breakdown)
+- **What was changed:** (1) Turnstile bot-check wired into the three remaining public forms: teacher pre-signup quiz (`/api/teacher-signup/submit` + widget on the quiz's email step), needs analyzer (`/api/needs-analyzer/submit` + widget on the final question), and trial starter (`/api/trial/start` — captcha applies to anonymous requests only, because logged-in users get their trial auto-started right after signup and a captcha there would silently break it; the trial banner/card also show the widget to visitors who aren't logged in so an anonymous manual start keeps working once keys are set). Like the other wired forms, the check stays dormant until the Turnstile keys are added. (2) System Admin "By Role" card now tallies ALL 8 platform roles (was only 3) plus an "Other" row for unexpected values; counts verified to sum to the user total. Files: `server/routes/teacherSignup.ts`, `server/routes/lessons.ts`, `server/routes/payments.ts`, `server/routes/admin.ts`, `client/src/pages/TeacherSignupQuiz.tsx`, `client/src/components/NeedsAnalyzer.tsx`, `client/src/pages/SystemAdmin.tsx`. Typecheck clean, 244/244 tests pass, all three endpoints smoke-tested, admin tally verified against the live database.
+- **Rollback:** the checkpoint created at the end of this change (July 17, 2026)
+
 ## [2026-07-16 05:15] — Teacher pre-signup needs flow + Signup Insights admin page
 - **Requested by:** chose to proceed after a risk rundown (via the guardrail pause prompt)
 - **Request (their words):** "Between the public landing page and the signup process, each user type needs to see the functions or features that are most valuable to them... look at ways to better blend the needs analyzer with the sign up process to reduce redundancy and improve the process." (starting with teachers/educators per their choice)

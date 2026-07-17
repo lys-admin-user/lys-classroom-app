@@ -16,6 +16,7 @@ import {
   type AnalyzerIdentity,
   type AnalyzerUrgency,
 } from "@/lib/needsAnalyzer";
+import { TurnstileWidget } from "@/components/TurnstileWidget";
 
 interface NeedsAnalyzerProps {
   onComplete?: () => void;
@@ -30,6 +31,7 @@ export function NeedsAnalyzer({ onComplete, className }: NeedsAnalyzerProps) {
   const [corePain, setCorePain] = useState<string>("");
   const [urgency, setUrgency] = useState<AnalyzerUrgency | null>(null);
   const [desiredOutcome, setDesiredOutcome] = useState<string>("");
+  const [captchaToken, setCaptchaToken] = useState("");
   const hydrated = useRef(false);
 
   // Hydrate from localStorage draft on first mount so a visitor can pick up
@@ -81,6 +83,7 @@ export function NeedsAnalyzer({ onComplete, className }: NeedsAnalyzerProps) {
         urgency: final.urgency,
         desiredOutcome: final.desiredOutcome,
         ctaShown: seg.cta.type,
+        captchaToken: captchaToken || undefined,
       });
       markAnalyzerSeen();
       clearAnalyzerDraft();
@@ -253,6 +256,7 @@ export function NeedsAnalyzer({ onComplete, className }: NeedsAnalyzerProps) {
                 <span className="font-roboto">{o}</span>
               </Button>
             ))}
+            <TurnstileWidget onToken={setCaptchaToken} className="pt-2" />
           </CardContent>
         </Card>
       )}

@@ -8,12 +8,14 @@ import { Progress } from "@/components/ui/progress";
 import { Clock, Sparkles, Gift, ArrowRight, X } from "lucide-react";
 import { Link } from "wouter";
 import { useState, useEffect } from "react";
+import { TurnstileWidget } from "@/components/TurnstileWidget";
 
 export function TrialBanner() {
   const { isAuthenticated } = useAuth();
   const { isPaid, isLoading: tierLoading } = useTier();
   const { trialStatus, isTrialActive, daysRemaining, canStartTrial, startTrial, isStartingTrial } = useTrial();
   const [dismissed, setDismissed] = useState(false);
+  const [captchaToken, setCaptchaToken] = useState("");
 
   // Auto-start trial for authenticated free users who haven't used their trial yet
   useEffect(() => {
@@ -113,11 +115,12 @@ export function TrialBanner() {
               </p>
             </div>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-wrap">
+            {!isAuthenticated && <TurnstileWidget onToken={setCaptchaToken} />}
             <Button
               size="sm"
               className="bg-lys-yellow hover:bg-lys-yellow/90 text-black"
-              onClick={() => startTrial()}
+              onClick={() => startTrial(isAuthenticated ? undefined : captchaToken || undefined)}
               disabled={isStartingTrial}
               data-testid="button-start-trial"
             >
@@ -143,8 +146,10 @@ export function TrialBanner() {
 }
 
 export function TrialCard() {
+  const { isAuthenticated } = useAuth();
   const { isPaid, isLoading: tierLoading } = useTier();
   const { isTrialActive, daysRemaining, canStartTrial, startTrial, isStartingTrial, trialStatus } = useTrial();
+  const [captchaToken, setCaptchaToken] = useState("");
 
   if (tierLoading || isPaid) return null;
 
@@ -209,10 +214,11 @@ export function TrialCard() {
               <p className="text-sm text-muted-foreground font-roboto mb-3">
                 Get 10 days of full access to all features. No credit card required.
               </p>
+              {!isAuthenticated && <TurnstileWidget onToken={setCaptchaToken} className="mb-3" />}
               <Button
                 size="sm"
                 className="bg-lys-yellow hover:bg-lys-yellow/90 text-black"
-                onClick={() => startTrial()}
+                onClick={() => startTrial(isAuthenticated ? undefined : captchaToken || undefined)}
                 disabled={isStartingTrial}
                 data-testid="button-trial-card-start"
               >

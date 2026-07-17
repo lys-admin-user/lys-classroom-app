@@ -66,14 +66,20 @@ export function useTrial() {
   });
 
   const startTrialMutation = useMutation({
-    mutationFn: async () => {
+    // Optional captchaToken: only needed for ANONYMOUS trial starts once
+    // Turnstile keys are configured; authenticated starts skip captcha.
+    mutationFn: async (captchaToken?: string) => {
       const metadata = {
         userAgent: navigator.userAgent,
         timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
         screenResolution: `${screen.width}x${screen.height}`,
         language: navigator.language,
       };
-      const res = await apiRequest("POST", "/api/trial/start", { fingerprint, metadata });
+      const res = await apiRequest("POST", "/api/trial/start", {
+        fingerprint,
+        metadata,
+        captchaToken: captchaToken || undefined,
+      });
       return res.json();
     },
     onSuccess: () => {
@@ -97,7 +103,7 @@ export function useTrial() {
     isTrialActive: trialStatus?.isActive || false,
     daysRemaining: trialStatus?.daysRemaining || 0,
     canStartTrial: trialStatus?.canStartTrial || false,
-    startTrial: startTrialMutation.mutate,
+    startTrial: (captchaToken?: string) => startTrialMutation.mutate(captchaToken),
     isStartingTrial: startTrialMutation.isPending,
     startTrialError: startTrialMutation.error,
     bindTrial: bindTrialMutation.mutate,

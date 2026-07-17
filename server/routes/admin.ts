@@ -2036,11 +2036,24 @@ export function registerAdminRoutes(app: Express): void {
         enterprise: allUsers.filter(u => u.tier === "enterprise").length,
       };
       
+      // Full tally across ALL platform roles (must sum to users.total).
       const roleBreakdown = {
-        student: allUsers.filter(u => u.role === "student").length,
-        educator: allUsers.filter(u => u.role === "educator").length,
-        campus_admin: allUsers.filter(u => u.role === "campus_admin").length,
-      };
+        student: 0,
+        homeschool_parent: 0,
+        educator: 0,
+        staff: 0,
+        campus_admin: 0,
+        district_admin: 0,
+        site_admin: 0,
+        system_admin: 0,
+      } as Record<string, number>;
+      for (const u of allUsers) {
+        if (u.role && roleBreakdown[u.role] !== undefined) {
+          roleBreakdown[u.role] += 1;
+        } else {
+          roleBreakdown.other = (roleBreakdown.other || 0) + 1;
+        }
+      }
       
       const affiliateStats = {
         total: allAffiliates.length,

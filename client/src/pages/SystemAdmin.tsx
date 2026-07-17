@@ -43,7 +43,7 @@ interface Analytics {
     newThisMonth: number;
     newThisWeek: number;
     byTier: { free: number; pro: number; campus: number; enterprise: number };
-    byRole: { student: number; educator: number; campus_admin: number };
+    byRole: Record<string, number>;
   };
   content: {
     totalLessons: number;
@@ -1134,27 +1134,33 @@ export default function SystemAdminPage({ params }: { params?: { tab?: string } 
                     <div>
                       <h4 className="text-sm font-medium mb-2">By Role</h4>
                       <div className="space-y-2">
-                        <div className="flex items-center justify-between">
-                          <div className="flex items-center gap-2">
-                            <GraduationCap className="h-4 w-4 text-muted-foreground" />
-                            <span className="text-sm">Students</span>
+                        {([
+                          ["student", "Students", GraduationCap],
+                          ["homeschool_parent", "Homeschool Parents", UserCheck],
+                          ["educator", "Educators", UserCheck],
+                          ["staff", "Staff", UserCog],
+                          ["campus_admin", "Campus Admins", UserCog],
+                          ["district_admin", "District Admins", UserCog],
+                          ["site_admin", "Site Admins", UserCog],
+                          ["system_admin", "System Admins", UserCog],
+                        ] as const).map(([key, label, Icon]) => (
+                          <div key={key} className="flex items-center justify-between" data-testid={`row-role-${key}`}>
+                            <div className="flex items-center gap-2">
+                              <Icon className="h-4 w-4 text-muted-foreground" />
+                              <span className="text-sm">{label}</span>
+                            </div>
+                            <span className="font-medium" data-testid={`text-role-count-${key}`}>{analytics?.users.byRole?.[key] || 0}</span>
                           </div>
-                          <span className="font-medium">{analytics?.users.byRole.student || 0}</span>
-                        </div>
-                        <div className="flex items-center justify-between">
-                          <div className="flex items-center gap-2">
-                            <UserCheck className="h-4 w-4 text-muted-foreground" />
-                            <span className="text-sm">Educators</span>
+                        ))}
+                        {(analytics?.users.byRole?.other || 0) > 0 && (
+                          <div className="flex items-center justify-between" data-testid="row-role-other">
+                            <div className="flex items-center gap-2">
+                              <UserCog className="h-4 w-4 text-muted-foreground" />
+                              <span className="text-sm">Other</span>
+                            </div>
+                            <span className="font-medium" data-testid="text-role-count-other">{analytics?.users.byRole?.other || 0}</span>
                           </div>
-                          <span className="font-medium">{analytics?.users.byRole.educator || 0}</span>
-                        </div>
-                        <div className="flex items-center justify-between">
-                          <div className="flex items-center gap-2">
-                            <UserCog className="h-4 w-4 text-muted-foreground" />
-                            <span className="text-sm">Campus Admins</span>
-                          </div>
-                          <span className="font-medium">{analytics?.users.byRole.campus_admin || 0}</span>
-                        </div>
+                        )}
                       </div>
                     </div>
                   </CardContent>

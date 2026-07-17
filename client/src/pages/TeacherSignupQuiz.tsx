@@ -19,11 +19,12 @@ import {
   type TeacherPlanningStyle,
   type TeacherSignupAnswers,
 } from "@/lib/teacherSignup";
+import { TurnstileWidget } from "@/components/TurnstileWidget";
 
 const DEST = "/lesson-generator";
 
 // Best-effort background save — never blocks or breaks the flow.
-function submitToServer(answers: TeacherSignupAnswers, skipped: boolean): void {
+function submitToServer(answers: TeacherSignupAnswers, skipped: boolean, captchaToken?: string): void {
   try {
     const sessionId = getOrCreateTeacherSignupSessionId();
     void fetch("/api/teacher-signup/submit", {
@@ -33,6 +34,7 @@ function submitToServer(answers: TeacherSignupAnswers, skipped: boolean): void {
       keepalive: true,
       body: JSON.stringify({
         sessionId,
+        captchaToken: captchaToken || undefined,
         email: answers.email || null,
         frustration: answers.frustration || null,
         planningStyle: answers.planningStyle || null,
@@ -59,6 +61,7 @@ export default function TeacherSignupQuiz() {
   const [subject, setSubject] = useState("");
   const [gradeLevel, setGradeLevel] = useState("");
   const [email, setEmail] = useState("");
+  const [captchaToken, setCaptchaToken] = useState("");
 
   useEffect(() => {
     document.title = "Quick questions — LYS";
@@ -110,7 +113,7 @@ export default function TeacherSignupQuiz() {
   const finish = (skippedAll: boolean) => {
     const final = { ...answers, completedAt: new Date().toISOString() };
     saveTeacherSignupAnswers(final);
-    submitToServer(final, skippedAll);
+    submitToServer(final, skippedAll, captchaToken);
     setLocation(DEST);
   };
 
@@ -338,6 +341,7 @@ export default function TeacherSignupQuiz() {
                   />
                 </div>
               </div>
+              <TurnstileWidget onToken={setCaptchaToken} />
               <div className="flex items-center justify-between pt-1">
                 <button
                   type="button"

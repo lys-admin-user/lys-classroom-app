@@ -1462,7 +1462,7 @@ export function registerLessonsRoutes(app: Express): void {
   });
 
 
-  app.post("/api/needs-analyzer/submit", async (req: any, res) => {
+  app.post("/api/needs-analyzer/submit", requireCaptcha(), async (req: any, res) => {
     try {
       const parsed = analyzerSubmitSchema.safeParse(req.body);
       if (!parsed.success) {
