@@ -25,6 +25,14 @@ and where to look to undo it.
 
 ---
 
+## [2026-07-18 04:05] — Clear stored curriculum file bytes on delete (Task: free up database space)
+- **Requested by:** confirmed developer via pause prompt ("Yes, proceed")
+- **Request (their words):** Task #29 — "Free up database space when curriculum files are deleted."
+- **Protected area(s):** server code (`server/services/curriculumLibrary.ts`, `server/index.ts`)
+- **What was changed:** `deleteCurriculumDocument` now sets `originalFileBytes` to NULL when soft-deleting (audit detail records `originalFileCleared: true`). Added `sweepArchivedCurriculumFileBytes()` — a data-only maintenance sweep that nulls stored blobs on already-archived documents — wired into the existing daily retention scheduler in `server/index.ts` so production reclaims space from previously deleted docs. No schema, auth, or route changes; moderation viewer's existing 404/`hasOriginal === false` path handles deleted docs.
+- **Rollback:** checkpoint created after this work (see checkpoint list in Replit)
+- **Outcome:** COMPLETED — typecheck clean, 244 tests passing; sweep verified end-to-end against the dev database (test row's bytes cleared, then removed).
+
 ## [2026-07-18 03:47] — Show verifier name in standards source popover (Task: show who confirmed a standard's source)
 - **Requested by:** confirmed developer via pause prompt ("Yes, proceed")
 - **Request (their words):** Task #23 — "Show teachers who confirmed a standard's source, not just when."

@@ -411,6 +411,16 @@ async function scheduleRetentionPurge() {
     } catch (err: any) {
       log(`Retention purge failed: ${err?.message || err}`, "scheduler");
     }
+    try {
+      // Reclaim DB space: null out stored curriculum file blobs (up to 20MB
+      // each) on archived documents. New deletes clear bytes inline; this
+      // catches rows archived before that existed.
+      const { sweepArchivedCurriculumFileBytes } = await import("./services/curriculumLibrary");
+      const swept = await sweepArchivedCurriculumFileBytes();
+      if (swept > 0) log(`Curriculum blob sweep cleared ${swept} archived file(s)`, "scheduler");
+    } catch (err: any) {
+      log(`Curriculum blob sweep failed: ${err?.message || err}`, "scheduler");
+    }
   };
 
   // Kick once shortly after boot, then daily.

@@ -4,7 +4,7 @@
 // already 4,200+ lines.
 
 import { db } from "../db";
-import { eq, and, desc, inArray, or, isNull, sql } from "drizzle-orm";
+import { eq, and, desc, inArray, or, isNull, isNotNull, sql } from "drizzle-orm";
 import {
   curriculumDocuments,
   orgCurriculumSettings,
@@ -226,9 +226,14 @@ export async function deleteCurriculumDocument(
       if (!memberOrgIds.includes(doc.organizationId)) return false;
     }
   }
+  // Soft-delete the row but hard-clear the stored file blob. The original
+  // PDF/HTML bytes (up to 20MB each) are only needed for the moderation
+  // side-by-side viewer of ACTIVE documents; keeping them on archived rows
+  // silently bloats the database. Metadata stays for audit/recovery, and the
+  // viewer's existing hasOriginal === false path handles the missing file.
   await db
     .update(curriculumDocuments)
-    .set({ isActive: false, updatedAt: new Date() })
+    .set({ isActive: false, originalFileBytes: null, updatedAt: new Date() })
     .where(eq(curriculumDocuments.id, id));
   try {
     const { writeAuditLog } = await import("./ingestionModeration");
@@ -237,12 +242,30 @@ export async function deleteCurriculumDocument(
       entityId: id,
       action: "edited",
       actorUserId: userId,
-      details: { archived: true },
+      details: { archived: true, originalFileCleared: true },
     });
   } catch (err) {
     console.error("[curriculumLibrary] audit-log delete failed:", err);
   }
   return true;
+}
+
+// Maintenance sweep: null out stored file blobs on documents that were
+// archived before clear-on-delete existed (or by any path that bypasses
+// deleteCurriculumDocument). Data-only UPDATE — safe to run repeatedly.
+// Returns the number of rows whose bytes were reclaimed.
+export async function sweepArchivedCurriculumFileBytes(): Promise<number> {
+  const cleared = await db
+    .update(curriculumDocuments)
+    .set({ originalFileBytes: null, updatedAt: new Date() })
+    .where(
+      and(
+        eq(curriculumDocuments.isActive, false),
+        isNotNull(curriculumDocuments.originalFileBytes),
+      ),
+    )
+    .returning({ id: curriculumDocuments.id });
+  return cleared.length;
 }
 
 async function getUserOrganizationIds(userId: string): Promise<string[]> {
