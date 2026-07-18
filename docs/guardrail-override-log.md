@@ -25,6 +25,14 @@ and where to look to undo it.
 
 ---
 
+## [2026-07-18 03:47] — Show verifier name in standards source popover (Task: show who confirmed a standard's source)
+- **Requested by:** confirmed developer via pause prompt ("Yes, proceed")
+- **Request (their words):** Task #23 — "Show teachers who confirmed a standard's source, not just when."
+- **Protected area(s):** server code (`server/services/standardsCatalog.ts`)
+- **What was changed:** `standardsCatalog.ts` now resolves the verifier's display name from `lastVerifiedBy` (set-level wins over jurisdiction-level, matching the timestamp precedence) and returns it as `lastVerifiedByName` on CatalogCode. `client/src/components/StandardsCascadePicker.tsx` popover shows "Verified by <name> on <date>". Read-only addition — no auth, schema, or write-path changes.
+- **Rollback:** checkpoint created after this work (see checkpoint list in Replit)
+- **Outcome:** COMPLETED — typecheck clean, full test suite passing (244 tests).
+
 ## [2026-07-17 16:10] — Add temporary debug logging to MFA disable endpoint
 - **Requested by:** confirmed developer ("Yes, I'm the developer — add the debug logging")
 - **Request (their words):** Recovery codes don't work to disable 2FA — "Invalid code. Please try again." DB shows codes are stored, hashing logic is correct, need to see what userId/token the endpoint actually receives at runtime.

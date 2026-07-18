@@ -66,6 +66,9 @@ export interface CatalogCode {
   standardsName?: string | null;
   authorityName?: string | null;
   lastVerifiedAt?: string | null;
+  // Display name of the moderator who confirmed the source (from
+  // lastVerifiedBy), or null when unverified / the user can't be resolved.
+  lastVerifiedByName?: string | null;
 }
 
 // A "course" is the teacher-facing unit between Subject and Codes. One umbrella
@@ -106,6 +109,33 @@ async function resolveJurisdiction(country: string, stateAbbr: string) {
     return jurisdictions.find((j) => j.name === stateName);
   }
   return await storage.getJurisdictionByAbbr(country, stateAbbr);
+}
+
+/**
+ * Resolve a verifier user id (lastVerifiedBy) to a display name for the
+ * teacher-facing source popover. Falls back to a generic "an admin" label
+ * when the user exists but has no name on file, and to null when there is
+ * no verifier or the user can't be found. Results are memoized per call
+ * site via the passed cache so a page of codes costs at most one lookup.
+ */
+async function resolveVerifierName(
+  userId: string | null | undefined,
+  cache: Map<string, string | null>,
+): Promise<string | null> {
+  if (!userId) return null;
+  if (cache.has(userId)) return cache.get(userId)!;
+  let name: string | null = null;
+  try {
+    const user = await storage.getUser(userId);
+    if (user) {
+      const full = [user.firstName, user.lastName].filter(Boolean).join(" ").trim();
+      name = full || "an admin";
+    }
+  } catch {
+    name = null;
+  }
+  cache.set(userId, name);
+  return name;
 }
 
 // --------------------------------------------------------------
@@ -457,6 +487,7 @@ export async function listCodes(
       const course = grouped.find((c) => c.courseId === opts.courseId);
       if (course) {
         const authority = enforceOfficialLink ? getStateAuthority(stateAbbr) : undefined;
+        const verifierCache = new Map<string, string | null>();
         // Order member sets by trust so higher-trust text wins on code collisions.
         const orderedSetIds = [...course.setIds].sort(
           (a, b) => (meta.get(b)?.rank ?? 0) - (meta.get(a)?.rank ?? 0),
@@ -473,6 +504,14 @@ export async function listCodes(
           const lastVerifiedAt: string | null = lastVerifiedRaw
             ? (lastVerifiedRaw instanceof Date ? lastVerifiedRaw.toISOString() : String(lastVerifiedRaw))
             : null;
+          // The verifier id must come from the same level (set vs jurisdiction)
+          // that supplied the winning timestamp, so the name matches the date.
+          const verifierId = (setRow as any).lastVerifiedAt
+            ? (setRow as any).lastVerifiedBy
+            : (jurisdiction as any).lastVerifiedAt
+              ? (jurisdiction as any).lastVerifiedBy
+              : null;
+          const lastVerifiedByName = await resolveVerifierName(verifierId, verifierCache);
           for (const s of standards) {
             if (byCode.has(s.humanCoding)) continue; // first (highest-trust) wins
             byCode.set(s.humanCoding, {
@@ -485,6 +524,7 @@ export async function listCodes(
               standardsName: jurisdiction.standardsName,
               authorityName: authority?.agency ?? null,
               lastVerifiedAt,
+              lastVerifiedByName,
             });
           }
         }
@@ -539,6 +579,13 @@ export async function listCodes(
     const lastVerifiedAt: string | null = lastVerifiedRaw
       ? (lastVerifiedRaw instanceof Date ? lastVerifiedRaw.toISOString() : String(lastVerifiedRaw))
       : null;
+    // Verifier must come from the same level that supplied the timestamp.
+    const verifierId = (chosenSet as any).lastVerifiedAt
+      ? (chosenSet as any).lastVerifiedBy
+      : (jurisdiction as any).lastVerifiedAt
+        ? (jurisdiction as any).lastVerifiedBy
+        : null;
+    const lastVerifiedByName = await resolveVerifierName(verifierId, new Map());
     return standards.map((s) => ({
       code: s.humanCoding,
       description: s.statement,
@@ -549,6 +596,7 @@ export async function listCodes(
       standardsName: jurisdiction.standardsName,
       authorityName: authority?.agency ?? null,
       lastVerifiedAt,
+      lastVerifiedByName,
     }));
   }
 

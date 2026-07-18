@@ -22,6 +22,7 @@ export interface CatalogCodeClient extends StandardCode {
   standardsName?: string | null;
   authorityName?: string | null;
   lastVerifiedAt?: string | null;
+  lastVerifiedByName?: string | null;
   gradeLevel?: string | null;
 }
 
@@ -101,12 +102,13 @@ function tierBadgeClass(tier?: string | null): string {
   return "border-muted-foreground/30 text-muted-foreground";
 }
 
-function formatVerified(ts?: string | null): string {
+function formatVerified(ts?: string | null, byName?: string | null): string {
   if (!ts) return "Not yet verified";
   try {
     const d = new Date(ts);
     if (isNaN(d.getTime())) return "Not yet verified";
-    return d.toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric" });
+    const date = d.toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric" });
+    return byName ? `Verified by ${byName} on ${date}` : date;
   } catch {
     return "Not yet verified";
   }
@@ -172,7 +174,7 @@ export function StandardsSourcePopover({
         <div>
           <p className="font-semibold text-foreground">Last verified</p>
           <p className="text-muted-foreground" data-testid={testId ? `${testId}-verified` : undefined}>
-            {formatVerified(code.lastVerifiedAt)}
+            {formatVerified(code.lastVerifiedAt, code.lastVerifiedByName)}
           </p>
         </div>
         {code.sourceUrl ? (
