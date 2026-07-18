@@ -11,7 +11,7 @@ const KEYWORDS = [
 
 /**
  * For each institution missing a scholarship URL, look at the homepage and pick
- * the most likely scholarship index page. Uses gpt-4o-mini ONLY when there are
+ * the most likely scholarship index page. Uses gpt-5-mini ONLY when there are
  * multiple plausible candidates; otherwise picks heuristically. Caps at one
  * LLM call per institution.
  */

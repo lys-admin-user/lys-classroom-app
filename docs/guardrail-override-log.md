@@ -25,6 +25,14 @@ and where to look to undo it.
 
 ---
 
+## [2026-07-18 04:20] — Update stale gpt-4o-mini comments to gpt-5-mini (Task: upgrade from gpt-4o to gpt-5)
+- **Requested by:** confirmed developer ("Yes, proceed")
+- **Request (their words):** Task #36 — "Switch this app from the gpt-4o model to gpt-5."
+- **Protected area(s):** server code (`server/services/voiceCriticService.ts`, `server/scholarshipScraper/discoverUrls.ts`)
+- **What was changed:** All LLM API call sites already used gpt-5/gpt-5-mini. Only stale comments referencing gpt-4o-mini were updated in two server files. No logic or call-site changes.
+- **Rollback:** checkpoint created after this work (see checkpoint list in Replit)
+- **Outcome:** COMPLETED — typecheck and tests pass; app redeployed.
+
 ## [2026-07-18 04:05] — Clear stored curriculum file bytes on delete (Task: free up database space)
 - **Requested by:** confirmed developer via pause prompt ("Yes, proceed")
 - **Request (their words):** Task #29 — "Free up database space when curriculum files are deleted."

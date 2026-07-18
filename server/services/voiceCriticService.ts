@@ -1,7 +1,7 @@
 // Voice critic post-pass — runs after generation to detect AI-ish tells and
 // optionally rewrite the output in LYS Master Teacher voice.
 //
-// One additional OpenAI call per generation (gpt-4o-mini for cost). Returns
+// One additional OpenAI call per generation (gpt-5-mini for cost). Returns
 // the original content if scoring is acceptable or the rewrite fails — never
 // breaks the generation pipeline.
 
