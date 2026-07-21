@@ -25,6 +25,14 @@ and where to look to undo it.
 
 ---
 
+## [2026-07-21] — Campus layer: grading systems, grade weight on assignments, student drill-down in gradebook
+- **Requested by:** confirmed developer ("Yes, proceed")
+- **Request (their words):** "Campus layer — Gradebook: click student name for individual view + teacher notes; grading scale selector (top 10 international); assignment grade type (major/minor/other) with customizable weights. Schema + server changes required."
+- **Protected area(s):** database schema · server code
+- **What was changed:** shared/schema.ts (gradeWeight on assignments, classGradingSettings table), server/routes/classroom.ts (grading settings endpoints), client/src/pages/Gradebook.tsx (student drill-down, grading system UI), client/src/pages/Assignments.tsx (grade type selector)
+- **Outcome:** IN PROGRESS
+- **Rollback:** checkpoint before this work (d52da21)
+
 ## [2026-07-18 04:20] — Update stale gpt-4o-mini comments to gpt-5-mini (Task: upgrade from gpt-4o to gpt-5)
 - **Requested by:** confirmed developer ("Yes, proceed")
 - **Request (their words):** Task #36 — "Switch this app from the gpt-4o model to gpt-5."

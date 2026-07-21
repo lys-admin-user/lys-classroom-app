@@ -53,6 +53,8 @@ import {
   knowResources,
   scholarshipSyncLog,
   savedScholarships,
+  classGradingSettings,
+  insertClassGradingSettingsSchema,
 } from "@shared/schema";
 import { z } from "zod";
 import { setupAuth, registerAuthRoutes, isAuthenticated } from "../replit_integrations/auth";
@@ -1020,6 +1022,46 @@ export function registerClassroomRoutes(app: Express): void {
     }
   });
 
+
+  // ── Grading Settings ──────────────────────────────────────────────────────
+
+  app.get("/api/classes/:classId/grading-settings", isAuthenticated, requireTeacher, async (req: any, res) => {
+    try {
+      const { classId } = req.params;
+      const [settings] = await db.select().from(classGradingSettings).where(eq(classGradingSettings.classId, classId));
+      res.json(settings || null);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch grading settings" });
+    }
+  });
+
+  app.put("/api/classes/:classId/grading-settings", isAuthenticated, requireTeacher, async (req: any, res) => {
+    try {
+      const userId = req.user?.claims?.sub;
+      const { classId } = req.params;
+      const parsed = insertClassGradingSettingsSchema.safeParse({ ...req.body, userId, classId });
+      if (!parsed.success) {
+        res.status(400).json({ error: "Invalid grading settings", details: parsed.error.issues });
+        return;
+      }
+      const [existing] = await db.select().from(classGradingSettings).where(eq(classGradingSettings.classId, classId));
+      if (existing) {
+        const [updated] = await db
+          .update(classGradingSettings)
+          .set({ ...parsed.data, updatedAt: new Date() })
+          .where(eq(classGradingSettings.classId, classId))
+          .returning();
+        res.json(updated);
+      } else {
+        const [created] = await db.insert(classGradingSettings).values(parsed.data).returning();
+        res.json(created);
+      }
+    } catch (error) {
+      res.status(500).json({ error: "Failed to save grading settings" });
+    }
+  });
+
+  // ── Enroll a student in a class with validation ────────────────────────────
 
   // Enroll a student in a class with validation
   app.post("/api/classes/:classId/enroll", isAuthenticated, requireTeacher, async (req: any, res) => {

@@ -1886,6 +1886,7 @@ export const assignments = pgTable("assignments", {
     standardsName?: string | null;
     lastVerifiedAt?: string | null;
   }[]>(),
+  gradeWeight: text("grade_weight").$type<"major" | "minor" | "other">(),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
@@ -1968,6 +1969,23 @@ export const gradingPeriods = pgTable("grading_periods", {
 export const insertGradingPeriodSchema = createInsertSchema(gradingPeriods).omit({ id: true, createdAt: true });
 export type InsertGradingPeriod = z.infer<typeof insertGradingPeriodSchema>;
 export type GradingPeriod = typeof gradingPeriods.$inferSelect;
+
+// Per-class grading system settings (international grading scale + category weights)
+export const classGradingSettings = pgTable("class_grading_settings", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull(),
+  classId: varchar("class_id").notNull().unique(),
+  gradingSystem: text("grading_system").notNull().default("af_us"),
+  majorWeight: integer("major_weight").notNull().default(50),
+  minorWeight: integer("minor_weight").notNull().default(35),
+  otherWeight: integer("other_weight").notNull().default(15),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertClassGradingSettingsSchema = createInsertSchema(classGradingSettings).omit({ id: true, createdAt: true, updatedAt: true });
+export type InsertClassGradingSettings = z.infer<typeof insertClassGradingSettingsSchema>;
+export type ClassGradingSettings = typeof classGradingSettings.$inferSelect;
 
 // ================================
 // Student Digital Portfolio System

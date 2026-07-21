@@ -221,6 +221,7 @@ export default function Assignments() {
   const [manualDescription, setManualDescription] = useState("");
   const [manualInstructions, setManualInstructions] = useState("");
   const [manualDueDate, setManualDueDate] = useState("");
+  const [manualGradeWeight, setManualGradeWeight] = useState<"" | "major" | "minor" | "other">("");
   const [manualClassId, setManualClassId] = useState("");
   const [manualStdCountry, setManualStdCountry] = useState("");
   const [manualStdState, setManualStdState] = useState("");
@@ -595,6 +596,7 @@ export default function Assignments() {
       assignmentType: "individual",
       status: "draft",
       standardsCodes: manualStdCodes.length > 0 ? manualStdCodes : undefined,
+      gradeWeight: manualGradeWeight || undefined,
     });
   };
 
@@ -1950,15 +1952,31 @@ export default function Assignments() {
                   />
                 </div>
 
-                <div className="space-y-2">
-                  <Label htmlFor="manual-due-date">Due Date (optional)</Label>
-                  <Input
-                    id="manual-due-date"
-                    type="date"
-                    value={manualDueDate}
-                    onChange={(e) => setManualDueDate(e.target.value)}
-                    data-testid="input-manual-due-date"
-                  />
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="manual-due-date">Due Date (optional)</Label>
+                    <Input
+                      id="manual-due-date"
+                      type="date"
+                      value={manualDueDate}
+                      onChange={(e) => setManualDueDate(e.target.value)}
+                      data-testid="input-manual-due-date"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="manual-grade-weight">Grade Weight (optional)</Label>
+                    <Select value={manualGradeWeight} onValueChange={(v) => setManualGradeWeight(v as "" | "major" | "minor" | "other")}>
+                      <SelectTrigger id="manual-grade-weight" data-testid="select-manual-grade-weight">
+                        <SelectValue placeholder="Select weight" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="major">Major (counts most)</SelectItem>
+                        <SelectItem value="minor">Minor (counts less)</SelectItem>
+                        <SelectItem value="other">Other / Daily</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <p className="text-xs text-muted-foreground">How much this grade counts toward the final average</p>
+                  </div>
                 </div>
 
                 <Separator />
