@@ -58,6 +58,9 @@ export function TurnstileWidget({ onToken, className }: TurnstileWidgetProps) {
       if (cancelled || !containerRef.current || !window.turnstile) return;
       widgetIdRef.current = window.turnstile.render(containerRef.current, {
         sitekey: SITE_KEY,
+        // Invisible unless Cloudflare needs the user to interact (rare).
+        // The token is still issued and verified server-side on every submit.
+        appearance: "interaction-only",
         callback: (token: string) => onToken(token),
         "expired-callback": () => onToken(""),
         "error-callback": () => onToken(""),
