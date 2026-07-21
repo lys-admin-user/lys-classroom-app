@@ -178,11 +178,15 @@ export default function LessonGenerator() {
     const state = params.get("state");
     const subject = params.get("subject");
     const code = params.get("code");
-    if (!country && !state && !subject && !code) return;
+    const topicParam = params.get("topic");
+    const gradeLevelParam = params.get("gradeLevel");
+    if (!country && !state && !subject && !code && !topicParam && !gradeLevelParam) return;
     if (country) setSelectedCountry(country);
     if (state) setSelectedState(state);
     if (subject) setSelectedSubject(subject);
     if (code) setPendingPreselectCode(code);
+    if (topicParam) setTopic(topicParam);
+    if (gradeLevelParam) setGradeLevel(gradeLevelParam);
     // URL wins over the educator-profile defaults below.
     setProfileApplied(true);
     setParamsApplied(true);

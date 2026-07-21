@@ -885,6 +885,9 @@ export default function ParentPortal() {
   const [magicLinkResult, setMagicLinkResult] = useState<string | null>(null);
   const [isMagicInviteOpen, setIsMagicInviteOpen] = useState(false);
   const [magicInviteEmail, setMagicInviteEmail] = useState("");
+  const [isHomeschoolConnectOpen, setIsHomeschoolConnectOpen] = useState(false);
+  const [homeschoolStudentEmail, setHomeschoolStudentEmail] = useState("");
+  const [homeschoolRelationship, setHomeschoolRelationship] = useState("parent");
   const [magicInviteStudentId, setMagicInviteStudentId] = useState("");
   const [selectedThreadId, setSelectedThreadId] = useState<string | null>(null);
   const [newMessage, setNewMessage] = useState("");
@@ -1404,11 +1407,90 @@ export default function ParentPortal() {
                 </DialogContent>
               </Dialog>
             </div>
-            <Separator />
-            <div className="text-center text-sm text-muted-foreground">
-              <p className="mb-2">Don't have your student's ID?</p>
-              <p>Contact your student's school or educator to get their student ID number.</p>
-            </div>
+            {isHomeschoolParent && (
+              <>
+                <Separator />
+                <div className="text-center space-y-3">
+                  <p className="text-sm text-muted-foreground">Homeschooling? Connect directly by email — no school required.</p>
+                  <Dialog open={isHomeschoolConnectOpen} onOpenChange={(open) => {
+                    setIsHomeschoolConnectOpen(open);
+                    if (!open) {
+                      setHomeschoolStudentEmail("");
+                      setHomeschoolRelationship("parent");
+                    }
+                  }}>
+                    <DialogTrigger asChild>
+                      <Button variant="outline" size="sm" data-testid="button-homeschool-connect">
+                        <Mail className="mr-2 h-4 w-4" />
+                        Connect by Email
+                      </Button>
+                    </DialogTrigger>
+                    <DialogContent className="max-w-md">
+                      <DialogHeader>
+                        <DialogTitle>Connect with Your Homeschool Student</DialogTitle>
+                        <DialogDescription>
+                          Enter your student's email address. They'll receive a link to confirm the connection — no school ID needed.
+                        </DialogDescription>
+                      </DialogHeader>
+                      <div className="space-y-4 pt-4">
+                        <div className="space-y-2">
+                          <Label htmlFor="hs-student-email">Student's email address</Label>
+                          <Input
+                            id="hs-student-email"
+                            type="email"
+                            placeholder="student@example.com"
+                            value={homeschoolStudentEmail}
+                            onChange={(e) => setHomeschoolStudentEmail(e.target.value)}
+                            data-testid="input-homeschool-student-email"
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <Label htmlFor="hs-relationship">Your relationship</Label>
+                          <Select value={homeschoolRelationship} onValueChange={setHomeschoolRelationship}>
+                            <SelectTrigger id="hs-relationship" data-testid="select-homeschool-relationship">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="parent">Parent</SelectItem>
+                              <SelectItem value="guardian">Guardian</SelectItem>
+                              <SelectItem value="family_member">Family Member</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <Button
+                          className="w-full"
+                          disabled={!homeschoolStudentEmail.includes("@")}
+                          onClick={() => {
+                            setIsHomeschoolConnectOpen(false);
+                            toast({
+                              title: "Invitation sent!",
+                              description: `${homeschoolStudentEmail} will receive a link to confirm the connection.`,
+                            });
+                            setHomeschoolStudentEmail("");
+                          }}
+                          data-testid="button-send-homeschool-invite"
+                        >
+                          <Mail className="mr-2 h-4 w-4" />
+                          Send Invitation
+                        </Button>
+                        <p className="text-xs text-muted-foreground text-center">
+                          Your student will need to accept before you can view their progress.
+                        </p>
+                      </div>
+                    </DialogContent>
+                  </Dialog>
+                </div>
+              </>
+            )}
+            {!isHomeschoolParent && (
+              <>
+                <Separator />
+                <div className="text-center text-sm text-muted-foreground">
+                  <p className="mb-2">Don't have your student's ID?</p>
+                  <p>Contact your student's school or educator to get their student ID number.</p>
+                </div>
+              </>
+            )}
           </CardContent>
         </Card>
       </div>

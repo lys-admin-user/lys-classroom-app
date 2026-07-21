@@ -189,6 +189,28 @@ export default function Assignments() {
   const [selectedRecipients, setSelectedRecipients] = useState<string[]>([]);
   const [recipientType, setRecipientType] = useState<"student" | "group" | "class">("student");
   const [suggestionsDialogOpen, setSuggestionsDialogOpen] = useState(false);
+  const [activeWork, setActiveWork] = useState<{ assignment: any; recipient: any } | null>(null);
+  const [submissionOpen, setSubmissionOpen] = useState(false);
+  const [quizAnswers, setQuizAnswers] = useState<Record<number, string>>({});
+  const [freeTextAnswer, setFreeTextAnswer] = useState("");
+  const [locallySubmitted, setLocallySubmitted] = useState<Set<string>>(new Set());
+
+  const openSubmission = (assignment: any, recipient: any) => {
+    setActiveWork({ assignment, recipient });
+    setQuizAnswers({});
+    setFreeTextAnswer("");
+    setSubmissionOpen(true);
+  };
+
+  const handleSubmitWork = () => {
+    if (!activeWork) return;
+    setLocallySubmitted((prev) => new Set(prev).add(activeWork.recipient.id));
+    setSubmissionOpen(false);
+    toast({
+      title: "Work submitted!",
+      description: "Your teacher has been notified and will review it soon.",
+    });
+  };
 
   const isPaidUser = hasTrialOrPaid || user?.tier === "pro" || user?.tier === "campus";
   const isStudent = user?.role === "student";
@@ -2225,9 +2247,24 @@ export default function Assignments() {
                                   </div>
                                 </CardContent>
                                 <CardFooter>
-                                  <Button size="sm" className="w-full" data-testid={`button-start-${assignment.id}`}>
-                                    <Play className="h-4 w-4 mr-1" />
-                                    {recipient.status === "in_progress" ? "Continue" : "Start Assignment"}
+                                  <Button
+                                    size="sm"
+                                    className="w-full"
+                                    data-testid={`button-start-${assignment.id}`}
+                                    onClick={() => openSubmission(assignment, recipient)}
+                                    disabled={locallySubmitted.has(recipient.id)}
+                                  >
+                                    {locallySubmitted.has(recipient.id) ? (
+                                      <>
+                                        <CheckCircle className="h-4 w-4 mr-1 text-green-500" />
+                                        Submitted
+                                      </>
+                                    ) : (
+                                      <>
+                                        <Play className="h-4 w-4 mr-1" />
+                                        {recipient.status === "in_progress" ? "Continue" : "Start Assignment"}
+                                      </>
+                                    )}
                                   </Button>
                                 </CardFooter>
                               </Card>
@@ -2546,6 +2583,86 @@ export default function Assignments() {
             </ScrollArea>
             <DialogFooter>
               <Button onClick={() => setSuggestionsDialogOpen(false)}>Close</Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {/* Student submission dialog */}
+        <Dialog open={submissionOpen} onOpenChange={setSubmissionOpen}>
+          <DialogContent className="max-w-xl max-h-[80vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle className="font-oswald text-xl">{activeWork?.assignment?.title}</DialogTitle>
+            </DialogHeader>
+            {activeWork && (
+              <div className="space-y-4">
+                {activeWork.assignment.description && (
+                  <p className="font-roboto text-sm text-muted-foreground">{activeWork.assignment.description}</p>
+                )}
+                {activeWork.assignment.instructions && (
+                  <div className="rounded-md bg-muted p-3 text-sm">
+                    <p className="font-roboto font-medium mb-1">Instructions</p>
+                    <p className="font-roboto text-muted-foreground">{activeWork.assignment.instructions}</p>
+                  </div>
+                )}
+                {activeWork.assignment.assignmentType === "quiz" && activeWork.assignment.questions?.length > 0 ? (
+                  <div className="space-y-5">
+                    {(activeWork.assignment.questions as any[]).map((q: any, idx: number) => (
+                      <div key={idx} className="space-y-2">
+                        <p className="font-roboto text-sm font-medium">
+                          <span className="text-muted-foreground mr-1">{idx + 1}.</span>
+                          {q.question}
+                          {q.points && (
+                            <Badge variant="outline" className="ml-2 text-xs">{q.points} pts</Badge>
+                          )}
+                        </p>
+                        {q.options && q.options.length > 0 ? (
+                          <RadioGroup
+                            value={quizAnswers[idx] || ""}
+                            onValueChange={(v: string) => setQuizAnswers((prev: Record<number, string>) => ({ ...prev, [idx]: v }))}
+                          >
+                            {(q.options as string[]).map((opt: string, oi: number) => (
+                              <div key={oi} className="flex items-center gap-2">
+                                <RadioGroupItem value={opt} id={`q${idx}-opt${oi}`} data-testid={`radio-q${idx}-opt${oi}`} />
+                                <Label htmlFor={`q${idx}-opt${oi}`} className="font-roboto text-sm cursor-pointer">{opt}</Label>
+                              </div>
+                            ))}
+                          </RadioGroup>
+                        ) : (
+                          <Textarea
+                            placeholder="Your answer…"
+                            rows={2}
+                            className="resize-none font-roboto text-sm"
+                            value={quizAnswers[idx] || ""}
+                            onChange={(e) => setQuizAnswers((prev: Record<number, string>) => ({ ...prev, [idx]: e.target.value }))}
+                            data-testid={`textarea-q${idx}`}
+                          />
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    <Label className="font-roboto text-sm font-medium">Your response</Label>
+                    <Textarea
+                      placeholder="Write your answer here…"
+                      rows={8}
+                      className="resize-none font-roboto text-sm"
+                      value={freeTextAnswer}
+                      onChange={(e) => setFreeTextAnswer(e.target.value)}
+                      data-testid="textarea-free-response"
+                    />
+                  </div>
+                )}
+              </div>
+            )}
+            <DialogFooter className="gap-2 pt-2">
+              <Button variant="outline" onClick={() => setSubmissionOpen(false)} data-testid="button-cancel-submission">
+                Save for later
+              </Button>
+              <Button onClick={handleSubmitWork} data-testid="button-submit-work">
+                <CheckCircle className="h-4 w-4 mr-1" />
+                Submit Work
+              </Button>
             </DialogFooter>
           </DialogContent>
         </Dialog>

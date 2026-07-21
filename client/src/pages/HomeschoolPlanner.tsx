@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useMutation } from "@tanstack/react-query";
+import { useLocation } from "wouter";
 import { apiRequest } from "@/lib/queryClient";
 import { US_GRADE_OPTIONS } from "@shared/gradeLevels";
 import { useAuth } from "@/hooks/use-auth";
@@ -27,6 +28,8 @@ import {
   Clock,
   CheckCircle2,
   CalendarDays,
+  BookOpen,
+  ArrowRight,
 } from "lucide-react";
 import type {
   GeneratedHomeschoolPlan,
@@ -56,7 +59,14 @@ interface HomeschoolForm {
   notes: string;
 }
 
-function DayCard({ day, index }: { day: HomeschoolDayPlan; index: number }) {
+interface DayCardProps {
+  day: HomeschoolDayPlan;
+  index: number;
+  gradeLevel: string;
+  onExpandActivity: (subject: string, focus: string, gradeLevel: string) => void;
+}
+
+function DayCard({ day, index, gradeLevel, onExpandActivity }: DayCardProps) {
   return (
     <Card data-testid={`card-day-${index}`}>
       <CardHeader className="pb-3">
@@ -100,6 +110,19 @@ function DayCard({ day, index }: { day: HomeschoolDayPlan; index: number }) {
                 <span className="font-semibold">Materials:</span> {act.materials.join(", ")}
               </p>
             )}
+            <div className="mt-3 flex justify-end">
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-7 gap-1 text-xs text-lys-teal hover:text-lys-teal hover:bg-lys-teal/10"
+                onClick={() => onExpandActivity(act.subject, act.focus || act.activity || "", gradeLevel)}
+                data-testid={`button-expand-lesson-${index}-${i}`}
+              >
+                <BookOpen className="h-3.5 w-3.5" />
+                Expand to Lesson Plan
+                <ArrowRight className="h-3 w-3" />
+              </Button>
+            </div>
           </div>
         ))}
       </CardContent>
@@ -110,6 +133,7 @@ function DayCard({ day, index }: { day: HomeschoolDayPlan; index: number }) {
 export default function HomeschoolPlanner() {
   const { isAuthenticated } = useAuth();
   const { toast } = useToast();
+  const [, setLocation] = useLocation();
 
   const [form, setForm] = useState<HomeschoolForm>({
     gradeLevel: "",
@@ -129,6 +153,14 @@ export default function HomeschoolPlanner() {
         ? f.subjects.filter((s) => s !== subject)
         : [...f.subjects, subject],
     }));
+  };
+
+  const handleExpandActivity = (subject: string, focus: string, gradeLevel: string) => {
+    const params = new URLSearchParams();
+    if (subject) params.set("subject", subject);
+    if (focus) params.set("topic", focus);
+    if (gradeLevel) params.set("gradeLevel", gradeLevel);
+    setLocation(`/lesson-generator?${params.toString()}`);
   };
 
   const generate = useMutation({
@@ -334,8 +366,17 @@ export default function HomeschoolPlanner() {
               </p>
             )}
           </div>
+          <p className="text-xs text-muted-foreground text-center font-roboto">
+            Tip: click <strong>Expand to Lesson Plan</strong> on any activity to build a full lesson from it.
+          </p>
           {result.days.map((day, i) => (
-            <DayCard key={day.id} day={day} index={i} />
+            <DayCard
+              key={day.id}
+              day={day}
+              index={i}
+              gradeLevel={form.gradeLevel}
+              onExpandActivity={handleExpandActivity}
+            />
           ))}
         </div>
       )}
