@@ -46,7 +46,9 @@ import {
   PinIcon,
   MessageCircle,
   Shield,
-  Moon
+  Moon,
+  Sparkles,
+  ChevronRight
 } from "lucide-react";
 import { Link } from "wouter";
 import type { Class, Student, InsertClass, InsertStudent, AccommodationType, Organization, OrgMembership, StudentNote, AttendanceRecord, StudentTransferRequest } from "@shared/schema";
@@ -275,6 +277,25 @@ export default function Classroom() {
     schoolYear: new Date().getFullYear().toString(),
     isActive: true
   });
+
+  const { data: educatorProfile } = useQuery<{ gradeLevels?: string[]; subjects?: string[] }>({
+    queryKey: ["/api/educator-profile"],
+    enabled: !!user,
+  });
+
+  const openCreateDialog = () => {
+    const firstGrade = (educatorProfile?.gradeLevels as string[] | undefined)?.[0] ?? "";
+    const firstSubject = (educatorProfile?.subjects as string[] | undefined)?.[0] ?? "";
+    setNewClass({
+      name: "",
+      subject: firstSubject,
+      gradeLevel: firstGrade,
+      period: "",
+      schoolYear: new Date().getFullYear().toString(),
+      isActive: true,
+    });
+    setIsCreateClassOpen(true);
+  };
 
   const [newStudent, setNewStudent] = useState<Partial<InsertStudent>>({
     firstName: "",
@@ -899,13 +920,13 @@ export default function Classroom() {
                 New Assignment
               </Button>
             </Link>
+            <Button className="bg-lys-teal hover:bg-lys-teal/90" data-testid="button-create-class" onClick={openCreateDialog}>
+              <Plus className="h-4 w-4 mr-2" />
+              New Class
+            </Button>
+
             <Dialog open={isCreateClassOpen} onOpenChange={setIsCreateClassOpen}>
-              <DialogTrigger asChild>
-                <Button className="bg-lys-teal hover:bg-lys-teal/90" data-testid="button-create-class">
-                  <Plus className="h-4 w-4 mr-2" />
-                  New Class
-                </Button>
-              </DialogTrigger>
+              <DialogTrigger asChild className="hidden" />
               <DialogContent>
                 <DialogHeader>
                   <DialogTitle>Create New Class</DialogTitle>
@@ -1034,17 +1055,45 @@ export default function Classroom() {
               <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
             </div>
           ) : classes.length === 0 ? (
-            <Card>
-              <CardContent className="py-12 text-center">
-                <BookOpen className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-                <p className="text-muted-foreground mb-2">No classes yet</p>
-                <p className="text-sm text-muted-foreground mb-4">
-                  Create your first class to start organizing students
-                </p>
-                <Button variant="outline" onClick={() => setIsCreateClassOpen(true)}>
-                  <Plus className="h-4 w-4 mr-2" />
-                  Create First Class
-                </Button>
+            <Card className="border-2 border-dashed border-lys-teal/30 bg-lys-teal/5">
+              <CardContent className="py-10 px-8">
+                <div className="flex flex-col sm:flex-row items-center gap-6">
+                  <div className="w-16 h-16 rounded-2xl bg-lys-teal/10 flex items-center justify-center flex-shrink-0">
+                    <Sparkles className="h-8 w-8 text-lys-teal" />
+                  </div>
+                  <div className="flex-1 text-center sm:text-left">
+                    <h3 className="text-lg font-semibold mb-1">Set up your first class</h3>
+                    <p className="text-sm text-muted-foreground mb-3">
+                      {educatorProfile?.subjects?.length || educatorProfile?.gradeLevels?.length
+                        ? "We've pre-filled what you told us during setup — just give your class a name."
+                        : "Create a class to start organizing your students and assignments."}
+                    </p>
+                    {(educatorProfile?.subjects?.length || educatorProfile?.gradeLevels?.length) && (
+                      <div className="flex flex-wrap gap-2 justify-center sm:justify-start mb-4">
+                        {educatorProfile?.gradeLevels?.[0] && (
+                          <Badge variant="secondary" className="text-xs">
+                            {educatorProfile.gradeLevels[0]}
+                          </Badge>
+                        )}
+                        {educatorProfile?.subjects?.[0] && (
+                          <Badge variant="secondary" className="text-xs">
+                            {educatorProfile.subjects[0]}
+                          </Badge>
+                        )}
+                        {((educatorProfile?.gradeLevels?.length ?? 0) + (educatorProfile?.subjects?.length ?? 0)) > 2 && (
+                          <Badge variant="outline" className="text-xs text-muted-foreground">
+                            + more from your profile
+                          </Badge>
+                        )}
+                      </div>
+                    )}
+                    <Button className="bg-lys-teal hover:bg-lys-teal/90" onClick={openCreateDialog} data-testid="button-first-class-nudge">
+                      <Plus className="h-4 w-4 mr-2" />
+                      Create First Class
+                      <ChevronRight className="h-4 w-4 ml-1" />
+                    </Button>
+                  </div>
+                </div>
               </CardContent>
             </Card>
           ) : (
