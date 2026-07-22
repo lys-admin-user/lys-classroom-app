@@ -1,0 +1,76 @@
+ Team Hub (internal HR & operations) This is for LYS Staff only
+Feature
+What it does
+Status
+Recommended Fixes
+Role directory
+38 internal job roles with KPIs and SOPs, editable by admins
+Working
+We need a way to add, delete, edit roles. 
+Auto suggest KPI’s, SOP’s, ect. Specific to the role
+
+
+Staff access gate
+Joining Team Hub requires admin approval (MFA-protected)
+Working
+This should not be seen by anyone until access is granted. So it may be once they signup, there can be a way that they get admins attention in the setting of their account
+Onboarding tasks
+Task checklists for new employees
+Working
+This should be more robust. When staff submit their answers, the system admin should be able to see them. So let’s improve the way staff fill these in.
+Quarterly OKRs module
+Company goal tracking
+Placeholder only — see gap #11
+
+
+Board and Calendar
+Company goal tracking
+
+
+Staff members should be able to add deadlines to their Google Calendar. 
+The staff calendar should have 3 views (my calendar, team calendar, all calendar)
+System Admin and Executive staff should be able to set calendars geographically for their teams. Ex: a Manager in Nigeria should be able to adjust their calendar to thier school year so that the team there has a different look than a team in germany or the US. 
+The calendars should be able to “sync” so that when a person in the hierarchy makes a change, it’s seen by everyone on that team.
+1. The Kanban Board (Your Digital Sticky-Note Board)
+A Kanban board is just a fancy name for a visual task tracker. Think of it like a board with columns, where you move sticky notes from left to right as you get stuff done.
+Here are the main parts:
+Lists (The Columns): These represent different stages of your project. A classic setup looks like this:
+To Do: Stuff you haven't started yet.
+Doing: Stuff you are working on right now.
+Done: Stuff you finished (the best column!).
+Cards (The Sticky Notes): Every task gets its own card. For example, if you're working on a science project, one card might say "Research volcano types" and another might say "Buy poster board."
+Drag-and-Drop: As soon as you start researching, you drag the "Research volcano types" card from To Do over to Doing. When you're finished, you slide it over to Done. It is super satisfying to move them!
+Cool Extras Inside Each Card:
+When you click on a card, it opens up like a mini notebook page where you can add:
+Checklists: Break a big task into smaller steps (like mini-quests).
+Color Labels: Tag cards with colors (e.g., Red for Urgent, Blue for Math, Green for English).
+Attachments: Drop in links, images, or documents you need for that task.
+Comments: Chat with classmates if you’re working on a group project together.
+2. The Calendar Feature (Your Time Machine)
+While the Kanban board shows what state your work is in, the Calendar View shows when things need to happen.
+If you give your cards due dates, you can flip a switch and turn your whole board into a monthly or weekly calendar.
+Here is what you can do with it:
+See All Your Deadlines at a Glance: Instead of columns, you see a regular monthly grid with your cards sitting on the exact days they are due.
+Drag-and-Drop Rescheduling: Just click the card on the calendar and drag it over to Friday. The due date updates automatically!
+Avoid Last-Minute Panic: By looking at the week ahead, you can quickly spot if you have three big things due on the same day, so you know to start earlier.
+When working in a group project or with a whole team can get a little chaotic. We need to avoid where one person did all the work while someone else forgot what they were supposed to do.
+
+1. Add a "Workload Meter" (Fair Work Sharing)
+The Problem: Right now, it’s easy for one person on the team to end up with 10 giant tasks assigned to them while someone else only has 1 tiny task.
+The Fix: A built-in workload tracker. It could show a little gauge next to each teammate's picture (Green = Good, Red = Overloaded!). That way, the team leader can instantly see who needs help and redistribute the work fairly before anyone burns out.
+2. Smart "Domino Effect" Dates (Task Dependencies)
+The Problem: In team projects, tasks often rely on each other. You can't edit a video until someone finishes filming it! If the filmer is late, the editor's deadline gets messed up, too.
+The Fix: Connect cards like falling dominoes. If the "Film Video" card gets delayed by 2 days, it should automatically move the "Edit Video" card back by 2 days, too. That way, nobody has to manually fix 20 different dates on the calendar.
+3. Built-In Stopwatches (Time Tracking)
+The Problem: Teams usually guess how long a task will take, and they are usually wrong. Right now, Trello doesn't show if a card took 15 minutes or 15 hours unless you add third-party apps.
+The Fix: Put a simple timer button directly on every card. Teammates could hit "Start" when they begin working and "Stop" when they take a break. This helps the team learn how long tasks actually take so they can plan better next time.
+4. An In-Board Team Chat (Fewer Apps to Check)
+The Problem: You can leave comments on individual cards, but if you just want to talk to your team in general (like "Hey guys, should we meet at lunch?"), you have to switch to Discord, text, or email.
+The Fix: Add a main chat tab right on the side of the board. Keeping all the general group talk in the exact same place where the work lives stops important news from getting lost.
+5. Automatic "Board Housekeeping" (Anti-Clutter)
+The Problem: When 5 or 10 people use the same board, it can quickly look like a messy bedroom. People forget to move finished cards, forget to add due dates, or leave old draft cards sitting around forever.
+The Fix: Smart cleanup rules built into the board. Trello could automatically warn someone if a card has been sitting in "Doing" for two weeks, or sweep old, finished cards into an archive box every Friday to keep the board sparkling clean.
+The Kanban and calendar should have executive summary features where a high level team leader can give the gist of a task for all to see and also how it ties to their OKR’s.
+
+
+
