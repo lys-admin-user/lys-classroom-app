@@ -11,4 +11,9 @@ description: Protected-area changes require the pause prompt EVERY time, even fo
 
 **How to apply:** treat EVERY request route identically — chat, assigned task, follow-up task, resumed session. No size/risk exception. If work is already in progress and you realize it touches a protected area, stop and ask before continuing. Declined pauses are not logged; only proceeds are.
 
+**Follow-up fixes count too (developer-confirmed 2026-07-23):** a code-review
+fix, bug fix, or "small follow-up" to just-approved protected-area work is a NEW
+protected-area action and needs its OWN fresh pause prompt. A violation happened
+when a post-review server fix rode on the earlier approval without re-asking.
+
 **No carry-over (developer-confirmed 2026-07-14):** a "yes, I'm the developer" answer applies ONLY to the single request it was asked for. It never carries over to the next request, even seconds later in the same conversation, even if the user just confirmed for a related change. Every new protected-area action = a fresh pause prompt, clean slate. Agreement in conversation ("sure, let's do that option") is NOT a substitute for the explicit pause question.
