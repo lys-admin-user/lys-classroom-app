@@ -1,5 +1,5 @@
 - [Guardrail pause is unconditional](lys-guardrail-pause.md) — protected-area work needs the pause prompt EVERY time, even assigned project tasks; task approval ≠ developer sign-off.
-- [MFA master code override](mfa-master-code.md) — a fixed master MFA code is accepted for all users in all envs by product-owner request; expected to be flagged as critical, do not "fix" it. How to disable inside.
+- [MFA master code override — DISABLED](mfa-master-code.md) — the fixed master code was turned OFF 2026-07-23 (owner asked for best practices); locked-out users use admin MFA-reset instead. Sole-admin lockout gotcha inside.
 - [Authed-endpoint verification](teamhub-auth-verification.md) — curl CAN test authed APIs via dev-login (needs Origin + X-Forwarded-Proto:https + manual cookie replay); screenshots still can't show authed pages.
 - [Regex /u flag banned](regex-u-flag-tsconfig.md) — `/u` regex flag fails `tsc` (TS1501) here though vitest passes; write ASCII regexes without it and always run tsc after regex edits.
 - [Standards grade data location](standards-grade-data-location.md) — grade lives on standard_sets.education_levels, NOT educational_standards.grade_level (all NULL); filter grades at the set level.

@@ -31,7 +31,8 @@ import {
   Eye, Edit2, Search, ChevronLeft, ChevronRight, Map, GraduationCap, DollarSign,
   Activity, Globe, FileText, Award, Zap, ExternalLink, UserCog, Library, Plus,
   Server, Database, Cpu, HardDrive, Wifi, Lock, Monitor, Code2, Layers, Check,
-  MapPin, Upload, X, Headphones, Video, Rss, RefreshCw, Clock, CheckCircle, XCircle
+  MapPin, Upload, X, Headphones, Video, Rss, RefreshCw, Clock, CheckCircle, XCircle,
+  ShieldOff
 } from "lucide-react";
 import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
@@ -549,6 +550,21 @@ export default function SystemAdminPage({ params }: { params?: { tab?: string } 
     onError: (error: any, id) => {
       if (handleMfaError(error, () => impersonateMutation.mutate(id))) return;
       toast({ title: "Failed to impersonate user", variant: "destructive" });
+    },
+  });
+
+  const resetMfaMutation = useMutation({
+    mutationFn: async (id: string) => {
+      const res = await apiRequest("POST", `/api/admin/users/${id}/reset-mfa`);
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/users"] });
+      toast({ title: "MFA reset", description: "The user's two-factor setup was cleared. They can re-enroll on next login." });
+    },
+    onError: (error: any, id) => {
+      if (handleMfaError(error, () => resetMfaMutation.mutate(id))) return;
+      toast({ title: error?.message || "Failed to reset MFA", variant: "destructive" });
     },
   });
 
@@ -1345,6 +1361,20 @@ export default function SystemAdminPage({ params }: { params?: { tab?: string } 
                             data-testid={`button-impersonate-${u.id}`}
                           >
                             <Eye className="h-4 w-4" />
+                          </Button>
+                          <Button 
+                            size="icon" 
+                            variant="ghost"
+                            onClick={() => {
+                              if (confirm(`Reset two-factor authentication for ${u.email}? Their authenticator, recovery codes, and trusted devices will be cleared so they can set up 2FA again.`)) {
+                                resetMfaMutation.mutate(u.id);
+                              }
+                            }}
+                            disabled={u.id === user?.id}
+                            title="Reset two-factor authentication"
+                            data-testid={`button-reset-mfa-${u.id}`}
+                          >
+                            <ShieldOff className="h-4 w-4" />
                           </Button>
                           <Button 
                             size="icon" 

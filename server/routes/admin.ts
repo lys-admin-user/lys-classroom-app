@@ -73,6 +73,8 @@ import { insertRssFeedSchema } from "@shared/schema";
 import { db } from "../db";
 import { logAuditEvent, getAuditLogs, getClientIP, verifyAuditChain } from "../services/auditLog";
 import { requireFreshMfa, checkFreshMfa } from "./mfa";
+import { invalidateRecoveryCodes } from "../services/recoveryCodeService";
+import { revokeAllTrustedDevices } from "../services/trustedDeviceService";
 import { filterChatMessage } from "../services/contentFilter";
 import { eq, desc, and, sql as drizzleSql, count, inArray, lte, gte } from "drizzle-orm";
 
@@ -2916,6 +2918,66 @@ export function registerAdminRoutes(app: Express): void {
       res.json({ success: true });
     } catch (error) {
       res.status(500).json({ error: "Failed to delete user" });
+    }
+  });
+
+
+  // Reset a user's MFA (site admin only, fresh MFA required). Support path for
+  // locked-out users: clears TOTP enrollment, revokes all trusted devices, and
+  // invalidates recovery codes so the user can re-enroll from scratch on next
+  // login. Cannot be used on your own account (use the normal disable flow).
+  app.post("/api/admin/users/:id/reset-mfa", isAuthenticated, isSiteAdmin, requireFreshMfa, async (req: any, res) => {
+    try {
+      const { id } = req.params;
+      const adminId = req.user?.claims?.sub;
+
+      if (id === adminId) {
+        res.status(400).json({ error: "Use your own security settings to manage your MFA." });
+        return;
+      }
+
+      const targetUser = await storage.getUser(id);
+      if (!targetUser) {
+        res.status(404).json({ error: "User not found" });
+        return;
+      }
+
+      // Privilege guard: an admin cannot reset MFA for a user with a role equal
+      // to or higher than their own (prevents lateral/upward account takeover).
+      const requester = adminId ? await storage.getUser(adminId) : undefined;
+      const requesterRole = requester?.role as any;
+      const targetRole = targetUser.role as any;
+      const outranksTarget =
+        !!requesterRole &&
+        (requesterRole === "system_admin" ||
+          (hasRolePrivilege(requesterRole, targetRole) && requesterRole !== targetRole));
+      if (!outranksTarget) {
+        res.status(403).json({ error: "Cannot reset MFA for a user with a role equal to or higher than your own." });
+        return;
+      }
+
+      await db.update(users)
+        .set({ mfaEnabled: false, mfaSecret: null, mfaActivatedAt: null, updatedAt: new Date() })
+        .where(eq(users.id, id));
+      const devicesRevoked = await revokeAllTrustedDevices(id);
+      const codesInvalidated = await invalidateRecoveryCodes(id);
+
+      await logAuditEvent({
+        userId: adminId,
+        action: "admin.user_mfa_reset",
+        category: "security",
+        severity: "warning",
+        resourceType: "user",
+        resourceId: id,
+        ipAddress: getClientIP(req),
+        userAgent: req.get("user-agent"),
+        details: { targetEmail: targetUser.email, devicesRevoked, codesInvalidated },
+      });
+
+      res.json({ success: true, devicesRevoked, codesInvalidated });
+    } catch (error) {
+      console.error("Failed to reset user MFA:", error);
+      res.status(500).json({ error: "Failed to reset user MFA" });
     }
   });
 

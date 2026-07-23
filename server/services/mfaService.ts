@@ -24,12 +24,12 @@ export function isDevBypassEnabled(): boolean {
 }
 
 // Master MFA code: a single fixed code accepted for EVERY user in EVERY
-// environment, by product-owner request ("default 123456 for all users until
-// told otherwise"). This is intentionally broader than the dev-only bypass
-// above. To turn it off and return to real per-user TOTP/email verification,
-// set MASTER_MFA_CODE_ENABLED to false (or delete this block + its call sites).
+// environment. DISABLED 2026-07-23 by product-owner request ("implement best
+// practices") — real per-user TOTP/email/recovery-code verification is now
+// required. Locked-out users are handled by the admin MFA-reset action
+// (POST /api/admin/users/:id/reset-mfa). Re-enable only on explicit request.
 export const MASTER_MFA_CODE = "123456";
-export const MASTER_MFA_CODE_ENABLED = true;
+export const MASTER_MFA_CODE_ENABLED = false;
 export function isMasterMfaCode(code: string): boolean {
   return MASTER_MFA_CODE_ENABLED && code.replace(/\s+/g, "") === MASTER_MFA_CODE;
 }

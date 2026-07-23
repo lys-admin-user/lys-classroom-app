@@ -71,10 +71,11 @@ describe("trusted device: pure helpers", () => {
   });
 });
 
-describe("master MFA code override (product-owner default)", () => {
-  it("accepts the fixed master code and rejects others", () => {
-    // The master override is intentionally enabled by product-owner request.
-    expect(isMasterMfaCode("123456")).toBe(true);
+describe("master MFA code override (disabled — best practices)", () => {
+  it("rejects the former master code now that the override is off", () => {
+    // Disabled 2026-07-23 by product-owner request ("implement best practices").
+    // Locked-out users are handled by the admin MFA-reset action instead.
+    expect(isMasterMfaCode("123456")).toBe(false);
     expect(isMasterMfaCode("000000")).toBe(false);
     expect(isMasterMfaCode("")).toBe(false);
   });

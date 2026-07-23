@@ -25,6 +25,14 @@ and where to look to undo it.
 
 ---
 
+## [2026-07-23] — MFA best practices: disable shared master code, add admin MFA-reset
+- **Requested by:** confirmed developer ("Yea, go ahead and proceed.")
+- **Request (their words):** "Ok. Let's implement best practices" (following discussion of the shared master 2FA code and locked-out users)
+- **Protected area(s):** auth (MFA) · server code
+- **What was changed:** server/services/mfaService.ts (MASTER_MFA_CODE_ENABLED → false), server/routes/admin.ts (new POST /api/admin/users/:id/reset-mfa — site admin + fresh MFA + role-outranking guard, clears enrollment, revokes trusted devices + recovery codes, audited as admin.user_mfa_reset), server/routes/mfa.ts (/api/mfa/disable now also accepts a FRESH step-up on the session — e.g. an email code — as a break-glass for users who lost both authenticator and recovery codes; factor recorded in audit), client/src/pages/SystemAdmin.tsx (Reset MFA shield button in Manage Users), server/__tests__/mfa-recovery-trusted.test.ts (updated expectations)
+- **Outcome:** COMPLETE — typecheck clean, 244/244 tests pass; curl verification confirmed the master code is rejected and the reset endpoint requires fresh MFA; architect review passed after break-glass fix
+- **Rollback:** checkpoint created after the work (see the checkpoint list in Replit)
+
 ## [2026-07-21] — Campus layer: grading systems, grade weight on assignments, student drill-down in gradebook
 - **Requested by:** confirmed developer ("Yes, proceed")
 - **Request (their words):** "Campus layer — Gradebook: click student name for individual view + teacher notes; grading scale selector (top 10 international); assignment grade type (major/minor/other) with customizable weights. Schema + server changes required."

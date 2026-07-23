@@ -460,13 +460,18 @@ export function registerMfaRoutes(app: Express): void {
       if (!user?.mfaEnabled || !user.mfaSecret) {
         return res.status(400).json({ error: "MFA is not enabled." });
       }
-      // Accept either a live TOTP code or a one-time recovery code so users
-      // who have lost access to their authenticator app can still disable MFA.
-      const totpOk = verifyTokenAgainstEncrypted(token, user.mfaSecret);
-      const recoveryOk = !totpOk && await verifyRecoveryCode(userId, token);
-      if (!totpOk && !recoveryOk) {
+      // Accept a live TOTP code, a one-time recovery code, or a FRESH step-up
+      // verification on this session (e.g. an email code verified moments ago).
+      // The fresh-session path is the break-glass for users who lost BOTH their
+      // authenticator and recovery codes: they can verify via email OTP and
+      // then disable here without needing an admin (or DB surgery).
+      const totpOk = !!token && verifyTokenAgainstEncrypted(token, user.mfaSecret);
+      const recoveryOk = !totpOk && !!token && await verifyRecoveryCode(userId, token);
+      const freshOk = !totpOk && !recoveryOk && isSessionFresh(req);
+      if (!totpOk && !recoveryOk && !freshOk) {
         return res.status(400).json({ error: "Invalid code. Please try again." });
       }
+      const factor = totpOk ? "totp" : recoveryOk ? "recovery_code" : "fresh_step_up";
       await db.update(users)
         .set({ mfaEnabled: false, mfaSecret: null, mfaActivatedAt: null, updatedAt: new Date() })
         .where(eq(users.id, userId));
@@ -486,7 +491,7 @@ export function registerMfaRoutes(app: Express): void {
         resourceId: userId,
         ipAddress: getClientIP(req),
         userAgent: req.get("user-agent"),
-        details: { devicesRevoked, codesInvalidated, factor: recoveryOk ? "recovery_code" : "totp" },
+        details: { devicesRevoked, codesInvalidated, factor },
       });
       res.json({ success: true });
     } catch (err) {
