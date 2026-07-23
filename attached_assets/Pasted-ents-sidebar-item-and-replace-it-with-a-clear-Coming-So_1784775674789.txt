@@ -1,0 +1,18 @@
+ents sidebar item and replace it with a clear "Coming Soon" state so teachers don't land on an empty page.
+Clarify how Assessments is meant to differ from Assignments (both seem to handle quizzes/rubrics) — there may be a product definition gap driving the tech gap.
+Definition of assessments: A formal or informal gathering of knowledge to show competence in a topic or lesson. 
+There seems to be confusion on the assessment for the teacher that is a Being, Knowing, Doing assessment. This is a professional assessment for the educator to determine their teaching style as it relates to being, knowing, doing and how that impacts how they teach the student. 
+
+VS 
+Assessment as a check-on-learning tool that an educator uses for a student. There should be a graded assessment, such as a rubric or a formal or informal evaluation similar to an assignment but not the same. At times, an educator may want to give an assessment as an exit ticket to check for understanding instead of or along with an assignment. So this assessment must align with the essential question of the lesson, but be flexible and light weight as not to “create learning”.
+
+If it is a student Assessment it can live in the assignments home as a drop-down for rubrics and formal evaluations, migrate the assessment_results schema rows already in the DB into a working UI.
+Remove redundant “Assessment” tab under Educator tools tab
+	
+
+4. Campus admin signup is a dead end — no path to get linked to a school
+When someone picks "School or district administrator" during signup, they're told to sign up as an educator and contact the LYS team. They then land in a full educator dashboard with zero indication of what to do next or how to escalate their account. There is no "Request Admin Access" button, no "Find My School" search, and no in-app way to get elevated.
+Recommendations:
+Add a post-onboarding "Request Campus Admin Access" card on the educator dashboard that appears when the user initially selected the admin path — it should let them enter their school name/district and submit a request that goes to site_admin for approval (similar to the Team Hub access request pattern that already exists in the platform).
+Allow campus admins to be invited by their district admin or site admin via a dedicated invite link that bypasses self-serve onboarding and pre-assigns their org and role.
+Add a visible "Your account is pending elevation" status message rather than silently dropping them into an educator dashboard with no context.
