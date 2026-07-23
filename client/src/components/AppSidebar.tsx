@@ -72,6 +72,9 @@ export interface NavItem {
 
 export interface NavGroup {
   label: string;
+  /** Alternative display label shown for non-student personas (D1). The `label`
+   *  is still used as the identifier for primaryGroups matching. */
+  altLabel?: string;
   items: NavItem[];
   minRole?: UserRole;
   exactRole?: UserRole;
@@ -95,6 +98,7 @@ export const navigationGroups: NavGroup[] = [
   },
   {
     label: "BE - Self Discovery",
+    altLabel: "Self Discovery",
     colorClass: "text-lys-red",
     studentFocused: true,
     items: [
@@ -107,6 +111,7 @@ export const navigationGroups: NavGroup[] = [
   },
   {
     label: "KNOW - Career Paths",
+    altLabel: "Career Resources",
     colorClass: "text-[hsl(45,93%,38%)]",
     studentFocused: true,
     items: [
@@ -118,6 +123,7 @@ export const navigationGroups: NavGroup[] = [
   },
   {
     label: "DO - Take Action",
+    altLabel: "Student Activities",
     colorClass: "text-lys-teal",
     studentFocused: true,
     items: [
@@ -154,6 +160,13 @@ export const navigationGroups: NavGroup[] = [
       { title: "Assessments", url: "/assessments", icon: FileText, requiresAuth: true },
       { title: "Gradebook", url: "/gradebook", icon: ClipboardList, requiresAuth: true },
       { title: "Collaboration", url: "/collaboration", icon: Share2, requiresAuth: true },
+    ],
+  },
+  {
+    label: "Educator Resources",
+    minRole: "educator",
+    icon: Folder,
+    items: [
       { title: "Community Library", url: "/resource-library", icon: Folder, requiresAuth: true },
       { title: "SIS Integration", url: "/sis-integration", icon: Link2, requiresAuth: true },
       { title: "Lesson Authoring", url: "/lesson-authoring", icon: PenTool, requiresAuth: true },
@@ -216,10 +229,17 @@ export const navigationGroups: NavGroup[] = [
     items: [
       { title: "System Dashboard", url: "/system-admin", icon: Settings, requiresAuth: true },
       { title: "Manage Users", url: "/system-admin/users", icon: Users, requiresAuth: true },
+      { title: "Signup Insights", url: "/admin/signup-insights", icon: BarChart3, requiresAuth: true },
+    ],
+  },
+  {
+    label: "Developer Tools",
+    minRole: "site_admin",
+    icon: Database,
+    items: [
       { title: "Standards Ingestion", url: "/admin/standards-ingestion", icon: BookOpen, requiresAuth: true },
       { title: "Standards Catalog", url: "/admin/standards", icon: Library, requiresAuth: true },
-      { title: "Signup Insights", url: "/admin/signup-insights", icon: BarChart3, requiresAuth: true },
-      { title: "Dev Docs", url: "/dev-docs", icon: FileText, requiresAuth: true, minRole: "site_admin" },
+      { title: "Dev Docs", url: "/dev-docs", icon: FileText, requiresAuth: true },
     ],
   },
 ];
@@ -302,6 +322,19 @@ export function AppSidebar() {
   const { viewAsStudent } = useViewAs();
   const { state, isMobile, setOpenMobile, setOpen } = useSidebar();
   const { pinned, togglePin, isPinned } = usePinnedNav(user?.email);
+
+  // D4: tracks which More-flyout groups are expanded beyond the preview limit.
+  const [expandedGroups, setExpandedGroups] = useState<globalThis.Set<string>>(
+    new globalThis.Set<string>(),
+  );
+  const toggleGroupExpand = (label: string) => {
+    setExpandedGroups((prev) => {
+      const next = new globalThis.Set(prev);
+      if (next.has(label)) next.delete(label);
+      else next.add(label);
+      return next;
+    });
+  };
 
   const actualRole = user?.role || "student";
   // When an educator+ turns on "student view", navigation is gated as if they
@@ -681,22 +714,53 @@ export function AppSidebar() {
 
             <div className="flex-1 overflow-y-auto px-3 py-3 flex flex-col gap-4">
               {activeCategory?.isMulti ? (
-                activeCategory.groups.map((group) => {
-                  const items = group.items.filter(shouldShowItem);
-                  if (!items.length) return null;
-                  return (
-                    <div key={group.label} className="flex flex-col gap-1">
-                      <h3
-                        className={`text-[10px] font-extrabold uppercase tracking-widest px-3 mb-1 ${
-                          group.colorClass ?? "text-slate-400"
-                        }`}
-                      >
-                        {group.label}
-                      </h3>
-                      {items.map(renderItem)}
-                    </div>
-                  );
-                })
+                <>
+                  {/* D2: first-time pin discovery hint — disappears once the user has any pin */}
+                  {isAuthenticated && visiblePinned.length === 0 && activeCategory.id === "more" && (
+                    <p className="flex items-center gap-1.5 text-[11px] text-slate-400 px-3 -mb-2">
+                      <Star className="w-3 h-3 shrink-0" />
+                      Hover any item, then click the star to pin it to your rail
+                    </p>
+                  )}
+                  {activeCategory.groups.map((group) => {
+                    const items = group.items.filter(shouldShowItem);
+                    if (!items.length) return null;
+                    const PREVIEW_LIMIT = 4;
+                    const isExpanded = expandedGroups.has(group.label);
+                    const visibleItems =
+                      items.length > PREVIEW_LIMIT && !isExpanded
+                        ? items.slice(0, PREVIEW_LIMIT)
+                        : items;
+                    // D1: use the human-friendly altLabel for non-student personas.
+                    const displayLabel =
+                      persona !== "student" && group.altLabel ? group.altLabel : group.label;
+                    return (
+                      <div key={group.label} className="flex flex-col gap-1">
+                        <h3
+                          className={`text-[10px] font-extrabold uppercase tracking-widest px-3 mb-1 ${
+                            group.colorClass ?? "text-slate-400"
+                          }`}
+                        >
+                          {displayLabel}
+                        </h3>
+                        {visibleItems.map(renderItem)}
+                        {/* D4: per-group expand toggle */}
+                        {items.length > PREVIEW_LIMIT && (
+                          <button
+                            type="button"
+                            onClick={() => toggleGroupExpand(group.label)}
+                            className="text-left text-[11px] text-slate-400 hover:text-persona px-3 py-0.5 transition-colors"
+                            data-testid={`group-expand-${group.label.toLowerCase().replace(/[^a-z0-9]+/g, "-")}`}
+                          >
+                            {isExpanded
+                              ? "Show less"
+                              : `${items.length - PREVIEW_LIMIT} more…`}
+                          </button>
+                        )}
+                      </div>
+                    );
+                  })}
+                </>
               ) : (
                 <div className="flex flex-col gap-1">
                   <h3 className="text-[10px] font-extrabold uppercase tracking-widest px-3 mb-1 text-slate-400">

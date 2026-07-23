@@ -89,7 +89,7 @@ export const PERSONA_CONFIGS: Record<Persona, PersonaConfig> = {
   homeschool: {
     id: "homeschool",
     label: "Homeschool Parent",
-    primaryGroups: ["Overview", "Homeschool Tools", "DO - Take Action"],
+    primaryGroups: ["Overview", "Homeschool Tools"],
   },
   educator: {
     id: "educator",

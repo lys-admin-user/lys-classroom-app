@@ -1,3 +1,4 @@
+import { useState, useEffect } from "react";
 import { Link } from "wouter";
 import { useAuth } from "@/hooks/use-auth";
 import { Card, CardContent } from "@/components/ui/card";
@@ -13,6 +14,8 @@ import {
   Users,
   ArrowRight,
   Briefcase,
+  CheckCircle2,
+  X,
   type LucideIcon,
 } from "lucide-react";
 import { homeConfigForRole } from "@/lib/personas";
@@ -27,44 +30,191 @@ import { useTeamHubAccess } from "@/hooks/useTeamHubAccess";
  * Presentation only — every link is still role-gated server-side.
  */
 
+// D3: "Getting Started" steps per role. Shown as a dismissible card on home.
+const GETTING_STARTED: Record<string, Array<{ label: string; href: string }>> = {
+  student: [
+    { label: "Discover yourself", href: "/self-discovery" },
+    { label: "Explore careers", href: "/careers" },
+    { label: "Set an action plan", href: "/action-plans" },
+  ],
+  homeschool_parent: [
+    { label: "Plan your first week", href: "/homeschool" },
+    { label: "Generate a lesson", href: "/lesson-generator" },
+    { label: "View your gradebook", href: "/gradebook" },
+  ],
+  educator: [
+    { label: "Generate your first lesson", href: "/lesson-generator" },
+    { label: "Set up your classroom", href: "/classroom" },
+    { label: "Explore standards", href: "/admin/standards" },
+  ],
+  campus_admin: [
+    { label: "Open campus admin", href: "/admin" },
+    { label: "Review standards", href: "/admin/standards" },
+    { label: "View analytics", href: "/analytics" },
+  ],
+  district_admin: [
+    { label: "Open district admin", href: "/district-admin" },
+    { label: "Manage campuses", href: "/district-admin/campuses" },
+    { label: "View analytics", href: "/analytics" },
+  ],
+  staff: [
+    { label: "Request Team Hub access", href: "/team" },
+    { label: "Browse role directory", href: "/team/roles" },
+    { label: "Check your onboarding", href: "/team/onboarding" },
+  ],
+  site_admin: [
+    { label: "Open system dashboard", href: "/system-admin" },
+    { label: "Review users", href: "/system-admin/users" },
+    { label: "Check standards ingestion", href: "/admin/standards-ingestion" },
+  ],
+  system_admin: [
+    { label: "Open system dashboard", href: "/system-admin" },
+    { label: "Review users", href: "/system-admin/users" },
+    { label: "Check standards ingestion", href: "/admin/standards-ingestion" },
+  ],
+};
+
+function useGettingStarted(role: string | undefined) {
+  const key = role ?? "guest";
+  const dismissKey = `lys:gs-dismissed:${key}`;
+  const visitedKey = `lys:gs-visited:${key}`;
+
+  const [dismissed, setDismissed] = useState(false);
+  const [visited, setVisited] = useState<string[]>([]);
+
+  useEffect(() => {
+    try {
+      setDismissed(localStorage.getItem(dismissKey) === "1");
+      const raw = localStorage.getItem(visitedKey);
+      setVisited(raw ? (JSON.parse(raw) as string[]) : []);
+    } catch {
+      /* ignore */
+    }
+  }, [dismissKey, visitedKey]);
+
+  const dismiss = () => {
+    setDismissed(true);
+    try {
+      localStorage.setItem(dismissKey, "1");
+    } catch {
+      /* ignore */
+    }
+  };
+
+  const markVisited = (href: string) => {
+    setVisited((prev) => {
+      if (prev.includes(href)) return prev;
+      const next = [...prev, href];
+      try {
+        localStorage.setItem(visitedKey, JSON.stringify(next));
+      } catch {
+        /* ignore */
+      }
+      return next;
+    });
+  };
+
+  return { dismissed, visited, dismiss, markVisited };
+}
+
+function GettingStartedCard({ role }: { role: string | undefined }) {
+  const steps = GETTING_STARTED[role ?? ""] ?? [];
+  const { dismissed, visited, dismiss, markVisited } = useGettingStarted(role);
+
+  if (!steps.length || dismissed) return null;
+  const allDone = steps.every((s) => visited.includes(s.href));
+  if (allDone) return null;
+
+  return (
+    <section
+      className="max-w-7xl mx-auto px-4 sm:px-6 pt-6"
+      data-testid="getting-started-card"
+    >
+      <div className="relative rounded-xl border border-persona/20 bg-persona/5 px-4 py-4">
+        <button
+          type="button"
+          onClick={dismiss}
+          className="absolute top-3 right-3 text-slate-400 hover:text-slate-600 transition-colors"
+          aria-label="Dismiss getting started"
+          data-testid="button-dismiss-getting-started"
+        >
+          <X className="h-4 w-4" />
+        </button>
+        <h3 className="font-oswald font-semibold text-sm uppercase tracking-wide text-persona mb-3">
+          Getting Started
+        </h3>
+        <div className="flex flex-wrap gap-2">
+          {steps.map((step) => {
+            const done = visited.includes(step.href);
+            return (
+              <Link
+                key={step.href}
+                href={step.href}
+                onClick={() => markVisited(step.href)}
+                data-testid={`gs-step${step.href.replace(/\//g, "-")}`}
+              >
+                <div
+                  className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-roboto border transition-all ${
+                    done
+                      ? "bg-persona/10 border-persona/20 text-persona"
+                      : "bg-white border-slate-200 text-slate-700 hover:border-persona/30 hover:shadow-sm"
+                  }`}
+                >
+                  <CheckCircle2
+                    className={`h-4 w-4 shrink-0 ${done ? "text-persona" : "text-slate-300"}`}
+                  />
+                  {step.label}
+                </div>
+              </Link>
+            );
+          })}
+        </div>
+      </div>
+    </section>
+  );
+}
+
 // Shared "welcome back" band with the persona's quick links. Used standalone
 // inside EducatorDashboard and as the top of each bespoke persona home.
 export function PersonaQuickStart({ role }: { role: string | undefined }) {
   const { greeting, subtitle, links } = homeConfigForRole(role);
 
   return (
-    <section
-      className="max-w-7xl mx-auto px-4 sm:px-6 pt-8"
-      data-testid="role-quick-start"
-    >
-      <div className="mb-4">
-        <h2
-          className="font-oswald text-2xl sm:text-3xl text-foreground"
-          data-testid="text-role-greeting"
-        >
-          {greeting}
-        </h2>
-        <p className="font-roboto text-muted-foreground">{subtitle}</p>
-      </div>
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
-        {links.map((link) => {
-          const Icon = link.icon;
-          return (
-            <Link key={link.href} href={link.href}>
-              <Card
-                className="hover-elevate active-elevate-2 cursor-pointer h-full"
-                data-testid={`quick-link-${link.href.replace(/\//g, "-")}`}
-              >
-                <CardContent className="flex flex-col items-center justify-center gap-2 p-4 text-center">
-                  <Icon className="h-6 w-6 text-persona" />
-                  <span className="font-oswald text-sm leading-tight">{link.label}</span>
-                </CardContent>
-              </Card>
-            </Link>
-          );
-        })}
-      </div>
-    </section>
+    <>
+      <GettingStartedCard role={role} />
+      <section
+        className="max-w-7xl mx-auto px-4 sm:px-6 pt-8"
+        data-testid="role-quick-start"
+      >
+        <div className="mb-4">
+          <h2
+            className="font-oswald text-2xl sm:text-3xl text-foreground"
+            data-testid="text-role-greeting"
+          >
+            {greeting}
+          </h2>
+          <p className="font-roboto text-muted-foreground">{subtitle}</p>
+        </div>
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+          {links.map((link) => {
+            const Icon = link.icon;
+            return (
+              <Link key={link.href} href={link.href}>
+                <Card
+                  className="hover-elevate active-elevate-2 cursor-pointer h-full"
+                  data-testid={`quick-link-${link.href.replace(/\//g, "-")}`}
+                >
+                  <CardContent className="flex flex-col items-center justify-center gap-2 p-4 text-center">
+                    <Icon className="h-6 w-6 text-persona" />
+                    <span className="font-oswald text-sm leading-tight">{link.label}</span>
+                  </CardContent>
+                </Card>
+              </Link>
+            );
+          })}
+        </div>
+      </section>
+    </>
   );
 }
 
